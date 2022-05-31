@@ -1,0 +1,76 @@
+syntax = "proto3";
+package fs2dev;
+
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestDevSize {
+};
+
+message RequestStartCopy {
+};
+
+message RequestWipe {
+};
+
+message RequestLoadBitVec {
+  bytes chunk = 1;
+  bool last = 2;
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestDevSize DevSize = 2;
+    RequestStartCopy StartCopy = 3;
+    RequestWipe wipe = 4;
+    RequestLoadBitVec LoadBitVec = 5;
+  }
+};
+
+
+
+/* Responses */
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseDevSize {
+  uint64 size = 1;
+};
+
+message ResponseStartCopy {
+};
+
+message ResponseWipe {
+};
+
+message ResponseCopyStatus {
+  uint64 current_size = 1;
+  uint64 total_size = 2;
+};
+
+message ResponseCopyStatusDone {
+};
+
+message ResponseLoadBitVec {
+};
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseError Error = 2;
+    ResponseCopyStatus CopyStatus = 3;
+    ResponseDevSize DevSize = 4;
+    ResponseStartCopy StartCopy = 5;
+    ResponseWipe Wipe = 6;
+    ResponseCopyStatusDone CopyStatusDone = 7;
+    ResponseLoadBitVec LoadBitVec = 8;
+  }
+};

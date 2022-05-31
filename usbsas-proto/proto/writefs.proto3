@@ -1,0 +1,109 @@
+syntax = "proto3";
+package writefs;
+import "common.proto3";
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestSetFsInfos {
+  uint64 dev_size = 2;
+  common.OutFsType fstype = 3;
+};
+
+message RequestNewFile {
+  string path = 1;
+  uint64 size = 2;
+  common.FileType ftype = 3;
+  int64 timestamp = 4;
+};
+
+message RequestWriteFile {
+  string path = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+};
+
+message RequestImgDisk {
+};
+
+message RequestWriteData {
+  bytes data = 1;
+};
+
+message RequestEndFile {
+  string path = 1;
+};
+
+
+message RequestClose {
+};
+
+message RequestBitVec {
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestSetFsInfos SetFsInfos = 2;
+    RequestNewFile NewFile = 3;
+    RequestWriteFile WriteFile = 4;
+    RequestEndFile EndFile = 5;
+    RequestClose Close = 6;
+    RequestBitVec BitVec = 7;
+    RequestImgDisk ImgDisk = 8;
+    RequestWriteData WriteData = 9;
+  }
+};
+
+/* Responses */
+
+message ResponseEnd {
+};
+
+message ResponseSetFsInfos {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseNewFile {
+};
+
+message ResponseWriteFile {
+};
+
+message ResponseEndFile {
+};
+
+message ResponseClose {
+};
+
+message ResponseBitVec {
+  bytes chunk = 1;
+  bool last = 2;
+};
+
+message ResponseImgDisk {
+};
+
+message ResponseWriteData {
+};
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseSetFsInfos SetFsInfos = 2;
+    ResponseError Error = 3;
+    ResponseNewFile NewFile = 4;
+    ResponseWriteFile WriteFile = 5;
+    ResponseEndFile EndFile = 6;
+    ResponseClose Close = 7;
+    ResponseBitVec BitVec = 8;
+    ResponseImgDisk ImgDisk = 9;
+    ResponseWriteData WriteData = 10;
+  }
+};
+

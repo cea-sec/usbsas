@@ -1,0 +1,35 @@
+[workspace]
+members = [
+  "ff",
+  "ntfs3g",
+  "usbsas-utils",
+  "usbsas-comm",
+  "usbsas-proto",
+  "usbsas-process",
+  "usbsas-privileges",
+  "usbsas-scsi",
+  "usbsas-mass-storage",
+  "usbsas-fsrw",
+  "usbsas-mock",
+  "usbsas-config",
+  "usbsas-analyzer-server",
+  "usbsas-cmdexec",
+  "usbsas-dev2scsi",
+  "usbsas-files2fs",
+  "usbsas-files2tar",
+  "usbsas-filter",
+  "usbsas-fs2dev",
+  "usbsas-identificator",
+  "usbsas-scsi2files",
+  "usbsas-tar2files",
+  "usbsas-net",
+  "usbsas-usbdev",
+  "usbsas-usbsas",
+  "usbsas-server",
+  "usbsas-hid",
+  "usbsas-tools"
+]
+
+[profile.release]
+overflow-checks = true
+strip = true

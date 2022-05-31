@@ -1,0 +1,483 @@
+@charset "UTF-8";
+@import url("Lato.css");
+* {
+  font-family: Lato;
+}
+
+.container {
+    max-width: None;
+}
+
+.content {
+  padding-top: 1rem;
+}
+
+.jumbotron {
+  background-color: #fff !important;
+}
+
+body {
+  color: #353535 !important;
+  background-color: #efefef !important;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+#main {
+  padding-top: 1rem;
+}
+
+.navbar.bg-dark {
+  background-color: #454545 !important;
+}
+
+.navbar.bg-light {
+  background-color: transparent !important;
+}
+
+.list-group-item.disabled {
+  background-color: #efefef !important;
+}
+
+#langsel {
+  background: #007bff;
+  border-radius: 5px;
+  border: 0px;
+}
+
+#langsel option {
+  background: white;
+}
+
+body[data-state="INIT"] #error {
+  display: flex !important;
+}
+
+body[data-state="WAIT_SOURCE"] #main {
+  background-color: transparent !important;
+}
+
+body[data-state="WAIT_SOURCE"] .jumbotron {
+  display: block !important;
+}
+
+#footer {
+  display: block !important;
+  margin-bottom: 1rem;
+  width: fit-content;
+}
+
+body[data-state="INIT"] #error::before {
+  content: "Attente de connexion ...";
+}
+
+body[data-state="WAIT_SOURCE"] #usb-arrow,
+body[data-state="WAIT_DESTINATION"] #usb-arrow,
+body[data-state="WAIT_IMAGE_KEY"] #usb-arrow,
+body[data-state="WAIT_WIPE_KEY"] #usb-arrow {
+  display: flex !important;
+}
+
+body[data-state="WAIT_DESTINATION"] #device-choice {
+  display: flex !important;
+}
+
+body[data-state="WAIT_SOURCE"] #tools-button,
+body[data-state="WAIT_SOURCE"] #doc-button {
+  display: flex !important;
+}
+
+body[data-state="TOOLS"] #tools {
+  display: block !important;
+}
+
+body[data-state="WAIT_WIPE_KEY"] #wait-key,
+body[data-state="WAIT_IMAGE_KEY"] #wait-key {
+  display: block !important;
+}
+
+body[data-state="WIPE_KEY"] #tool-page,
+body[data-state="IMAGE_KEY"] #tool-page {
+  display: block !important;
+}
+
+body[data-state="DOCUMENTATION"] #documentation {
+  display: block !important;
+}
+
+.navbar-brand {
+  font-size: 200%;
+}
+
+.fa-file, .fa-folder-open {
+  font-size: 130%;
+}
+
+#usb-arrow {
+  position: absolute;
+  bottom: 6vh;
+  left: 4vw;
+}
+
+body[data-state="WAIT_DESTINATION"] #usb-arrow {
+  top: 78%;
+}
+
+#usb-arrow i {
+  font-size: 6rem;
+  animation: bounce 1s ease infinite alternate;
+}
+
+#usb-arrow p {
+  width: 50%;
+  font-size: 2rem;
+  text-align: center;
+  margin-top: -10px;
+}
+
+#usb-arrow img {
+  height: 5rem;
+}
+
+body[data-state="WAIT_SOURCE"] #usb-arrow p strong {
+  color: #b70e0b;
+}
+
+body[data-state="WAIT_DESTINATION"] #usb-arrow p b {
+  color: #77b72b;
+}
+
+body[data-state="WAIT_DESTINATION"] #usb-arrow p strong {
+  color: #77b72b;
+}
+
+.button-bar {
+  margin-top: 1rem;
+}
+
+#device-out .list-group-item.disabled {
+  color: #333;
+  background-color: #eee !important;
+}
+
+.list-group-item.active {
+  background-color: #0d6582 !important;
+  border-color: #0d6582 !important;
+}
+
+@keyframes bounce {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-20px);
+  }
+}
+
+body[data-state="WAIT_ID"] #id-arrow {
+  display: flex !important;
+}
+
+body[data-state="COPY"] #copy,
+body[data-state="WAIT_REMOVAL"] #copy {
+  display: block !important;
+}
+
+body[data-state="WAIT_REMOVAL"] #removal {
+  display: block !important;
+}
+
+body[data-state="WAIT_REMOVAL_RESTART"] #removal {
+  display: block !important;
+  padding: 50px;
+}
+
+body[data-state="SELECT_PARTITION"] #partition-choice {
+  display: block !important;
+}
+
+body[data-state="SELECT_FILES"] #view-choice {
+  display: block !important;
+}
+
+body[data-state="SELECT_FILES"] #launch-button {
+  display: block !important;
+}
+
+body[data-state="WAIT_DESTINATION"] #next-button {
+  display: block !important;
+}
+
+body[data-state="COPY"] #id-num,
+body[data-state="WAIT_REMOVAL"] #id-num,
+body[data-state="WAIT_ID"] #id-num {
+  display: flex !important;
+}
+
+body[data-state="WAIT_DESTINATION"] #cancel-button,
+body[data-state="SELECT_PARTITION"] #cancel-button,
+body[data-state="SELECT_FILES"] #cancel-button,
+body[data-state="WAIT_ID"] #cancel-button,
+body[data-state="COPY"] #cancel-button,
+body[data-state="WAIT_WIPE_KEY"] #cancel-button,
+body[data-state="WAIT_WIPE_KEY"] #confirm-button,
+body[data-state="WIPE_KEY"] #cancel-button,
+body[data-state="WAIT_IMAGE_KEY"] #cancel-button,
+body[data-state="WAIT_IMAGE_KEY"] #confirm-button,
+body[data-state="IMAGE_KEY"] #cancel-button {
+  display: inline-block !important;
+}
+
+body[data-state="TOOLS"] #back-button,
+body[data-state="DOCUMENTATION"] #back-button {
+  display: inline-block !important;
+}
+
+#main {
+  background-color: #ffff;
+  padding: 12px 25px;
+  margin-top: 25px;
+}
+
+.jumbotron {
+  padding-bottom: 4px;
+  margin-top: 10px;
+  background-color: transparent !important;
+  padding: 2rem 2rem;
+}
+
+#id-arrow {
+  position: absolute;
+  top: 55%;
+  right: 1%;
+}
+
+#id-arrow i {
+  font-size: 6rem;
+  animation: bounce 1s ease infinite alternate;
+}
+
+#id-arrow span {
+  font-size: 6rem;
+  margin-right: 30px;
+}
+
+#id-num {
+  height: 300px;
+}
+
+#launch-button,
+#next-button,
+#confirm-button {
+  margin-left: 3rem;
+}
+
+#view-choice tr th:first-child i,
+#listing tr td:first-child i {
+  font-size: 140%;
+}
+
+#partition-view {
+  display: block;
+  overflow-y: auto;
+  max-height: 40vh;
+}
+
+#partition-view tbody {
+  cursor: pointer;
+}
+
+#path_explode {
+  font-size: 110%;
+}
+
+#path_explode li {
+  padding: 0px 3px;
+}
+
+div.progress {
+  height: 1.5rem;
+}
+
+#filetable thead,
+#filetable tbody,
+#filetable tr,
+#filetable td,
+#filetable th {
+  display: block;
+}
+
+#filetable tbody td,
+#filetable tbody th,
+#filetable thead > tr > th {
+  float: left;
+  position: relative;
+}
+
+#filetable thead {
+  flex-shrink: 0;
+}
+
+#filetable tfoot {
+  flex-shrink: 0;
+}
+
+#filetable tbody > tr::after {
+  content: " ";
+  display: block;
+  visibility: hidden;
+  clear: both;
+}
+
+#filetable tbody {
+  overflow-y: auto;
+  max-height: 40vh;
+}
+
+#view-clean {
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
+#documentation {
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+#schema {
+  width: 800px;
+  height: 450px;
+  position: relative;
+  /*
+  background-color:white;
+  border:2px solid blue;
+ */
+}
+
+#statustable {
+  overflow-y: auto;
+  max-height: 40vh;
+  display: block;
+}
+
+#schema img,
+#schema i {
+  position: absolute;
+}
+
+#schema #s_arrows {
+  left: 220px;
+  top: 50px;
+}
+
+#schema #s_firewall {
+    position:absolute;
+    left: 300px;
+    top: 180px;
+}
+
+#schema #s_source {
+  left: 80px;
+  top: 130px;
+}
+
+#schema #s_destination {
+  left: 560px;
+  top: 10px;
+}
+
+#schema #s_network {
+  font-size: 7rem;
+  left: 560px;
+  top: 290px;
+}
+
+#schema #s_file {
+  font-size: 2rem;
+  color: #1613aa;
+  left: 150px;
+  top: 190px;
+  opacity: 0.01;
+}
+
+#schema.anim_usb #s_file:first-child {
+  animation: file_pass 5s infinite;
+}
+
+#schema #s_file_filtered {
+  font-size: 2rem;
+  color: #df1414;
+  top: 190px;
+  left: 125px;
+  opacity: 1;
+}
+
+#schema.anim_usb #s_file_filtered {
+  animation: file_filtered 5s infinite;
+}
+
+#schema #s_file_filtered i:last-child {
+  font-size: 1rem;
+  top: 10px;
+  left: 3px;
+}
+
+@keyframes file_filtered {
+  from {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(180px);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(180px);
+    opacity: 0;
+  }
+}
+
+@keyframes file_pass {
+  from {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(180px);
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(260px);
+    opacity: 0;
+  }
+}
+
+.fadeout {
+  transition: opacity 100ms;
+}
+
+.fadein100 {
+  transition: opacity 100ms;
+}
+
+.fadein500 {
+  transition: opacity 500ms;
+}
+
+.hide {
+  opacity: 0;
+}
+
+#footer #sasver {
+  font-size: 0.7em;
+}
+
+tr.infos {
+  background-color: #42eff5;
+  margin-bottom: 0px;
+}
+
+table.td {
+  padding: 0px;
+}

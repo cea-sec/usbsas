@@ -1,0 +1,114 @@
+syntax = "proto3";
+package files;
+import "common.proto3";
+
+/*
+fuse_operations:
+ - getattr
+ - readdir
+ - read
+*/
+
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestOpenDevice {
+  uint32 busnum = 1;
+  uint32 devnum = 2;
+};
+
+message RequestPartitions {
+};
+
+message RequestOpenPartition {
+  uint32 index = 1;
+};
+
+message RequestGetAttr {
+  string path = 1;
+};
+
+message RequestReadDir {
+  string path = 1;
+};
+
+message RequestReadFile {
+  string path = 1;
+  uint64 size = 2;
+  uint64 offset = 3;
+};
+
+message RequestReadSectors {
+  uint64 offset = 1;
+  uint64 count = 2;
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestOpenDevice OpenDevice = 2;
+    RequestPartitions Partitions = 3;
+    RequestOpenPartition OpenPartition = 4;
+    RequestGetAttr GetAttr = 5;
+    RequestReadDir ReadDir = 6;
+    RequestReadFile ReadFile = 7;
+    RequestReadSectors ReadSectors = 8;
+  }
+};
+
+
+/* Responses */
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+
+message ResponseOpenDevice {
+  uint64 block_size = 1;
+  uint64 dev_size = 2;
+};
+
+message ResponseOpenPartition {
+};
+
+message ResponsePartitions {
+  repeated common.PartitionInfo partitions = 2;
+};
+
+message ResponseGetAttr {
+  common.FileType ftype = 1;
+  uint64 size = 2;
+  int64 timestamp = 3;
+};
+
+message ResponseReadDir {
+  repeated common.FileInfo filesinfo = 1;
+};
+
+message ResponseReadFile {
+  bytes data = 1;
+};
+
+message ResponseReadSectors {
+  bytes data = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseError Error = 2;
+    ResponseOpenDevice OpenDevice = 3;
+    ResponseOpenPartition OpenPartition = 4;
+    ResponsePartitions Partitions = 5;
+    ResponseGetAttr GetAttr = 6;
+    ResponseReadDir ReadDir = 7;
+    ResponseReadFile ReadFile = 8;
+    ResponseReadSectors ReadSectors = 9;
+  }
+};

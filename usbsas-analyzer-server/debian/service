@@ -1,0 +1,11 @@
+[Unit]
+Description=usbsas analyzer server
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/usbsas-analyzer-server
+Environment="RUST_LOG=info"
+User=usbsas
+
+[Install]
+WantedBy=multi-user.target

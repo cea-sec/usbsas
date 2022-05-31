@@ -1,0 +1,18 @@
+#! /bin/sh
+set -e
+
+# Create usbsas user and reload udev rules
+
+if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
+  if [ -z "$(id -u usbsas 2>/dev/null)" ]; then
+    echo "adding usbsas user"
+    adduser --system  --home /var/lib/misc --gecos "usbsas" \
+            --no-create-home --disabled-password \
+            --quiet usbsas
+
+    echo "reloading udev rules"
+    udevadm control --reload-rules
+  fi
+fi
+
+#DEBHELPER#

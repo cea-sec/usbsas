@@ -1,0 +1,62 @@
+out_directory = "/tmp/"
+
+[network]
+description = "Network"
+longdescr = "Send files on a remote server"
+url = "http://127.0.0.1:8042/api/uploadbundle"
+
+[analyzer]
+url = "http://127.0.0.1:8042/api/scanbundle"
+referer = "http://127.0.0.1"
+
+[[filters]]
+contain = ["__macosx"]
+
+[[filters]]
+contain = [".ds_store"]
+
+[[filters]]
+contain = [".lnk."]
+
+[[filters]]
+contain = [".lnk/"]
+
+[[filters]]
+end = ".lnk"
+
+[[filters]]
+contain = ["autorun.inf"]
+
+[[filters]]
+contain = ["thumbs.db"]
+
+[[filters]]
+contain = ["desktop.ini"]
+
+[[filters]]
+end = "/$recycle.bin"
+
+[[filters]]
+contain = ["/$recycle.bin/"]
+
+[[filters]]
+end = "/recycler"
+
+[[filters]]
+contain = ["/recycler/"]
+
+[[filters]]
+end = "/recycled"
+
+[[filters]]
+contain = ["/recycled/"]
+
+[[filters]]
+contain = ["/."]
+
+[[filters]]
+contain = ["𝄞"]
+
+[[filters]]
+contain = ["test"]
+end = "é"

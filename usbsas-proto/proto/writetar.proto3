@@ -1,0 +1,80 @@
+syntax = "proto3";
+package writetar;
+import "common.proto3";
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestNewFile {
+  string path = 1;
+  uint64 size = 2;
+  common.FileType ftype = 3;
+  int64 timestamp = 4;
+};
+
+message RequestWriteFile {
+  string path = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+};
+
+message RequestEndFile {
+  string path = 1;
+};
+
+
+message RequestClose {
+  string id = 1;
+  uint32 vendorid = 2;
+  uint32 productid = 3;
+  string manufacturer = 4;
+  string serial = 5;
+  string description = 6;
+
+};
+
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestNewFile NewFile = 2;
+    RequestWriteFile WriteFile = 3;
+    RequestEndFile EndFile = 4;
+    RequestClose Close = 5;
+  }
+};
+
+/* Responses */
+
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseNewFile {
+};
+
+message ResponseWriteFile {
+};
+
+message ResponseEndFile {
+};
+
+message ResponseClose {
+};
+
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseError Error = 2;
+    ResponseNewFile NewFile = 3;
+    ResponseWriteFile WriteFile = 4;
+    ResponseEndFile EndFile = 5;
+    ResponseClose Close = 6;
+  }
+};

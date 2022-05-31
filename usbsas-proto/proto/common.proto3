@@ -1,0 +1,46 @@
+syntax = "proto3";
+package common;
+
+enum FileType {
+  OTHER = 0;
+  REGULAR = 1;
+  DIRECTORY = 2;
+};
+
+enum OutFileType {
+  TAR = 0;
+  FS = 1;
+};
+
+enum OutFsType {
+  NTFS = 0;
+  FAT = 1;
+  EXFAT = 2;
+};
+
+message FileInfo {
+  string path = 1;
+  FileType ftype = 2;
+  uint64 size = 3;
+  int64 timestamp = 4;
+};
+
+message Device {
+  uint32 busnum = 1;
+  uint32 devnum = 2;
+  uint32 vendorid = 3;
+  uint32 productid = 4;
+  string manufacturer = 5;
+  string description = 6;
+  string serial = 7;
+  bool is_src = 8;
+  bool is_dst = 9;
+};
+
+message PartitionInfo {
+  uint64 size = 1;
+  uint64 start = 2;
+  uint32 ptype = 3;
+  string name_str = 4;
+  string type_str = 5;
+}

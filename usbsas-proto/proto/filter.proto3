@@ -1,0 +1,46 @@
+syntax = "proto3";
+package filter;
+
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestFilterPaths {
+  repeated string path = 1;
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestFilterPaths FilterPaths = 2;
+  }
+};
+
+/* Responses */
+
+enum FilterResult {
+  PATH_OK = 0;
+  PATH_FILTERED = 1;
+  PATH_ERROR = 2;
+};
+
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseFilterPaths {
+  repeated FilterResult results = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseError Error = 2;
+    ResponseFilterPaths FilterPaths = 3;
+  }
+};

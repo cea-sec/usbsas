@@ -1,0 +1,14 @@
+#! /bin/sh
+set -e
+
+# Delete usbsas user and reload udev rules
+
+if [ purge = "$1" ]; then
+  echo "deleting usbsas user"
+  deluser --quiet --system usbsas >/dev/null || true
+
+  echo "reloading udev rules"
+  udevadm control --reload-rules
+fi
+
+#DEBHELPER#

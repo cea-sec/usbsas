@@ -1,0 +1,209 @@
+syntax = "proto3";
+package usbsas;
+import public "common.proto3";
+
+/*
+operations:
+ - get id
+ - list/select device
+ - list/select partitions
+ - getattr
+ - readdir
+ - copy
+*/
+
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestId {
+};
+
+message RequestDevices {
+};
+
+message RequestPartitions {
+};
+
+message RequestOpenPartition {
+  uint32 index = 1;
+};
+
+message RequestOpenDevice {
+  common.Device device = 1;
+};
+
+message RequestGetAttr {
+  string path = 1;
+};
+
+message RequestReadDir {
+  string path = 1;
+};
+
+message DestUSB {
+  uint32 busnum = 1;
+  uint32 devnum = 2;
+  common.OutFsType fstype = 3;
+};
+
+message DestNet {
+};
+
+message DestCmd {
+};
+
+message RequestPostCopyCmd {
+  common.OutFileType outfiletype = 1;
+};
+
+message RequestCopyStart {
+  oneof destination {
+    DestUSB usb = 1;
+    DestNet net = 2;
+    DestCmd cmd = 3;
+  };
+  repeated string selected = 4;
+};
+
+message RequestWipe {
+  uint32 busnum = 1;
+  uint32 devnum = 2;
+  common.OutFsType fstype = 3;
+  bool quick = 4;
+};
+
+message RequestImgDisk {
+  common.Device device = 1;
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestId Id = 2;
+    RequestDevices Devices = 3;
+    RequestOpenDevice OpenDevice = 4;
+    RequestPartitions Partitions = 5;
+    RequestOpenPartition OpenPartition = 6;
+    RequestGetAttr GetAttr = 7;
+    RequestReadDir ReadDir = 8;
+    RequestCopyStart CopyStart = 9;
+    RequestWipe Wipe = 10;
+    RequestPostCopyCmd PostCopyCmd = 11;
+    RequestImgDisk ImgDisk = 12;
+  }
+};
+
+
+
+/* Responses */
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseId {
+  string id = 1;
+};
+
+message ResponseDevices {
+  repeated common.Device devices = 1;
+};
+
+message ResponseOpenDevice {
+  uint64 sector_size = 1;
+  uint64 dev_size = 2;
+};
+
+message ResponseOpenPartition {
+};
+
+message ResponsePartitions {
+  repeated common.PartitionInfo partitions = 1;
+};
+
+message ResponseGetAttr {
+  common.FileType ftype = 1;
+  uint64 size = 2;
+  int64 timestamp = 3;
+};
+
+message ResponseReadDir {
+  repeated common.FileInfo filesinfo = 1;
+};
+
+message ResponseCopyStart {
+  uint64 total_files_size = 1;
+};
+
+message ResponseCopyDone {
+  repeated string error_path = 1;
+  repeated string filtered_path = 2;
+  repeated string dirty_path = 3;
+};
+
+message ResponseCopyStatus {
+  uint64 current_size = 1;
+};
+
+message ResponseCopyStatusDone {
+};
+
+message ResponseAnalyzeStatus {
+  uint64 current_size = 1;
+  uint64 total_size = 2;
+};
+
+message ResponseAnalyzeDone {
+};
+
+message ResponseFinalCopyStatus {
+  uint64 current_size = 1;
+  uint64 total_size = 2;
+};
+
+message ResponseFinalCopyStatusDone {
+};
+
+message ResponseNotEnoughSpace {
+  uint64 max_size = 1;
+}
+
+message ResponseWipe {
+};
+
+message ResponseImgDisk {
+};
+
+message ResponsePostCopyCmd {
+};
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseError Error = 2;
+    ResponseId Id = 3;
+    ResponseDevices Devices = 4;
+    ResponseOpenDevice OpenDevice = 5;
+    ResponseOpenPartition OpenPartition = 6;
+    ResponsePartitions Partitions = 7;
+    ResponseGetAttr GetAttr = 8;
+    ResponseReadDir ReadDir = 9;
+    ResponseCopyStart CopyStart = 10;
+    ResponseCopyStatus CopyStatus = 11;
+    ResponseFinalCopyStatus FinalCopyStatus = 12;
+    ResponseNotEnoughSpace NotEnoughSpace = 13;
+    ResponseWipe Wipe = 14;
+    ResponsePostCopyCmd PostCopyCmd = 15;
+    ResponseAnalyzeStatus AnalyzeStatus = 16;
+    ResponseAnalyzeDone AnalyzeDone = 17;
+    ResponseCopyStatusDone CopyStatusDone = 18;
+    ResponseFinalCopyStatusDone FinalCopyStatusDone = 19;
+    ResponseImgDisk ImgDisk = 20;
+    ResponseCopyDone CopyDone = 21;
+  }
+};

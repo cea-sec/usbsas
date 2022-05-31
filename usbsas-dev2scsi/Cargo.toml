@@ -1,0 +1,22 @@
+[package]
+name = "usbsas-dev2scsi"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+bootsector = "0.1.6"
+byteorder = "1.4.3"
+env_logger = "0.9.0"
+log = "0.4.17"
+rusb = "0.9.1"
+thiserror = "1.0.31"
+usbsas-comm = { path = "../usbsas-comm" }
+usbsas-mass-storage = { path = "../usbsas-mass-storage" }
+usbsas-mock = { path = "../usbsas-mock", optional = true }
+usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-process = { path = "../usbsas-process" }
+usbsas-proto = { path = "../usbsas-proto" }
+
+[features]
+mock = ["usbsas-mock"]

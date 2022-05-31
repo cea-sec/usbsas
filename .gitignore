@@ -1,0 +1,38 @@
+### rust
+# build directories
+target
+
+# cargo lock files
+*.lock
+
+*.bk
+
+### c
+# object files
+*.o
+
+# generated file
+**/binaries_path.txt
+
+### protobuf
+# generated python
+proto3_pb2.py
+# generated c header
+*.proto3.pb-c.h
+
+### python
+*.pyc
+
+### latex
+*.aux
+*.dvi
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.pdf
+*.snm
+*.toc
+*.vrb
+*.xdv

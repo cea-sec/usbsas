@@ -1,0 +1,507 @@
+From dc43a4ae12d6e891c4693b68f3941529f9bdf661 Mon Sep 17 00:00:00 2001
+Date: Thu, 17 Feb 2022 15:16:10 +0100
+Subject: [PATCH] Modifications for usbsas
+
+---
+ diskio.c   | 162 ++++-------------------------------------------------
+ diskio.h   |  18 +++---
+ ff.c       |  26 ++++-----
+ ff.h       |   7 ++-
+ ffconf.h   |  18 +++---
+ ffsystem.c |   1 +
+ 6 files changed, 47 insertions(+), 185 deletions(-)
+
+diff --git a/diskio.c b/diskio.c
+index 179e387..fc33731 100644
+--- a/diskio.c
++++ b/diskio.c
+@@ -10,46 +10,16 @@
+ #include "ff.h"			/* Obtains integer types */
+ #include "diskio.h"		/* Declarations of disk functions */
+ 
+-/* Definitions of physical drive number for each drive */
+-#define DEV_RAM		0	/* Example: Map Ramdisk to physical drive 0 */
+-#define DEV_MMC		1	/* Example: Map MMC/SD card to physical drive 1 */
+-#define DEV_USB		2	/* Example: Map USB MSD to physical drive 2 */
+-
+ 
+ /*-----------------------------------------------------------------------*/
+ /* Get Drive Status                                                      */
+ /*-----------------------------------------------------------------------*/
+ 
+ DSTATUS disk_status (
+-	BYTE pdrv		/* Physical drive nmuber to identify the drive */
++	void* pdrv		/* Physical drive nmuber to identify the drive */
+ )
+ {
+-	DSTATUS stat;
+-	int result;
+-
+-	switch (pdrv) {
+-	case DEV_RAM :
+-		result = RAM_disk_status();
+-
+-		// translate the reslut code here
+-
+-		return stat;
+-
+-	case DEV_MMC :
+-		result = MMC_disk_status();
+-
+-		// translate the reslut code here
+-
+-		return stat;
+-
+-	case DEV_USB :
+-		result = USB_disk_status();
+-
+-		// translate the reslut code here
+-
+-		return stat;
+-	}
+-	return STA_NOINIT;
++	return ff_disk_status(pdrv);
+ }
+ 
+ 
+@@ -59,35 +29,10 @@ DSTATUS disk_status (
+ /*-----------------------------------------------------------------------*/
+ 
+ DSTATUS disk_initialize (
+-	BYTE pdrv				/* Physical drive nmuber to identify the drive */
++	void* pdrv				/* Physical drive nmuber to identify the drive */
+ )
+ {
+-	DSTATUS stat;
+-	int result;
+-
+-	switch (pdrv) {
+-	case DEV_RAM :
+-		result = RAM_disk_initialize();
+-
+-		// translate the reslut code here
+-
+-		return stat;
+-
+-	case DEV_MMC :
+-		result = MMC_disk_initialize();
+-
+-		// translate the reslut code here
+-
+-		return stat;
+-
+-	case DEV_USB :
+-		result = USB_disk_initialize();
+-
+-		// translate the reslut code here
+-
+-		return stat;
+-	}
+-	return STA_NOINIT;
++	return ff_disk_initialize(pdrv);
+ }
+ 
+ 
+@@ -97,45 +42,13 @@ DSTATUS disk_initialize (
+ /*-----------------------------------------------------------------------*/
+ 
+ DRESULT disk_read (
+-	BYTE pdrv,		/* Physical drive nmuber to identify the drive */
++	void* pdrv,		/* Physical drive nmuber to identify the drive */
+ 	BYTE *buff,		/* Data buffer to store read data */
+ 	LBA_t sector,	/* Start sector in LBA */
+ 	UINT count		/* Number of sectors to read */
+ )
+ {
+-	DRESULT res;
+-	int result;
+-
+-	switch (pdrv) {
+-	case DEV_RAM :
+-		// translate the arguments here
+-
+-		result = RAM_disk_read(buff, sector, count);
+-
+-		// translate the reslut code here
+-
+-		return res;
+-
+-	case DEV_MMC :
+-		// translate the arguments here
+-
+-		result = MMC_disk_read(buff, sector, count);
+-
+-		// translate the reslut code here
+-
+-		return res;
+-
+-	case DEV_USB :
+-		// translate the arguments here
+-
+-		result = USB_disk_read(buff, sector, count);
+-
+-		// translate the reslut code here
+-
+-		return res;
+-	}
+-
+-	return RES_PARERR;
++	return ff_disk_read(pdrv, buff, sector, count);
+ }
+ 
+ 
+@@ -147,45 +60,13 @@ DRESULT disk_read (
+ #if FF_FS_READONLY == 0
+ 
+ DRESULT disk_write (
+-	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
++	void* pdrv,			/* Physical drive nmuber to identify the drive */
+ 	const BYTE *buff,	/* Data to be written */
+ 	LBA_t sector,		/* Start sector in LBA */
+ 	UINT count			/* Number of sectors to write */
+ )
+ {
+-	DRESULT res;
+-	int result;
+-
+-	switch (pdrv) {
+-	case DEV_RAM :
+-		// translate the arguments here
+-
+-		result = RAM_disk_write(buff, sector, count);
+-
+-		// translate the reslut code here
+-
+-		return res;
+-
+-	case DEV_MMC :
+-		// translate the arguments here
+-
+-		result = MMC_disk_write(buff, sector, count);
+-
+-		// translate the reslut code here
+-
+-		return res;
+-
+-	case DEV_USB :
+-		// translate the arguments here
+-
+-		result = USB_disk_write(buff, sector, count);
+-
+-		// translate the reslut code here
+-
+-		return res;
+-	}
+-
+-	return RES_PARERR;
++	return ff_disk_write(pdrv, buff, sector, count);
+ }
+ 
+ #endif
+@@ -196,34 +77,11 @@ DRESULT disk_write (
+ /*-----------------------------------------------------------------------*/
+ 
+ DRESULT disk_ioctl (
+-	BYTE pdrv,		/* Physical drive nmuber (0..) */
++	void* pdrv,		/* Physical drive nmuber (0..) */
+ 	BYTE cmd,		/* Control code */
+ 	void *buff		/* Buffer to send/receive control data */
+ )
+ {
+-	DRESULT res;
+-	int result;
+-
+-	switch (pdrv) {
+-	case DEV_RAM :
+-
+-		// Process of the command for the RAM drive
+-
+-		return res;
+-
+-	case DEV_MMC :
+-
+-		// Process of the command for the MMC/SD card
+-
+-		return res;
+-
+-	case DEV_USB :
+-
+-		// Process of the command the USB drive
+-
+-		return res;
+-	}
+-
+-	return RES_PARERR;
++	return ff_disk_ioctl(pdrv, cmd, buff);
+ }
+ 
+diff --git a/diskio.h b/diskio.h
+index e4ead78..acabe03 100644
+--- a/diskio.h
++++ b/diskio.h
+@@ -21,16 +21,20 @@ typedef enum {
+ 	RES_PARERR		/* 4: Invalid Parameter */
+ } DRESULT;
+ 
+-
+ /*---------------------------------------*/
+ /* Prototypes for disk control functions */
+ 
+-
+-DSTATUS disk_initialize (BYTE pdrv);
+-DSTATUS disk_status (BYTE pdrv);
+-DRESULT disk_read (BYTE pdrv, BYTE* buff, LBA_t sector, UINT count);
+-DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count);
+-DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
++DSTATUS disk_initialize (void* pdrv);
++DSTATUS disk_status (void* pdrv);
++DRESULT disk_read (void* pdrv, BYTE* buff, LBA_t sector, UINT count);
++DRESULT disk_write (void* pdrv, const BYTE* buff, LBA_t sector, UINT count);
++DRESULT disk_ioctl (void* pdrv, BYTE cmd, void* buff);
++
++extern DSTATUS ff_disk_initialize(void* pdrv);
++extern DSTATUS ff_disk_status(void* pdrv);
++extern DRESULT ff_disk_read(void* pdrv, BYTE *buff, LBA_t sector, UINT count);
++extern DRESULT ff_disk_write(void* pdrv, const BYTE *buff, LBA_t sector, UINT count);
++extern DRESULT ff_disk_ioctl (void* pdrv, BYTE cmd, void *buff);
+ 
+ 
+ /* Disk Status Bits (DSTATUS) */
+diff --git a/ff.c b/ff.c
+index d209605..a07300a 100644
+--- a/ff.c
++++ b/ff.c
+@@ -247,10 +247,8 @@
+ 
+ /* Definitions of logical drive - physical location conversion */
+ #if FF_MULTI_PARTITION
+-#define LD2PD(vol) VolToPart[vol].pd	/* Get physical drive number */
+ #define LD2PT(vol) VolToPart[vol].pt	/* Get partition number (0:auto search, 1..:forced partition number) */
+ #else
+-#define LD2PD(vol) (BYTE)(vol)	/* Each logical drive is associated with the same physical drive number */
+ #define LD2PT(vol) 0			/* Auto partition search */
+ #endif
+ 
+@@ -3372,7 +3370,6 @@ static FRESULT mount_volume (	/* FR_OK(0): successful, !=0: an error occurred */
+ 	/* Following code attempts to mount the volume. (find an FAT volume, analyze the BPB and initialize the filesystem object) */
+ 
+ 	fs->fs_type = 0;					/* Clear the filesystem object */
+-	fs->pdrv = LD2PD(vol);				/* Volume hosting physical drive */
+ 	stat = disk_initialize(fs->pdrv);	/* Initialize the physical drive */
+ 	if (stat & STA_NOINIT) { 			/* Check if the initialization succeeded */
+ 		return FR_NOT_READY;			/* Failed to initialize due to no medium or hard error */
+@@ -5657,20 +5654,20 @@ FRESULT f_forward (
+ /* Create partitions on the physical drive in format of MBR or GPT */
+ 
+ static FRESULT create_partition (
+-	BYTE drv,			/* Physical drive number */
++	void* drv,			/* Physical drive number */
+ 	const LBA_t plst[],	/* Partition list */
+ 	BYTE sys,			/* System ID (for only MBR, temp setting) */
+-	BYTE* buf			/* Working buffer for a sector */
++	BYTE* buf,			/* Working buffer for a sector */
++	LBA_t sz_drv		/* Volume size (will be requested via ioctl if 0) */
+ )
+ {
+ 	UINT i, cy;
+-	LBA_t sz_drv;
+ 	DWORD sz_drv32, nxt_alloc32, sz_part32;
+ 	BYTE *pte;
+ 	BYTE hd, n_hd, sc, n_sc;
+ 
+ 	/* Get physical drive size */
+-	if (disk_ioctl(drv, GET_SECTOR_COUNT, &sz_drv) != RES_OK) return FR_DISK_ERR;
++	if (sz_drv == 0 && disk_ioctl(drv, GET_SECTOR_COUNT, &sz_drv) != RES_OK) return FR_DISK_ERR;
+ 
+ #if FF_LBA64
+ 	if (sz_drv >= FF_MIN_GPT) {	/* Create partitions in GPT format */
+@@ -5800,6 +5797,7 @@ static FRESULT create_partition (
+ 
+ 
+ FRESULT f_mkfs (
++	void* pdrv,
+ 	const TCHAR* path,		/* Logical drive number */
+ 	const MKFS_PARM* opt,	/* Format options */
+ 	void* work,				/* Pointer to working buffer (null: use heap memory) */
+@@ -5808,8 +5806,8 @@ FRESULT f_mkfs (
+ {
+ 	static const WORD cst[] = {1, 4, 16, 64, 256, 512, 0};	/* Cluster size boundary for FAT volume (4Ks unit) */
+ 	static const WORD cst32[] = {1, 2, 4, 8, 16, 32, 0};	/* Cluster size boundary for FAT32 volume (128Ks unit) */
+-	static const MKFS_PARM defopt = {FM_ANY, 0, 0, 0, 0};	/* Default parameter */
+-	BYTE fsopt, fsty, sys, *buf, *pte, pdrv, ipart;
++	static const MKFS_PARM defopt = {FM_ANY, 0, 0, 0, 0, 0};	/* Default parameter */
++	BYTE fsopt, fsty, sys, *buf, *pte, ipart;
+ 	WORD ss;	/* Sector size */
+ 	DWORD sz_buf, sz_blk, n_clst, pau, nsect, n, vsn;
+ 	LBA_t sz_vol, b_vol, b_fat, b_data;		/* Size of volume, Base LBA of volume, fat, data */
+@@ -5825,7 +5823,6 @@ FRESULT f_mkfs (
+ 	vol = get_ldnumber(&path);					/* Get target logical drive */
+ 	if (vol < 0) return FR_INVALID_DRIVE;
+ 	if (FatFs[vol]) FatFs[vol]->fs_type = 0;	/* Clear the fs object if mounted */
+-	pdrv = LD2PD(vol);			/* Physical drive */
+ 	ipart = LD2PT(vol);			/* Partition (0:create as new, 1..:get from partition table) */
+ 	if (!opt) opt = &defopt;	/* Use default parameter if it is not given */
+ 
+@@ -5895,7 +5892,8 @@ FRESULT f_mkfs (
+ 			sz_vol = ld_dword(pte + PTE_SizLba);	/* Get volume size */
+ 		}
+ 	} else {	/* The volume is associated with a physical drive */
+-		if (disk_ioctl(pdrv, GET_SECTOR_COUNT, &sz_vol) != RES_OK) LEAVE_MKFS(FR_DISK_ERR);
++		sz_vol = opt->sz_vol;
++		if (sz_vol == 0 && disk_ioctl(pdrv, GET_SECTOR_COUNT, &sz_vol) != RES_OK) LEAVE_MKFS(FR_DISK_ERR);
+ 		if (!(fsopt & FM_SFD)) {	/* To be partitioned? */
+ 			/* Create a single-partition on the drive in this function */
+ #if FF_LBA64
+@@ -6282,7 +6280,7 @@ FRESULT f_mkfs (
+ 	} else {								/* Volume as a new single partition */
+ 		if (!(fsopt & FM_SFD)) {			/* Create partition table if not in SFD */
+ 			lba[0] = sz_vol; lba[1] = 0;
+-			fr = create_partition(pdrv, lba, sys, buf);
++			fr = create_partition(pdrv, lba, sys, buf, opt->sz_vol);
+ 			if (fr != FR_OK) LEAVE_MKFS(fr);
+ 		}
+ 	}
+@@ -6301,7 +6299,7 @@ FRESULT f_mkfs (
+ /*-----------------------------------------------------------------------*/
+ 
+ FRESULT f_fdisk (
+-	BYTE pdrv,			/* Physical drive number */
++	void* pdrv,			/* Physical drive number */
+ 	const LBA_t ptbl[],	/* Pointer to the size table for each partitions */
+ 	void* work			/* Pointer to the working buffer (null: use heap memory) */
+ )
+@@ -6318,7 +6316,7 @@ FRESULT f_fdisk (
+ #endif
+ 	if (!buf) return FR_NOT_ENOUGH_CORE;
+ 
+-	LEAVE_MKFS(create_partition(pdrv, ptbl, 0x07, buf));
++	LEAVE_MKFS(create_partition(pdrv, ptbl, 0x07, buf, 0));
+ }
+ 
+ #endif /* FF_MULTI_PARTITION */
+diff --git a/ff.h b/ff.h
+index 4866576..0eb6c00 100644
+--- a/ff.h
++++ b/ff.h
+@@ -131,7 +131,7 @@ extern const char* VolumeStr[FF_VOLUMES];	/* User defied volume ID */
+ 
+ typedef struct {
+ 	BYTE	fs_type;		/* Filesystem type (0:not mounted) */
+-	BYTE	pdrv;			/* Associated physical drive */
++	void*	pdrv;			/* Associated physical drive */
+ 	BYTE	n_fats;			/* Number of FATs (1 or 2) */
+ 	BYTE	wflag;			/* win[] flag (b0:dirty) */
+ 	BYTE	fsi_flag;		/* FSINFO flags (b7:disabled, b0:dirty) */
+@@ -267,6 +267,7 @@ typedef struct {
+ 	UINT align;			/* Data area alignment (sector) */
+ 	UINT n_root;		/* Number of root directory entries */
+ 	DWORD au_size;		/* Cluster size (byte) */
++	LBA_t sz_vol;		/* Sector count (will be requested via ioctl if 0) */
+ } MKFS_PARM;
+ 
+ 
+@@ -328,8 +329,8 @@ FRESULT f_setlabel (const TCHAR* label);							/* Set volume label */
+ FRESULT f_forward (FIL* fp, UINT(*func)(const BYTE*,UINT), UINT btf, UINT* bf);	/* Forward data to the stream */
+ FRESULT f_expand (FIL* fp, FSIZE_t fsz, BYTE opt);					/* Allocate a contiguous block to the file */
+ FRESULT f_mount (FATFS* fs, const TCHAR* path, BYTE opt);			/* Mount/Unmount a logical drive */
+-FRESULT f_mkfs (const TCHAR* path, const MKFS_PARM* opt, void* work, UINT len);	/* Create a FAT volume */
+-FRESULT f_fdisk (BYTE pdrv, const LBA_t ptbl[], void* work);		/* Divide a physical drive into some partitions */
++FRESULT f_mkfs (void* pdrv, const TCHAR* path, const MKFS_PARM* opt, void* work, UINT len);	/* Create a FAT volume */
++FRESULT f_fdisk (void* pdrv, const LBA_t ptbl[], void* work);		/* Divide a physical drive into some partitions */
+ FRESULT f_setcp (WORD cp);											/* Set current code page */
+ int f_putc (TCHAR c, FIL* fp);										/* Put a character to the file */
+ int f_puts (const TCHAR* str, FIL* cp);								/* Put a string to the file */
+diff --git a/ffconf.h b/ffconf.h
+index ca17485..c496972 100644
+--- a/ffconf.h
++++ b/ffconf.h
+@@ -30,7 +30,7 @@
+ /  f_findnext(). (0:Disable, 1:Enable 2:Enable with matching altname[] too) */
+ 
+ 
+-#define FF_USE_MKFS		0
++#define FF_USE_MKFS		1
+ /* This option switches f_mkfs() function. (0:Disable or 1:Enable) */
+ 
+ 
+@@ -38,11 +38,11 @@
+ /* This option switches fast seek function. (0:Disable or 1:Enable) */
+ 
+ 
+-#define FF_USE_EXPAND	0
++#define FF_USE_EXPAND	1
+ /* This option switches f_expand function. (0:Disable or 1:Enable) */
+ 
+ 
+-#define FF_USE_CHMOD	0
++#define FF_USE_CHMOD	1
+ /* This option switches attribute manipulation functions, f_chmod() and f_utime().
+ /  (0:Disable or 1:Enable) Also FF_FS_READONLY needs to be 0 to enable this option. */
+ 
+@@ -113,7 +113,7 @@
+ */
+ 
+ 
+-#define FF_USE_LFN		0
++#define FF_USE_LFN		3
+ #define FF_MAX_LFN		255
+ /* The FF_USE_LFN switches the support for LFN (long file name).
+ /
+@@ -133,7 +133,7 @@
+ /  ff_memfree() exemplified in ffsystem.c, need to be added to the project. */
+ 
+ 
+-#define FF_LFN_UNICODE	0
++#define FF_LFN_UNICODE	1
+ /* This option switches the character encoding on the API when LFN is enabled.
+ /
+ /   0: ANSI/OEM in current CP (TCHAR = char)
+@@ -171,7 +171,7 @@
+ 
+ 
+ #define FF_STR_VOLUME_ID	0
+-#define FF_VOLUME_STRS		"RAM","NAND","CF","SD","SD2","USB","USB2","USB3"
++#define FF_VOLUME_STRS		"USB"
+ /* FF_STR_VOLUME_ID switches support for volume ID in arbitrary strings.
+ /  When FF_STR_VOLUME_ID is set to 1 or 2, arbitrary strings can be used as drive
+ /  number in the path name. FF_VOLUME_STRS defines the volume ID strings for each
+@@ -194,7 +194,7 @@
+ 
+ 
+ #define FF_MIN_SS		512
+-#define FF_MAX_SS		512
++#define FF_MAX_SS		4096
+ /* This set of options configures the range of sector size to be supported. (512,
+ /  1024, 2048 or 4096) Always set both 512 for most systems, generic memory card and
+ /  harddisk, but a larger value may be required for on-board flash memory and some
+@@ -231,13 +231,13 @@
+ /  buffer in the filesystem object (FATFS) is used for the file data transfer. */
+ 
+ 
+-#define FF_FS_EXFAT		0
++#define FF_FS_EXFAT		1
+ /* This option switches support for exFAT filesystem. (0:Disable or 1:Enable)
+ /  To enable exFAT, also LFN needs to be enabled. (FF_USE_LFN >= 1)
+ /  Note that enabling exFAT discards ANSI C (C89) compatibility. */
+ 
+ 
+-#define FF_FS_NORTC		0
++#define FF_FS_NORTC		1
+ #define FF_NORTC_MON	1
+ #define FF_NORTC_MDAY	1
+ #define FF_NORTC_YEAR	2020
+diff --git a/ffsystem.c b/ffsystem.c
+index b88ce15..227cc52 100644
+--- a/ffsystem.c
++++ b/ffsystem.c
+@@ -5,6 +5,7 @@
+ 
+ 
+ #include "ff.h"
++#include <stdlib.h>
+ 
+ 
+ #if FF_USE_LFN == 3	/* Dynamic memory allocation */
+-- 
+2.35.1
+

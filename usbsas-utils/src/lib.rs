@@ -1,0 +1,42 @@
+//! usbsas constants and logging utility.
+
+use std::env;
+
+pub mod log;
+
+pub const INPUT_PIPE_FD_VAR: &str = "INPUT_PIPE_FD";
+pub const OUTPUT_PIPE_FD_VAR: &str = "OUTPUT_PIPE_FD";
+pub const READ_FILE_MAX_SIZE: u64 = 1024 * 1024 * 10;
+pub const SECTOR_SIZE: u64 = 512;
+pub const USBSAS_BIN_PATH: &str = env!("USBSAS_BIN_PATH");
+pub const USBSAS_CONFIG: &str = env!("USBSAS_CONFIG");
+pub const USBSAS_VERSION: &str = env!("GIT_HASH");
+
+#[macro_export]
+macro_rules! get_binary_path {
+    ($binary_name:expr) => {{
+        let path = USBSAS_BIN_PATH.trim_end_matches('/').to_owned() + "/" + $binary_name;
+        std::path::Path::new(&path.to_string())
+    }};
+}
+
+/// formats a byte array as an hexadecimal pretty string
+#[macro_export]
+macro_rules! formathex {
+    ( $array:expr ) => {
+        $array
+            .iter()
+            .map(|x| format!("{:02x} ", x))
+            .collect::<String>()
+    };
+}
+
+/// prints a byte array as an hexadecimal string (debug-only)
+#[macro_export]
+macro_rules! dbgprinthex {
+    ( $array:expr ) => {
+        if cfg!(debug_assertions) {
+            println!("{}", formathex!($array));
+        }
+    };
+}

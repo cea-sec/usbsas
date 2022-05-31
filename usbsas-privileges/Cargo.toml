@@ -1,0 +1,14 @@
+[package]
+name = "usbsas-privileges"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[build-dependencies]
+cc = "1.0.73"
+
+[dependencies]
+libc = "0.2.126"
+procfs = "0.12.0"
+syscallz = "0.16.1"
+thiserror = "1.0.31"

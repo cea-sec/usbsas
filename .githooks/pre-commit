@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+# To use me, run (at the root of the project):
+# $ ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
+
+hash rustfmt >/dev/null || exit 0
+
+cargo fmt -q -- --check || { echo "Please run cargo fmt"; exit 1; }

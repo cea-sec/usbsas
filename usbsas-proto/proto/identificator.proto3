@@ -1,0 +1,38 @@
+syntax = "proto3";
+package identificator;
+
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestId {
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestId Id = 2;
+  }
+};
+
+/* Responses */
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseId {
+  string id = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseError Error = 2;
+    ResponseId Id = 3;
+  }
+};

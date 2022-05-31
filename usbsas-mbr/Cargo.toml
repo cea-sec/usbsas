@@ -1,0 +1,10 @@
+[package]
+name = "usbsas-mbr"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+byteorder = "1.4.3"
+log = "0.4.17"
+packed_struct = "0.10.0"

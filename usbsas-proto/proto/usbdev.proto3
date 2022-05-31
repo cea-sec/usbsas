@@ -1,0 +1,38 @@
+syntax = "proto3";
+package usbdev;
+import "common.proto3";
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestDevices {
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestDevices Devices = 2;
+  }
+};
+
+/* Responses */
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseDevices {
+  repeated common.Device devices = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseEnd End = 1;
+    ResponseError Error = 2;
+    ResponseDevices Devices = 3;
+  }
+};

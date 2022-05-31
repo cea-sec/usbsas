@@ -1,0 +1,136 @@
+# usbsas configuration file
+
+
+# Directory where temp tar and fs will be stored. (Mandatory)
+out_directory = "/tmp/"
+
+# Environment variables to keep when forking children processes. (Optional)
+# (These are kept by default if none are specified)
+#env_vars = ["TERM",
+#            "LANG",
+#            "KRB5CCNAME",
+#            "PATH",
+#            "RUST_LOG",
+#            "RUST_BACKTRACE",
+#            "USBSAS_MOCK_IN_DEV",
+#            "USBSAS_MOCK_OUT_DEV"]
+
+
+# Destination "network". (Optional)
+# Upload copied files (in a tar) to a remote network.
+# description, longdescr and url are mandatory, krb_service_name is optional.
+# If krb_service_name is specified, mutual HTTP authentication with Kerberos
+# will be performed with the remote server prior to upload.
+#[network]
+#description = "Network XXX"
+#longdescr = "Send files on network XXX"
+#url = "http://127.0.0.1:8042/api/uploadbundle"
+#krb_service_name = "HTTP@your.domain"
+
+
+# Destination "command". (Optional)
+# Execute a command.
+# "%SOURCE_FILE%" in command_args will be replaced with the filename of the
+# output tar before execution.
+[command]
+description = "Save files on disk"
+longdescr = "Save out tar in /usbsas_data/"
+command_bin = "/bin/cp"
+command_args = [
+    "%SOURCE_FILE%",
+    "/usbsas_data/",
+]
+
+
+# Remote analyzer server. (Optional)
+# Like for network destination bellow, kerberos authentication can be enabled.
+[analyzer]
+url = "http://127.0.0.1:8042/api/scanbundle"
+#krb_service_name = "HTTP@your.domain"
+
+
+# Command to execute after a transfer. (Optional)
+# %SOURCE_FILE% is either a tar archive if destination is a network or the
+# filesystem of the USB destination.
+#[post_copy]
+#description = "Archive transfer"
+#command_bin = "/bin/cp"
+#command_args = [
+#	"%SOURCE_FILE%"
+#	"/usbsas_archive/"
+#]
+
+
+# USB ports allowed. (Optional)
+# Enforce USB topology for source and destination USB devices.
+# [1] means: device should be plugged into the physical port 1.
+# [1, 2] means: a USB hub is plugged into the physical port 1 and the device
+#               should be plugged into the physical port 2 of the hub. There can
+#               be more than 1 hub (e.g. [2, 3, 1, 2]).
+# To check your topology: $ lsusb -t
+#[usb_port_accesses]
+#ports_src = [9, 3]
+#ports_dst = [6]
+
+
+# Message to show on web page if using web client/server. (Optional)
+# Message can be in HTML.
+#message="<strong>Under maintenance</strong>"
+
+
+# Filename filters. (Optional)
+# They should be written in lower case as their are tested case insensitive.
+# A file is filtered if a filter matches.
+# A filter matches if each of its components (contain/start/end) matches
+# A component matches if:
+# - contain: every strings in the filter are present in the filename
+# - start: the filenames startswith the string
+# - end: the filenames endswith the string
+[[filters]]
+contain = ["__macosx"]
+
+[[filters]]
+contain = [".ds_store"]
+
+[[filters]]
+contain = [".lnk."]
+
+[[filters]]
+contain = [".lnk/"]
+
+[[filters]]
+end = ".lnk"
+
+[[filters]]
+contain = ["autorun.inf"]
+
+[[filters]]
+contain = ["thumbs.db"]
+
+[[filters]]
+contain = ["desktop.ini"]
+
+[[filters]]
+end = "/$recycle.bin"
+
+[[filters]]
+contain = ["/$recycle.bin/"]
+
+[[filters]]
+end = "/recycler"
+
+[[filters]]
+contain = ["/recycler/"]
+
+[[filters]]
+end = "/recycled"
+
+[[filters]]
+contain = ["/recycled/"]
+
+[[filters]]
+contain = ["𝄞"]
+
+[[filters]]
+contain = ["test"]
+end = "é"

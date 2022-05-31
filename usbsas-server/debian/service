@@ -1,0 +1,13 @@
+[Unit]
+Description=SAS USB Server
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/usbsas-server
+Environment="RUST_LOG=info"
+WorkingDirectory=/usr/libexec
+User=usbsas
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

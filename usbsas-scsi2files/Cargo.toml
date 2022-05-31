@@ -1,0 +1,19 @@
+[package]
+name = "usbsas-scsi2files"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+byteorder = "1.4.3"
+env_logger = "0.9.0"
+log = "0.4.17"
+thiserror = "1.0.31"
+usbsas-comm = { path = "../usbsas-comm" }
+usbsas-dev2scsi = { path = "../usbsas-dev2scsi" }
+usbsas-fsrw = { path = "../usbsas-fsrw" }
+usbsas-mass-storage = { path = "../usbsas-mass-storage" }
+usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-process = { path = "../usbsas-process" }
+usbsas-proto = { path = "../usbsas-proto" }
+usbsas-utils = { path = "../usbsas-utils" }

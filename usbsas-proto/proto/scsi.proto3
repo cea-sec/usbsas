@@ -1,0 +1,81 @@
+syntax = "proto3";
+package scsi;
+import "common.proto3";
+
+
+
+/* Requests */
+
+message RequestEnd {
+};
+
+message RequestOpenDevice {
+  uint32 vendorid = 1;
+  uint32 productid = 2;
+};
+
+message RequestPartitions {
+};
+
+message RequestReadSectors {
+  /* in sector */
+  uint64 offset = 1;
+  /* in sector */
+  uint64 count = 2;
+};
+
+message Request {
+  oneof msg {
+    RequestEnd End = 1;
+    RequestOpenDevice OpenDevice = 2;
+    RequestPartitions Partitions = 3;
+    RequestReadSectors ReadSectors = 4;
+  }
+};
+
+
+
+message Device {
+  uint32 vendorid = 1;
+  uint32 productid = 2;
+  string manufacturer = 3;
+  string description = 4;
+  string serial = 5;
+};
+
+/* Responses */
+
+message ResponseEnd {
+};
+
+message ResponseDevices {
+  repeated Device devices = 1;
+};
+
+message ResponseOpenDevice {
+  uint64 block_size = 1;
+  uint64 dev_size = 2;
+};
+
+message ResponsePartitions {
+  repeated common.PartitionInfo partitions = 1;
+};
+
+message ResponseReadSectors {
+  bytes data = 1;
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseError Error = 1;
+    ResponseDevices Devices = 2;
+    ResponseOpenDevice OpenDevice = 3;
+    ResponseEnd End = 4;
+    ResponsePartitions Partitions = 5;
+    ResponseReadSectors ReadSectors = 6;
+  }
+};

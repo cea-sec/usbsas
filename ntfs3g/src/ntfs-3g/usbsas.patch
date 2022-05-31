@@ -1,0 +1,910 @@
+From be0dd6f3c630c98aa68155d30016d92af7ea6e91 Mon Sep 17 00:00:00 2001
+Date: Thu, 17 Feb 2022 15:23:27 +0100
+Subject: [PATCH] Modifications for usbsas
+
+---
+ mft.c      |   6 +-
+ mkntfs.c   | 402 +++--------------------------------------------------
+ mkntfs.h   |  30 ++++
+ security.c |   2 +-
+ unix_io.c  | 163 +++-------------------
+ unix_io.h  |   8 ++
+ utils.c    |   2 +-
+ volume.c   |   4 +-
+ volume.h   |   9 +-
+ 9 files changed, 86 insertions(+), 540 deletions(-)
+ create mode 100644 mkntfs.h
+ create mode 100644 unix_io.h
+
+diff --git a/mft.c b/mft.c
+index d0a601f..4f2c620 100644
+--- a/mft.c
++++ b/mft.c
+@@ -1916,9 +1916,9 @@ found_free_rec:
+ 	/* Initialize time, allocated and data size in ntfs_inode struct. */
+ 	ni->data_size = ni->allocated_size = 0;
+ 	ni->flags = const_cpu_to_le32(0);
+-	ni->creation_time = ni->last_data_change_time =
+-			ni->last_mft_change_time =
+-			ni->last_access_time = ntfs_current_time();
++	/* ni->creation_time = ni->last_data_change_time = */
++	/* 		ni->last_mft_change_time = */
++	/* 		ni->last_access_time = ntfs_current_time(); */
+ 	/* Update the default mft allocation position if it was used. */
+ 	if (!base_ni)
+ 		vol->mft_data_pos = bit + 1;
+diff --git a/mkntfs.c b/mkntfs.c
+index 3e127a3..ac8e1c4 100644
+--- a/mkntfs.c
++++ b/mkntfs.c
+@@ -130,7 +130,6 @@
+ #include "mft.h"
+ #include "mst.h"
+ #include "runlist.h"
+-#include "utils.h"
+ #include "ntfstime.h"
+ #include "sd.h"
+ #include "boot.h"
+@@ -139,7 +138,9 @@
+ #include "logging.h"
+ #include "support.h"
+ #include "unistr.h"
++#include "utils.h"
+ #include "misc.h"
++#include "mkntfs.h"
+ 
+ #if defined(__sun) && defined (__SVR4)
+ #undef basename
+@@ -157,8 +158,6 @@ switch if you want to be able to build the NTFS utilities."
+ /* Page size on ia32. Can change to 8192 on Alpha. */
+ #define NTFS_PAGE_SIZE	4096
+ 
+-static char EXEC_NAME[] = "mkntfs";
+-
+ struct BITMAP_ALLOCATION {
+ 	struct BITMAP_ALLOCATION *next;
+ 	LCN	lcn;		/* first allocated cluster */
+@@ -206,91 +205,7 @@ static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
+ 
+ static struct BITMAP_ALLOCATION *g_allocation	  = NULL;	/* Head of cluster allocations */
+ 
+-/**
+- * struct mkntfs_options
+- */
+-static struct mkntfs_options {
+-	char *dev_name;			/* Name of the device, or file, to use */
+-	BOOL enable_compression;	/* -C, enables compression of all files on the volume by default. */
+-	BOOL quick_format;		/* -f or -Q, fast format, don't zero the volume first. */
+-	BOOL force;			/* -F, force fs creation. */
+-	long heads;			/* -H, number of heads on device */
+-	BOOL disable_indexing;		/* -I, disables indexing of file contents on the volume by default. */
+-	BOOL no_action;			/* -n, do not write to device, only display what would be done. */
+-	long long part_start_sect;	/* -p, start sector of partition on parent device */
+-	long sector_size;		/* -s, in bytes, power of 2, default is 512 bytes. */
+-	long sectors_per_track;		/* -S, number of sectors per track on device */
+-	BOOL use_epoch_time;		/* -T, fake the time to be 00:00:00 UTC, Jan 1, 1970. */
+-	long mft_zone_multiplier;	/* -z, value from 1 to 4. Default is 1. */
+-	long long num_sectors;		/* size of device in sectors */
+-	long cluster_size;		/* -c, format with this cluster-size */
+-	BOOL with_uuid;			/* -U, request setting an uuid */
+-	char *label;			/* -L, volume label */
+-} opts;
+-
+-
+-/**
+- * mkntfs_license
+- */
+-static void mkntfs_license(void)
+-{
+-	ntfs_log_info("%s", ntfs_gpl);
+-}
+-
+-/**
+- * mkntfs_usage
+- */
+-static void mkntfs_usage(void)
+-{
+-	ntfs_log_info("\nUsage: %s [options] device [number-of-sectors]\n"
+-"\n"
+-"Basic options:\n"
+-"    -f, --fast                      Perform a quick format\n"
+-"    -Q, --quick                     Perform a quick format\n"
+-"    -L, --label STRING              Set the volume label\n"
+-"    -C, --enable-compression        Enable compression on the volume\n"
+-"    -I, --no-indexing               Disable indexing on the volume\n"
+-"    -n, --no-action                 Do not write to disk\n"
+-"\n"
+-"Advanced options:\n"
+-"    -c, --cluster-size BYTES        Specify the cluster size for the volume\n"
+-"    -s, --sector-size BYTES         Specify the sector size for the device\n"
+-"    -p, --partition-start SECTOR    Specify the partition start sector\n"
+-"    -H, --heads NUM                 Specify the number of heads\n"
+-"    -S, --sectors-per-track NUM     Specify the number of sectors per track\n"
+-"    -z, --mft-zone-multiplier NUM   Set the MFT zone multiplier\n"
+-"    -T, --zero-time                 Fake the time to be 00:00 UTC, Jan 1, 1970\n"
+-"    -F, --force                     Force execution despite errors\n"
+-"\n"
+-"Output options:\n"
+-"    -q, --quiet                     Quiet execution\n"
+-"    -v, --verbose                   Verbose execution\n"
+-"        --debug                     Very verbose execution\n"
+-"\n"
+-"Help options:\n"
+-"    -V, --version                   Display version\n"
+-"    -l, --license                   Display licensing information\n"
+-"    -h, --help                      Display this help\n"
+-"\n", basename(EXEC_NAME));
+-	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
+-}
+-
+-/**
+- * mkntfs_version
+- */
+-static void mkntfs_version(void)
+-{
+-	ntfs_log_info("\n%s v%s (libntfs-3g)\n\n", EXEC_NAME, VERSION);
+-	ntfs_log_info("Create an NTFS volume on a user specified (block) "
+-			"device.\n\n");
+-	ntfs_log_info("Copyright (c) 2000-2007 Anton Altaparmakov\n");
+-	ntfs_log_info("Copyright (c) 2001-2005 Richard Russon\n");
+-	ntfs_log_info("Copyright (c) 2002-2006 Szabolcs Szakacsits\n");
+-	ntfs_log_info("Copyright (c) 2005      Erik Sornes\n");
+-	ntfs_log_info("Copyright (c) 2007      Yura Pakhuchiy\n");
+-	ntfs_log_info("Copyright (c) 2010-2018 Jean-Pierre Andre\n");
+-	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+-}
++struct mkntfs_options opts;
+ 
+ /*
+  *  crc64, adapted from http://rpm5.org/docs/api/digest_8c-source.html
+@@ -514,259 +429,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
+ 	}
+ }
+ 
+-/**
+- * mkntfs_parse_long
+- */
+-static BOOL mkntfs_parse_long(const char *string, const char *name, long *num)
+-{
+-	char *end = NULL;
+-	long tmp;
+-
+-	if (!string || !name || !num)
+-		return FALSE;
+-
+-	if (*num >= 0) {
+-		ntfs_log_error("You may only specify the %s once.\n", name);
+-		return FALSE;
+-	}
+-
+-	tmp = strtol(string, &end, 0);
+-	if (end && *end) {
+-		ntfs_log_error("Cannot understand the %s '%s'.\n", name, string);
+-		return FALSE;
+-	} else {
+-		*num = tmp;
+-		return TRUE;
+-	}
+-}
+-
+-/**
+- * mkntfs_parse_llong
+- */
+-static BOOL mkntfs_parse_llong(const char *string, const char *name,
+-		long long *num)
+-{
+-	char *end = NULL;
+-	long long tmp;
+-
+-	if (!string || !name || !num)
+-		return FALSE;
+-
+-	if (*num >= 0) {
+-		ntfs_log_error("You may only specify the %s once.\n", name);
+-		return FALSE;
+-	}
+-
+-	tmp = strtoll(string, &end, 0);
+-	if (end && *end) {
+-		ntfs_log_error("Cannot understand the %s '%s'.\n", name,
+-				string);
+-		return FALSE;
+-	} else {
+-		*num = tmp;
+-		return TRUE;
+-	}
+-}
+-
+-/**
+- * mkntfs_init_options
+- */
+-static void mkntfs_init_options(struct mkntfs_options *opts2)
+-{
+-	if (!opts2)
+-		return;
+-
+-	memset(opts2, 0, sizeof(*opts2));
+-
+-	/* Mark all the numeric options as "unset". */
+-	opts2->cluster_size		= -1;
+-	opts2->heads			= -1;
+-	opts2->mft_zone_multiplier	= -1;
+-	opts2->num_sectors		= -1;
+-	opts2->part_start_sect		= -1;
+-	opts2->sector_size		= -1;
+-	opts2->sectors_per_track	= -1;
+-}
+-
+-/**
+- * mkntfs_parse_options
+- */
+-static int mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *opts2)
+-{
+-	static const char *sopt = "-c:CfFhH:IlL:np:qQs:S:TUvVz:";
+-	static const struct option lopt[] = {
+-		{ "cluster-size",	required_argument,	NULL, 'c' },
+-		{ "debug",		no_argument,		NULL, 'Z' },
+-		{ "enable-compression",	no_argument,		NULL, 'C' },
+-		{ "fast",		no_argument,		NULL, 'f' },
+-		{ "force",		no_argument,		NULL, 'F' },
+-		{ "heads",		required_argument,	NULL, 'H' },
+-		{ "help",		no_argument,		NULL, 'h' },
+-		{ "label",		required_argument,	NULL, 'L' },
+-		{ "license",		no_argument,		NULL, 'l' },
+-		{ "mft-zone-multiplier",required_argument,	NULL, 'z' },
+-		{ "no-action",		no_argument,		NULL, 'n' },
+-		{ "no-indexing",	no_argument,		NULL, 'I' },
+-		{ "partition-start",	required_argument,	NULL, 'p' },
+-		{ "quick",		no_argument,		NULL, 'Q' },
+-		{ "quiet",		no_argument,		NULL, 'q' },
+-		{ "sector-size",	required_argument,	NULL, 's' },
+-		{ "sectors-per-track",	required_argument,	NULL, 'S' },
+-		{ "with-uuid",		no_argument,		NULL, 'U' },
+-		{ "verbose",		no_argument,		NULL, 'v' },
+-		{ "version",		no_argument,		NULL, 'V' },
+-		{ "zero-time",		no_argument,		NULL, 'T' },
+-		{ NULL, 0, NULL, 0 }
+-	};
+-
+-	int c = -1;
+-	int lic = 0;
+-	int help = 0;
+-	int err = 0;
+-	int ver = 0;
+-
+-	if (!argv || !opts2) {
+-		ntfs_log_error("Internal error: invalid parameters to "
+-				"mkntfs_options.\n");
+-		return FALSE;
+-	}
+-
+-	opterr = 0; /* We'll handle the errors, thank you. */
+-
+-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
+-		switch (c) {
+-		case 1:		/* A device, or a number of sectors */
+-			if (!opts2->dev_name)
+-				opts2->dev_name = argv[optind - 1];
+-			else if (!mkntfs_parse_llong(optarg,
+-					"number of sectors",
+-					&opts2->num_sectors))
+-				err++;
+-			break;
+-		case 'C':
+-			opts2->enable_compression = TRUE;
+-			break;
+-		case 'c':
+-			if (!mkntfs_parse_long(optarg, "cluster size",
+-					&opts2->cluster_size))
+-				err++;
+-			break;
+-		case 'F':
+-			opts2->force = TRUE;
+-			break;
+-		case 'f':	/* fast */
+-		case 'Q':	/* quick */
+-			opts2->quick_format = TRUE;
+-			break;
+-		case 'H':
+-			if (!mkntfs_parse_long(optarg, "heads", &opts2->heads))
+-				err++;
+-			break;
+-		case 'h':
+-			help++;	/* display help */
+-			break;
+-		case 'I':
+-			opts2->disable_indexing = TRUE;
+-			break;
+-		case 'L':
+-			if (!opts2->label) {
+-				opts2->label = optarg;
+-			} else {
+-				ntfs_log_error("You may only specify the label "
+-						"once.\n");
+-				err++;
+-			}
+-			break;
+-		case 'l':
+-			lic++;	/* display the license */
+-			break;
+-		case 'n':
+-			opts2->no_action = TRUE;
+-			break;
+-		case 'p':
+-			if (!mkntfs_parse_llong(optarg, "partition start",
+-						&opts2->part_start_sect))
+-				err++;
+-			break;
+-		case 'q':
+-			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET |
+-					NTFS_LOG_LEVEL_VERBOSE |
+-					NTFS_LOG_LEVEL_PROGRESS);
+-			break;
+-		case 's':
+-			if (!mkntfs_parse_long(optarg, "sector size",
+-						&opts2->sector_size))
+-				err++;
+-			break;
+-		case 'S':
+-			if (!mkntfs_parse_long(optarg, "sectors per track",
+-						&opts2->sectors_per_track))
+-				err++;
+-			break;
+-		case 'T':
+-			opts2->use_epoch_time = TRUE;
+-			break;
+-		case 'U':
+-			opts2->with_uuid = TRUE;
+-			break;
+-		case 'v':
+-			ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET |
+-					NTFS_LOG_LEVEL_VERBOSE |
+-					NTFS_LOG_LEVEL_PROGRESS);
+-			break;
+-		case 'V':
+-			ver++;	/* display version info */
+-			break;
+-		case 'Z':	/* debug - turn on everything */
+-			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG |
+-					NTFS_LOG_LEVEL_TRACE |
+-					NTFS_LOG_LEVEL_VERBOSE |
+-					NTFS_LOG_LEVEL_QUIET);
+-			break;
+-		case 'z':
+-			if (!mkntfs_parse_long(optarg, "mft zone multiplier",
+-						&opts2->mft_zone_multiplier))
+-				err++;
+-			break;
+-		default:
+-			if (ntfs_log_parse_option (argv[optind-1]))
+-				break;
+-			if (((optopt == 'c') || (optopt == 'H') ||
+-			     (optopt == 'L') || (optopt == 'p') ||
+-			     (optopt == 's') || (optopt == 'S') ||
+-			     (optopt == 'N') || (optopt == 'z')) &&
+-			     (!optarg)) {
+-				ntfs_log_error("Option '%s' requires an "
+-						"argument.\n", argv[optind-1]);
+-			} else if (optopt != '?') {
+-				ntfs_log_error("Unknown option '%s'.\n",
+-						argv[optind - 1]);
+-			}
+-			err++;
+-			break;
+-		}
+-	}
+-
+-	if (!err && !help && !ver && !lic) {
+-		if (opts2->dev_name == NULL) {
+-			if (argc > 1)
+-				ntfs_log_error("You must specify a device.\n");
+-			err++;
+-		}
+-	}
+-
+-	if (ver)
+-		mkntfs_version();
+-	if (lic)
+-		mkntfs_license();
+-	if (err || help)
+-		mkntfs_usage();
+-
+-		/* tri-state 0 : done, 1 : error, -1 : proceed */
+-	return (err ? 1 : (help || ver || lic ? 0 : -1));
+-}
+-
+-
+ /**
+  * mkntfs_time
+  */
+@@ -3453,7 +3115,7 @@ static void mkntfs_cleanup(void)
+ /**
+  * mkntfs_open_partition -
+  */
+-static BOOL mkntfs_open_partition(ntfs_volume *vol)
++static BOOL mkntfs_open_partition(ntfs_volume *vol, void *priv_data)
+ {
+ 	BOOL result = FALSE;
+ 	int i;
+@@ -3464,7 +3126,7 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
+ 	 * Allocate and initialize an ntfs device structure and attach it to
+ 	 * the volume.
+ 	 */
+-	vol->dev = ntfs_device_alloc(opts.dev_name, 0, &ntfs_device_default_io_ops, NULL);
++	vol->dev = ntfs_device_alloc(opts.dev_name, 0, &ntfs_device_default_io_ops, priv_data);
+ 	if (!vol->dev) {
+ 		ntfs_log_perror("Could not create device");
+ 		goto done;
+@@ -3484,18 +3146,19 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
+ 			ntfs_log_perror("Could not open %s", vol->dev->d_name);
+ 		goto done;
+ 	}
++
+ 	/* Verify we are dealing with a block device. */
+-	if (vol->dev->d_ops->stat(vol->dev, &sbuf)) {
+-		ntfs_log_perror("Error getting information about %s", vol->dev->d_name);
+-		goto done;
+-	}
++	/* if (vol->dev->d_ops->stat(vol->dev, &sbuf)) { */
++	/* 	ntfs_log_perror("Error getting information about %s", vol->dev->d_name); */
++	/* 	goto done; */
++	/* } */
+ 
+ 	if (!S_ISBLK(sbuf.st_mode)) {
+ 		ntfs_log_error("%s is not a block device.\n", vol->dev->d_name);
+-		if (!opts.force) {
+-			ntfs_log_error("Refusing to make a filesystem here!\n");
+-			goto done;
+-		}
++		/* if (!opts.force) { */
++		/* 	ntfs_log_error("Refusing to make a filesystem here!\n"); */
++		/* 	goto done; */
++		/* } */
+ 		if (!opts.num_sectors) {
+ 			if (!sbuf.st_size && !sbuf.st_blocks) {
+ 				ntfs_log_error("You must specify the number of sectors.\n");
+@@ -4962,7 +4625,7 @@ static BOOL mkntfs_create_root_structures(void)
+ /**
+  * mkntfs_redirect
+  */
+-static int mkntfs_redirect(struct mkntfs_options *opts2)
++int mkntfs(struct mkntfs_options *opts2, void *priv_data)
+ {
+ 	u64 upcase_crc;
+ 	int result = 1;
+@@ -4972,6 +4635,12 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+ 	MFT_RECORD *m;
+ 	int i, err;
+ 
++	/* ntfs_log_set_handler(ntfs_log_handler_outerr); */
++	/* ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET | */
++	/* 		NTFS_LOG_LEVEL_VERBOSE | */
++	/* 		NTFS_LOG_LEVEL_PROGRESS); */
++
++
+ 	if (!opts2) {
+ 		ntfs_log_error("Internal error: invalid parameters to mkntfs_options.\n");
+ 		goto done;
+@@ -5021,7 +4690,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+ 			sizeof(attrdef_ntfs3x_array));
+ 	g_vol->attrdef_len = sizeof(attrdef_ntfs3x_array);
+ 	/* Open the partition. */
+-	if (!mkntfs_open_partition(g_vol))
++	if (!mkntfs_open_partition(g_vol, priv_data))
+ 		goto done;
+ 	/*
+ 	 * Decide on the sector size, cluster size, mft record and index record
+@@ -5164,30 +4833,3 @@ done:
+ 	mkntfs_cleanup();	/* Device is unlocked and closed here */
+ 	return result;
+ }
+-
+-
+-/**
+- * main - Begin here
+- *
+- * Start from here.
+- *
+- * Return:  0  Success, the program worked
+- *	    1  Error, something went wrong
+- */
+-int main(int argc, char *argv[])
+-{
+-	int result = 1;
+-
+-	ntfs_log_set_handler(ntfs_log_handler_outerr);
+-	utils_set_locale();
+-
+-	mkntfs_init_options(&opts);			/* Set up the options */
+-
+-			/* Read the command line options */
+-	result = mkntfs_parse_options(argc, argv, &opts);
+-
+-	if (result < 0)
+-		result = mkntfs_redirect(&opts);
+-
+-	return result;
+-}
+diff --git a/mkntfs.h b/mkntfs.h
+new file mode 100644
+index 0000000..a2f1d93
+--- /dev/null
++++ b/mkntfs.h
+@@ -0,0 +1,30 @@
++#ifndef _NTFS_MKNTFS_H
++#define _NTFS_MKNTFS_H
++
++/**
++ * struct mkntfs_options
++ */
++struct mkntfs_options {
++	char *dev_name;			/* Name of the device, or file, to use */
++	BOOL enable_compression;	/* -C, enables compression of all files on the volume by default. */
++	BOOL quick_format;		/* -f or -Q, fast format, don't zero the volume first. */
++	BOOL force;			/* -F, force fs creation. */
++	long heads;			/* -H, number of heads on device */
++	BOOL disable_indexing;		/* -I, disables indexing of file contents on the volume by default. */
++	BOOL no_action;			/* -n, do not write to device, only display what would be done. */
++	long long part_start_sect;	/* -p, start sector of partition on parent device */
++	long sector_size;		/* -s, in bytes, power of 2, default is 512 bytes. */
++	long sectors_per_track;		/* -S, number of sectors per track on device */
++	BOOL use_epoch_time;		/* -T, fake the time to be 00:00:00 UTC, Jan 1, 1970. */
++	long mft_zone_multiplier;	/* -z, value from 1 to 4. Default is 1. */
++	long long num_sectors;		/* size of device in sectors */
++	long cluster_size;		/* -c, format with this cluster-size */
++	BOOL with_uuid;			/* -U, request setting an uuid */
++	char *label;			/* -L, volume label */
++};
++
++extern struct mkntfs_options opts;
++
++extern int mkntfs(struct mkntfs_options *opts2, void *priv_data);
++
++#endif /* defined _NTFS_MKNTFS_H */
+diff --git a/security.c b/security.c
+index acee0a5..a2b5de0 100644
+--- a/security.c
++++ b/security.c
+@@ -5342,7 +5342,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
+ 	scapi = (struct SECURITY_API*)NULL;
+ 	mnt = ntfs_check_if_mounted(device, &mntflag);
+ 	if (!mnt && !(mntflag & NTFS_MF_MOUNTED) && !getuid()) {
+-		vol = ntfs_mount(device, flags);
++		vol = ntfs_mount(device, flags, NULL);
+ 		if (vol) {
+ 			scapi = (struct SECURITY_API*)
+ 				ntfs_malloc(sizeof(struct SECURITY_API));
+diff --git a/unix_io.c b/unix_io.c
+index 5495a6a..982276b 100644
+--- a/unix_io.c
++++ b/unix_io.c
+@@ -63,6 +63,7 @@
+ #include "device.h"
+ #include "logging.h"
+ #include "misc.h"
++#include "unix_io.h"
+ 
+ #define DEV_FD(dev)	(*(int *)dev->d_private)
+ 
+@@ -79,31 +80,11 @@
+  * was retrieved from:
+  *   http://mirror.linux.org.au/pub/linux.conf.au/2007/video/talks/278.pdf
+  */
++/*
+ static int ntfs_fsync(int fildes)
+ {
+-	int ret = -1;
+-#if defined(__APPLE__) || defined(__DARWIN__)
+-# ifndef F_FULLFSYNC
+-#  error "Mac OS X: F_FULLFSYNC is not defined. Either you didn't include fcntl.h or you're using an older, unsupported version of Mac OS X (pre-10.3)."
+-# endif
+-	/* 
+-	 * Apple has disabled fsync() for internal disk drives in OS X.
+-	 * To force a synchronization of disk contents, we use a Mac OS X
+-	 * specific fcntl, F_FULLFSYNC. 
+-	 */
+-	ret = fcntl(fildes, F_FULLFSYNC, NULL);
+-	if (ret) {
+-		/* 
+-		 * If we are not on a file system that supports this,
+-		 * then fall back to a plain fsync. 
+-		 */
+-		ret = fsync(fildes);
+-	}
+-#else
+-	ret = fsync(fildes);
+-#endif
+-	return ret;
+ }
++*/
+ 
+ /**
+  * ntfs_device_unix_io_open - Open a device and lock it exclusively
+@@ -116,80 +97,7 @@ static int ntfs_fsync(int fildes)
+  */
+ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
+ {
+-	struct flock flk;
+-	struct stat sbuf;
+-	int err;
+-
+-	if (NDevOpen(dev)) {
+-		errno = EBUSY;
+-		return -1;
+-	}
+-	if (stat(dev->d_name, &sbuf)) {
+-		ntfs_log_perror("Failed to access '%s'", dev->d_name);
+-		return -1;
+-	}
+-	if (S_ISBLK(sbuf.st_mode))
+-		NDevSetBlock(dev);
+-	
+-	dev->d_private = ntfs_malloc(sizeof(int));
+-	if (!dev->d_private)
+-		return -1;
+-	/*
+-	 * Open file for exclusive access if mounting r/w.
+-	 * Fuseblk takes care about block devices.
+-	 */ 
+-	if (!NDevBlock(dev) && (flags & O_RDWR) == O_RDWR)
+-		flags |= O_EXCL;
+-	*(int*)dev->d_private = open(dev->d_name, flags);
+-	if (*(int*)dev->d_private == -1) {
+-		err = errno;
+-			/* if permission error and rw, retry read-only */
+-		if ((err == EACCES) && ((flags & O_RDWR) == O_RDWR))
+-			err = EROFS;
+-		goto err_out;
+-	}
+-#ifdef HAVE_LINUX_FS_H
+-		/* Check whether the device was forced read-only */
+-	if (NDevBlock(dev) && ((flags & O_RDWR) == O_RDWR)) {
+-		int r;
+-		int state;
+-
+-		r = ioctl(DEV_FD(dev), BLKROGET, &state);
+-		if (!r && state) {
+-			err = EROFS;
+-			if (close(DEV_FD(dev)))
+-				err = errno;
+-			goto err_out;
+-   		}
+-	}
+-#endif
+-	
+-	if ((flags & O_RDWR) != O_RDWR)
+-		NDevSetReadOnly(dev);
+-	
+-	memset(&flk, 0, sizeof(flk));
+-	if (NDevReadOnly(dev))
+-		flk.l_type = F_RDLCK;
+-	else
+-		flk.l_type = F_WRLCK;
+-	flk.l_whence = SEEK_SET;
+-	flk.l_start = flk.l_len = 0LL;
+-	if (fcntl(DEV_FD(dev), F_SETLK, &flk)) {
+-		err = errno;
+-		ntfs_log_perror("Failed to %s lock '%s'", NDevReadOnly(dev) ? 
+-				"read" : "write", dev->d_name);
+-		if (close(DEV_FD(dev)))
+-			ntfs_log_perror("Failed to close '%s'", dev->d_name);
+-		goto err_out;
+-	}
+-	
+-	NDevSetOpen(dev);
+ 	return 0;
+-err_out:
+-	free(dev->d_private);
+-	dev->d_private = NULL;
+-	errno = err;
+-	return -1;
+ }
+ 
+ /**
+@@ -202,32 +110,6 @@ err_out:
+  */
+ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
+ {
+-	struct flock flk;
+-
+-	if (!NDevOpen(dev)) {
+-		errno = EBADF;
+-		ntfs_log_perror("Device %s is not open", dev->d_name);
+-		return -1;
+-	}
+-	if (NDevDirty(dev))
+-		if (ntfs_fsync(DEV_FD(dev))) {
+-			ntfs_log_perror("Failed to fsync device %s", dev->d_name);
+-			return -1;
+-		}
+-
+-	memset(&flk, 0, sizeof(flk));
+-	flk.l_type = F_UNLCK;
+-	flk.l_whence = SEEK_SET;
+-	flk.l_start = flk.l_len = 0LL;
+-	if (fcntl(DEV_FD(dev), F_SETLK, &flk))
+-		ntfs_log_perror("Could not unlock %s", dev->d_name);
+-	if (close(DEV_FD(dev))) {
+-		ntfs_log_perror("Failed to close device %s", dev->d_name);
+-		return -1;
+-	}
+-	NDevClearOpen(dev);
+-	free(dev->d_private);
+-	dev->d_private = NULL;
+ 	return 0;
+ }
+ 
+@@ -244,7 +126,7 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
+ static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
+ 		int whence)
+ {
+-	return lseek(DEV_FD(dev), offset, whence);
++	return ntfs_dev_lseek(dev, offset, whence);
+ }
+ 
+ /**
+@@ -260,7 +142,7 @@ static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
+ static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
+ 		s64 count)
+ {
+-	return read(DEV_FD(dev), buf, count);
++	return -1;
+ }
+ 
+ /**
+@@ -276,12 +158,7 @@ static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
+ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
+ 		s64 count)
+ {
+-	if (NDevReadOnly(dev)) {
+-		errno = EROFS;
+-		return -1;
+-	}
+-	NDevSetDirty(dev);
+-	return write(DEV_FD(dev), buf, count);
++	return ntfs_dev_write(dev, buf, count);
+ }
+ 
+ /**
+@@ -298,7 +175,10 @@ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
+ static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
+ 		s64 count, s64 offset)
+ {
+-	return pread(DEV_FD(dev), buf, count, offset);
++	if (ntfs_dev_lseek(dev, offset, 0) != offset) {
++		return -1;
++	}
++	return ntfs_dev_read(dev, buf, count);
+ }
+ 
+ /**
+@@ -315,12 +195,10 @@ static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
+ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
+ 		s64 count, s64 offset)
+ {
+-	if (NDevReadOnly(dev)) {
+-		errno = EROFS;
+-		return -1;
++	if (ntfs_dev_lseek(dev, offset, 0) != offset ) {
++		return -1;;
+ 	}
+-	NDevSetDirty(dev);
+-	return pwrite(DEV_FD(dev), buf, count, offset);
++	return ntfs_dev_write(dev, buf, count);
+ }
+ 
+ /**
+@@ -333,16 +211,7 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
+  */
+ static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
+ {
+-	int res = 0;
+-	
+-	if (!NDevReadOnly(dev)) {
+-		res = ntfs_fsync(DEV_FD(dev));
+-		if (res)
+-			ntfs_log_perror("Failed to sync device %s", dev->d_name);
+-		else
+-			NDevClearDirty(dev);
+-	}
+-	return res;
++	return 0;
+ }
+ 
+ /**
+@@ -356,7 +225,7 @@ static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
+  */
+ static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
+ {
+-	return fstat(DEV_FD(dev), buf);
++	return -1;
+ }
+ 
+ /**
+@@ -372,7 +241,7 @@ static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
+ static int ntfs_device_unix_io_ioctl(struct ntfs_device *dev,
+ 		unsigned long request, void *argp)
+ {
+-	return ioctl(DEV_FD(dev), request, argp);
++	return 0;
+ }
+ 
+ /**
+diff --git a/unix_io.h b/unix_io.h
+new file mode 100644
+index 0000000..de7e7c7
+--- /dev/null
++++ b/unix_io.h
+@@ -0,0 +1,8 @@
++#ifndef UNIX_IO_H
++#define UNIX_IO_H
++
++extern s64 ntfs_dev_read(struct ntfs_device *dev, const void* buf, u64 count);
++extern s64 ntfs_dev_write(struct ntfs_device *dev, const void* buf, u64 count);
++extern s64 ntfs_dev_lseek(struct ntfs_device *dev, s64 offset, int whence);
++
++#endif /* UNIX_IO_H */
+diff --git a/utils.c b/utils.c
+index 31522da..d35a4e4 100644
+--- a/utils.c
++++ b/utils.c
+@@ -281,7 +281,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags)
+ 	if (!utils_valid_device(device, flags & NTFS_MNT_RECOVER))
+ 		return NULL;
+ 
+-	vol = ntfs_mount(device, flags);
++	vol = ntfs_mount(device, flags, NULL);
+ 	if (!vol) {
+ 		ntfs_log_perror("Failed to mount '%s'", device);
+ 		if (errno == EINVAL)
+diff --git a/volume.c b/volume.c
+index a6d467b..f675102 100644
+--- a/volume.c
++++ b/volume.c
+@@ -1412,14 +1412,14 @@ int ntfs_set_ignore_case(ntfs_volume *vol)
+  * soon as the function returns.
+  */
+ ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
+-		ntfs_mount_flags flags __attribute__((unused)))
++		ntfs_mount_flags flags __attribute__((unused)), void *priv_data)
+ {
+ #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
+ 	struct ntfs_device *dev;
+ 	ntfs_volume *vol;
+ 
+ 	/* Allocate an ntfs_device structure. */
+-	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, NULL);
++	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, priv_data);
+ 	if (!dev)
+ 		return NULL;
+ 	/* Call ntfs_device_mount() to do the actual mount. */
+diff --git a/volume.h b/volume.h
+index 42800a2..600d648 100644
+--- a/volume.h
++++ b/volume.h
+@@ -179,11 +179,7 @@ typedef enum {
+  * struct _ntfs_volume - structure describing an open volume in memory.
+  */
+ struct _ntfs_volume {
+-	union {
+-		struct ntfs_device *dev;	/* NTFS device associated with
+-						   the volume. */
+-		void *sb;	/* For kernel porting compatibility. */
+-	};
++	struct ntfs_device *dev;	/* NTFS device associated with */
+ 	char *vol_name;		/* Name of the volume. */
+ 	unsigned long state;	/* NTFS specific flags describing this volume.
+ 				   See ntfs_volume_state_bits above. */
+@@ -298,7 +294,8 @@ extern ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
+ extern ntfs_volume *ntfs_device_mount(struct ntfs_device *dev,
+ 		ntfs_mount_flags flags);
+ 
+-extern ntfs_volume *ntfs_mount(const char *name, ntfs_mount_flags flags);
++extern ntfs_volume *ntfs_mount(const char *name, ntfs_mount_flags flags,
++		void *priv_data);
+ extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
+ 
+ extern int ntfs_version_is_supported(ntfs_volume *vol);
+-- 
+2.35.1
+

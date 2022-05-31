@@ -1,0 +1,47 @@
+syntax = "proto3";
+package analyzer;
+
+/* Requests */
+
+message RequestAnalyze {
+  string id = 1;
+};
+
+message RequestEnd {
+};
+
+message Request {
+  oneof msg {
+    RequestAnalyze Analyze = 1;
+    RequestEnd End = 2;
+  }
+};
+
+
+/* Response */
+
+message ResponseAnalyze {
+  repeated string clean = 1;
+  repeated string dirty = 2;
+}
+
+message ResponseUploadStatus {
+  uint64 current_size = 1;
+  uint64 total_size = 2;
+}
+
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseAnalyze Analyze = 1;
+    ResponseEnd End = 2;
+    ResponseError Error = 3;
+    ResponseUploadStatus UploadStatus = 4;
+  }
+};

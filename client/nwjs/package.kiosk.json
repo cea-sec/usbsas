@@ -1,0 +1,11 @@
+{
+    "name": "usbsas",
+    "main": "http://localhost:8080",
+    "node-main": "node-main.js",
+    "chromium-args" : "--disable-accelerated-video --disable-pinch",
+    "window": {
+	"kiosk": true,
+	"min_width": 1920,
+	"min_height": 1080
+    }
+}

@@ -1,0 +1,31 @@
+[package]
+name = "usbsas-usbsas"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+clap = "3.1.18"
+log = "0.4.17"
+thiserror = "1.0.31"
+usbsas-cmdexec = { path = "../usbsas-cmdexec" }
+usbsas-comm = { path = "../usbsas-comm" }
+usbsas-files2fs = { path = "../usbsas-files2fs" }
+usbsas-files2tar = { path = "../usbsas-files2tar" }
+usbsas-filter = { path = "../usbsas-filter" }
+usbsas-fs2dev = { path = "../usbsas-fs2dev" }
+usbsas-identificator = { path = "../usbsas-identificator" }
+usbsas-mass-storage = { path = "../usbsas-mass-storage" }
+usbsas-mock = { path = "../usbsas-mock", optional = true }
+usbsas-net = { path = "../usbsas-net" }
+usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-process = { path = "../usbsas-process" }
+usbsas-proto = { path = "../usbsas-proto" }
+usbsas-scsi2files = { path = "../usbsas-scsi2files" }
+usbsas-tar2files = { path = "../usbsas-tar2files" }
+usbsas-usbdev = { path = "../usbsas-usbdev" }
+usbsas-utils = { path = "../usbsas-utils" }
+
+[features]
+mock = ["usbsas-mock"]
+log-json = ["usbsas-utils/log-json"]
