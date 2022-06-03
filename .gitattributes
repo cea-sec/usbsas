@@ -1,0 +1,7 @@
+ntfs3g/src/ntfs-3g/** linguist-vendored
+ff/src/ff/** linguist-vendored
+client/web/static/bs/** linguist-vendored
+client/web/static/css/Lato.css linguist-vendored
+client/web/static/js/jquery.min.js linguist-vendored
+client/web/static/fontawesome/** linguist-vendored
+client/web/static/fonts/** linguist-vendored
