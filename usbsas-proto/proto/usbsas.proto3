@@ -171,7 +171,12 @@ message ResponseFinalCopyStatusDone {
 
 message ResponseNotEnoughSpace {
   uint64 max_size = 1;
-}
+};
+
+message ResponseNothingToCopy {
+  repeated string rejected_filter = 1;
+  repeated string rejected_dirty = 2;
+};
 
 message ResponseWipe {
 };
@@ -205,5 +210,6 @@ message Response {
     ResponseFinalCopyStatusDone FinalCopyStatusDone = 19;
     ResponseImgDisk ImgDisk = 20;
     ResponseCopyDone CopyDone = 21;
+    ResponseNothingToCopy NothingToCopy = 22;
   }
 };

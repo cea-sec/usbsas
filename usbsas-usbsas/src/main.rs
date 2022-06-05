@@ -70,6 +70,7 @@ protoresponse!(
     finalcopystatus = FinalCopyStatus[ResponseFinalCopyStatus],
     finalcopystatusdone = FinalCopyStatusDone[ResponseFinalCopyStatusDone],
     notenoughspace = NotEnoughSpace[ResponseNotEnoughSpace],
+    nothingtocopy = NothingToCopy[ResponseNothingToCopy],
     wipe = Wipe[ResponseWipe],
     imgdisk = ImgDisk[ResponseImgDisk],
     postcopycmd = PostCopyCmd[ResponsePostCopyCmd]
@@ -489,6 +490,16 @@ impl CopyFilesState {
         all_entries_filtered.append(&mut all_directories_filtered.clone());
         all_entries_filtered.append(&mut all_files_filtered.clone());
 
+        // Abort if no files passed name filtering
+        if all_entries_filtered.is_empty() {
+            comm.nothingtocopy(proto::usbsas::ResponseNothingToCopy {
+                rejected_filter: filtered,
+                rejected_dirty: vec![],
+            })?;
+            warn!("Aborting copy, no files survived filter");
+            return Ok(State::WaitEnd(WaitEndState {}));
+        }
+
         // max_file_size is 4GB if we're writing a FAT fs, None otherwise
         let max_file_size = match self.destination {
             Destination::Usb(ref usb) => {
@@ -781,9 +792,19 @@ impl WriteFilesState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        self.init_fs(children)?;
-
         self.analyze_files(comm, children)?;
+
+        // Abort if no files survived antivirus
+        if self.files.is_empty() {
+            comm.nothingtocopy(proto::usbsas::ResponseNothingToCopy {
+                rejected_filter: self.filtered,
+                rejected_dirty: self.dirty,
+            })?;
+            warn!("Aborting copy, no files survived antivirus");
+            return Ok(State::WaitEnd(WaitEndState {}));
+        }
+
+        self.init_fs(children)?;
 
         trace!("copy usb");
 

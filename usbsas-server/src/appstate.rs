@@ -717,6 +717,16 @@ impl AppState {
                     resp_stream.done.store(true, Ordering::Relaxed);
                     return Err(ServiceError::InternalServerError);
                 }
+                Msg::NothingToCopy(msg) => {
+                    resp_stream.add_message(ReportCopy {
+                        status: "nothing_to_copy",
+                        filtered_path: msg.rejected_filter,
+                        dirty_path: msg.rejected_dirty,
+                        error_path: vec![],
+                    })?;
+                    resp_stream.done.store(true, Ordering::Relaxed);
+                    return Ok(());
+                }
                 Msg::Error(err) => {
                     error!("{}", err.err);
                     resp_stream.report_error(&err.err)?;
@@ -776,6 +786,16 @@ impl AppState {
                             resp_stream.report_progress("copy_fromtar_update", progress)?;
                         }
                         Msg::CopyStatusDone(_) => break,
+                        Msg::NothingToCopy(msg) => {
+                            resp_stream.add_message(ReportCopy {
+                                status: "nothing_to_copy",
+                                filtered_path: msg.rejected_filter,
+                                dirty_path: msg.rejected_dirty,
+                                error_path: vec![],
+                            })?;
+                            resp_stream.done.store(true, Ordering::Relaxed);
+                            return Ok(());
+                        }
                         Msg::Error(err) => {
                             error!("{}", err.err);
                             resp_stream.report_error(&err.err)?;
