@@ -87,13 +87,10 @@ fn ntfs_file_from_path<'a, T: Read + Seek>(
         let mut index_entries = index.entries();
         while let Some(entry) = index_entries.next(reader) {
             let entry = entry?.to_file(fs, reader)?;
-            if let Some(name) = entry.name(reader, None, None) {
-                if let Some(name_string) = name?.name().to_string_checked() {
-                    if name_string == cur_path {
-                        cur_file = entry;
-                        continue 'outer;
-                    }
-                }
+            let name_string = ntfs_name_from_file(&entry, reader)?;
+            if name_string == cur_path {
+                cur_file = entry;
+                continue 'outer;
             }
         }
         return Err(Error::FSError(format!(
@@ -102,6 +99,31 @@ fn ntfs_file_from_path<'a, T: Read + Seek>(
         )));
     }
     Ok(cur_file)
+}
+
+fn ntfs_name_from_file<'a, T: Read + Seek>(
+    file: &'a ntfs::NtfsFile,
+    reader: &mut T,
+) -> Result<String> {
+    // Try to get the Posix name (it may not be the first registered) or
+    // fallback to whatever there is.
+    let name = if let Some(name) = file.name(
+        reader,
+        Some(ntfs::structured_values::NtfsFileNamespace::Posix),
+        None,
+    ) {
+        name
+    } else if let Some(name) = file.name(reader, None, None) {
+        name
+    } else {
+        return Err(Error::FSError("Didn't find file name".to_string()));
+    };
+
+    if let Some(name_string) = name?.name().to_string_checked() {
+        Ok(name_string)
+    } else {
+        Err(Error::FSError("Didn't find file name".to_string()))
+    }
 }
 
 fn ntfs_file_size<T: Read + Seek>(ntfs_file: &ntfs::NtfsFile, reader: &mut T) -> Result<u64> {
@@ -151,20 +173,11 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
             if ntfs_file.file_record_number() < 27 {
                 continue;
             }
-            let name_string = if let Some(name) = ntfs_file.name(&mut self.reader, None, None) {
-                let name = name?;
-                if let Some(name_string) = name.name().to_string_checked() {
-                    if !(name_string == "." || name_string == "..") {
-                        name_string
-                    } else {
-                        continue;
-                    }
-                } else {
-                    return Err(Error::FSError(format!("String convertion error: {}", path)));
-                }
-            } else {
-                return Err(Error::FSError(format!("Failed to get ntfs name: {}", path)));
-            };
+
+            let name_string = ntfs_name_from_file(&ntfs_file, &mut self.reader)?;
+            if name_string == "." || name_string == ".." {
+                continue;
+            }
             // See get_attr() above
             let ts =
                 ntfs_file.info()?.creation_time().nt_timestamp() as i64 / 10000000 - 11644473600;
