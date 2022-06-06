@@ -703,6 +703,65 @@ function do_copy() {
             reset_usbsas();
           }, reset_timeout);
           break;
+        case "nothing_to_copy":
+          elements[elements.length - 1].icon.classList.remove("spinner-border");
+          elements[elements.length - 1].icon.classList.add("fa-check");
+          progress.classList.add("bg-danger");
+          let nothing_tr = document.createElement("tr");
+          nothing_tr.innerHTML =
+            "<td><i class='fas fa-times'></i>&nbsp;</td><td><strong data-langkey=\"nothingtocopy\">" +
+            langDocument["nothingtocopy"] + "</strong></td>";
+          tbody.appendChild(nothing_tr);
+          document.querySelector("#cancel-button").classList.remove("d-none");
+          document.querySelector("#cancel-button").innerText = langDocument["return"];
+          for (let filtered_path of json.filtered_path) {
+            // Display filtered elements
+            has_error = true;
+            let tr_err = document.createElement("tr");
+            let status_td_err = document.createElement("td");
+            status_td_err.innerHTML = "&nbsp;";
+            let format_status_icon_err = document.createElement("i");
+            format_status_icon_err.classList.add("fas");
+            format_status_icon_err.classList.add("fa-times");
+            format_status_icon_err.classList.add("text-danger");
+            status_td_err.insertBefore(format_status_icon_err, status_td_err.firstChild);
+            tr_err.appendChild(status_td_err);
+            let name_td_err = document.createElement("td");
+            let p_err = document.createElement("p");
+            p_err.classList.add("text-danger");
+            p_err.innerHTML = "<strong data-langkey=\"filterf\">" + langDocument["filterf"] + "</strong>";
+            let span_err = document.createElement("span");
+            span_err.innerText = filtered_path;
+            p_err.appendChild(span_err);
+            name_td_err.appendChild(p_err);
+            tr_err.appendChild(name_td_err);
+            tbody.appendChild(tr_err);
+          }
+          for (let dirty_path of json.dirty_path) {
+            // Display dirty elements
+            has_error = true;
+            let tr_err = document.createElement("tr");
+            let status_td_err = document.createElement("td");
+            status_td_err.innerHTML = "&nbsp;";
+            let format_status_icon_err = document.createElement("i");
+            format_status_icon_err.classList.add("fas");
+            format_status_icon_err.classList.add("fa-times");
+            format_status_icon_err.classList.add("text-danger");
+            status_td_err.insertBefore(format_status_icon_err, status_td_err.firstChild);
+            tr_err.appendChild(status_td_err);
+            let name_td_err = document.createElement("td");
+            let p_err = document.createElement("p");
+            p_err.classList.add("text-danger");
+            p_err.innerHTML = "<strong data-langkey=\"filterav\">" + langDocument["filterav"] + "</strong>";
+            let span_err = document.createElement("span");
+            span_err.innerText = dirty_path;
+            p_err.appendChild(span_err);
+            name_td_err.appendChild(p_err);
+            tr_err.appendChild(name_td_err);
+            tbody.appendChild(tr_err);
+          }
+          set_state("WAIT_REMOVAL");
+          break;
         case "terminate":
           // Effective write on device
           elements[elements.length - 1].icon.classList.remove("spinner-border");

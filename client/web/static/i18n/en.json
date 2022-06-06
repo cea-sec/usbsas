@@ -60,6 +60,7 @@
     "insertwipe": "Insert device to <strong>wipe</strong>",
     "name": "Name",
     "next": "Next",
+    "nothingtocopy": "No file to copy after name filter or antivirus analysis",
     "ntfsdirty": "La partition NTFS est 'dirty', il est probable que la clé USB n'ait pas été éjectée correctement, veuillez vérifier l'intégrité du système de fichiers.",
     "output": "Destination",
     "outusb": "USB device",

@@ -60,6 +60,7 @@
     "insertwipe": "Insérez le périphérique à <strong>effacer</strong>",
     "name": "Nom",
     "next": "Suivant",
+    "nothingtocopy": "Aucun fichier à copier après filtrage ou analyse antivirale",
     "ntfsdirty": "The NTFS partition is 'dirty', the device was probably not ejected correctly, please check the partition integrity.",
     "output": "Destination",
     "outusb": "Périphérique USB",
