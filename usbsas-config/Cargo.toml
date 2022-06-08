@@ -9,4 +9,3 @@ lazy_static = "1.4.0"
 log = "0.4.17"
 serde = { version = "1.0.137", features = ["derive"] }
 toml = "0.5.9"
-usbsas-utils = { path = "../usbsas-utils" }

@@ -325,6 +325,7 @@ impl ReqAuthentication for Vec<u8> {
 /// Actix data struct
 pub(crate) struct AppState {
     config: Mutex<Config>,
+    pub config_path: Mutex<String>,
     comm: Mutex<Comm<proto::usbsas::Request>>,
     out_dev: Mutex<Option<CopyDestination>>,
     hmac: Mutex<Hmac<Sha256>>,
@@ -335,8 +336,8 @@ pub(crate) struct AppState {
 }
 
 impl AppState {
-    pub(crate) fn new() -> Result<Self, ServiceError> {
-        let config = conf_parse(&conf_read()?)?;
+    pub(crate) fn new(config_path: String) -> Result<Self, ServiceError> {
+        let config = conf_parse(&conf_read(&config_path)?)?;
 
         let tmpfiles = TmpFiles::new(config.out_directory.clone())?;
 
@@ -348,6 +349,7 @@ impl AppState {
 
         let (comm, usbsas_pid) = AppState::start_usbsas(
             &config,
+            &config_path,
             &tmpfiles,
             #[cfg(feature = "log-json")]
             &session_id,
@@ -355,6 +357,7 @@ impl AppState {
 
         Ok(AppState {
             config: Mutex::new(config),
+            config_path: Mutex::new(config_path),
             tmpfiles: Mutex::new(tmpfiles),
             comm: Mutex::new(comm),
             out_dev: Mutex::new(None),
@@ -369,6 +372,7 @@ impl AppState {
 
     fn start_usbsas(
         config: &Config,
+        config_path: &str,
         tmpfiles: &TmpFiles,
         #[cfg(feature = "log-json")] sessionid: &str,
     ) -> Result<(Comm<proto::usbsas::Request>, Arc<Mutex<unistd::Pid>>), ServiceError> {
@@ -381,6 +385,8 @@ impl AppState {
         if config.analyzer.is_some() {
             command.arg("--analyze");
         }
+
+        command.args(["-c", config_path]);
 
         #[cfg(feature = "log-json")]
         command.args(["--sessionid", sessionid]);
@@ -426,6 +432,7 @@ impl AppState {
 
         let (new_comm, new_usbsas_pid) = AppState::start_usbsas(
             &*self.config.lock()?,
+            &*self.config_path.lock()?,
             &*self.tmpfiles.lock()?,
             #[cfg(feature = "log-json")]
             &new_session_id,

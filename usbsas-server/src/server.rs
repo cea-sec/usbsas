@@ -17,13 +17,13 @@ async fn id(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
 }
 
 #[get("/usbsas_infos")]
-async fn usbsas_infos() -> Result<impl Responder, ServiceError> {
+async fn usbsas_infos(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     let node_name = match uname::Info::new() {
         Ok(infos) => infos.nodename,
         _ => "Unknown".to_string(),
     };
     /* Re-read conf to get message updates */
-    let config_str = conf_read()?;
+    let config_str = conf_read(&data.config_path.lock()?)?;
     let config = conf_parse(&config_str)?;
 
     Ok(HttpResponse::Ok().json(UsbsasInfos {
@@ -145,8 +145,8 @@ async fn index() -> Result<impl Responder, ServiceError> {
 }
 
 #[actix_web::main]
-pub async fn start_server() -> io::Result<()> {
-    let app_data = web::Data::new(AppState::new().map_err(|err| {
+pub async fn start_server(config_path: String) -> io::Result<()> {
+    let app_data = web::Data::new(AppState::new(config_path).map_err(|err| {
         io::Error::new(
             ErrorKind::Other,
             format!("couldn't init server data: {}", err),

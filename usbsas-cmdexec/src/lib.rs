@@ -72,6 +72,7 @@ impl State {
 struct InitState {
     out_tar: String,
     out_fs: String,
+    config_path: String,
 }
 
 struct RunningState {
@@ -85,7 +86,7 @@ struct WaitEndState {}
 
 impl InitState {
     fn run(self, _comm: &mut Comm<proto::cmdexec::Request>) -> Result<State> {
-        let config = conf_parse(&conf_read()?)?;
+        let config = conf_parse(&conf_read(&self.config_path)?)?;
         Ok(State::Running(RunningState {
             out_tar: self.out_tar,
             out_fs: self.out_fs,
@@ -209,10 +210,19 @@ pub struct CmdExec {
 }
 
 impl CmdExec {
-    fn new(comm: Comm<proto::cmdexec::Request>, out_tar: String, out_fs: String) -> Result<Self> {
+    fn new(
+        comm: Comm<proto::cmdexec::Request>,
+        out_tar: String,
+        out_fs: String,
+        config_path: String,
+    ) -> Result<Self> {
         Ok(CmdExec {
             comm,
-            state: State::Init(InitState { out_tar, out_fs }),
+            state: State::Init(InitState {
+                out_tar,
+                out_fs,
+                config_path,
+            }),
         })
     }
 
@@ -242,11 +252,12 @@ impl UsbsasProcess for CmdExec {
         args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         if let Some(args) = args {
-            if args.len() == 2 {
+            if args.len() == 3 {
                 CmdExec::new(
                     Comm::from_raw_fd(read_fd, write_fd),
                     args[0].to_owned(),
                     args[1].to_owned(),
+                    args[2].to_owned(),
                 )?
                 .main_loop()
                 .map(|_| log::debug!("cmdexec: exiting"))?;

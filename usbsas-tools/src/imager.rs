@@ -279,6 +279,14 @@ fn main() -> Result<()> {
         .about("Clone a usb device (Mass Storage) with usbsas")
         .version("1.0")
         .arg(
+            clap::Arg::new("config")
+                .short('c')
+                .long("config")
+                .help("Path of the configuration file")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
             Arg::new("output")
                 .short('o')
                 .long("output")
@@ -325,7 +333,11 @@ fn main() -> Result<()> {
     } else if matches.is_present("stdout") {
         None
     } else {
-        let config = conf_parse(&conf_read()?)?;
+        let config = conf_parse(&conf_read(
+            matches
+                .value_of("config")
+                .unwrap_or(usbsas_utils::USBSAS_CONFIG),
+        )?)?;
         let out_dir = path::Path::new(&config.out_directory);
         let (out_file, out_path) = tempfile::Builder::new()
             .prefix("device_image_")

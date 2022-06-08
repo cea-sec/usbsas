@@ -16,9 +16,6 @@ fn main() {
     println!("cargo:rustc-env=USBSAS_BIN_PATH={}", bin_path);
     println!("cargo:rerun-if-env-changed=USBSAS_BIN_PATH");
 
-    let config_path =
-        env::var("USBSAS_CONFIG").unwrap_or_else(|_| "/etc/usbsas/config.toml".to_string());
-    println!("cargo:rustc-env=USBSAS_CONFIG={}", config_path);
     println!("cargo:rerun-if-env-changed=USBSAS_CONFIG");
 
     // Set version for env!() macro
