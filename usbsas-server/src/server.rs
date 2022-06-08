@@ -145,7 +145,7 @@ async fn index() -> Result<impl Responder, ServiceError> {
 }
 
 #[actix_web::main]
-pub async fn start_server(config_path: String) -> io::Result<()> {
+pub async fn start_server(config_path: String, bind_addr: &str, bind_port: &str) -> io::Result<()> {
     let app_data = web::Data::new(AppState::new(config_path).map_err(|err| {
         io::Error::new(
             ErrorKind::Other,
@@ -185,7 +185,7 @@ pub async fn start_server(config_path: String) -> io::Result<()> {
             ))
             .service(index)
     })
-    .bind("127.0.0.1:8080")?
+    .bind(format!("{}:{}", bind_addr, bind_port))?
     .run()
     .await
 }
