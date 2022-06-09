@@ -66,6 +66,7 @@ impl State {
 
 struct InitState {
     tarpath: String,
+    config_path: String,
 }
 
 struct RunningState {
@@ -79,7 +80,7 @@ struct WaitEndState {}
 impl InitState {
     fn run(self, _comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
         let file = File::open(&self.tarpath)?;
-        let config_str = conf_read()?;
+        let config_str = conf_read(&self.config_path)?;
         let config = conf_parse(&config_str)?;
         let net_conf = config.network.ok_or(Error::Conf)?;
 
@@ -175,8 +176,16 @@ pub struct Uploader {
 }
 
 impl Uploader {
-    fn new(comm: Comm<proto::uploader::Request>, tarpath: String) -> Result<Self> {
-        let state = State::Init(InitState { tarpath });
+    fn new(
+        comm: Comm<proto::uploader::Request>,
+        tarpath: String,
+        config_path: String,
+    ) -> Result<Self> {
+        log::info!("uploader: {}", tarpath);
+        let state = State::Init(InitState {
+            tarpath,
+            config_path,
+        });
         Ok(Uploader { comm, state })
     }
 
@@ -206,17 +215,19 @@ impl UsbsasProcess for Uploader {
         args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         if let Some(args) = args {
-            if let Some(fname) = args.get(0) {
-                log::info!("uploader: {}", fname);
-                Uploader::new(Comm::from_raw_fd(read_fd, write_fd), fname.to_owned())?
-                    .main_loop()
-                    .map(|_| log::debug!("uploader exit"))?;
+            if args.len() == 2 {
+                Uploader::new(
+                    Comm::from_raw_fd(read_fd, write_fd),
+                    args[0].to_owned(),
+                    args[1].to_owned(),
+                )?
+                .main_loop()
+                .map(|_| log::debug!("uploader exit"))?;
                 return Ok(());
             }
         }
-        error!("Uploader need a fname argument");
         Err(Box::new(Error::Error(
-            "uploader need a fname arg".to_string(),
+            "uploader need a fname and a config_path arg".to_string(),
         )))
     }
 }

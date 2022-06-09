@@ -23,6 +23,8 @@ use usbsas_proto::{common::Device as UsbDevice, usbdev::request::Msg};
 enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
+    #[error("{0}")]
+    Error(String),
     #[error("rusb error: {0}")]
     Rusb(#[from] rusb::Error),
     #[error("privileges: {0}")]
@@ -319,7 +321,9 @@ impl State {
     }
 }
 
-struct InitState {}
+struct InitState {
+    config_path: String,
+}
 
 struct RunningState {
     context: rusb::Context,
@@ -332,7 +336,7 @@ struct WaitEndState {}
 impl InitState {
     fn run(self, comm: &mut Comm<proto::usbdev::Request>) -> Result<State> {
         trace!("init state");
-        let config = conf_parse(&conf_read()?)?;
+        let config = conf_parse(&conf_read(&self.config_path)?)?;
 
         let context = rusb::Context::new()?;
         let current_devices = Arc::new(Mutex::new(CurrentDevices::new(config.usb_port_accesses)));
@@ -426,14 +430,14 @@ pub struct UsbDev {
 }
 
 impl UsbDev {
-    fn new(comm: Comm<proto::usbdev::Request>) -> Result<Self> {
+    fn new(comm: Comm<proto::usbdev::Request>, config_path: String) -> Result<Self> {
         if !rusb::has_hotplug() {
             error!("libusb doesn't support hotplug");
             std::process::exit(1);
         }
         Ok(UsbDev {
             comm,
-            state: State::Init(InitState {}),
+            state: State::Init(InitState { config_path }),
         })
     }
 
@@ -460,11 +464,18 @@ impl UsbsasProcess for UsbDev {
     fn spawn(
         read_fd: RawFd,
         write_fd: RawFd,
-        _args: Option<Vec<String>>,
+        args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        UsbDev::new(Comm::from_raw_fd(read_fd, write_fd))?
-            .main_loop()
-            .map(|_| debug!("usbdev: exiting"))?;
-        Ok(())
+        if let Some(args) = args {
+            if args.len() == 1 {
+                UsbDev::new(Comm::from_raw_fd(read_fd, write_fd), args[0].to_owned())?
+                    .main_loop()
+                    .map(|_| debug!("usbdev: exiting"))?;
+                return Ok(());
+            }
+        }
+        Err(Box::new(Error::Error(
+            "usbdev needs a config_path arg".to_string(),
+        )))
     }
 }

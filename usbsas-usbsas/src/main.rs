@@ -1525,8 +1525,9 @@ pub struct Usbsas {
 impl Usbsas {
     fn new(
         comm: Comm<proto::usbsas::Request>,
-        out_tar: String,
-        out_fs: String,
+        config_path: &str,
+        out_tar: &str,
+        out_fs: &str,
         analyze: bool,
     ) -> Result<Self> {
         trace!("init");
@@ -1542,13 +1543,16 @@ impl Usbsas {
         pipes_write.push(identificator.comm.output_fd());
 
         let cmdexec = UsbsasChildSpawner::new()
-            .arg(&out_tar)
-            .arg(&out_fs)
+            .arg(out_tar)
+            .arg(out_fs)
+            .arg(config_path)
             .spawn::<usbsas_cmdexec::CmdExec, proto::cmdexec::Request>()?;
         pipes_read.push(cmdexec.comm.input_fd());
         pipes_write.push(cmdexec.comm.output_fd());
 
-        let usbdev = UsbsasChildSpawner::new().spawn::<UsbDev, proto::usbdev::Request>()?;
+        let usbdev = UsbsasChildSpawner::new()
+            .arg(config_path)
+            .spawn::<UsbDev, proto::usbdev::Request>()?;
         pipes_read.push(usbdev.comm.input_fd());
         pipes_write.push(usbdev.comm.output_fd());
 
@@ -1558,46 +1562,49 @@ impl Usbsas {
         pipes_write.push(scsi2files.comm.output_fd());
 
         let files2tar = UsbsasChildSpawner::new()
-            .arg(&out_tar)
+            .arg(out_tar)
             .wait_on_startup()
             .spawn::<usbsas_files2tar::Files2Tar, proto::writetar::Request>()?;
         pipes_read.push(files2tar.comm.input_fd());
         pipes_write.push(files2tar.comm.output_fd());
 
         let files2fs = UsbsasChildSpawner::new()
-            .arg(&out_fs)
+            .arg(out_fs)
             .spawn::<usbsas_files2fs::Files2Fs, proto::writefs::Request>()?;
         pipes_read.push(files2fs.comm.input_fd());
         pipes_write.push(files2fs.comm.output_fd());
 
-        let filter =
-            UsbsasChildSpawner::new().spawn::<usbsas_filter::Filter, proto::filter::Request>()?;
+        let filter = UsbsasChildSpawner::new()
+            .arg(config_path)
+            .spawn::<usbsas_filter::Filter, proto::filter::Request>()?;
         pipes_read.push(filter.comm.input_fd());
         pipes_write.push(filter.comm.output_fd());
 
         let fs2dev = UsbsasChildSpawner::new()
-            .arg(&out_fs)
+            .arg(out_fs)
             .wait_on_startup()
             .spawn::<usbsas_fs2dev::Fs2Dev, proto::fs2dev::Request>()?;
         pipes_read.push(fs2dev.comm.input_fd());
         pipes_write.push(fs2dev.comm.output_fd());
 
         let tar2files = UsbsasChildSpawner::new()
-            .arg(&out_tar)
+            .arg(out_tar)
             .wait_on_startup()
             .spawn::<usbsas_tar2files::Tar2Files, proto::files::Request>()?;
         pipes_read.push(tar2files.comm.input_fd());
         pipes_write.push(tar2files.comm.output_fd());
 
         let uploader = UsbsasChildSpawner::new()
-            .arg(&out_tar)
+            .arg(out_tar)
+            .arg(config_path)
             .spawn::<usbsas_net::Uploader, proto::uploader::Request>()?;
         pipes_read.push(uploader.comm.input_fd());
         pipes_write.push(uploader.comm.output_fd());
 
         let analyzer = if analyze {
             let analyzer = UsbsasChildSpawner::new()
-                .arg(&out_tar)
+                .arg(out_tar)
+                .arg(config_path)
                 .spawn::<usbsas_net::Analyzer, proto::analyzer::Request>()?;
             pipes_read.push(analyzer.comm.input_fd());
             pipes_write.push(analyzer.comm.output_fd());
@@ -1653,6 +1660,14 @@ impl Usbsas {
 fn main() -> Result<()> {
     let cmd = clap::Command::new("usbsas-usbsas")
         .arg(
+            clap::Arg::new("config")
+                .short('c')
+                .long("config")
+                .help("Path of the configuration file")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
             clap::Arg::new("outtar")
                 .value_name("OUT_TAR")
                 .index(1)
@@ -1688,6 +1703,10 @@ fn main() -> Result<()> {
 
     let matches = cmd.get_matches();
 
+    let config_path = matches
+        .value_of("config")
+        .unwrap_or(usbsas_utils::USBSAS_CONFIG);
+
     #[cfg(feature = "log-json")]
     usbsas_utils::log::init_logger(Arc::new(RwLock::new(
         matches.value_of("sessionid").unwrap().to_string(),
@@ -1702,8 +1721,9 @@ fn main() -> Result<()> {
 
     let usbsas = Usbsas::new(
         comm,
-        matches.value_of("outtar").unwrap().to_string(),
-        matches.value_of("outfs").unwrap().to_string(),
+        config_path,
+        matches.value_of("outtar").unwrap(),
+        matches.value_of("outfs").unwrap(),
         matches.is_present("analyze"),
     )?;
 

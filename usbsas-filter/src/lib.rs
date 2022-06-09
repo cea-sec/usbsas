@@ -17,6 +17,8 @@ use usbsas_proto::{filter::request::Msg, filter::FilterResult};
 enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
+    #[error("{0}")]
+    Error(String),
     #[error("privileges: {0}")]
     Privileges(#[from] usbsas_privileges::Error),
     #[error("Bad Request")]
@@ -113,14 +115,16 @@ impl State {
     }
 }
 
-struct InitState {}
+struct InitState {
+    config_path: String,
+}
 struct RunningState {
     rules: Rules,
 }
 
 impl InitState {
     fn run(self, comm: &mut Comm<proto::filter::Request>) -> Result<State> {
-        let config_str = conf_read()?;
+        let config_str = conf_read(&self.config_path)?;
 
         usbsas_privileges::filter::drop_priv(comm.input_fd(), comm.output_fd())?;
 
@@ -176,10 +180,10 @@ pub struct Filter {
 }
 
 impl Filter {
-    fn new(comm: Comm<proto::filter::Request>) -> Result<Self> {
+    fn new(comm: Comm<proto::filter::Request>, config_path: String) -> Result<Self> {
         Ok(Filter {
             comm,
-            state: State::Init(InitState {}),
+            state: State::Init(InitState { config_path }),
         })
     }
 
@@ -199,12 +203,19 @@ impl UsbsasProcess for Filter {
     fn spawn(
         read_fd: RawFd,
         write_fd: RawFd,
-        _args: Option<Vec<String>>,
+        args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        Filter::new(Comm::from_raw_fd(read_fd, write_fd))?
-            .main_loop()
-            .map(|_| log::debug!("filter: exiting"))?;
-        Ok(())
+        if let Some(args) = args {
+            if args.len() == 1 {
+                Filter::new(Comm::from_raw_fd(read_fd, write_fd), args[0].to_owned())?
+                    .main_loop()
+                    .map(|_| log::debug!("filter: exiting"))?;
+                return Ok(());
+            }
+        }
+        Err(Box::new(Error::Error(
+            "filter needs a config_path arg".to_string(),
+        )))
     }
 }
 

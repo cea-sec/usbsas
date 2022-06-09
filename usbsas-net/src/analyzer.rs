@@ -77,6 +77,7 @@ impl State {
 
 struct InitState {
     tarpath: String,
+    config_path: String,
 }
 
 struct RunningState {
@@ -90,7 +91,7 @@ struct WaitEndState {}
 impl InitState {
     fn run(self, _comm: &mut Comm<proto::analyzer::Request>) -> Result<State> {
         let file = File::open(&self.tarpath)?;
-        let config = conf_parse(&conf_read()?)?;
+        let config = conf_parse(&conf_read(&self.config_path)?)?;
 
         // XXX seccomp
 
@@ -236,8 +237,16 @@ pub struct Analyzer {
 }
 
 impl Analyzer {
-    fn new(comm: Comm<proto::analyzer::Request>, tarpath: String) -> Result<Self> {
-        let state = State::Init(InitState { tarpath });
+    fn new(
+        comm: Comm<proto::analyzer::Request>,
+        tarpath: String,
+        config_path: String,
+    ) -> Result<Self> {
+        log::info!("analyzer: {:?}", tarpath);
+        let state = State::Init(InitState {
+            tarpath,
+            config_path,
+        });
         Ok(Analyzer { comm, state })
     }
 
@@ -267,11 +276,14 @@ impl UsbsasProcess for Analyzer {
         args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         if let Some(args) = args {
-            if let Some(fname) = args.get(0) {
-                log::info!("analyzer: {:?}", fname);
-                Analyzer::new(Comm::from_raw_fd(read_fd, write_fd), fname.to_owned())?
-                    .main_loop()
-                    .map(|_| log::debug!("analyzer: exiting"))?;
+            if args.len() == 2 {
+                Analyzer::new(
+                    Comm::from_raw_fd(read_fd, write_fd),
+                    args[0].to_owned(),
+                    args[1].to_owned(),
+                )?
+                .main_loop()
+                .map(|_| log::debug!("analyzer: exiting"))?;
                 return Ok(());
             }
         }

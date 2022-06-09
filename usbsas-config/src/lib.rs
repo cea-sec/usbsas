@@ -5,7 +5,6 @@
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::{fs, io};
-use usbsas_utils::USBSAS_CONFIG;
 
 // Default environment variables to keep when forking
 lazy_static! {
@@ -96,9 +95,9 @@ impl Config {
     }
 }
 
-pub fn conf_read() -> io::Result<String> {
-    log::debug!("read config file: {}", USBSAS_CONFIG);
-    fs::read_to_string(USBSAS_CONFIG)
+pub fn conf_read(config_path: &str) -> io::Result<String> {
+    log::debug!("read config file: {}", config_path);
+    fs::read_to_string(config_path)
 }
 
 pub fn conf_parse(conf_str: &str) -> io::Result<Config> {

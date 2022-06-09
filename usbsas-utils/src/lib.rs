@@ -9,7 +9,10 @@ pub const OUTPUT_PIPE_FD_VAR: &str = "OUTPUT_PIPE_FD";
 pub const READ_FILE_MAX_SIZE: u64 = 1024 * 1024 * 10;
 pub const SECTOR_SIZE: u64 = 512;
 pub const USBSAS_BIN_PATH: &str = env!("USBSAS_BIN_PATH");
-pub const USBSAS_CONFIG: &str = env!("USBSAS_CONFIG");
+pub const USBSAS_CONFIG: &str = match option_env!("USBSAS_CONFIG") {
+    Some(val) => val,
+    None => "/etc/usbsas/config.toml",
+};
 pub const USBSAS_VERSION: &str = env!("GIT_HASH");
 
 #[macro_export]

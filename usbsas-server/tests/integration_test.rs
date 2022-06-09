@@ -79,6 +79,7 @@ impl IntegrationTester {
         // Start usbsas server
         let usbsas_server = Command::cargo_bin("usbsas-server")
             .expect("Couldn't run usbsas server")
+            .args(&["-c", &format!("{}/config_test.toml", test_data_dir)])
             .spawn()
             .expect("Couldn't run usbsas server");
 

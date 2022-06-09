@@ -53,7 +53,6 @@ as well. Packages are provided for the server and the analyzer server.
 ```shell
 $ sudo apt install cargo pkgconf clang cmake git libfuse3-dev libssl-dev libkrb5-dev libclamav-dev libx11-dev libxtst-dev libseccomp-dev
 $ cargo install cargo-deb
-$ export USBSAS_CONFIG="/etc/usbsas/config.toml"
 $ export USBSAS_WEBFILES_DIR="/usr/share/usbsas/web"
 $ export USBSAS_BIN_PATH="/usr/libexec"
 $ cargo build --release
@@ -211,8 +210,8 @@ A `mock` feature is available to test the usbsas without real usb devices.
 
 Run the integration tests:
 ```shell
-$ USBSAS_CONFIG=$(pwd)/usbsas-server/test_data/config_test.toml cargo build --features mock
-$ USBSAS_CONFIG=$(pwd)/usbsas-server/test_data/config_test.toml cargo test -p usbsas-server
+$ cargo build --features mock
+$ cargo test -p usbsas-server
 ```
 
 ### Try usbsas without USB devices
