@@ -17,7 +17,7 @@ use std::{
     thread,
 };
 use tar::Archive;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 struct AnalyzeStatus {
     status: String,
@@ -33,7 +33,10 @@ struct AppState {
 
 impl AppState {
     fn analyze(&self, bundle_id: String, tar: String) -> Result<(), actix_web::Error> {
-        let tmpdir = TempDir::new_in(self.working_dir.lock().unwrap().path(), &bundle_id).unwrap();
+        let tmpdir = tempfile::Builder::new()
+            .prefix(&bundle_id)
+            .tempdir_in(self.working_dir.lock().unwrap().path())
+            .unwrap();
         let mut archive = Archive::new(fs::File::open(&tar).unwrap());
         // XXX TODO maybe mmap archive file and use clamav's scan_map function instead of unpacking
         if let Err(err) = archive.unpack(tmpdir.path()) {
@@ -235,7 +238,12 @@ async fn main() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
     let (engine, settings) = init_clamav();
     let app_data = web::Data::new(AppState {
-        working_dir: Mutex::new(TempDir::new_in("/tmp", "analyzer").unwrap()),
+        working_dir: Mutex::new(
+            tempfile::Builder::new()
+                .prefix("usbsas-analyzer")
+                .tempdir_in("/tmp")
+                .unwrap(),
+        ),
         current_scans: Mutex::new(HashMap::new()),
         clamav_engine: Mutex::new(engine),
         clamav_settings: Mutex::new(settings),
