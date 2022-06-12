@@ -721,8 +721,8 @@ impl AppState {
                         status: "copy_not_enough_space",
                         size: msg.max_size,
                     })?;
-                    resp_stream.done.store(true, Ordering::Relaxed);
-                    return Err(ServiceError::InternalServerError);
+                    resp_stream.done()?;
+                    return Ok(());
                 }
                 Msg::NothingToCopy(msg) => {
                     resp_stream.add_message(ReportCopy {
@@ -731,7 +731,7 @@ impl AppState {
                         dirty_path: msg.rejected_dirty,
                         error_path: vec![],
                     })?;
-                    resp_stream.done.store(true, Ordering::Relaxed);
+                    resp_stream.done()?;
                     return Ok(());
                 }
                 Msg::Error(err) => {
@@ -800,7 +800,7 @@ impl AppState {
                                 dirty_path: msg.rejected_dirty,
                                 error_path: vec![],
                             })?;
-                            resp_stream.done.store(true, Ordering::Relaxed);
+                            resp_stream.done()?;
                             return Ok(());
                         }
                         Msg::Error(err) => {
@@ -880,7 +880,7 @@ impl AppState {
         };
 
         resp_stream.add_message(final_report)?;
-        resp_stream.done.store(true, Ordering::Relaxed);
+        resp_stream.done()?;
         Ok(())
     }
 
@@ -935,7 +935,7 @@ impl AppState {
                 }
                 Msg::Wipe(_) => {
                     resp_stream.report_progress("wipe_end", 0.0)?;
-                    resp_stream.done.store(true, Ordering::Relaxed);
+                    resp_stream.done()?;
                     break;
                 }
                 _ => {
@@ -998,7 +998,7 @@ impl AppState {
                         ),
                     )?;
                     resp_stream.report_progress("imgdisk_end", 0.0)?;
-                    resp_stream.done.store(true, Ordering::Relaxed);
+                    resp_stream.done()?;
                     break;
                 }
                 Msg::Error(err) => {
@@ -1022,9 +1022,9 @@ impl AppState {
 #[derive(Clone)]
 pub(crate) struct ResponseStream {
     /// Contains serialized messages to send
-    pub(crate) messages: Arc<Mutex<Vec<u8>>>,
-    pub(crate) done: Arc<AtomicBool>,
-    pub(crate) waker: Arc<Mutex<Option<Waker>>>,
+    messages: Arc<Mutex<Vec<u8>>>,
+    done: Arc<AtomicBool>,
+    waker: Arc<Mutex<Option<Waker>>>,
 }
 
 impl ResponseStream {
@@ -1061,7 +1061,14 @@ impl ResponseStream {
             status: "fatal_error",
             msg,
         })?;
+        self.done()
+    }
+
+    fn done(&mut self) -> Result<(), ServiceError> {
         self.done.store(true, Ordering::Relaxed);
+        if let Some(waker) = self.waker.lock()?.take() {
+            waker.wake();
+        }
         Ok(())
     }
 }
