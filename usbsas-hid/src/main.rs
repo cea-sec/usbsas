@@ -1,4 +1,4 @@
-//! Minimal HID userland driver for X. It only supports left click or mouses and
+//! Minimal HID userland driver for X. It only supports left click of mouses and
 //! touch screens.
 
 use rusb::{
@@ -477,29 +477,6 @@ struct HidItem {
 }
 
 impl HidItem {
-    fn new(
-        offset: usize,
-        usage_page: HidUsagePage,
-        usage: Vec<HidUsage>,
-        logical_min: i32,
-        logical_max: i32,
-        coordinatestate: CoordinateState,
-        count: u8,
-        size: u8,
-        r#type: HidItemType,
-    ) -> HidItem {
-        HidItem {
-            offset,
-            usage_page,
-            usage,
-            logical_min,
-            logical_max,
-            coordinatestate,
-            count,
-            size,
-            r#type,
-        }
-    }
     fn get_value(&self, index: usize, buffer: &[u8]) -> Result<i32, Error> {
         if self.logical_min < 0 {
             match self.size {
@@ -591,23 +568,23 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                 }
 
                                 //assert!(report_count == usages.len());
-                                let item = HidItem::new(
-                                    total_report_size,
-                                    usage_page.clone().take().ok_or_else(|| {
+                                let item = HidItem {
+                                    offset: total_report_size,
+                                    usage_page: usage_page.clone().take().ok_or_else(|| {
                                         Error::new(ErrorKind::Other, "No usage page")
                                     })?,
-                                    usages.clone(),
-                                    logical_min.clone().take().ok_or_else(|| {
+                                    usage: usages.clone(),
+                                    logical_min: logical_min.clone().take().ok_or_else(|| {
                                         Error::new(ErrorKind::Other, "No logical min")
                                     })?,
-                                    logical_max.clone().take().ok_or_else(|| {
+                                    logical_max: logical_max.clone().take().ok_or_else(|| {
                                         Error::new(ErrorKind::Other, "No logical max")
                                     })?,
                                     coordinatestate,
-                                    report_count as u8,
-                                    report_size as u8,
-                                    HidItemType::Input,
-                                );
+                                    count: report_count as u8,
+                                    size: report_size as u8,
+                                    r#type: HidItemType::Input,
+                                };
                                 if report_count != 0 {
                                     items.push(item);
                                 }
@@ -672,23 +649,23 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                 }
 
                                 //assert!(report_count == usages.len());
-                                let item = HidItem::new(
-                                    total_report_size,
-                                    usage_page.clone().take().ok_or_else(|| {
+                                let item = HidItem {
+                                    offset: total_report_size,
+                                    usage_page: usage_page.clone().take().ok_or_else(|| {
                                         Error::new(ErrorKind::Other, "No usage page")
                                     })?,
-                                    usages.clone(),
-                                    logical_min.clone().take().ok_or_else(|| {
+                                    usage: usages.clone(),
+                                    logical_min: logical_min.clone().take().ok_or_else(|| {
                                         Error::new(ErrorKind::Other, "No logical min")
                                     })?,
-                                    logical_max.clone().take().ok_or_else(|| {
+                                    logical_max: logical_max.clone().take().ok_or_else(|| {
                                         Error::new(ErrorKind::Other, "No logical max")
                                     })?,
                                     coordinatestate,
-                                    report_count as u8,
-                                    report_size as u8,
-                                    HidItemType::Feature,
-                                );
+                                    count: report_count as u8,
+                                    size: report_size as u8,
+                                    r#type: HidItemType::Feature,
+                                };
                                 if report_count != 0 {
                                     items.push(item);
                                 }
