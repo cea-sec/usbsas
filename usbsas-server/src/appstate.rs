@@ -4,7 +4,6 @@ use actix_web::web;
 use futures::task::{Context, Poll, Waker};
 use hmac::{Hmac, Mac};
 use log::{debug, error};
-use nix::unistd;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -19,7 +18,6 @@ use std::{
 };
 use usbsas_comm::{protorequest, Comm};
 use usbsas_config::{conf_parse, conf_read, Config};
-use usbsas_process::forward_sigterm_to_son;
 use usbsas_proto as proto;
 use usbsas_proto::common::OutFileType;
 use usbsas_utils::{INPUT_PIPE_FD_VAR, OUTPUT_PIPE_FD_VAR, USBSAS_BIN_PATH};
@@ -330,7 +328,6 @@ pub(crate) struct AppState {
     out_dev: Mutex<Option<CopyDestination>>,
     hmac: Mutex<Hmac<Sha256>>,
     tmpfiles: Mutex<TmpFiles>,
-    usbsas_pid: Arc<Mutex<unistd::Pid>>,
     #[cfg(feature = "log-json")]
     pub session_id: Arc<std::sync::RwLock<String>>,
 }
@@ -347,7 +344,7 @@ impl AppState {
         debug!("Out tar file name: {:?}", tmpfiles.out_tar);
         debug!("Out fs file name: {:?}", tmpfiles.out_fs);
 
-        let (comm, usbsas_pid) = AppState::start_usbsas(
+        let comm = AppState::start_usbsas(
             &config,
             &config_path,
             &tmpfiles,
@@ -364,7 +361,6 @@ impl AppState {
             hmac: Mutex::new(Hmac::new_from_slice(
                 &rand::thread_rng().gen::<[u8; 0x10]>(),
             )?),
-            usbsas_pid,
             #[cfg(feature = "log-json")]
             session_id: Arc::new(std::sync::RwLock::new(session_id)),
         })
@@ -375,7 +371,7 @@ impl AppState {
         config_path: &str,
         tmpfiles: &TmpFiles,
         #[cfg(feature = "log-json")] sessionid: &str,
-    ) -> Result<(Comm<proto::usbsas::Request>, Arc<Mutex<unistd::Pid>>), ServiceError> {
+    ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
         debug!("starting usbsas");
 
         let mut command = Command::new(path::Path::new(USBSAS_BIN_PATH).join("usbsas-usbsas"));
@@ -408,16 +404,11 @@ impl AppState {
         command.env(INPUT_PIPE_FD_VAR, parent_to_child_rd.to_string());
         command.env(OUTPUT_PIPE_FD_VAR, child_to_parent_wr.to_string());
 
-        let child = command.spawn()?;
+        let _ = command.spawn()?;
         usbsas_process::close(parent_to_child_rd)?;
         usbsas_process::close(child_to_parent_wr)?;
 
-        let usbsas_pid = Arc::new(Mutex::new(unistd::Pid::from_raw(child.id() as i32)));
-        forward_sigterm_to_son(&usbsas_pid)?;
-        Ok((
-            Comm::from_raw_fd(child_to_parent_rd, parent_to_child_wr),
-            usbsas_pid,
-        ))
+        Ok(Comm::from_raw_fd(child_to_parent_rd, parent_to_child_wr))
     }
 
     pub(crate) fn reset(&self) -> Result<(), ServiceError> {
@@ -430,7 +421,7 @@ impl AppState {
         #[cfg(feature = "log-json")]
         let new_session_id = uuid::Uuid::new_v4().simple().to_string();
 
-        let (new_comm, new_usbsas_pid) = AppState::start_usbsas(
+        let new_comm = AppState::start_usbsas(
             &*self.config.lock()?,
             &*self.config_path.lock()?,
             &*self.tmpfiles.lock()?,
@@ -444,7 +435,6 @@ impl AppState {
         }
 
         *comm = new_comm;
-        *self.usbsas_pid.lock()? = *new_usbsas_pid.lock()?;
 
         Ok(())
     }
@@ -1015,6 +1005,15 @@ impl AppState {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for AppState {
+    fn drop(&mut self) {
+        // End usbsas and its children properly
+        let mut comm = self.comm.lock().unwrap();
+        let _ = comm.end(proto::usbsas::RequestEnd {}).unwrap();
+        nix::sys::wait::wait().unwrap();
     }
 }
 

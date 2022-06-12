@@ -1,19 +1,11 @@
 //! Helper functions for usbsas processes spawning
 
-use log::{error, info};
 use nix::{
     self,
     fcntl::{FcntlArg, FdFlag},
-    sys::signal,
     unistd,
 };
-use signal_hook::{consts::SIGTERM, iterator::Signals};
-use std::{
-    io,
-    os::unix::io::RawFd,
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::{io, os::unix::io::RawFd};
 use thiserror::Error;
 use usbsas_comm::Comm;
 
@@ -145,21 +137,4 @@ pub fn set_cloexec(fd: RawFd) -> io::Result<libc::c_int> {
     let mut flags = FdFlag::from_bits(fcntl(fd, FcntlArg::F_GETFD)?).unwrap();
     flags.insert(FdFlag::FD_CLOEXEC);
     fcntl(fd, FcntlArg::F_SETFD(flags))
-}
-
-pub fn forward_sigterm_to_son(child_pid: &Arc<Mutex<unistd::Pid>>) -> Result<()> {
-    let mut signals = Signals::new(&[SIGTERM])?;
-    let pid_clone = Arc::clone(child_pid);
-    thread::spawn(move || {
-        let mut pending = signals.wait();
-        let sig = pending.next();
-        info!("Received SIGTERM {:?}", sig);
-        if let Ok(pid) = pid_clone.lock() {
-            if signal::kill(*pid, signal::SIGTERM).is_err() {
-                error!("Couldn't end son {}", &pid);
-            }
-        }
-        std::process::exit(2);
-    });
-    Ok(())
 }
