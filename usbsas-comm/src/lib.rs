@@ -137,7 +137,7 @@ impl<R> Read for Comm<R> {
 ///
 /// usbdev.proto3 message definition:
 ///
-/// ```
+/// ```ignore
 ///
 /// message RequestDevices {};
 /// message RequestEnd {};
@@ -170,7 +170,7 @@ impl<R> Read for Comm<R> {
 /// ```
 ///
 /// In usbdev.rs:
-/// ```rust
+/// ```rust,ignore
 /// protorequest!(
 ///    CommUsbdev,
 ///    usbdev,
