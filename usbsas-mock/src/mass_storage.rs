@@ -5,6 +5,10 @@ use std::{
     marker::PhantomData,
 };
 
+pub trait MockUsbContext {}
+pub struct MockContext {}
+impl MockUsbContext for MockContext {}
+
 pub struct MockMassStorage<T> {
     fakedev: File,
     pub block_size: u32,

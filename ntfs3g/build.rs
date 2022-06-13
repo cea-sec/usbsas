@@ -61,6 +61,7 @@ fn main() {
         .header("src/wrapper.h")
         .derive_copy(false)
         .derive_debug(false)
+        .generate_comments(false)
         .generate()
         .expect("Unable to generate bindings");
 

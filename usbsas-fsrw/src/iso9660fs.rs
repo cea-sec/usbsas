@@ -53,25 +53,11 @@ impl<T: Read + Seek> FSRead<T> for Iso9660<T> {
 
     fn get_attr(&mut self, path: &str) -> Result<(FileType, u64, i64)> {
         log::trace!("get_attr: '{}'", path);
-        let (ftype, size, tm) = match isobject_from_path(&self.fs, path)? {
+        let (ftype, size, ts) = match isobject_from_path(&self.fs, path)? {
             DirectoryEntry::Directory(dir) => (FileType::Directory, 0, dir.time()),
             DirectoryEntry::File(file) => (FileType::Regular, file.size() as u64, file.time()),
         };
-        let ts = time::PrimitiveDateTime::new(
-            time::Date::from_calendar_date(
-                1980 + tm.tm_year,
-                time::Month::try_from(tm.tm_mon as u8).unwrap_or(time::Month::January),
-                tm.tm_mday as u8,
-            )
-            .unwrap_or_else(|_| {
-                time::Date::from_calendar_date(1980, time::Month::January, 1).unwrap()
-            }),
-            time::Time::from_hms(tm.tm_hour as u8, tm.tm_min as u8, tm.tm_sec as u8)
-                .unwrap_or_else(|_| time::Time::from_hms(0, 0, 0).unwrap()),
-        )
-        .assume_utc()
-        .unix_timestamp();
-        Ok((ftype, size, ts))
+        Ok((ftype, size, ts.unix_timestamp()))
     }
 
     fn read_dir(&mut self, path: &str) -> Result<Vec<FileInfo>> {

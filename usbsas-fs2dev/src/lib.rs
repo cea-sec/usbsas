@@ -4,6 +4,7 @@
 use bitvec::prelude::*;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{debug, error, trace};
+#[cfg(not(feature = "mock"))]
 use rusb::{Context, UsbContext};
 use std::{
     fs::File,
@@ -13,7 +14,9 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 #[cfg(feature = "mock")]
-use usbsas_mock::mass_storage::MockMassStorage as MassStorage;
+use usbsas_mock::mass_storage::{
+    MockContext, MockMassStorage as MassStorage, MockUsbContext as UsbContext,
+};
 use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_utils::SECTOR_SIZE;
@@ -438,6 +441,7 @@ impl UsbsasProcess for Fs2Dev {
         write_fd: RawFd,
         args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        #[cfg(not(feature = "mock"))]
         assert!(rusb::supports_detach_kernel_driver());
 
         if let Some(args) = args {
@@ -446,7 +450,10 @@ impl UsbsasProcess for Fs2Dev {
                 Fs2DevContext::new(
                     Comm::from_raw_fd(read_fd, write_fd),
                     fname.to_owned(),
+                    #[cfg(not(feature = "mock"))]
                     Context::new()?,
+                    #[cfg(feature = "mock")]
+                    MockContext {},
                 )?
                 .main_loop()
                 .map(|_| debug!("fs2dev: exit"))?;

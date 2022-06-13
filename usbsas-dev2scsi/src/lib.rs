@@ -4,6 +4,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
+#[cfg(not(feature = "mock"))]
 use rusb::UsbContext;
 use std::{convert::TryFrom, io::prelude::*, os::unix::io::RawFd, str};
 use thiserror::Error;
@@ -11,7 +12,9 @@ use usbsas_comm::{protoresponse, Comm};
 #[cfg(not(feature = "mock"))]
 use usbsas_mass_storage::{self, MassStorage};
 #[cfg(feature = "mock")]
-use usbsas_mock::mass_storage::MockMassStorage as MassStorage;
+use usbsas_mock::mass_storage::{
+    MockContext, MockMassStorage as MassStorage, MockUsbContext as UsbContext,
+};
 use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
@@ -441,11 +444,17 @@ impl UsbsasProcess for Dev2Scsi {
         write_fd: RawFd,
         _args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        #[cfg(not(feature = "mock"))]
         assert!(rusb::supports_detach_kernel_driver());
-        let libusb_ctx = rusb::Context::new()?;
-        Dev2ScsiContext::new(Comm::from_raw_fd(read_fd, write_fd), libusb_ctx)?
-            .main_loop()
-            .map(|_| log::debug!("exit dev2scsi"))?;
+        Dev2ScsiContext::new(
+            Comm::from_raw_fd(read_fd, write_fd),
+            #[cfg(not(feature = "mock"))]
+            rusb::Context::new()?,
+            #[cfg(feature = "mock")]
+            MockContext {},
+        )?
+        .main_loop()
+        .map(|_| log::debug!("exit dev2scsi"))?;
         Ok(())
     }
 }

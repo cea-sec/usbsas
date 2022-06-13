@@ -6,7 +6,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-actix-web = "4.0.1"
+actix-web = "4.1.0"
 clamav-rs = "0.5.5"
 env_logger = "0.9.0"
 futures = "0.3.21"
@@ -15,7 +15,7 @@ serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 tar = "0.4.38"
 tempfile = "3.3.0"
-uuid = { version = "1.1.1", features = ["v4"] }
+uuid = { version = "1.1.2", features = ["v4"] }
 
 # cargo-deb
 [package.metadata.deb]

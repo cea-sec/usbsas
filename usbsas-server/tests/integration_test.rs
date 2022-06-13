@@ -89,7 +89,11 @@ impl IntegrationTester {
             .spawn()
             .expect("Couldn't run analyzer server");
 
-        let client = Client::new();
+        let client = Client::builder()
+            .timeout(Duration::from_secs(60))
+            .connect_timeout(Duration::from_secs(30))
+            .build()
+            .expect("couldn't build reqwest client");
 
         // Wait for analyzer server to be ready (clamav db can be slow to load)
         loop {

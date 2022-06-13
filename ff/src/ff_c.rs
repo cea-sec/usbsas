@@ -2,6 +2,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(dead_code)]
+#![allow(non_snake_case)]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 impl FATFS {
