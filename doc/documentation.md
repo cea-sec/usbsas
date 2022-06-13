@@ -13,8 +13,7 @@
 Most dependencies are managed by `cargo` but before building usbsas, the
 following packages must also be installed (the names may change depending on the
 Linux distribution, see bellow for Debian): `rust`, `cargo`, `pkgconf`, `clang`,
-`cmake`, `protobuf`, `seccomp`, `libusb`, `krb5 `, `fuse3 `, `clamav `, `libx11
-`, `libxtst `.
+`cmake`, `protobuf`, `seccomp`, `libusb`, `krb5 `.
 
 A recent version of `rustc` and `cargo` (edition 2021) is needed: instead of a
 packaged version, a [rustup](https://rustup.rs/) installation may be necessary.
@@ -50,14 +49,21 @@ build target directory)
 [cargo-deb](https://github.com/kornelski/cargo-deb#readme) needs to be installed
 as well. Packages are provided for the server and the analyzer server.
 
+Build usbsas package:
+
 ```shell
-$ sudo apt install cargo pkgconf clang cmake git libfuse3-dev libssl-dev libkrb5-dev libclamav-dev libx11-dev libxtst-dev libseccomp-dev
+$ sudo apt install cargo pkgconf clang cmake git libssl-dev libkrb5-dev libseccomp-dev
 $ cargo install cargo-deb
 $ export USBSAS_WEBFILES_DIR="/usr/share/usbsas/web"
 $ export USBSAS_BIN_PATH="/usr/libexec"
 $ cargo build --release
-$ cargo-deb --manifest-path=usbsas-analyzer-server/Cargo.toml
 $ cargo-deb --manifest-path=usbsas-server/Cargo.toml
+```
+
+Build the analyzer server package:
+```shell
+$ sudo apt install libclamav-dev
+$ cargo-deb --manifest-path=usbsas-analyzer-server/Cargo.toml
 ```
 
 /!\ The `usbsas-server` package will create a new user `usbsas` and add a `udev`
@@ -154,6 +160,7 @@ $ nw client/nwjs
 #### Fuse
 Build the usbsas-tools crate:
 ```shell
+$ sudo apt install libfuse3-dev
 $ cargo build --release -p usbsas-tools
 ```
 ```shell
@@ -193,7 +200,6 @@ Protobuf python code is generated with `make`, `protobuf` python module and
 $ make
 $ python usbsas_transfer_example.py
 ```
-
 
 ## Configuration
 
