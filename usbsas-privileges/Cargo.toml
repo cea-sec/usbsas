@@ -9,6 +9,6 @@ cc = "1.0.73"
 
 [dependencies]
 libc = "0.2.126"
-procfs = "0.12.0"
+procfs = { version = "0.12.0", default-features = false }
 syscallz = "0.16.1"
 thiserror = "1.0.31"
