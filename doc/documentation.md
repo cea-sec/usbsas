@@ -52,18 +52,19 @@ as well. Packages are provided for the server and the analyzer server.
 Build usbsas package:
 
 ```shell
-$ sudo apt install cargo pkgconf clang cmake git libssl-dev libkrb5-dev libseccomp-dev
+$ sudo apt install pkgconf clang cmake git libssl-dev libkrb5-dev libseccomp-dev
 $ cargo install cargo-deb
 $ export USBSAS_WEBFILES_DIR="/usr/share/usbsas/web"
 $ export USBSAS_BIN_PATH="/usr/libexec"
 $ cargo build --release
-$ cargo-deb --manifest-path=usbsas-server/Cargo.toml
+$ cargo-deb --manifest-path=usbsas-server/Cargo.toml --no-build
 ```
 
 Build the analyzer server package:
 ```shell
 $ sudo apt install libclamav-dev
-$ cargo-deb --manifest-path=usbsas-analyzer-server/Cargo.toml
+$ cargo build --release -p usbsas-analyzer-server
+$ cargo-deb --manifest-path=usbsas-analyzer-server/Cargo.toml --no-build
 ```
 
 /!\ The `usbsas-server` package will create a new user `usbsas` and add a `udev`
@@ -180,6 +181,11 @@ OPTIONS:
     -h, --help                  Print help information
     -n, --part-num <PARTNUM>    Partition number to mount [default: 1]
     -V, --version               Print version information
+```
+
+A Debian package can be generated as well (after building):
+```shell
+$ cargo-deb --manifest-path=usbsas-tools/Cargo.toml --no-build
 ```
 
 #### Python

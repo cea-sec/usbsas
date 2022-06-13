@@ -46,3 +46,17 @@ required-features = ["uploader"]
 name = "usbsas-fuse-mount"
 path = "src/fuse-mount.rs"
 required-features = ["fuse-mount"]
+
+# cargo-deb
+[package.metadata.deb]
+maintainer = "usbsas"
+copyright = "usbsas"
+depends = "$auto"
+section = "utility"
+priority = "optional"
+systemd-units = { enable = false }
+assets = [
+  ["target/release/usbsas-fuse-mount", "usr/bin/", "755"],
+  ["target/release/usbsas-imager", "usr/bin/", "755"],
+  ["target/release/usbsas-uploader", "usr/bin/", "755"],
+]
