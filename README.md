@@ -1,3 +1,5 @@
+[![Build & Test](https://github.com/cea-sec/usbsas/actions/workflows/build_check_test.yml/badge.svg?branch=main)](https://github.com/cea-sec/usbsas/actions/workflows/build_check_test.yml?branch=main)
+
 # usbsas
 
 <p align="center"><img src="./doc/usbsas-logo.svg"/></p>
