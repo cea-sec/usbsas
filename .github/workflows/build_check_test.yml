@@ -1,0 +1,145 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - name: Install dependencies
+      run: |
+        sudo apt update && \
+        sudo apt install -y --no-install-recommends \
+        pkgconf \
+        clang \
+        cmake \
+        git \
+        libfuse3-dev \
+        libssl-dev \
+        libkrb5-dev \
+        libclamav-dev \
+        libx11-dev \
+        libxtst-dev \
+        libseccomp-dev
+    # Build
+    - name: Build
+      env:
+        RUSTFLAGS: -D warnings
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --all --verbose
+    # Run the tests
+    - name: Tests
+      env:
+        RUSTFLAGS: -D warnings
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --release --all --verbose --exclude usbsas-server
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - name: Install dependencies
+      run: |
+        sudo apt update && \
+        sudo apt install -y --no-install-recommends \
+        pkgconf \
+        clang \
+        cmake \
+        git \
+        libfuse3-dev \
+        libssl-dev \
+        libkrb5-dev \
+        libclamav-dev \
+        libx11-dev \
+        libxtst-dev \
+        libseccomp-dev \
+        clamav-freshclam; \
+        systemctl is-active --quiet clamav-freshclam && \
+        sudo systemctl stop clamav-freshclam;  \
+        sudo freshclam \
+    # Build with mock feature for the integration tests
+    - name: Build with mock feature
+      env:
+        RUSTFLAGS: -D warnings
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --all --verbose --features mock
+    # Run the integration tests
+    - name: Integration tests with mock feature
+      env:
+        RUSTFLAGS: -D warnings
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --release --verbose -p usbsas-server
+
+  # cargo fmt
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Check format
+        run: cargo fmt --all -- --check
+
+  # cargo audit
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Security audit
+        uses: actions-rs/audit-check@v1
+        with:
+         token: ${{ secrets.GITHUB_TOKEN }}
+
+  # cargo clippy
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Install dependencies
+        run: |
+          sudo apt update && \
+          sudo apt install -y --no-install-recommends \
+          pkgconf \
+          clang \
+          cmake \
+          git \
+          libfuse3-dev \
+          libssl-dev \
+          libkrb5-dev \
+          libclamav-dev \
+          libx11-dev \
+          libxtst-dev \
+          libseccomp-dev
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all -- -D warnings
