@@ -113,6 +113,18 @@ fn ntfs_name_from_file<'a, T: Read + Seek>(
         None,
     ) {
         name
+    } else if let Some(name) = file.name(
+        reader,
+        Some(ntfs::structured_values::NtfsFileNamespace::Win32),
+        None,
+    ) {
+        name
+    } else if let Some(name) = file.name(
+        reader,
+        Some(ntfs::structured_values::NtfsFileNamespace::Win32AndDos),
+        None,
+    ) {
+        name
     } else if let Some(name) = file.name(reader, None, None) {
         name
     } else {
