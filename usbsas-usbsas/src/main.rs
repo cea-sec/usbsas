@@ -1665,6 +1665,7 @@ fn main() -> Result<()> {
                 .long("config")
                 .help("Path of the configuration file")
                 .takes_value(true)
+                .default_value(usbsas_utils::USBSAS_CONFIG)
                 .required(false),
         )
         .arg(
@@ -1702,14 +1703,13 @@ fn main() -> Result<()> {
     );
 
     let matches = cmd.get_matches();
-
-    let config_path = matches
-        .value_of("config")
-        .unwrap_or(usbsas_utils::USBSAS_CONFIG);
+    let config = matches.get_one::<String>("config").unwrap();
+    let outtar = matches.get_one::<String>("outtar").unwrap();
+    let outfs = matches.get_one::<String>("outfs").unwrap();
 
     #[cfg(feature = "log-json")]
     usbsas_utils::log::init_logger(Arc::new(RwLock::new(
-        matches.value_of("sessionid").unwrap().to_string(),
+        matches.get_one::<&String>("sessionid").unwrap().to_string(),
     )));
 
     #[cfg(not(feature = "log-json"))]
@@ -1719,13 +1719,7 @@ fn main() -> Result<()> {
 
     let comm = Comm::from_env()?;
 
-    let usbsas = Usbsas::new(
-        comm,
-        config_path,
-        matches.value_of("outtar").unwrap(),
-        matches.value_of("outfs").unwrap(),
-        matches.is_present("analyze"),
-    )?;
+    let usbsas = Usbsas::new(comm, config, outtar, outfs, matches.contains_id("analyze"))?;
 
     usbsas.main_loop()?;
 

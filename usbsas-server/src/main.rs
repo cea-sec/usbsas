@@ -31,9 +31,9 @@ fn main() -> io::Result<()> {
         )
         .get_matches();
 
-    let config_path = matches.value_of("config").unwrap().to_owned();
-    let ip = matches.value_of("bind_addr").unwrap();
-    let port = matches.value_of("bind_port").unwrap();
+    let config_path = matches.get_one::<String>("config").unwrap().to_string();
+    let ip = matches.get_one("bind_addr").unwrap();
+    let port = matches.get_one("bind_port").unwrap();
 
     usbsas_server::server::start_server(config_path, ip, port)
 }

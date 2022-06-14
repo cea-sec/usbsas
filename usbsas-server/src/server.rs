@@ -145,7 +145,11 @@ async fn index() -> Result<impl Responder, ServiceError> {
 }
 
 #[actix_web::main]
-pub async fn start_server(config_path: String, bind_addr: &str, bind_port: &str) -> io::Result<()> {
+pub async fn start_server(
+    config_path: String,
+    bind_addr: &String,
+    bind_port: &String,
+) -> io::Result<()> {
     let app_data = web::Data::new(AppState::new(config_path).map_err(|err| {
         io::Error::new(
             ErrorKind::Other,

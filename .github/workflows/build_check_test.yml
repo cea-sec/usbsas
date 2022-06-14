@@ -35,16 +35,12 @@ jobs:
         libseccomp-dev
     # Build
     - name: Build
-      env:
-        RUSTFLAGS: -D warnings
       uses: actions-rs/cargo@v1
       with:
         command: build
         args: --release --all --verbose
     # Run the tests
     - name: Tests
-      env:
-        RUSTFLAGS: -D warnings
       uses: actions-rs/cargo@v1
       with:
         command: test
@@ -78,16 +74,12 @@ jobs:
         sudo freshclam \
     # Build with mock feature for the integration tests
     - name: Build with mock feature
-      env:
-        RUSTFLAGS: -D warnings
       uses: actions-rs/cargo@v1
       with:
         command: build
         args: --release --all --verbose --features mock
     # Run the integration tests
     - name: Integration tests with mock feature
-      env:
-        RUSTFLAGS: -D warnings
       uses: actions-rs/cargo@v1
       with:
         command: test
