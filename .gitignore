@@ -2,9 +2,6 @@
 # build directories
 target
 
-# cargo lock files
-*.lock
-
 *.bk
 
 ### c
