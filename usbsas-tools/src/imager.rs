@@ -284,6 +284,7 @@ fn main() -> Result<()> {
                 .long("config")
                 .help("Path of the configuration file")
                 .takes_value(true)
+                .default_value(usbsas_utils::USBSAS_CONFIG)
                 .required(false),
         )
         .arg(
@@ -322,7 +323,7 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
-    let writer = if let Some(path) = matches.value_of("output") {
+    let writer = if let Some(path) = matches.get_one::<&String>("output") {
         match fs::File::create(path) {
             Ok(file) => Some(file),
             Err(err) => {
@@ -330,14 +331,10 @@ fn main() -> Result<()> {
                 return Err(err.into());
             }
         }
-    } else if matches.is_present("stdout") {
+    } else if matches.contains_id("stdout") {
         None
     } else {
-        let config = conf_parse(&conf_read(
-            matches
-                .value_of("config")
-                .unwrap_or(usbsas_utils::USBSAS_CONFIG),
-        )?)?;
+        let config = conf_parse(&conf_read(matches.get_one::<&String>("config").unwrap())?)?;
         let out_dir = path::Path::new(&config.out_directory);
         let (out_file, out_path) = tempfile::Builder::new()
             .prefix("device_image_")
@@ -349,15 +346,14 @@ fn main() -> Result<()> {
         Some(out_file)
     };
 
-    let busdevnum = match (matches.value_of("busnum"), matches.value_of("devnum")) {
-        (Some(busnum), Some(devnum)) => match (busnum.parse::<u32>(), devnum.parse::<u32>()) {
-            (Ok(busnum), Ok(devnum)) => Some(BusDevNum { busnum, devnum }),
-            _ => {
-                return Err(Error::Error(
-                    "Couldn't parse busnum and/or devnum".to_string(),
-                ));
-            }
-        },
+    let busdevnum = match (
+        matches.get_one::<u32>("busnum"),
+        matches.get_one::<u32>("devnum"),
+    ) {
+        (Some(busnum), Some(devnum)) => Some(BusDevNum {
+            busnum: busnum.to_owned(),
+            devnum: devnum.to_owned(),
+        }),
         (None, Some(_)) | (Some(_), None) => {
             return Err(Error::Error(
                 "Must specify both busnum and devnum".to_string(),

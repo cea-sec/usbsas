@@ -153,9 +153,9 @@ fn main() -> Result<()> {
 
     let matches = command.get_matches();
 
-    if let Some(path) = matches.value_of("bundle") {
-        if let Some(id) = matches.value_of("ID") {
-            if matches.is_present("analyze") {
+    if let Some(path) = matches.get_one::<&String>("bundle") {
+        if let Some(id) = matches.get_one::<&String>("ID") {
+            if matches.contains_id("analyze") {
                 analyze(path, id)?;
                 return Ok(());
             }

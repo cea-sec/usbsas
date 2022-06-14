@@ -276,14 +276,16 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
-    let mountpoint = matches.value_of("mountpoint").unwrap().to_owned();
+    let mountpoint = matches.get_one::<String>("mountpoint").unwrap();
 
     let (busnum, devnum, partnum) = match (
-        matches.value_of("busnum").unwrap().parse::<u32>(),
-        matches.value_of("devnum").unwrap().parse::<u32>(),
-        matches.value_of("part-num").unwrap().parse::<u32>(),
+        matches.get_one::<u32>("busnum"),
+        matches.get_one::<u32>("devnum"),
+        matches.get_one::<u32>("part-num"),
     ) {
-        (Ok(busnum), Ok(devnum), Ok(partnum)) => (busnum, devnum, partnum),
+        (Some(busnum), Some(devnum), Some(partnum)) => {
+            (busnum.to_owned(), devnum.to_owned(), partnum.to_owned())
+        }
         _ => {
             log::error!("Busnum / devnum / partnum must be u32");
             std::process::exit(1);
