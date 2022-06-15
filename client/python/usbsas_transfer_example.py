@@ -21,7 +21,7 @@ import time
 from comm import CommUsbsas
 from proto.usbsas import proto3_pb2 as proto_usbsas
 
-+usbsas_bin = "/usr/libexec/usbsas-usbsas"
+usbsas_bin = "/usr/libexec/usbsas-usbsas"
 date = datetime.datetime.now()
 out_tar = "/tmp/usbsas_tmp_%s.tar" % str(date).replace(' ', '_')
 out_fs = "/tmp/usbsas_tmp_%s.fs" % str(date).replace(' ', '_')
