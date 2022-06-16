@@ -248,6 +248,8 @@ fn main() -> Result<()> {
             Arg::new("busnum")
                 .index(1)
                 .required(true)
+                .value_name("BUSNUM")
+                .value_parser(clap::value_parser!(u32))
                 .help("Bus nummber of the device to mount")
                 .takes_value(true),
         )
@@ -255,6 +257,8 @@ fn main() -> Result<()> {
             Arg::new("devnum")
                 .index(2)
                 .required(true)
+                .value_name("DEVNUM")
+                .value_parser(clap::value_parser!(u32))
                 .help("Dev number of the device to mount")
                 .takes_value(true),
         )
@@ -270,6 +274,7 @@ fn main() -> Result<()> {
                 .short('n')
                 .long("part-num")
                 .value_name("PARTNUM")
+                .value_parser(clap::value_parser!(u32))
                 .help("Partition number to mount")
                 .default_value("1")
                 .takes_value(true),

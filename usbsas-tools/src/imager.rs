@@ -298,6 +298,7 @@ fn main() -> Result<()> {
                 .long("output")
                 .value_name("FILE")
                 .help("Path of the output file")
+                .conflicts_with("stdout")
                 .takes_value(true),
         )
         .arg(
@@ -306,6 +307,7 @@ fn main() -> Result<()> {
                 .long("busnum")
                 .requires("devnum")
                 .value_name("BUSNUM")
+                .value_parser(clap::value_parser!(u32))
                 .help("Bus number of the device to clone")
                 .takes_value(true),
         )
@@ -315,6 +317,7 @@ fn main() -> Result<()> {
                 .long("devnum")
                 .requires("busnum")
                 .value_name("DEVNUM")
+                .value_parser(clap::value_parser!(u32))
                 .help("Device number of the device to clone")
                 .takes_value(true),
         )
@@ -323,13 +326,13 @@ fn main() -> Result<()> {
                 .short('O')
                 .long("stdout")
                 .help("Output to stdout")
-                .conflicts_with("FILE")
+                .conflicts_with("output")
                 .takes_value(false),
         )
         .get_matches();
 
     let config_path = matches.get_one::<String>("config").unwrap();
-    let writer = if let Some(path) = matches.get_one::<&String>("output") {
+    let writer = if let Some(path) = matches.get_one::<String>("output") {
         match fs::File::create(path) {
             Ok(file) => Some(file),
             Err(err) => {
