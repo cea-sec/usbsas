@@ -1709,7 +1709,7 @@ fn main() -> Result<()> {
 
     #[cfg(feature = "log-json")]
     usbsas_utils::log::init_logger(Arc::new(RwLock::new(
-        matches.get_one::<&String>("sessionid").unwrap().to_string(),
+        matches.get_one::<String>("sessionid").unwrap().to_string(),
     )));
 
     #[cfg(not(feature = "log-json"))]

@@ -75,7 +75,11 @@ struct Imager {
 }
 
 impl Imager {
-    fn new(out_file: Option<fs::File>, busdevnum: Option<BusDevNum>) -> Result<Self> {
+    fn new(
+        config_path: &str,
+        out_file: Option<fs::File>,
+        busdevnum: Option<BusDevNum>,
+    ) -> Result<Self> {
         let mut pipes_read = vec![];
         let mut pipes_write = vec![];
 
@@ -97,6 +101,7 @@ impl Imager {
         // If busnum and devnum were not specified we need usbdev to select the device
         let usbdev = if busdevnum.is_none() {
             let usbdev = UsbsasChildSpawner::new()
+                .arg(config_path)
                 .spawn::<usbsas_usbdev::UsbDev, proto::usbdev::Request>()?;
             pipes_read.push(usbdev.comm.input_fd());
             pipes_write.push(usbdev.comm.output_fd());
@@ -293,6 +298,7 @@ fn main() -> Result<()> {
                 .long("output")
                 .value_name("FILE")
                 .help("Path of the output file")
+                .conflicts_with("stdout")
                 .takes_value(true),
         )
         .arg(
@@ -301,6 +307,7 @@ fn main() -> Result<()> {
                 .long("busnum")
                 .requires("devnum")
                 .value_name("BUSNUM")
+                .value_parser(clap::value_parser!(u32))
                 .help("Bus number of the device to clone")
                 .takes_value(true),
         )
@@ -310,6 +317,7 @@ fn main() -> Result<()> {
                 .long("devnum")
                 .requires("busnum")
                 .value_name("DEVNUM")
+                .value_parser(clap::value_parser!(u32))
                 .help("Device number of the device to clone")
                 .takes_value(true),
         )
@@ -318,12 +326,13 @@ fn main() -> Result<()> {
                 .short('O')
                 .long("stdout")
                 .help("Output to stdout")
-                .conflicts_with("FILE")
+                .conflicts_with("output")
                 .takes_value(false),
         )
         .get_matches();
 
-    let writer = if let Some(path) = matches.get_one::<&String>("output") {
+    let config_path = matches.get_one::<String>("config").unwrap();
+    let writer = if let Some(path) = matches.get_one::<String>("output") {
         match fs::File::create(path) {
             Ok(file) => Some(file),
             Err(err) => {
@@ -334,7 +343,7 @@ fn main() -> Result<()> {
     } else if matches.contains_id("stdout") {
         None
     } else {
-        let config = conf_parse(&conf_read(matches.get_one::<&String>("config").unwrap())?)?;
+        let config = conf_parse(&conf_read(config_path)?)?;
         let out_dir = path::Path::new(&config.out_directory);
         let (out_file, out_path) = tempfile::Builder::new()
             .prefix("device_image_")
@@ -362,7 +371,7 @@ fn main() -> Result<()> {
         (None, None) => None,
     };
 
-    let mut imager = Imager::new(writer, busdevnum)?;
+    let mut imager = Imager::new(config_path, writer, busdevnum)?;
 
     if imager.busdevnum.is_none() {
         imager.select_device()?;
