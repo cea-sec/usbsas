@@ -39,10 +39,11 @@ protorequest!(
     end = End[RequestEnd, ResponseEnd]
 );
 
-fn upload(bundle_path: &str, id: &str) -> Result<()> {
+fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::uploader::response::Msg;
     let mut uploader = UsbsasChildSpawner::new()
         .arg(bundle_path)
+        .arg(config_path)
         .spawn::<usbsas_net::Uploader, proto::uploader::Request>()?;
 
     log::info!("Uploading bundle");
@@ -130,6 +131,15 @@ fn main() -> Result<()> {
         .about("Test uploading or analyzing a usbsas bundle")
         .version("1.0")
         .arg(
+            clap::Arg::new("config")
+                .short('c')
+                .long("config")
+                .help("Path of the configuration file")
+                .takes_value(true)
+                .default_value(usbsas_utils::USBSAS_CONFIG)
+                .required(false),
+        )
+        .arg(
             Arg::new("bundle")
                 .value_name("FILE")
                 .index(1)
@@ -152,14 +162,15 @@ fn main() -> Result<()> {
         );
 
     let matches = command.get_matches();
+    let config_path = matches.get_one::<String>("config").unwrap();
 
-    if let Some(path) = matches.get_one::<&String>("bundle") {
-        if let Some(id) = matches.get_one::<&String>("ID") {
+    if let Some(path) = matches.get_one::<String>("bundle") {
+        if let Some(id) = matches.get_one::<String>("ID") {
             if matches.contains_id("analyze") {
                 analyze(path, id)?;
                 return Ok(());
             }
-            upload(path, id)?;
+            upload(config_path, path, id)?;
         }
     }
 
