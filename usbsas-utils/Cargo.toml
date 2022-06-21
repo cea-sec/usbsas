@@ -9,7 +9,7 @@ env_logger = "0.9.0"
 log = "0.4.17"
 serde_json = { version = "1.0.81", optional = true }
 thiserror = { version = "1.0.31", optional = true }
-time = { version = "0.3.9", features = ["formatting"], optional = true }
+time = { version = "0.3.10", features = ["formatting"], optional = true }
 
 [features]
 log-json = ["serde_json", "time"]
