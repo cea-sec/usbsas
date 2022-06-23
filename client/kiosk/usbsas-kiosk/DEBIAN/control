@@ -1,0 +1,6 @@
+Package: usbsas-kiosk
+Version: 0.1.0
+Maintainer: usbsas
+Architecture: amd64
+Depends: usbsas-server, xserver-xorg-core, x11-xserver-utils, xinit, xdotool, unclutter, fonts-noto-color-emoji, libnss3, libatspi2.0-0, libgtk-3-0
+Description: usbsas kiosk client

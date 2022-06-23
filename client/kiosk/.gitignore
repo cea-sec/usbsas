@@ -1,0 +1,4 @@
+*.tar.gz
+*.deb
+usbsas-kiosk/usr/share/usbsas/
+usbsas-kiosk/opt/nwjs/*

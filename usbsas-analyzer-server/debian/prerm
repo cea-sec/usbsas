@@ -1,0 +1,14 @@
+#! /bin/sh
+set -e
+
+if [ "$1" = remove ]; then
+    echo "stopping usbsas-analyzer-server"
+    if systemctl -q is-active usbsas-analyzer-server; then
+        systemctl stop usbsas-analyzer-server
+    fi
+    if systemctl -q is-enabled usbsas-analyzer-server; then
+        systemctl disable usbsas-analyzer-server
+    fi
+fi
+
+#DEBHELPER#

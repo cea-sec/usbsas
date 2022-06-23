@@ -1,0 +1,24 @@
+#! /bin/bash
+
+# Start hid-dealer if service exists
+if systemctl --user list-unit-files | grep -q hid-dealer.service; then
+    if systemctl -q --user is-active hid-dealer.service; then
+        systemctl --user restart hid-dealer.service
+    else
+        systemctl --user start hid-dealer.service
+    fi
+fi
+
+# Set max resolution
+monitor=$(xrandr | grep " connected" | awk '{print $1}')
+mode=$(xrandr | grep -A1 " connected" | tail -1 | cut -d ' ' -f4)
+xrandr --output "$monitor" --mode "$mode"
+window_size=$(echo $mode | tr 'x' ',')
+
+xsetroot -solid grey95
+xdotool mousemove 300 400
+xset -dpms
+xset s noblank
+xset s off
+/usr/bin/unclutter -idle 1 -jitter 5 &
+exec /opt/nwjs/nw /usr/share/usbsas/nwjs --window-size="$window_size"

@@ -53,7 +53,6 @@ assets = [
   ["../config.example.toml", "etc/usbsas/config.toml", "644"],
   ["assets/99-usbsas.rules", "etc/udev/rules.d/", "644"],
   ["assets/usbsas.conf", "etc/modprobe.d/", "644"],
-  ["../client/nwjs/*", "usr/share/usbsas/nwjs/", "644"],
   ["../client/web/*", "usr/share/usbsas/web/", "644"],
   ["../client/web/static/css/*", "usr/share/usbsas/web/static/css/", "644"],
   ["../client/web/static/js/*", "usr/share/usbsas/web/static/js/", "644"],
@@ -70,4 +69,4 @@ assets = [
   ["../client/web/static/fontawesome/sprites/*", "usr/share/usbsas/web/static/fontawesome/sprites/", "644"],
   ["../client/web/static/fontawesome/webfonts/*", "usr/share/usbsas/web/static/fontawesome/webfonts/", "644"],
 ]
-conf-files = ["/etc/usbsas/config.toml", "/usr/share/usbsas/nwjs/package.json"]
+conf-files = ["/etc/usbsas/config.toml"]
