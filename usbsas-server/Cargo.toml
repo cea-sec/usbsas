@@ -21,7 +21,7 @@ serde_json = "1.0.81"
 sha2 = "0.10.2"
 systemstat = "0.1.11"
 tempfile = "3.3.0"
-time = "0.3.10"
+time = "0.3.11"
 toml = "0.5.9"
 uname = "0.1.1"
 usbsas-comm = { path = "../usbsas-comm" }
