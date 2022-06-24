@@ -87,7 +87,7 @@ fn open_device(busnum: u8, devnum: u8) -> Result<UsbDevice, rusb::Error> {
                                 handle.detach_kernel_driver(interface.number())?;
                             }
                             handle.claim_interface(interface.number())?;
-                            log::info!(
+                            log::debug!(
                                 "Found interface: {} endpoint {:x}",
                                 interface.number(),
                                 endp.address()
@@ -550,8 +550,8 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
                         let specs = parse_items_attr_to_str(value);
                         let (coordinatestate,) = parse_items_attr(value);
-                        log::info!("{}INPUT({}) ({})", gen_space(indent), value, specs);
-                        log::info!("");
+                        log::debug!("{}INPUT({}) ({})", gen_space(indent), value, specs);
+                        log::debug!("");
                         match (local_report_count, local_report_size) {
                             (Some(report_count), Some(report_size)) => {
                                 if report_count > MAX_REPORT_COUNT {
@@ -603,7 +603,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                     0b1001 => {
                         // OUTPUT
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
-                        log::info!("{}OUTPUT({})", gen_space(indent), value);
+                        log::debug!("{}OUTPUT({})", gen_space(indent), value);
                     }
 
                     0b1010 => {
@@ -620,7 +620,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             value => format!("Unknown: {}", value),
                         };
 
-                        log::info!("{}Collection({})", gen_space(indent), description);
+                        log::debug!("{}Collection({})", gen_space(indent), description);
                         indent += 1;
                         usages.clear();
                     }
@@ -630,8 +630,8 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
                         let specs = parse_items_attr_to_str(value);
                         let (coordinatestate,) = parse_items_attr(value);
-                        log::info!("{}Feature({:?}) ({})", gen_space(indent), value, specs);
-                        log::info!("{}", gen_space(indent));
+                        log::debug!("{}Feature({:?}) ({})", gen_space(indent), value, specs);
+                        log::debug!("{}", gen_space(indent));
 
                         match (local_report_count, local_report_size) {
                             (Some(report_count), Some(report_size)) => {
@@ -690,8 +690,8 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             ));
                         };
                         indent -= 1;
-                        log::info!("{}END_COLLECTION()", gen_space(indent));
-                        log::info!("{}", gen_space(indent));
+                        log::debug!("{}END_COLLECTION()", gen_space(indent));
+                        log::debug!("{}", gen_space(indent));
                     }
 
                     btag => {
@@ -725,7 +725,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             0x10 => "Unicode".to_string(),
                             value => format!("Unknown: {}", value),
                         };
-                        log::info!("{}Usage_Page({})", gen_space(indent), description);
+                        log::debug!("{}Usage_Page({})", gen_space(indent), description);
                         usage_page = Some(HidUsagePage::from_value(value as u16));
                     }
 
@@ -733,32 +733,32 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         // LOGICAL_MINIMUM
                         let value = get_item_value_i32(item.bsize(), &mut buffer)?;
                         logical_min = Some(value);
-                        log::info!("{}LOGICAL_MINIMUM({})", gen_space(indent), value);
+                        log::debug!("{}LOGICAL_MINIMUM({})", gen_space(indent), value);
                     }
 
                     0b0010 => {
                         // LOGICAL_MAXIMUM
                         let value = get_item_value_i32(item.bsize(), &mut buffer)?;
                         logical_max = Some(value);
-                        log::info!("{}LOGICAL_MAXIMUM({})", gen_space(indent), value);
+                        log::debug!("{}LOGICAL_MAXIMUM({})", gen_space(indent), value);
                     }
 
                     0b0011 => {
                         // PHYSICAL_MINIMUM
                         let value = get_item_value_i32(item.bsize(), &mut buffer)?;
-                        log::info!("{}PHYSICAL_MINIMUM({})", gen_space(indent), value);
+                        log::debug!("{}PHYSICAL_MINIMUM({})", gen_space(indent), value);
                     }
 
                     0b0100 => {
                         // PHYSICAL_MAXIMUM
                         let value = get_item_value_i32(item.bsize(), &mut buffer)?;
-                        log::info!("{}PHYSICAL_MAXIMUM({})", gen_space(indent), value);
+                        log::debug!("{}PHYSICAL_MAXIMUM({})", gen_space(indent), value);
                     }
 
                     0b0101 => {
                         // UNIT_EXPONENT
                         let value = get_item_value_i32(item.bsize(), &mut buffer)?;
-                        log::info!("{}UNIT_EXPONENT({:?})", gen_space(indent), value);
+                        log::debug!("{}UNIT_EXPONENT({:?})", gen_space(indent), value);
                     }
 
                     0b0110 => {
@@ -774,7 +774,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         let unit_luminosity = (value >> 24) & 0xF;
 
                         if unit_length != 0 {
-                            log::info!(
+                            log::debug!(
                                 "{}UNITS(length: {} {})",
                                 gen_space(indent),
                                 match unit_length {
@@ -790,7 +790,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         }
 
                         if unit_mass != 0 {
-                            log::info!(
+                            log::debug!(
                                 "{}UNITS(length: {} {})",
                                 gen_space(indent),
                                 unit_length,
@@ -799,7 +799,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         }
 
                         if unit_time != 0 {
-                            log::info!(
+                            log::debug!(
                                 "{}UNITS(length: {} {})",
                                 gen_space(indent),
                                 unit_length,
@@ -808,7 +808,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         }
 
                         if unit_temperature != 0 {
-                            log::info!(
+                            log::debug!(
                                 "{}UNITS(length: {} {})",
                                 gen_space(indent),
                                 unit_temperature,
@@ -817,7 +817,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         }
 
                         if unit_current != 0 {
-                            log::info!(
+                            log::debug!(
                                 "{}UNITS(length: {} {})",
                                 gen_space(indent),
                                 unit_current,
@@ -826,7 +826,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         }
 
                         if unit_luminosity != 0 {
-                            log::info!(
+                            log::debug!(
                                 "{}UNITS(length: {} {})",
                                 gen_space(indent),
                                 unit_luminosity,
@@ -838,7 +838,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                     0b0111 => {
                         // REPORT_SIZE
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
-                        log::info!("{}REPORT_SIZE({})", gen_space(indent), value);
+                        log::debug!("{}REPORT_SIZE({})", gen_space(indent), value);
                         local_report_size = Some(value as usize);
                     }
 
@@ -849,7 +849,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         }
 
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
-                        log::info!("{}REPORT_ID({:?})", gen_space(indent), value);
+                        log::debug!("{}REPORT_ID({:?})", gen_space(indent), value);
                         report_id = value;
                         items.clear();
                         total_report_size = 8;
@@ -858,7 +858,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                     0b1001 => {
                         // REPORT_COUNT
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
-                        log::info!("{}REPORT_COUNT({})", gen_space(indent), value);
+                        log::debug!("{}REPORT_COUNT({})", gen_space(indent), value);
                         local_report_count = Some(value as usize);
                     }
 
@@ -887,20 +887,20 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                 HidUsage::Unknown(value as u16)
                             }
                         };
-                        log::info!("{}Usage({:?})", gen_space(indent), usage);
+                        log::debug!("{}Usage({:?})", gen_space(indent), usage);
                         usages.push(usage);
                     }
 
                     0b0001 => {
                         // USAGE_MINIMUM
                         let value = get_item_value_i32(item.bsize(), &mut buffer)?;
-                        log::info!("{}USAGE_MINIMUM({})", gen_space(indent), value);
+                        log::debug!("{}USAGE_MINIMUM({})", gen_space(indent), value);
                     }
 
                     0b0010 => {
                         // USAGE_MAXIMUM
                         let value = get_item_value_i32(item.bsize(), &mut buffer)?;
-                        log::info!("{}USAGE_MAXIMUM({})", gen_space(indent), value);
+                        log::debug!("{}USAGE_MAXIMUM({})", gen_space(indent), value);
                     }
 
                     btag => {
@@ -921,11 +921,11 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
         }
     }
 
-    log::info!("Items: ");
+    log::debug!("Items: ");
     for (report_id, report) in reports.iter() {
-        log::info!("Report {} size: {}", report_id, report.1 / 8);
+        log::debug!("Report {} size: {}", report_id, report.1 / 8);
         for item in report.0.iter() {
-            log::info!("    {:?}", item);
+            log::debug!("    {:?}", item);
         }
     }
     Ok(reports)
@@ -1163,9 +1163,9 @@ fn get_screen_display() -> Result<ScreenInfo, Error> {
             "Error in XOpenDisplay".to_string(),
         ));
     }
-    log::info!("Display: {:?}", display);
+    log::debug!("Display: {:?}", display);
     let rootwindow = unsafe { XRootWindow(display, 0) };
-    log::info!("Root windows: {:?}", rootwindow);
+    log::debug!("Root windows: {:?}", rootwindow);
     unsafe { XSelectInput(display, rootwindow, KeyReleaseMask) };
 
     /* Get screen size */
@@ -1210,7 +1210,7 @@ fn get_hid_descriptor(device: &UsbDevice) -> Result<Vec<u8>, Error> {
         return Err(Error::new(ErrorKind::Other, "Response too big"));
     }
     buffer.truncate(len);
-    log::info!("{}, {:?}", len, buffer);
+    log::debug!("{}, {:?}", len, buffer);
 
     buffer.reverse();
     Ok(buffer)
@@ -1289,7 +1289,7 @@ fn parse_generic_desktop_control(
 
         match usage {
             HidUsage::GenericDesktop(HidUsageGenericDesktop::X) => {
-                // log::info!("value x {}", value);
+                log::trace!("value x {}", value);
                 match item.coordinatestate {
                     CoordinateState::Abs => {
                         if context.finger_touch {
@@ -1304,7 +1304,7 @@ fn parse_generic_desktop_control(
                 }
             }
             HidUsage::GenericDesktop(HidUsageGenericDesktop::Y) => {
-                // log::info!("value y {}", value);
+                log::trace!("value y {}", value);
                 match item.coordinatestate {
                     CoordinateState::Abs => {
                         if context.finger_touch {
@@ -1340,20 +1340,20 @@ fn parse_digitizer(
     item: &HidItem,
     buffer: &[u8],
 ) -> Result<(), Error> {
-    //log::info!("item {:?}", item);
+    log::trace!("item {:?}", item);
     if item.count as usize != item.usage.len() {
         return Ok(());
     }
     for index in 0..item.count as usize {
         let usage = &item.usage[index];
-        //log::info!("item usage {:?}", usage);
+        log::trace!("item usage {:?}", usage);
         match usage {
             HidUsage::Digitizer(HidUsageDigitizer::TipSwitch) => {
                 if item.size != 1 {
                     continue;
                 }
                 let button_value = item.get_value(index, buffer)?;
-                //log::info!("button {} {}", index, button_value);
+                log::trace!("button {} {}", index, button_value);
                 if button_value != 0 {
                     context.finger_touch = true;
                     context.surface_touched = true;
@@ -1406,7 +1406,7 @@ fn request_reports(device: &UsbDevice, reports: &HashMap<u32, (Vec<HidItem>, usi
             &mut buffer,
             Duration::from_millis(1000),
         );
-        log::info!("Get report id: {:?} {:?}, {:?}", report_id, result, buffer);
+        log::debug!("Get report id: {:?} {:?}, {:?}", report_id, result, buffer);
 
         if !items.iter().all(|item| item.r#type == HidItemType::Feature) {
             continue;
@@ -1432,7 +1432,7 @@ fn request_reports(device: &UsbDevice, reports: &HashMap<u32, (Vec<HidItem>, usi
                     &buffer,
                     Duration::from_millis(1000),
                 );
-                log::info!("Set report {:?} {:?}, {:?}", report_id, result, buffer);
+                log::debug!("Set report {:?} {:?}, {:?}", report_id, result, buffer);
             }
         }
     }
@@ -1484,7 +1484,7 @@ fn main() -> Result<(), Error> {
     request_reports(&device, &reports);
 
     let screen = get_screen_display()?;
-    log::info!("Screen: {}x{}", screen.width, screen.height);
+    log::debug!("Screen: {}x{}", screen.width, screen.height);
 
     let mut context = DisplayContext::new(screen);
     context.updt_cursor();
@@ -1500,7 +1500,7 @@ fn main() -> Result<(), Error> {
                 context.button_num = 0;
                 context.finger_touch = false;
 
-                log::info!("Read: {:?}", buffer);
+                log::debug!("Read: {:?}", buffer);
                 let report = get_associated_report(&buffer, &reports)?;
                 for item in report.0.iter() {
                     match &item.usage_page {
@@ -1517,7 +1517,7 @@ fn main() -> Result<(), Error> {
                             parse_digitizer(&mut context, item, &buffer)?;
                         }
                         value => {
-                            log::info!("Unknown: {:?}", value);
+                            log::debug!("Unknown: {:?}", value);
                         }
                     }
                 }
@@ -1547,7 +1547,7 @@ fn main() -> Result<(), Error> {
                 // skip
             }
             Err(err) => {
-                log::info!("Err {:?}, exiting", err);
+                log::error!("Err {:?}, exiting", err);
                 break;
             }
         }

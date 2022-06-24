@@ -1,0 +1,3 @@
+Defaults:usbsas-client !requiretty
+
+usbsas-client ALL=(ALL) NOPASSWD: /usr/bin/udevadm trigger
