@@ -1,14 +1,10 @@
 #! /bin/sh
 set -e
 
-# Create usbsas user, update initramfs and reload udev rules
-
 if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
-    if [ -z "$(id -u usbsas 2>/dev/null)" ]; then
-        echo "adding usbsas user"
-        adduser --system  --home /var/lib/usbsas --gecos "usbsas" \
-            --disabled-password --quiet usbsas
-    fi
+    # Reload udev rules
+    echo "reloading udev rules"
+    udevadm control --reload-rules
 
     echo "updating initramfs"
     depmod
@@ -20,10 +16,6 @@ if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
     else
         echo "WARN: couldn't update initramfs !"
     fi
-
-    echo "reloading udev rules"
-    udevadm control --reload-rules
-
 fi
 
 #DEBHELPER#

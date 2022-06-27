@@ -1,11 +1,10 @@
 #! /bin/sh
 set -e
 
-# Delete usbsas user, update initramfs and reload udev rules
-
-if [ "$1" = remove ]; then
-    echo "deleting usbsas user"
-    userdel -r -f usbsas
+if [ "$1" = "remove" ]; then
+    # Reload udev rules
+    echo "reloading udev rules"
+    udevadm control --reload-rules
 
     echo "updating initramfs"
     depmod
@@ -17,9 +16,6 @@ if [ "$1" = remove ]; then
     else
         echo "WARN: couldn't update initramfs !"
     fi
-
-    echo "reloading udev rules"
-    udevadm control --reload-rules
 fi
 
 #DEBHELPER#

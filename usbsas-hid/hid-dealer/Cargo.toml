@@ -1,0 +1,33 @@
+[package]
+name = "hid-dealer"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+env_logger = "0.9.0"
+log = "0.4.17"
+dbus-crossroads = "0.5.0"
+dbus = "0.9.5"
+lazy_static = "1.4.0"
+err-derive = "0.3.1"
+
+# cargo-deb
+[package.metadata.deb]
+name = "usbsas-hid"
+maintainer = "usbsas"
+copyright = "usbsas"
+depends = "$auto, sudo, dbus, usbsas-kiosk"
+section = "utility"
+priority = "optional"
+maintainer-scripts = "debian/"
+systemd-units = { enable = false }
+assets = [
+  ["target/release/hid-dealer", "usr/libexec/", "755"],
+  ["target/release/hid-user", "usr/libexec/", "755"],
+  ["assets/hid-hotplug", "usr/libexec/", "755"],
+  ["assets/99-usbsas-hid.rules", "etc/udev/rules.d/", "644"],
+  ["assets/hid.conf", "etc/modprobe.d/", "644"],
+  ["assets/hid-dealer.service", "usr/lib/systemd/user/", "644"],
+  ["assets/udev-trigger", "etc/sudoers.d/", "644"],
+]

@@ -1,0 +1,16 @@
+#! /bin/bash
+
+arg=$(printf '%q' "$1")
+
+set -eu
+
+# Converts busnum/devnum strings to base 10 integers
+busnum=$((10#$BUSNUM))
+devnum=$((10#$DEVNUM))
+
+HID_USER=usbsas-client
+
+sudo -u $HID_USER \
+    DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u $HID_USER)/bus \
+    /usr/bin/dbus-send --print-reply --dest=usbsas.hid /usb_device \
+    "usbsas.hid.${arg}" byte:$busnum byte:$devnum

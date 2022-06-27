@@ -21,7 +21,7 @@ uuid = { version = "1.1.2", features = ["v4"] }
 [package.metadata.deb]
 maintainer = "usbsas"
 copyright = "usbsas"
-depends = "$auto, usbsas-server"
+depends = "$auto, usbsas-server, clamav-freshclam"
 section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"

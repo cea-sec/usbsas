@@ -1,5 +1,5 @@
 [package]
-name = "usbsas-hid"
+name = "hid-user"
 version = "0.1.0"
 edition = "2021"
 links = "X11,Xtst"

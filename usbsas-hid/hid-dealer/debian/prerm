@@ -1,0 +1,17 @@
+#! /bin/sh
+set -e
+
+if [ "$1" = "remove" ]; then
+    # Stop user service if running
+    DBADDR="/run/user/$(id -u usbsas-client)/bus"
+    if [ -f $DBADDR ]; then
+        if sudo -u usbsas-client DBUS_SESSION_BUS_ADDRESS="unix:path=$DBADDR" \
+            systemctl --user is-active hid-dealer.service; then
+                    sudo -u usbsas-client \
+                        DBUS_SESSION_BUS_ADDRESS="unix:path=$DBADDR" \
+                        systemctl --user stop hid-dealer.service
+        fi
+    fi
+fi
+
+#DEBHELPER#

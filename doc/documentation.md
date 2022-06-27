@@ -49,8 +49,7 @@ build target directory)
 [cargo-deb](https://github.com/kornelski/cargo-deb#readme) needs to be installed
 as well. Packages are provided for the server and the analyzer server.
 
-Build usbsas package:
-
+Build the usbsas-server package:
 ```shell
 $ sudo apt install pkgconf clang cmake git libssl-dev libkrb5-dev libseccomp-dev
 $ cargo install cargo-deb
@@ -72,7 +71,20 @@ rule that will give it ownership of mass storage USB devices (see [USB
 permissions](#usb-permissions) bellow).
 
 If you use the analyzer-server, also install `clamav-freshclam` and run `$
-freshclam` to download the database.
+freshclam` to download the database (this is done automatically while installing
+the debian package).
+
+Build the client / kiosk package:
+```shell
+$ make -C client/kiosk
+```
+
+Build the usbsas-hid package:
+```shell
+$ cargo build --release --manifest-path usbsas-hid/hid-user/Cargo.toml
+$ cargo build --release --manifest-path usbsas-hid/hid-dealer/Cargo.toml
+$ cargo-deb --manifest-path=usbsas-hid/hid-dealer/Cargo.toml --no-build
+```
 
 ## Usage
 
@@ -132,12 +144,6 @@ Start the browser or `nwjs` (for the kiosk mode):
 ```shell
 $ $BROWSER http://localhost:8080
 ```
-or:
-
-```shell
-$ nw /usr/share/usbsas/nwjs
-```
-
 
 #### Manually from the source directory
 ```shell
