@@ -47,6 +47,7 @@ section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
 systemd-units = { enable = false }
+triggers-file = "debian/triggers"
 assets = [
   ["target/release/usbsas-server", "usr/bin/", "755"],
   ["target/release/usbsas-usbsas", "usr/libexec/", "755"],
