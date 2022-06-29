@@ -99,6 +99,20 @@ pub(crate) fn new_context_with_common_rules(
         )],
     )?;
 
+    // Allow mremap
+    ctx.allow_syscall(Syscall::mremap)?;
+    // but disallow with PROT_EXEC
+    ctx.set_rule_for_syscall(
+        Action::KillThread,
+        Syscall::mremap,
+        &[Comparator::new(
+            2,
+            Cmp::MaskedEq,
+            libc::PROT_EXEC as u64,
+            Some(libc::PROT_EXEC as u64),
+        )],
+    )?;
+
     // Allow more syscalls
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::munmap)?;

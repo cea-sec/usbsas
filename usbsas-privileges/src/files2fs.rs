@@ -16,20 +16,6 @@ pub fn drop_priv(fd_read: RawFd, fd_write: RawFd, out_fs_fd: RawFd) -> Result<()
         &[Comparator::new(0, Cmp::Eq, out_fs_fd as u64, None)],
     )?;
 
-    // Allow mremap
-    ctx.allow_syscall(Syscall::mremap)?;
-    // but disallow with PROT_EXEC
-    ctx.set_rule_for_syscall(
-        Action::KillThread,
-        Syscall::mremap,
-        &[Comparator::new(
-            2,
-            Cmp::MaskedEq,
-            libc::PROT_EXEC as u64,
-            Some(libc::PROT_EXEC as u64),
-        )],
-    )?;
-
     ctx.load()?;
 
     Ok(())
