@@ -32,6 +32,7 @@ Allowed syscalls for all processes:
 - `write()` on the second communication pipe, stdout and stderr
 - `close()` communication pipes
 - `mmap()` with a NULL addr and without the PROT_EXEC flag
+- `mremap()` without the PROT_EXEC flag
 - `sigaltstack()`
 - `munmap()`
 - `exit_group()`
@@ -78,10 +79,9 @@ job of dev2scsi. It is the only process able to read the input device.
 
 Requests: `OpenDevice`, `ReadSectors`, `ReadPartitions`,
 
-syscalls: `mremap()` without PROT_EXEC flag; `poll()`; some `ioctl()` and
-`close()` on the device file descriptor; `read()`, `write()` and `close()` on
-libusb's event file descriptor; `timerfd_settime()` and `close()` on libusb's
-timer file descriptor
+syscalls: `poll()`; some `ioctl()` and `close()` on the device file descriptor;
+`read()`, `write()` and `close()` on libusb's event file descriptor;
+`timerfd_settime()` and `close()` on libusb's timer file descriptor
 
 ### scsi2files
 
@@ -92,7 +92,7 @@ reading `FAT`, `exFAT`, `NTFS`, `ext4` and `ISO9660`.
 Requests: `OpenDevice`, `ReadSectors`, `ReadPartitions`, `OpenPartition`,
 `ReadDir`, `ReadFile`, `GetAttr`
 
-syscalls: `mremap()` without PROT_EXEC flag; `getrandom()`
+syscalls: `getrandom()`
 
 ### filter
 
@@ -192,8 +192,7 @@ Requests: `SetFsInfos`, `NewFile`, `WriteFile`, `EndFile`, `Close`, `BitVec`,
 `ImgDisk`, `WriteData`
 
 syscalls: `read()`, `write()` `lseek()` and `close()` on fs file descriptor,
-`mremap()` without PROT_EXEC flag, `poll()` and same as dev2scsi for libusb's
-file descriptors
+`poll()` and same as dev2scsi for libusb's file descriptors
 
 ### fs2dev
 
@@ -206,7 +205,7 @@ It can also wipe devices (zero are written on all sectors).
 Requests: `DevSize`, `StartCopy`, `Wipe`, `LoadBitVec`
 
 syscalls: `write()`, `lseek()`, `close()` and some `ioctl()` on fs file
-descriptor, `mremap()` without PROT_EXEC flag,
+descriptor
 
 ### uploader
 

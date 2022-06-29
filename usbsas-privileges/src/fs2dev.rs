@@ -14,20 +14,6 @@ pub fn drop_priv(
     }
     let mut ctx = crate::new_context_with_common_rules(fds_read, vec![fd_write])?;
 
-    // Allow mremap
-    ctx.allow_syscall(Syscall::mremap)?;
-    // but disallow with PROT_EXEC
-    ctx.set_rule_for_syscall(
-        Action::KillThread,
-        Syscall::mremap,
-        &[Comparator::new(
-            2,
-            Cmp::MaskedEq,
-            libc::PROT_EXEC as u64,
-            Some(libc::PROT_EXEC as u64),
-        )],
-    )?;
-
     if let Some(fd) = out_fs_fd {
         // Allow lseek on out_fs
         ctx.set_rule_for_syscall(
