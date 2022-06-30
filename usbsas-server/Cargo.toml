@@ -8,7 +8,7 @@ license = "GPL-3.0"
 actix-files = "0.6.1"
 actix-web = "4.1.0"
 base64 = "0.13.0"
-clap = "3.2.7"
+clap = "3.2.8"
 err-derive = "0.3.1"
 futures = "0.3.21"
 hmac = { version = "0.12.1", features = ["reset"] }

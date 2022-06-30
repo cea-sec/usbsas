@@ -376,7 +376,7 @@ dependencies = [
  "bitflags",
  "cexpr 0.6.0",
  "clang-sys",
- "clap 3.2.7",
+ "clap 3.2.8",
  "env_logger 0.9.0",
  "lazy_static",
  "lazycell",
@@ -649,9 +649,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.7"
+version = "3.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b7b16274bb247b45177db843202209b12191b631a14a9d06e41b3777d6ecf14"
+checksum = "190814073e85d238f31ff738fcb0bf6910cedeb73376c87cd69291028966fd83"
 dependencies = [
  "atty",
  "bitflags",
@@ -3107,7 +3107,7 @@ dependencies = [
  "actix-web",
  "assert_cmd",
  "base64",
- "clap 3.2.7",
+ "clap 3.2.8",
  "err-derive",
  "futures",
  "hmac",
@@ -3152,7 +3152,7 @@ dependencies = [
 name = "usbsas-tools"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.7",
+ "clap 3.2.8",
  "env_logger 0.9.0",
  "fuse_mt",
  "indicatif",
@@ -3194,7 +3194,7 @@ dependencies = [
 name = "usbsas-usbsas"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.7",
+ "clap 3.2.8",
  "log",
  "thiserror",
  "usbsas-cmdexec",
