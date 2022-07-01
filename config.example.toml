@@ -106,31 +106,3 @@ contain = ["autorun.inf"]
 
 [[filters]]
 contain = ["thumbs.db"]
-
-[[filters]]
-contain = ["desktop.ini"]
-
-[[filters]]
-end = "/$recycle.bin"
-
-[[filters]]
-contain = ["/$recycle.bin/"]
-
-[[filters]]
-end = "/recycler"
-
-[[filters]]
-contain = ["/recycler/"]
-
-[[filters]]
-end = "/recycled"
-
-[[filters]]
-contain = ["/recycled/"]
-
-[[filters]]
-contain = ["𝄞"]
-
-[[filters]]
-contain = ["test"]
-end = "é"

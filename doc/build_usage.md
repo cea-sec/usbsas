@@ -1,10 +1,12 @@
-# usbsas documentation
+# usbsas build and usage
 
-## Table of contents
+General instructions to build and use `usbsas`. See also [kiosk](kiosk.md) for
+Debian specific instructions.
+
 * [Build](#build)
-* [Usage](#usage)
-* [Configuration](#configuration)
 * [Tests](#tests)
+* [Configuration](#configuration)
+* [Usage](#usage)
 
 ## Build
 
@@ -12,8 +14,11 @@
 
 Most dependencies are managed by `cargo` but before building usbsas, the
 following packages must also be installed (the names may change depending on the
-Linux distribution, see bellow for Debian): `rust`, `cargo`, `pkgconf`, `clang`,
-`cmake`, `protobuf`, `seccomp`, `libusb`, `krb5 `.
+Linux distribution): `rust`, `cargo`, `pkgconf`, `clang`, `cmake`, `protobuf`,
+`libseccomp`, `libusb`, `libkrb5 `.
+
+Optional dependencies to build the analyzer-server, the tools and the HID
+manager: `libclamav`, `libdbus`, `libxtst`, `libx11`, `libfuse`
 
 A recent version of `rustc` and `cargo` (edition 2021) is needed: instead of a
 packaged version, a [rustup](https://rustup.rs/) installation may be necessary.
@@ -26,13 +31,6 @@ Already included in the project:
   hopefully ntfs3g won't be needed in the future, patched source code is located
   in `ntfs3g/src/ntfs-3g`).
 
-## Build manually
-Install the dependencies and run:
-
-```shell
-$ cargo build --release
-```
-
 ### Build environment variables
 
 `USBSAS_BIN_PATH`: location of the executables (e.g. `/usr/bin/`, default is the
@@ -44,46 +42,38 @@ build target directory)
 `USBSAS_CONFIG`: path of the configuration file (default is
 `/etc/usbsas/config.toml`)
 
-## Build the debian packages
-
-[cargo-deb](https://github.com/kornelski/cargo-deb#readme) needs to be installed
-as well. Packages are provided for the server and the analyzer server.
-
-Build the usbsas-server package:
+### Build
 ```shell
-$ sudo apt install pkgconf clang cmake git libssl-dev libkrb5-dev libseccomp-dev
-$ cargo install cargo-deb
-$ export USBSAS_WEBFILES_DIR="/usr/share/usbsas/web"
-$ export USBSAS_BIN_PATH="/usr/libexec"
 $ cargo build --release
-$ cargo-deb --manifest-path=usbsas-server/Cargo.toml --no-build
 ```
+Only `usbsas-server` is built by default, to build the analyzer-server:
 
-Build the analyzer server package:
 ```shell
-$ sudo apt install libclamav-dev
 $ cargo build --release -p usbsas-analyzer-server
-$ cargo-deb --manifest-path=usbsas-analyzer-server/Cargo.toml --no-build
+```
+To build the tools (like `usbsas-fuse-mount`):
+
+```shell
+$ cargo build --release -p usbsas-tools
+```
+To build the userland HID manager:
+```shell
+$ cargo build --release --manifest-path=usbsas-hid/hid-user/Cargo.toml
+$ cargo build --release --manifest-path=usbsas-hid/hid-dealer/Cargo.toml
 ```
 
-/!\ The `usbsas-server` package will create a new user `usbsas` and add a `udev`
-rule that will give it ownership of mass storage USB devices (see [USB
-permissions](#usb-permissions) bellow).
+## Tests
+#### Integration test
 
-If you use the analyzer-server, also install `clamav-freshclam` and run `$
-freshclam` to download the database (this is done automatically while installing
-the debian package).
+Integration tests are written for the `usbsas-server` crate, they test the WEB
+API, USB to USB transfer, USB to NET transfer, device wipe etc.
 
-Build the client / kiosk package:
+A `mock` feature is available to test the usbsas without real USB devices.
+
+Run the integration tests:
 ```shell
-$ make -C client/kiosk
-```
-
-Build the usbsas-hid package:
-```shell
-$ cargo build --release --manifest-path usbsas-hid/hid-user/Cargo.toml
-$ cargo build --release --manifest-path usbsas-hid/hid-dealer/Cargo.toml
-$ cargo-deb --manifest-path=usbsas-hid/hid-dealer/Cargo.toml --no-build
+$ cargo build --all --features mock
+$ cargo test -p usbsas-server
 ```
 
 ## Usage
@@ -128,24 +118,13 @@ This rule will give ownership of the device to user `usbsas` if the device has
 an interface with the class mass storage (0x80), SCSI command set (0x06) and
 Bulk transport mode (0x50).
 
+### Configuration
+See the described `config.example.toml`.
+
 ### Web client / server
 
-#### After installing the debian package
+After building, start usbsas-server, usbsas-analyzer-server and a web client:
 
-Start the servers (analyzer-server can take a moment to load its database, make
-sure it exists and is up to date with `freshcalm`):
-
-```shell
-$ systemctl start usbsas-analyzer-server
-$ systemctl start usbsas-server
-```
-
-Start the browser or `nwjs` (for the kiosk mode):
-```shell
-$ $BROWSER http://localhost:8080
-```
-
-#### Manually from the source directory
 ```shell
 $ ./target/release/usbsas-server
 ```
@@ -156,7 +135,7 @@ $ ./target/release/usbsas-analyzer-server
 ```shell
 $ $BROWSER http://localhost:8080
 ```
-or:
+or with nwjs:
 
 ```shell
 $ nw client/nwjs
@@ -165,11 +144,7 @@ $ nw client/nwjs
 ### Other applications
 
 #### Fuse
-Build the usbsas-tools crate:
-```shell
-$ sudo apt install libfuse3-dev
-$ cargo build --release -p usbsas-tools
-```
+After building `usbsas-tools`:
 ```shell
 $ ./target/release/usbsas-fuse-mount --help
 usbsas-fuse-mount 1.0
@@ -187,11 +162,6 @@ OPTIONS:
     -h, --help                  Print help information
     -n, --part-num <PARTNUM>    Partition number to mount [default: 1]
     -V, --version               Print version information
-```
-
-A Debian package can be generated as well (after building):
-```shell
-$ cargo-deb --manifest-path=usbsas-tools/Cargo.toml --no-build
 ```
 
 #### Python
@@ -213,26 +183,7 @@ $ make
 $ python usbsas_transfer_example.py
 ```
 
-## Configuration
-
-See the described `config.example.toml`.
-
-
-## Tests
-### Integration test
-
-Integration tests are written for the `usbsas-server` crate, they test the WEB
-API, USB to USB transfer, USB to NET transfer, device wipe etc.
-
-A `mock` feature is available to test the usbsas without real usb devices.
-
-Run the integration tests:
-```shell
-$ cargo build --all --features mock
-$ cargo test -p usbsas-server
-```
-
-### Try usbsas without USB devices
+#### Try usbsas without USB devices
 
 The `mock` feature used for the integration tests also allows using usbsas with
 _fake_ (file-backed) USB devices. After building with this feature:
