@@ -156,6 +156,7 @@ pub fn get_libusb_opened_fds(busnum: u32, devnum: u32) -> Result<LibusbFds> {
     let mut timer_fds = vec![];
 
     for fd in Process::myself()?.fd()? {
+        let fd = fd?;
         match fd.target {
             FDTarget::Path(path) => {
                 if PathBuf::from(format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum)) == path {
