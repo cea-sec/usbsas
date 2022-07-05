@@ -22,6 +22,7 @@ section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
 systemd-units = { enable = false }
+triggers-file = "debian/triggers"
 assets = [
   ["target/release/hid-dealer", "usr/libexec/", "755"],
   ["target/release/hid-user", "usr/libexec/", "755"],

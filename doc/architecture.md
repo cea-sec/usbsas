@@ -1,5 +1,10 @@
 # usbsas architecture
 
+* [Communication](#communication)
+* [Privileges](#privileges)
+* [Processes](#processes)
+* [HID](#hid)
+
 Here are the various processes composing usbsas:
 <p align="center"><img src="./architecture.svg" style="background-color:white" width="100%"/></p>
 
@@ -233,3 +238,11 @@ destination) the output tar or filesystem as argument.
 Requests: `Exec`, `PostCopyExec`
 
 syscall: cmdexec doesn't run in a seccomp sandbox
+
+
+## HID
+
+In order to protect against BadUSB devices, a minimal HID driver has also been
+implemented. It runs in user space (`hid` kernel modules aren't used) and only
+supports mouse left clicks (enough for selecting files to transfer), keystrokes
+sent by a malicious device won't be handled by the system.

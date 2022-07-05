@@ -7,17 +7,6 @@ if [ "$1" = remove ]; then
     echo "deleting usbsas user"
     userdel -r -f usbsas
 
-    echo "updating initramfs"
-    depmod
-    if [ -x /usr/sbin/update-initramfs ]; then
-        update-initramfs -u 2>/dev/null
-    elif [ -x /usr/bin/dracut ]; then
-        KVER=$(uname -r)
-        kernel-install add $KVER /boot/vmlinuz-$KVER /boot/initrd.img-$KVER
-    else
-        echo "WARN: couldn't update initramfs !"
-    fi
-
     echo "reloading udev rules"
     udevadm control --reload-rules
 fi
