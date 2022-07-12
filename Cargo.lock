@@ -439,9 +439,9 @@ dependencies = [
 
 [[package]]
 name = "bitvec"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1489fcb93a5bb47da0462ca93ad252ad6af2145cce58d10d46a83931ba9f016b"
+checksum = "1bc2832c24239b0141d5674bb9174f9d68a8b5b3f2753311927c172ca46f7e9c"
 dependencies = [
  "funty 2.0.0",
  "radium 0.7.0",
@@ -2945,7 +2945,7 @@ dependencies = [
 name = "usbsas-files2fs"
 version = "0.1.0"
 dependencies = [
- "bitvec 1.0.0",
+ "bitvec 1.0.1",
  "env_logger 0.9.0",
  "fscommon",
  "log",
@@ -2997,7 +2997,7 @@ dependencies = [
 name = "usbsas-fs2dev"
 version = "0.1.0"
 dependencies = [
- "bitvec 1.0.0",
+ "bitvec 1.0.1",
  "byteorder 1.4.3",
  "env_logger 0.9.0",
  "log",
