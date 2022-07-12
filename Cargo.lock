@@ -1533,9 +1533,9 @@ dependencies = [
 
 [[package]]
 name = "libgssapi"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adbf0ba411069dcfe60ab82285ee0f89606e26de424fd26c55aa97a5ed6c2bce"
+checksum = "42971038bb1f78bc88dd817b3aafa509be3d1b71e2042f93246654235e3592f5"
 dependencies = [
  "bitflags",
  "bytes",
