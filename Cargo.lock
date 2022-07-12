@@ -797,9 +797,9 @@ dependencies = [
 
 [[package]]
 name = "dbus-crossroads"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5d83c4b78f7c7d0dec4859d286665a06858a607ba406c91a36316ff36918141"
+checksum = "554114296d012b33fdaf362a733db6dc5f73c4c9348b8b620ddd42e61b406e30"
 dependencies = [
  "dbus",
 ]
