@@ -1062,8 +1062,9 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "fuse_mt"
-version = "0.6.0-dev"
-source = "git+https://github.com/wfraser/fuse-mt?rev=1876f8200c5c391be28da74cab8de27198809be4#1876f8200c5c391be28da74cab8de27198809be4"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6fb32ee97853a470831e058c0340955c9c773c8a1885aab99b37a2d3131fc06"
 dependencies = [
  "fuser",
  "libc",
@@ -1073,14 +1074,18 @@ dependencies = [
 
 [[package]]
 name = "fuser"
-version = "0.6.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5cd519583b0984ff2afd39b0c5b64b9520ef754c6d0330c54631595aa1de170"
+checksum = "aef8400a4ea1d18a8302e2952f5137a9a21ab257825ccc7d67db4a8018b89022"
 dependencies = [
  "libc",
  "log",
+ "memchr",
+ "page_size",
  "pkg-config",
+ "smallvec",
  "users",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1918,6 +1923,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "page_size"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eebde548fbbf1ea81a99b128872779c437752fb99f217c45245e1a61dcd9edcd"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -3595,6 +3610,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d1526bbe5aaeb5eb06885f4d987bcdfa5e23187055de9b83fe00156a821fabc"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "332f188cc1bcf1fe1064b8c58d150f497e697f49774aa846f2dc949d9a25f236"
+dependencies = [
+ "byteorder 1.4.3",
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0fbc82b82efe24da867ee52e015e58178684bd9dd64c34e66bdf21da2582a9f"
+dependencies = [
+ "proc-macro2",
+ "syn",
+ "synstructure",
 ]
 
 [[package]]
