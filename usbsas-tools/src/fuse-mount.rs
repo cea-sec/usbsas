@@ -250,7 +250,7 @@ fn main() -> Result<()> {
                 .required(true)
                 .value_name("BUSNUM")
                 .value_parser(clap::value_parser!(u32))
-                .help("Bus nummber of the device to mount")
+                .help("Bus number of the device to mount")
                 .takes_value(true),
         )
         .arg(

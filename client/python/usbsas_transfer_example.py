@@ -5,7 +5,7 @@
 Simple python script to copy files from a USB device to another using usbsas.
 
 (Start usbsas-analyzer-server before running this script or remove "--analyze"
-flag in execv bellow)
+flag in execv below)
 
 /!\ Don't use this as is in production, it is roughly an example of how to use
     usbsas with python and protobuf

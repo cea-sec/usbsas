@@ -167,7 +167,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
         };
         let size = ntfs_file_size(&ntfs_file, &mut self.reader)?;
         // Convert ntfs timestamp to unix timestamp (e.g. nano sec to sec and
-        // substract ntfs "epoch" 01.01.1601 00:00:00
+        // subtract ntfs "epoch" 01.01.1601 00:00:00
         let ts = ntfs_file.info()?.creation_time().nt_timestamp() as i64 / 10000000 - 11644473600;
         Ok((file_type, size, ts))
     }
@@ -230,7 +230,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
         data_value.seek(&mut self.reader, SeekFrom::Start(offset))?;
 
         // read() while buffer isn't full or EOF is reached.
-        // don't use read_exact() because it whould ret an error and fuse always asks 4kb
+        // don't use read_exact() because it would ret an error and fuse always asks 4kb
         let mut bytes_read = 0;
         loop {
             match data_value.read(&mut self.reader, &mut buf[bytes_read..]) {

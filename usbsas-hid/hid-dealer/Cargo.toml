@@ -3,6 +3,7 @@ name = "hid-dealer"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0"
+description = "usbsas userland HID manager"
 
 [dependencies]
 env_logger = "0.9.0"

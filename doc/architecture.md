@@ -46,7 +46,7 @@ Allowed syscalls for all processes:
 - `clock_gettime()`
 - `rt_sigreturn()`
 
-Other syscalls can be allowed, depending on the tasks of the process, see bellow.
+Other syscalls can be allowed, depending on the tasks of the process, see below.
 
 ## Processes
 
@@ -70,7 +70,7 @@ syscalls: `wait4()`; `getrandom()`
 ### usbdev
 
 usbdev is responsible for detecting plugged usb mass storage devices and getting
-their informations.
+their information.
 
 Requests: `Devices`
 
@@ -115,7 +115,7 @@ files2tar writes files in a tar archive. It can be started in two modes
 depending on the transfer destination. If data is copied to another USB device,
 files will be stored directly in the tar for analysis. If data is uploaded to a
 remote server, files will be stored in the tar under a "/data/" directory and a
-"/infos.json" file containing informations about the input device, hostname etc.
+"/infos.json" file containing information about the input device, hostname etc.
 will be added.
 
 Requests: `NewFile`, `WriteFile`, `EndFile`, `Close`

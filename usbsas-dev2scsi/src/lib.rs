@@ -48,7 +48,7 @@ protoresponse!(
     error = Error[ResponseError]
 );
 
-// Max we need to read for ext4 check (other fs need less) ans iso9660
+// Max we need to read for ext4 check (other fs need less) and iso9660
 const MAX_LEN_PART_HEADER: u64 = 0x464;
 const MAX_LEN_ISO_HEADER: u64 = 0x8806;
 
@@ -233,7 +233,7 @@ impl<T: UsbContext> DevOpenedState<T> {
         };
 
         // If bootsector didn't return any partition, a filesystem may be written directly on the
-        // device without partition table, try to find it bellow
+        // device without partition table, try to find it below
         if partitions.is_empty() {
             partitions.push(PartitionInfo {
                 ptype: 0,

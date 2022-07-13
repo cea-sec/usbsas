@@ -203,7 +203,7 @@ impl MainLoopState {
         trace!("req_readfile {}", path);
 
         if size as u64 > READ_FILE_MAX_SIZE {
-            return Err(Error::Error("max read size exceded".to_string()));
+            return Err(Error::Error("max read size exceeded".to_string()));
         }
 
         let mut data = vec![0u8; size];

@@ -141,6 +141,11 @@ or with nwjs:
 $ nw client/nwjs
 ```
 
+The antivirus analysis with the analyzer server is optional. To disable it,
+comment or remove the `[analyzer]` section of the `config.toml` file. The
+provided analyzer-server based on clamAV is mainly given as example, an
+analyzer-server with multiple antiviruses should be preferred.
+
 ### Other applications
 
 #### Fuse

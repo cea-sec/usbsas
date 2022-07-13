@@ -193,7 +193,7 @@ impl WaitFsInfosState {
 
         let fs: Box<dyn FSWrite<StreamSlice<SparseFile<File>>>> = match out_fs_type {
             OutFsType::Fat | OutFsType::Exfat => {
-                // ff handles writing mbr but still wrap in StreamSlice so we have the same type as ntfs bellow
+                // ff handles writing mbr but still wrap in StreamSlice so we have the same type as ntfs below
                 let file_slice =
                     StreamSlice::new(sparse_file, 0, (SECTOR_START + sector_count) * SECTOR_SIZE)?;
 

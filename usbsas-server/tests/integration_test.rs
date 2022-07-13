@@ -339,7 +339,7 @@ impl IntegrationTester {
             .send()?
             .json()?;
 
-        // Find intput dev (first USB)
+        // Find input dev (first USB)
         let input_dev = devices
             .iter()
             .find(|dev| dev.dev_type == appstate::DevType::Usb)

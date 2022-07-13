@@ -93,7 +93,7 @@ impl<T: Read + Seek> FSRead<T> for Iso9660<T> {
         file_reader.seek(SeekFrom::Start(offset))?;
 
         // read() while buffer isn't full or EOF is reached.
-        // don't use read_exact() because it whould ret an error and fuse always asks 4kb
+        // don't use read_exact() because it would ret an error and fuse always asks 4kb
         let mut bytes_read = 0;
         loop {
             match file_reader.read(&mut buf[bytes_read..]) {

@@ -110,7 +110,7 @@ impl WaitNewFileState {
                 Ok(State::End)
             }
             _ => {
-                error!("unexpexted req");
+                error!("unexpected req");
                 Err(Error::BadRequest)
             }
         }
@@ -230,7 +230,7 @@ impl UsbsasProcess for Files2Tar {
                     // 0: create a "flat" tar for the remote analyzer
                     0 => Files2Tar::new(comm, fname.to_string(), false)?.main_loop()?,
                     // 1: create a tar in which files will be stored under the "/data" directory.
-                    //    "/info.json" will also be added with informations about the transfer.
+                    //    "/info.json" will also be added with information about the transfer.
                     1 => Files2Tar::new(comm, fname.to_string(), true)?.main_loop()?,
                     // 2: unlock to exit value
                     2 => Files2Tar {

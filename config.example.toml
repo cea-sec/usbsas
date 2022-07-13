@@ -43,7 +43,7 @@ command_args = [
 
 
 # Remote analyzer server. (Optional)
-# Like for network destination bellow, kerberos authentication can be enabled.
+# Like for network destination below, kerberos authentication can be enabled.
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 #krb_service_name = "HTTP@your.domain"
