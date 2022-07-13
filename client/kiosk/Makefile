@@ -6,7 +6,7 @@ PKG=../../target/debian/usbsas-kiosk_$(VER)_amd64.deb
 all: $(PKG)
 
 nwjs-v$(NWJS_VER)-linux-x64.tar.gz:
-	wget "https://dl.nwjs.io/v$(NWJS_VER)/nwjs-v$(NWJS_VER)-linux-x64.tar.gz"
+	curl -O "https://dl.nwjs.io/v$(NWJS_VER)/nwjs-v$(NWJS_VER)-linux-x64.tar.gz"
 
 usbsas-kiosk/opt/nwjs/nw: nwjs-v$(NWJS_VER)-linux-x64.tar.gz
 	mkdir -p usbsas-kiosk/opt/nwjs

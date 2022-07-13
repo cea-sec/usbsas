@@ -13,7 +13,13 @@ The generated packages will be located in `target/debian`.
 $ sudo apt install -y --no-install-recommends curl pkgconf clang cmake git
 $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 $ source $HOME/.cargo/env
-$ cargo install --git "https://github.com/kornelski/cargo-deb" cargo-deb
+$ cargo install cargo-deb
+```
+
+### Clone usbsas
+```shell
+$ git clone https://github.com/cea-sec/usbsas
+$ cd usbsas
 ```
 
 ### Set environment variables
