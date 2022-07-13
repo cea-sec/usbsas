@@ -114,7 +114,7 @@ pub struct UsbsasChild<R> {
 impl<R> UsbsasChild<R> {
     pub fn wait(&self) -> Result<()> {
         if let Err(err) = nix::sys::wait::waitpid(self.child, None) {
-            log::error!("Couldnt' wait child {}: {}", self.child, err);
+            log::error!("Couldn't wait child {}: {}", self.child, err);
             return Err(Error::Error("waitpid() error".to_string()));
         }
         Ok(())

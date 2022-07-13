@@ -3,7 +3,7 @@
 //! copied to another USB device, files will be stored directly in the tar for
 //! analysis. If data is uploaded to a remote server, files will be stored in
 //! the tar under a "/data/" directory and a "/infos.json" file containing
-//! informations about the input device, hostname etc. will be added.
+//! information about the input device, hostname etc. will be added.
 //!
 
 use thiserror::Error;

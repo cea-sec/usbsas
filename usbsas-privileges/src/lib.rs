@@ -148,7 +148,7 @@ pub struct LibusbFds {
     pub events: Vec<RawFd>,
 }
 
-// XXX Get thoses fds from rusb when possible
+// XXX Get those fds from rusb when possible
 #[cfg(not(feature = "mock"))]
 pub fn get_libusb_opened_fds(busnum: u32, devnum: u32) -> Result<LibusbFds> {
     let mut dev_fd = None;
