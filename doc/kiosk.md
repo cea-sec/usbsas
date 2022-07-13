@@ -4,6 +4,10 @@ usbsas is meant to be deployed as a kiosk station. Here is a guide to do it
 based on a fresh Debian installation (everything as default, no desktop
 environment).
 
+Debian packages (for x86_64) can be downloaded from the [realease
+page](https://github.com/cea-sec/usbsas/releases/latest) or built with the
+following instructions.
+
 ## Build the Debian packages
 
 The generated packages will be located in `target/debian`.
@@ -77,18 +81,18 @@ manager. The installation of `usbsas-hid` is recommended but not mandatory.
 ## Install the Debian packages
 
 ```shell
-$ sudo apt install ./target/debian/usbsas-server_0.1.0_amd64.deb \
-                   ./target/debian/usbsas-analyzer-server_0.1.0_amd64.deb \
-                   ./target/debian/usbsas-kiosk_0.1.0_amd64.deb \
-                   ./target/debian/usbsas-hid_0.1.0_amd64.deb
+$ sudo apt install ./usbsas-server_0.1.0_amd64.deb \
+                   ./usbsas-analyzer-server_0.1.0_amd64.deb \
+                   ./usbsas-kiosk_0.1.0_amd64.deb \
+                   ./usbsas-hid_0.1.0_amd64.deb
 ```
 
 
 After installation, systemd services must be enabled and a reboot is needed.
 
 /!\ Warning: Once the system has rebooted, the only displayed application will
-be nwjs and since keyboards will be disabled, it is a good idea to keep an
-access (ssh for example) to the machine.
+be nwjs and since keyboards will be disabled (if usbsas-hid is installed), it is
+a good idea to keep an access (ssh for example) to the machine.
 
 ```shell
 sudo systemctl enable usbsas-server.service
