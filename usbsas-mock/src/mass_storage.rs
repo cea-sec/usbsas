@@ -1,3 +1,4 @@
+use positioned_io2::ReadAt;
 use std::{
     env,
     fs::{File, OpenOptions},
@@ -113,5 +114,39 @@ impl<T> Seek for MockMassStorage<T> {
             }
             _ => Err(io::Error::new(ErrorKind::InvalidInput, "unsupported seek")),
         }
+    }
+}
+
+impl<T> ReadAt for MockMassStorage<T> {
+    fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
+        if self.pos % (self.block_size as u64) != 0 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Read on non sector aligned",
+            ));
+        }
+        if (buf.len() % (self.block_size as usize)) != 0 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Read on non sector size",
+            ));
+        }
+        self.fakedev.read_at(pos, buf)
+    }
+
+    fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<()> {
+        if self.pos % (self.block_size as u64) != 0 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Read on non sector aligned",
+            ));
+        }
+        if (buf.len() % (self.block_size as usize)) != 0 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Read on non sector size",
+            ));
+        }
+        self.fakedev.read_exact_at(pos, buf)
     }
 }

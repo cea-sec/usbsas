@@ -3077,6 +3077,7 @@ dependencies = [
  "log",
  "lru",
  "positioned-io",
+ "positioned-io2",
  "rusb",
  "usbsas-comm",
  "usbsas-proto",
@@ -3097,6 +3098,7 @@ name = "usbsas-mock"
 version = "0.1.0"
 dependencies = [
  "log",
+ "positioned-io2",
  "thiserror",
  "usbsas-comm",
  "usbsas-process",
