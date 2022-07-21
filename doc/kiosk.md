@@ -4,7 +4,7 @@ usbsas is meant to be deployed as a kiosk station. Here is a guide to do it
 based on a fresh Debian installation (everything as default, no desktop
 environment).
 
-Debian packages (for x86_64) can be downloaded from the [realease
+Debian packages (for x86_64) can be downloaded from the [release
 page](https://github.com/cea-sec/usbsas/releases/latest) or built with the
 following instructions.
 

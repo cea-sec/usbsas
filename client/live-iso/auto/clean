@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -e
+
+lb clean noauto "${@}"
+
+rm -f build.log
+rm -rf .build \
+	config/binary \
+	config/bootstrap \
+	config/chroot \
+	config/common \
+	config/source \
+	config/hooks/live/0010-disable-kexec-tools.hook.chroot \
+	config/hooks/live/0050-disable-sysvinit-tmpfs.hook.chroot \
+	config/hooks/normal

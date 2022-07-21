@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+MIRROR="https://deb.debian.org"
+VER=$(grep ^VER config/hooks/live/0098.usbsas.hook.chroot | sed 's/VER=//')
+
+lb config noauto \
+	--distribution bullseye \
+	--architecture amd64 \
+	--image-name "usbsas-${VER}" \
+	--apt-recommends false \
+	--security true \
+	--source false \
+	--clean \
+	--verbose \
+	--binary-image iso-hybrid \
+	--system live \
+	--mirror-bootstrap "${MIRROR}/debian/" \
+	--mirror-chroot "${MIRROR}/debian/" \
+	--mirror-binary "${MIRROR}/debian/" \
+	--mirror-binary-security "${MIRROR}/debian-security/" \
+	--mirror-chroot-security "${MIRROR}/debian-security/" \
+	--mirror-debian-installer "${MIRROR}/debian/" \
+	--debootstrap-options "--include=apt-transport-https,ca-certificates,openssl" \
+	--apt-source-archives false \
+	--linux-packages "linux-image linux-headers" \
+	--bootappend-live "boot=live silent toram splash nopersistence components noautologin hostname=live-usbsas" \
+	--bootappend-live-failsafe "none" \
+	--firmware-binary true \
+	--firmware-chroot true \
+	--uefi-secure-boot enable \
+	"${@}"

@@ -1,0 +1,10 @@
+[Unit]
+Description=rm USB modules for usbsas
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/usbsas-rmmod
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
