@@ -34,7 +34,7 @@ enum LibusbClassCode {
 // Mass storage struct used by dev2scsi
 #[cfg(not(feature = "mock"))]
 pub struct MassStorage<T: UsbContext> {
-    scsiusb: ScsiUsb<T>,
+    scsiusb: RwLock<ScsiUsb<T>>,
     pub max_lba: u32,
     pub block_size: u32,
     pub dev_size: u64,
@@ -57,7 +57,7 @@ impl<T: UsbContext> MassStorage<T> {
         // TODO: support more sector size
         assert!(vec![0x200, 0x800, 0x1000].contains(&block_size));
         Ok(MassStorage {
-            scsiusb,
+            scsiusb: RwLock::new(scsiusb),
             max_lba,
             block_size,
             dev_size,
@@ -132,7 +132,10 @@ impl<T: UsbContext> MassStorage<T> {
         count: u64,
         block_size: usize,
     ) -> Result<Vec<u8>, io::Error> {
-        self.scsiusb.read_sectors(offset, count, block_size)
+        self.scsiusb
+            .write()
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .read_sectors(offset, count, block_size)
     }
 
     pub fn scsi_write_10(
@@ -141,7 +144,11 @@ impl<T: UsbContext> MassStorage<T> {
         offset: u64,
         count: u64,
     ) -> Result<u8, io::Error> {
-        let ret = self.scsiusb.scsi_write_10(buffer, offset, count)?;
+        let ret = self
+            .scsiusb
+            .write()
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .scsi_write_10(buffer, offset, count)?;
         // Read last sector of what we've just written and verify it's ok.
         // XXX TODO FIXME Apparently, some devices requires reads between writes
         // to avoid overwriting cache of previous write call. Read call will
@@ -149,6 +156,8 @@ impl<T: UsbContext> MassStorage<T> {
         // Hint: Linux seems to do this, check its code.
         let mut buf_check = vec![0; self.block_size as usize];
         self.scsiusb
+            .write()
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
             .scsi_read_10(&mut buf_check, offset + count - 1, 1)?;
         if buf_check != buffer[(buffer.len() - buf_check.len()) as usize..] {
             return Err(io::Error::new(
@@ -179,10 +188,11 @@ impl<T: UsbContext> Read for MassStorage<T> {
         let sectors = (buf.len() / (self.block_size as usize)) as u64;
         let data = self
             .scsiusb
+            .write()
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
             .read_sectors(offset, sectors, self.block_size as usize)?;
 
         self.pos += buf.len() as u64;
-
         for (i, c) in data.iter().enumerate() {
             buf[i] = *c;
         }
@@ -202,6 +212,43 @@ impl<T: UsbContext> Seek for MassStorage<T> {
             }
         }
         Ok(self.pos)
+    }
+}
+
+#[cfg(not(feature = "mock"))]
+impl<T: UsbContext> positioned_io2::ReadAt for MassStorage<T> {
+    fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
+        self.read_exact_at(pos, buf)?;
+        Ok(buf.len())
+    }
+
+    fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<()> {
+        if pos % (self.block_size as u64) != 0 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Read on non sector aligned",
+            ));
+        }
+
+        if (buf.len() % (self.block_size as usize)) != 0 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Read on non sector size",
+            ));
+        }
+        let offset = pos / (self.block_size as u64);
+        let sectors = (buf.len() / (self.block_size as usize)) as u64;
+        let data = self
+            .scsiusb
+            .write()
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .read_sectors(offset, sectors, self.block_size as usize)?;
+
+        for (i, c) in data.iter().enumerate() {
+            buf[i] = *c;
+        }
+
+        Ok(())
     }
 }
 

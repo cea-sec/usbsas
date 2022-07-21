@@ -460,11 +460,12 @@ dependencies = [
 
 [[package]]
 name = "bootsector"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f3192e6173cf42a208883b1fc237db7d58d2bb8efcf123d78fa7e3c55fadb73"
+checksum = "0c0ebf288c46b0a18ad07b8c24af14e6221b8a8b41694ed841c4367cd2962023"
 dependencies = [
  "crc 2.1.0",
+ "positioned-io2",
 ]
 
 [[package]]
@@ -2011,6 +2012,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "positioned-io2"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2152cab2c54f7f472e78b0c228fe932d05300f648d827b696648d0cbce7c5a3"
+dependencies = [
+ "byteorder 1.4.3",
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3059,6 +3071,7 @@ dependencies = [
  "log",
  "lru",
  "positioned-io",
+ "positioned-io2",
  "rusb",
  "usbsas-comm",
  "usbsas-proto",
@@ -3079,6 +3092,7 @@ name = "usbsas-mock"
 version = "0.1.0"
 dependencies = [
  "log",
+ "positioned-io2",
  "thiserror",
  "usbsas-comm",
  "usbsas-process",
