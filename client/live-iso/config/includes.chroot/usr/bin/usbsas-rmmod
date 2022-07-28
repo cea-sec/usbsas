@@ -1,0 +1,17 @@
+#! /usr/bin/env sh
+
+mkdir -p /etc/modprobe.d
+cat <<EOF > /etc/modprobe.d/usbsas.conf
+blacklist uas
+blacklist usb_storage
+blacklist usbnet
+install usb_storage /bin/true
+install uas /bin/true
+install usbnet /bin/true
+EOF
+
+rmmod uas
+rmmod usb_storage
+
+systemctl restart systemd-modules-load
+depmod $(uname -r)

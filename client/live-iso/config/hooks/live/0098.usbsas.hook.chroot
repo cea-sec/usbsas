@@ -1,0 +1,33 @@
+#! /bin/sh
+
+set -e
+
+VER=0.1.0
+
+apt install -y --no-install-recommends wget
+
+wget \
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-server_${VER}_amd64.deb" \
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-analyzer-server_${VER}_amd64.deb" \
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-kiosk_${VER}_amd64.deb" \
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-hid_${VER}_amd64.deb"
+
+apt install -y --no-install-recommends -o Dpkg::Options::="--force-confold" \
+    ./usbsas-server_${VER}_amd64.deb \
+    ./usbsas-analyzer-server_${VER}_amd64.deb \
+    ./usbsas-kiosk_${VER}_amd64.deb \
+    ./usbsas-hid_${VER}_amd64.deb
+
+freshclam
+
+systemctl enable usbsas-server
+systemctl enable usbsas-analyzer-server
+systemctl enable usbsas-client
+systemctl disable getty@tty1.service
+
+# ISO won't boot without usb modules, remove them once booted
+rm /etc/modprobe.d/usbsas.conf
+sed -i '/^\[Unit\]$/a Requires=usbsas-rmmod.service' /usr/lib/systemd/system/usbsas-server.service
+
+systemctl disable systemd-networkd
+systemctl disable networking

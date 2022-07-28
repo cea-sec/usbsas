@@ -1,0 +1,9 @@
+live-boot
+live-config
+live-config-systemd
+kbd
+xserver-xorg-video-intel
+xserver-xorg-video-amdgpu
+xserver-xorg-video-ati
+xserver-xorg-video-vesa
+xserver-xorg-video-nouveau

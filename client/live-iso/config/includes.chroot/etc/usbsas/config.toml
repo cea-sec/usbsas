@@ -1,0 +1,33 @@
+out_directory = "/tmp/"
+
+[analyzer]
+url = "http://127.0.0.1:8042/api/scanbundle"
+
+[post_copy]
+description = "Remove transfer files"
+command_bin = "/bin/rm"
+command_args = [
+	"-f",
+	"%SOURCE_FILE%",
+]
+
+[[filters]]
+contain = ["__macosx"]
+
+[[filters]]
+contain = [".ds_store"]
+
+[[filters]]
+contain = [".lnk."]
+
+[[filters]]
+contain = [".lnk/"]
+
+[[filters]]
+end = ".lnk"
+
+[[filters]]
+contain = ["autorun.inf"]
+
+[[filters]]
+contain = ["thumbs.db"]
