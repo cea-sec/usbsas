@@ -15,5 +15,5 @@ ntfs = "0.2.0"
 ntfs3g = { path = "../ntfs3g" }
 positioned-io = "0.2.2"
 thiserror = "1.0.31"
-time = "0.3.11"
+time = "0.3.12"
 usbsas-proto = { path = "../usbsas-proto" }
