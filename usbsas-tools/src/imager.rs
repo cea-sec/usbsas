@@ -219,6 +219,7 @@ impl Imager {
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
                 .template("[{wide_bar}] {bytes}/{total_bytes} ({eta})")
+                .map_err(|err| Error::Error(format!("progress bar err: {}", err)))?
                 .progress_chars("#>-"),
         );
 
