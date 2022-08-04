@@ -3,7 +3,7 @@
 use positioned_io::ReadAt;
 use std::{
     io::{self, ErrorKind, Read, Seek, SeekFrom},
-    sync::RwLock,
+    sync::{Arc, RwLock},
 };
 use usbsas_comm::{protorequest, Comm};
 use usbsas_proto as proto;
@@ -271,7 +271,8 @@ pub struct MassStorageComm {
     pub seek: u64,
     pub dev_size: u64,
     pub partition_sector_start: u64,
-    pub comm: RwLock<Comm<proto::scsi::Request>>,
+    // RwLock because we need to impl ReadAt which takes a non mut ref
+    pub comm: Arc<RwLock<Comm<proto::scsi::Request>>>,
     // Small cache to avoid reading the same sectors multiple time
     pub cache: RwLock<lru::LruCache<(u64, u64), Vec<u8>>>,
 }
@@ -283,7 +284,7 @@ impl MassStorageComm {
             seek: 0,
             dev_size: 0,
             partition_sector_start: 0,
-            comm: RwLock::new(comm),
+            comm: Arc::new(RwLock::new(comm)),
             cache: RwLock::new(lru::LruCache::new(1024)),
         }
     }
