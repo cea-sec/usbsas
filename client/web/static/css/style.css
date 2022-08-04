@@ -155,6 +155,10 @@ body[data-state="WAIT_DESTINATION"] #usb-arrow p strong {
   margin-top: 1rem;
 }
 
+.list-group-item-text, #key-serial {
+  word-wrap: break-word;
+}
+
 #device-out .list-group-item.disabled {
   color: #333;
   background-color: #eee !important;
