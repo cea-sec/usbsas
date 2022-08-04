@@ -699,9 +699,6 @@ function do_copy() {
             "</strong> (" + File.humanFileSize(json.size) +")</td>";
           tbody.appendChild(tr);
           progress.classList.add("bg-danger");
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         case "nothing_to_copy":
           elements[elements.length - 1].icon.classList.remove("spinner-border");
@@ -781,9 +778,6 @@ function do_copy() {
           }
           document.querySelector("#cancel-button").classList.remove("d-none");
           document.querySelector("#cancel-button").innerText = langDocument["return"];
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         case "final_report":
           elements[elements.length - 1].icon.classList.remove("spinner-border");
@@ -876,9 +870,6 @@ function do_copy() {
           fatal_error.classList.add("text-danger");
           tbody.appendChild(fatal_error);
           document.querySelector("#error-reason").innerText = json.msg;
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         case "cmd_error":
           has_error = true;
@@ -898,9 +889,6 @@ function do_copy() {
             document.querySelector("#cancel-button").classList.remove("d-none");
             document.querySelector("#cancel-button").innerText = langDocument["return"];
           }
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         default:
           add_status(json);
@@ -1352,9 +1340,6 @@ function do_wipe_key() {
         wipe_icon.classList.remove("spinner-border-sm");
         wipe_icon.classList.add("fa-check");
         document.querySelector("#cancel-button").innerText = langDocument["return"];
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       case "error":
       case "fatal_error":
@@ -1365,9 +1350,6 @@ function do_wipe_key() {
         wipe_icon.classList.add("fa-times");
         throw_error(langDocument["formaterr"]);
         document.querySelector("#cancel-button").innerText = "Retour";
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       default:
         console.error("Unknown status message: ", json);
@@ -1460,9 +1442,6 @@ function do_image_disk() {
         icon.classList.remove("spinner-border-sm");
         icon.classList.add("fa-check");
         document.querySelector("#cancel-button").innerText = langDocument["return"];
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       case "error":
         progress.classList.remove("bg-info");
@@ -1472,9 +1451,6 @@ function do_image_disk() {
         icon.classList.add("fa-times");
         throw_error(langDocument["imgerr"]);
         document.querySelector("#cancel-button").innerText = langDocument["return"];
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       default:
         console.error("Unknown status message: ", json);
