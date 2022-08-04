@@ -1121,12 +1121,14 @@ function check_render_device_choice() {
         set_state("SELECT_PARTITION");
         partition_choice();
       } else {
-        throw_error(langDocument["errseldev"]);
+        devices.device_in = undefined;
+        devices.device_out = undefined;
+        throw_error(langDocument["errseldev"] + ": " + this.response);
       }
       return;
     };
     request.error = function () {
-        throw_error(langDocument["errseldev"]);
+      throw_error(langDocument["errseldev"] + ": " + this.response);
     };
     request.send();
   }
