@@ -7,7 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 clap = "3.2.16"
 log = "0.4.17"
-thiserror = "1.0.31"
+thiserror = "1.0.32"
 usbsas-cmdexec = { path = "../usbsas-cmdexec" }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-files2fs = { path = "../usbsas-files2fs" }

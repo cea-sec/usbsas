@@ -7,7 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 log = "0.4.17"
 positioned-io2 = "0.3.4"
-thiserror = "1.0.31"
+thiserror = "1.0.32"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
