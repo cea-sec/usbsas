@@ -125,7 +125,15 @@ impl ChildStartedState {
     fn run(mut self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
         let req: proto::files::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
-            Msg::OpenDevice(req) => self.opendevice(comm, req.busnum, req.devnum)?,
+            Msg::OpenDevice(req) => {
+                if let Err(err) = self.opendevice(comm, req.busnum, req.devnum) {
+                    error!("err open device: {}, waiting end", err);
+                    comm.error(proto::files::ResponseError {
+                        err: format!("{}", err),
+                    })?;
+                    return Ok(State::WaitEnd(WaitEndState {}));
+                }
+            }
             Msg::End(_) => {
                 // unlock and end dev2scsi
                 self.usb_mass.comm()?.write_all(&(0u64.to_le_bytes()))?;
@@ -151,16 +159,18 @@ impl ChildStartedState {
         // unlock dev2scsi
         self.usb_mass.comm()?.write_all(&buf.to_le_bytes())?;
         let rep: proto::scsi::Response = self.usb_mass.comm()?.recv()?;
-        if let Some(proto::scsi::response::Msg::OpenDevice(rep)) = rep.msg {
-            self.usb_mass.block_size = u32::try_from(rep.block_size)?;
-            self.usb_mass.dev_size = rep.dev_size;
-            comm.opendevice(proto::files::ResponseOpenDevice {
-                block_size: rep.block_size,
-                dev_size: rep.dev_size,
-            })?;
-        } else {
-            return Err(Error::BadRequest);
-        };
+        match rep.msg.ok_or(Error::BadRequest)? {
+            proto::scsi::response::Msg::OpenDevice(rep) => {
+                self.usb_mass.block_size = u32::try_from(rep.block_size)?;
+                self.usb_mass.dev_size = rep.dev_size;
+                comm.opendevice(proto::files::ResponseOpenDevice {
+                    block_size: rep.block_size,
+                    dev_size: rep.dev_size,
+                })?;
+            }
+            proto::scsi::response::Msg::Error(rep) => return Err(Error::Error(rep.err)),
+            _ => return Err(Error::BadRequest),
+        }
         Ok(())
     }
 }

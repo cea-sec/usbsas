@@ -8,8 +8,8 @@ pub(crate) enum ServiceError {
     #[error(display = "Internal Server Error")]
     InternalServerError,
 
-    #[error(display = "BadRequest: {}", _0)]
-    BadRequest(String),
+    #[error(display = "{}", _0)]
+    Error(String),
 
     #[error(display = "Unauthorized")]
     Unauthorized,
@@ -28,7 +28,7 @@ impl ResponseError for ServiceError {
             ServiceError::InternalServerError => {
                 HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
             }
-            ServiceError::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
+            ServiceError::Error(ref message) => HttpResponse::InternalServerError().json(message),
             ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
         }
     }
@@ -36,7 +36,7 @@ impl ResponseError for ServiceError {
 
 impl From<base64::DecodeError> for ServiceError {
     fn from(error: base64::DecodeError) -> ServiceError {
-        ServiceError::BadRequest(format!(
+        ServiceError::Error(format!(
             "Input data error: unable to decode base64: {:?}",
             error
         ))
@@ -81,9 +81,7 @@ impl From<nix::Error> for ServiceError {
 impl From<AuthentError> for ServiceError {
     fn from(error: AuthentError) -> ServiceError {
         match error {
-            AuthentError::NotEnoughBytes => {
-                ServiceError::BadRequest("Not enough bytes".to_string())
-            }
+            AuthentError::NotEnoughBytes => ServiceError::Error("Not enough bytes".to_string()),
             AuthentError::BadHmac => ServiceError::Unauthorized,
         }
     }

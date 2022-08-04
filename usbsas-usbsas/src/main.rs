@@ -864,14 +864,22 @@ impl WriteFilesState {
         comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
 
         children.forward_bitvec()?;
-        self.write_fs(comm, children)?;
-        comm.copydone(proto::usbsas::ResponseCopyDone {
-            error_path: self.errors,
-            filtered_path: self.filtered,
-            dirty_path: self.dirty,
-        })?;
-
-        info!("USB TRANSFER DONE for user {}", self.id);
+        match self.write_fs(comm, children) {
+            Ok(()) => {
+                comm.copydone(proto::usbsas::ResponseCopyDone {
+                    error_path: self.errors,
+                    filtered_path: self.filtered,
+                    dirty_path: self.dirty,
+                })?;
+                info!("USB TRANSFER DONE for user {}", self.id);
+            }
+            Err(err) => {
+                comm.error(proto::usbsas::ResponseError {
+                    err: format!("err writing fs: {}", err),
+                })?;
+                error!("USB TRANSFER FAILED for user {}", self.id);
+            }
+        }
 
         Ok(State::TransferDone(TransferDoneState {}))
     }
@@ -1028,12 +1036,8 @@ impl WriteFilesState {
                     comm.finalcopystatusdone(proto::usbsas::ResponseFinalCopyStatusDone {})?;
                     break;
                 }
-                _ => {
-                    comm.error(proto::usbsas::ResponseError {
-                        err: "Error during fs2dev".to_string(),
-                    })?;
-                    return Ok(());
-                }
+                Msg::Error(msg) => return Err(Error::Error(msg.err)),
+                _ => return Err(Error::Error("error writing fs".into())),
             }
         }
         Ok(())
