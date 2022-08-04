@@ -82,6 +82,8 @@ body[data-state="WAIT_DESTINATION"] #device-choice {
   display: flex !important;
 }
 
+body[data-state="WAIT_DESTINATION"] #tools-button,
+body[data-state="WAIT_DESTINATIOn"] #doc,
 body[data-state="WAIT_SOURCE"] #tools-button,
 body[data-state="WAIT_SOURCE"] #doc-button {
   display: flex !important;
