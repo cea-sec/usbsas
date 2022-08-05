@@ -2,21 +2,25 @@
 
 set -e
 
-VER=0.1.0
+VER=0.1.1
+SRV_VER=0.1.1
+ASRV_VER=0.1.0
+KSK_VER=0.1.1
+HID_VER=0.1.0
 
 apt install -y --no-install-recommends wget
 
 wget \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-server_${VER}_amd64.deb" \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-analyzer-server_${VER}_amd64.deb" \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-kiosk_${VER}_amd64.deb" \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-hid_${VER}_amd64.deb"
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-server_${SRV_VER}_amd64.deb" \
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-analyzer-server_${ASRV_VER}_amd64.deb" \
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-kiosk_${KSK_VER}_amd64.deb" \
+    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-hid_${HID_VER}_amd64.deb"
 
 apt install -y --no-install-recommends -o Dpkg::Options::="--force-confold" \
-    ./usbsas-server_${VER}_amd64.deb \
-    ./usbsas-analyzer-server_${VER}_amd64.deb \
-    ./usbsas-kiosk_${VER}_amd64.deb \
-    ./usbsas-hid_${VER}_amd64.deb
+    ./usbsas-server_${SRV_VER}_amd64.deb \
+    ./usbsas-analyzer-server_${ASRV_VER}_amd64.deb \
+    ./usbsas-kiosk_${KSK_VER}_amd64.deb \
+    ./usbsas-hid_${HID_VER}_amd64.deb
 
 freshclam
 
