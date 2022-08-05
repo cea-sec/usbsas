@@ -54,6 +54,7 @@ Applications built on top of usbsas:
 - [Architecture and technical](doc/architecture.md) documentation
 - [Build and usage](doc/build_usage.md) documentation
 - [Kiosk deployment](doc/kiosk.md) documentation
+- [Live ISO](doc/live-iso.md) documentation
 - Developer documentation can be generated with `$ cargo doc`
 
 ## Contributing

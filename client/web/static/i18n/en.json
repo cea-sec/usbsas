@@ -24,7 +24,7 @@
     "errgetdev": "Error getting devices",
     "errgetid": "Error getting ID",
     "erropenpart": "Error opening partition",
-    "errseldev": "Error selecting destination",
+    "errseldev": "Error selecting device",
     "faq": "F.A.Q",
     "faq1": "What is USBSAS ?",
     "faq2": "How to use USBSAS ?",

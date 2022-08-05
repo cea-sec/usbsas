@@ -2,7 +2,12 @@
 //! file systems from data received.
 
 use log::{error, trace};
-use std::{convert::TryFrom, io::Write, os::unix::io::RawFd};
+use std::{
+    convert::TryFrom,
+    io::Write,
+    os::unix::io::RawFd,
+    sync::{Arc, RwLock},
+};
 use thiserror::Error;
 use usbsas_comm::{protorequest, protoresponse, Comm};
 use usbsas_fsrw::{ext4fs, ff, iso9660fs, ntfs, FSRead};
@@ -119,13 +124,25 @@ struct PartitionOpenedState {
     fs: Box<dyn FSRead<MassStorageComm>>,
 }
 
-struct WaitEndState {}
+struct WaitEndState {
+    child_comm: Option<Arc<RwLock<Comm<proto::scsi::Request>>>>,
+}
 
 impl ChildStartedState {
     fn run(mut self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
         let req: proto::files::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
-            Msg::OpenDevice(req) => self.opendevice(comm, req.busnum, req.devnum)?,
+            Msg::OpenDevice(req) => {
+                if let Err(err) = self.opendevice(comm, req.busnum, req.devnum) {
+                    error!("err open device: {}, waiting end", err);
+                    comm.error(proto::files::ResponseError {
+                        err: format!("{}", err),
+                    })?;
+                    return Ok(State::WaitEnd(WaitEndState {
+                        child_comm: Some(self.usb_mass.comm.clone()),
+                    }));
+                }
+            }
             Msg::End(_) => {
                 // unlock and end dev2scsi
                 self.usb_mass.comm()?.write_all(&(0u64.to_le_bytes()))?;
@@ -151,16 +168,18 @@ impl ChildStartedState {
         // unlock dev2scsi
         self.usb_mass.comm()?.write_all(&buf.to_le_bytes())?;
         let rep: proto::scsi::Response = self.usb_mass.comm()?.recv()?;
-        if let Some(proto::scsi::response::Msg::OpenDevice(rep)) = rep.msg {
-            self.usb_mass.block_size = u32::try_from(rep.block_size)?;
-            self.usb_mass.dev_size = rep.dev_size;
-            comm.opendevice(proto::files::ResponseOpenDevice {
-                block_size: rep.block_size,
-                dev_size: rep.dev_size,
-            })?;
-        } else {
-            return Err(Error::BadRequest);
-        };
+        match rep.msg.ok_or(Error::BadRequest)? {
+            proto::scsi::response::Msg::OpenDevice(rep) => {
+                self.usb_mass.block_size = u32::try_from(rep.block_size)?;
+                self.usb_mass.dev_size = rep.dev_size;
+                comm.opendevice(proto::files::ResponseOpenDevice {
+                    block_size: rep.block_size,
+                    dev_size: rep.dev_size,
+                })?;
+            }
+            proto::scsi::response::Msg::Error(rep) => return Err(Error::Error(rep.err)),
+            _ => return Err(Error::BadRequest),
+        }
         Ok(())
     }
 }
@@ -222,15 +241,21 @@ impl PartitionsListedState {
     fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
         let req: proto::files::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
-            Msg::OpenPartition(req) => match self.open_partition(comm, req.index) {
-                Ok(fs) => Ok(State::PartitionOpened(PartitionOpenedState { fs })),
-                Err(err) => {
-                    comm.error(proto::files::ResponseError {
-                        err: format!("{}", err),
-                    })?;
-                    Ok(State::WaitEnd(WaitEndState {}))
+            Msg::OpenPartition(req) => {
+                // Keep comm in case of error so we can end dev2scsi properly
+                let comm_bk = self.usb_mass.comm.clone();
+                match self.open_partition(comm, req.index) {
+                    Ok(fs) => Ok(State::PartitionOpened(PartitionOpenedState { fs })),
+                    Err(err) => {
+                        comm.error(proto::files::ResponseError {
+                            err: format!("{}", err),
+                        })?;
+                        Ok(State::WaitEnd(WaitEndState {
+                            child_comm: Some(comm_bk),
+                        }))
+                    }
                 }
-            },
+            }
             Msg::End(_) => {
                 self.usb_mass.comm()?.end(proto::scsi::RequestEnd {})?;
                 comm.end(proto::files::ResponseEnd {})?;
@@ -332,6 +357,11 @@ impl WaitEndState {
             let req: proto::files::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
                 Msg::End(_) => {
+                    if let Some(child_comm) = self.child_comm {
+                        if let Ok(mut child_comm) = child_comm.write() {
+                            child_comm.end(proto::scsi::RequestEnd {})?;
+                        }
+                    }
                     comm.end(proto::files::ResponseEnd {})?;
                     break;
                 }
@@ -369,7 +399,7 @@ impl Scsi2Files {
                     comm.error(proto::files::ResponseError {
                         err: format!("run error: {}", err),
                     })?;
-                    State::WaitEnd(WaitEndState {})
+                    State::WaitEnd(WaitEndState { child_comm: None })
                 }
             }
         }

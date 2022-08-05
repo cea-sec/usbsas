@@ -489,7 +489,7 @@ impl AppState {
                 }
             }
         }
-        Err(ServiceError::BadRequest("Couldn't find device".into()))
+        Err(ServiceError::Error("Couldn't find device".into()))
     }
 
     pub(crate) fn id(&self) -> Result<String, ServiceError> {
@@ -502,7 +502,7 @@ impl AppState {
         fingerprint_out: String,
     ) -> Result<(), ServiceError> {
         if fingerprint_dirty == fingerprint_out {
-            return Err(ServiceError::BadRequest(
+            return Err(ServiceError::Error(
                 "Output cannot be the same as input".to_string(),
             ));
         }
@@ -538,13 +538,16 @@ impl AppState {
             (Some(dirty), Some(_)) => dirty,
             (_, _) => {
                 error!("Cannot find diry or out dev");
-                return Err(ServiceError::BadRequest(
+                return Err(ServiceError::Error(
                     "Cannot find dirty or out dev".to_string(),
                 ));
             }
         };
 
-        self.comm.lock()?.opendev(dirty)?;
+        self.comm
+            .lock()?
+            .opendev(dirty)
+            .map_err(|err| ServiceError::Error(format!("couldn't open input device: {}", err)))?;
         *self.out_dev.lock()? = out_dev;
 
         Ok(())
@@ -583,7 +586,7 @@ impl AppState {
             .openpartition(proto::usbsas::RequestOpenPartition { index })
         {
             error!("Error opening partition: {}", err);
-            return Err(ServiceError::BadRequest(format!(
+            return Err(ServiceError::Error(format!(
                 "Cannot open partition: {}",
                 err
             )));
@@ -1012,7 +1015,7 @@ impl Drop for AppState {
     fn drop(&mut self) {
         // End usbsas and its children properly
         let mut comm = self.comm.lock().unwrap();
-        let _ = comm.end(proto::usbsas::RequestEnd {}).unwrap();
+        let _ = comm.end(proto::usbsas::RequestEnd {}).ok();
         nix::sys::wait::wait().unwrap();
     }
 }

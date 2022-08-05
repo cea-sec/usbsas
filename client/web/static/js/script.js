@@ -699,9 +699,6 @@ function do_copy() {
             "</strong> (" + File.humanFileSize(json.size) +")</td>";
           tbody.appendChild(tr);
           progress.classList.add("bg-danger");
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         case "nothing_to_copy":
           elements[elements.length - 1].icon.classList.remove("spinner-border");
@@ -781,9 +778,6 @@ function do_copy() {
           }
           document.querySelector("#cancel-button").classList.remove("d-none");
           document.querySelector("#cancel-button").innerText = langDocument["return"];
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         case "final_report":
           elements[elements.length - 1].icon.classList.remove("spinner-border");
@@ -876,9 +870,6 @@ function do_copy() {
           fatal_error.classList.add("text-danger");
           tbody.appendChild(fatal_error);
           document.querySelector("#error-reason").innerText = json.msg;
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         case "cmd_error":
           has_error = true;
@@ -898,9 +889,6 @@ function do_copy() {
             document.querySelector("#cancel-button").classList.remove("d-none");
             document.querySelector("#cancel-button").innerText = langDocument["return"];
           }
-          setTimeout(function () {
-            reset_usbsas();
-          }, reset_timeout);
           break;
         default:
           add_status(json);
@@ -1018,6 +1006,13 @@ function partition_choice() {
 function render_device_choice() {
   document.querySelector("#device-in").innerHTML = "";
   document.querySelector("#device-out").innerHTML = "";
+
+  if (devices.availables.filter(function(e) { e.dev_type == "Usb" }).length == 0) {
+    set_state("WAIT_SOURCE");
+    updateElementLang(document.querySelector("#usb-arrow p"), "insert-in-dev");
+    document.querySelector("#usb-arrow img").src = "static/img/device_in.svg";
+  }
+
   for (let device of devices.availables) {
     for (let type of ["in", "out"]) {
       let a = document.createElement("a");
@@ -1026,12 +1021,10 @@ function render_device_choice() {
       a.href = "#";
       if (type == "in" && device.is_src) {
         if (state == "WAIT_SOURCE") {
-          devices.device_in = device;
           set_state("WAIT_DESTINATION");
           updateElementLang(document.querySelector("#usb-arrow p"), "insert-dest");
           document.querySelector("#usb-arrow img").src = "static/img/device_out.svg";
         }
-        /*
         a.onclick = function () {
           if (a.classList.contains("disabled")) {
             return false;
@@ -1039,21 +1032,13 @@ function render_device_choice() {
             devices.device_in = undefined;
           } else {
             devices.device_in = device;
+            if (Devices.compare(devices.device_out, device)) {
+              devices.device_out = undefined;
+            }
           }
-          check_render_device_choice();
-          return false;
+          render_device_choice();
         };
-        */
       } else if (type == "out" && device.is_dst) {
-        if (
-          devices.device_out == undefined &&
-          device.dev_type == "Usb" &&
-          !Devices.compare(devices.device_in, device)
-        ) {
-          devices.device_out = device;
-          updateElementLang(document.querySelector("#removal h4"), "rmdev");
-          check_render_device_choice();
-        }
         a.onclick = function () {
           if (a.classList.contains("disabled")) {
             return false;
@@ -1061,9 +1046,11 @@ function render_device_choice() {
             devices.device_out = undefined;
           } else {
             devices.device_out = device;
+            if (Devices.compare(devices.device_in, device)) {
+              devices.device_in = undefined;
+            }
           }
-          check_render_device_choice();
-          return false;
+          render_device_choice();
         };
       }
 
@@ -1074,12 +1061,9 @@ function render_device_choice() {
       p.classList.add("list-group-item-text");
       let h4 = document.createElement("h4");
       h4.classList.add("list-group-item-heading");
-      if (type == "out" && Devices.compare(devices.device_in, device)) {
-        updateElementLang(h4, "usb-dev");
-        updateElementLang(p, "usb-dest-descr");
-      } else if (device.dev_type == "Usb") {
+      if (device.dev_type == "Usb") {
         h4.innerText = device.dev.Usb.description;
-        p.innerText = device.dev.Usb.manufacturer + ", serial " + device.dev.Usb.serial;
+        p.innerText = device.dev.Usb.manufacturer + " / " + device.dev.Usb.serial;
       } else if (device.dev_type == "Net") {
         p.innerText = device.dev.Net.longdescr;
         h4.innerText = device.dev.Net.description;
@@ -1090,23 +1074,27 @@ function render_device_choice() {
 
       a.appendChild(h4);
       a.appendChild(p);
-      if (type == "in") {
+      if (type == "in" && device.dev_type == "Usb") {
         document.querySelector("#device-in").appendChild(a);
         if (Devices.compare(device, devices.device_in)) {
           a.classList.add("active");
-        } else if (Devices.compare(device, devices.device_out)) {
-          a.classList.add("disabled");
         }
       } else if (type == "out") {
         document.querySelector("#device-out").appendChild(a);
         if (Devices.compare(device, devices.device_out)) {
           a.classList.add("active");
-        } else if (Devices.compare(device, devices.device_in)) {
-          a.classList.add("disabled");
         }
       }
     }
   }
+  if (devices.device_in !== undefined && devices.device_out !== undefined) {
+    let next_b = document.querySelector("#next-button");
+    next_b.onclick = function() { check_render_device_choice() };
+    next_b.removeAttribute("disabled");
+  } else {
+    document.querySelector("#next-button").setAttribute("disabled", "disabled");
+  }
+
 }
 
 function check_render_device_choice() {
@@ -1133,12 +1121,14 @@ function check_render_device_choice() {
         set_state("SELECT_PARTITION");
         partition_choice();
       } else {
-        throw_error(langDocument["errseldev"]);
+        devices.device_in = undefined;
+        devices.device_out = undefined;
+        throw_error(langDocument["errseldev"] + ": " + this.response);
       }
       return;
     };
     request.error = function () {
-        throw_error(langDocument["errseldev"]);
+      throw_error(langDocument["errseldev"] + ": " + this.response);
     };
     request.send();
   }
@@ -1146,21 +1136,25 @@ function check_render_device_choice() {
 }
 
 function restart() {
+  document.querySelector("#copy-options").classList.add("d-none");
+  if (state == "WAIT_DESTINATION") {
+    devices.device_in = undefined;
+  }
   set_state("WAIT_REMOVAL_RESTART");
   check_device_removal();
   reset_usbsas();
 }
 
 function check_device_removal() {
-  let usb_count = 0;
   let src_plugged = false;
+  let dst_plugged = false;
   for (let device of devices.availables) {
     if (device.dev_type == "Usb") {
-      usb_count += 1;
       if (devices.device_in && Devices.compare(device, devices.device_in)) src_plugged = true;
+      if (devices.device_in && Devices.compare(device, devices.device_out)) dst_plugged = true;
     }
   }
-  if (usb_count == 0 || (!state.startsWith("WAIT_REMOVAL") && !src_plugged)) {
+  if (!(src_plugged || dst_plugged)) {
     document.location.reload(true);
   }
 }
@@ -1181,8 +1175,7 @@ function device_choice() {
         } else if (state == "WAIT_WIPE_KEY" || state == 'WAIT_IMAGE_KEY') {
           confirm_key();
         } else {
-          if (state == "WAIT_DESTINATION") check_device_removal();
-          check_render_device_choice();
+          render_device_choice();
         }
       }
     } else {
@@ -1268,13 +1261,13 @@ function confirm_key() {
   for (let device of devices.availables) {
     if (device.is_src) {
       devices.device_in = device;
+      document.querySelector("#key-manuf").innerText = devices.device_in.dev.Usb.manufacturer
+        + " " + devices.device_in.dev.Usb.description;
+      document.querySelector("#key-serial").innerText = devices.device_in.dev.Usb.serial;
+      document.querySelector("#usb-arrow").style.visibility = "hidden";
+      document.querySelector("#confirm-button").removeAttribute("disabled");
     }
   }
-  document.querySelector("#key-manuf").innerText = devices.device_in.dev.Usb.manufacturer
-    + " " + devices.device_in.dev.Usb.description;
-  document.querySelector("#key-serial").innerText = devices.device_in.dev.Usb.serial;
-  document.querySelector("#usb-arrow").style.visibility = "hidden";
-  document.querySelector("#confirm-button").removeAttribute("disabled");
 }
 
 function do_tool() {
@@ -1352,9 +1345,6 @@ function do_wipe_key() {
         wipe_icon.classList.remove("spinner-border-sm");
         wipe_icon.classList.add("fa-check");
         document.querySelector("#cancel-button").innerText = langDocument["return"];
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       case "error":
       case "fatal_error":
@@ -1365,9 +1355,6 @@ function do_wipe_key() {
         wipe_icon.classList.add("fa-times");
         throw_error(langDocument["formaterr"]);
         document.querySelector("#cancel-button").innerText = "Retour";
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       default:
         console.error("Unknown status message: ", json);
@@ -1460,9 +1447,6 @@ function do_image_disk() {
         icon.classList.remove("spinner-border-sm");
         icon.classList.add("fa-check");
         document.querySelector("#cancel-button").innerText = langDocument["return"];
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       case "error":
         progress.classList.remove("bg-info");
@@ -1472,9 +1456,6 @@ function do_image_disk() {
         icon.classList.add("fa-times");
         throw_error(langDocument["imgerr"]);
         document.querySelector("#cancel-button").innerText = langDocument["return"];
-        setTimeout(function () {
-          reset_usbsas();
-        }, reset_timeout);
         break;
       default:
         console.error("Unknown status message: ", json);

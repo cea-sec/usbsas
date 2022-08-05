@@ -24,7 +24,7 @@
     "errgetdev": "Error getting devices",
     "errgetid": "Erreur lors de la récupération de l'identifiant",
     "erropenpart": "Erreur lors de l'ouverture de la partition",
-    "errseldev": "Erreur lors de la sélection de la destination",
+    "errseldev": "Erreur lors de la sélection des périphériques",
     "faq": "F.A.Q",
     "faq1": "Qu'est ce que le SAS USB ?",
     "faq2": "Comment utiliser le SAS USB ?",

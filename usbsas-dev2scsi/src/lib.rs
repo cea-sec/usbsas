@@ -109,7 +109,16 @@ impl<T: UsbContext> InitState<T> {
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
-        let usb_mass_storage = MassStorage::from_busnum_devnum(self.context, busnum, devnum)?;
+        let usb_mass_storage = match MassStorage::from_busnum_devnum(self.context, busnum, devnum) {
+            Ok(ums) => ums,
+            Err(err) => {
+                error!("Init mass storage error: {}, waiting end", err);
+                comm.error(proto::scsi::ResponseError {
+                    err: format!("{}", err),
+                })?;
+                return Ok(State::WaitEnd(WaitEndState {}));
+            }
+        };
 
         #[cfg(not(feature = "mock"))]
         usbsas_privileges::dev2scsi::drop_priv(
