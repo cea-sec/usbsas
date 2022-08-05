@@ -27,7 +27,7 @@ $ lb config
 $ sudo lb build
 ```
 
-The resulting image will be `usbsas-0.1.0-amd64.hybrid.iso`.
+The resulting image will be `usbsas-0.1.1-amd64.hybrid.iso`.
 
 # How to use
 

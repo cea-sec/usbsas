@@ -81,9 +81,9 @@ manager. The installation of `usbsas-hid` is recommended but not mandatory.
 ## Install the Debian packages
 
 ```shell
-$ sudo apt install ./usbsas-server_0.1.0_amd64.deb \
+$ sudo apt install ./usbsas-server_0.1.1_amd64.deb \
                    ./usbsas-analyzer-server_0.1.0_amd64.deb \
-                   ./usbsas-kiosk_0.1.0_amd64.deb \
+                   ./usbsas-kiosk_0.1.1_amd64.deb \
                    ./usbsas-hid_0.1.0_amd64.deb
 ```
 
