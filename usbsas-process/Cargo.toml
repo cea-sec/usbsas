@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-libc = "0.2.127"
+libc = "0.2.129"
 log = "0.4.17"
 nix = "0.24.2"
 thiserror = "1.0.32"
