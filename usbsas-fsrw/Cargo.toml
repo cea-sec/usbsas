@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-anyhow = "1.0.60"
+anyhow = "1.0.61"
 ext4 = { git = "https://github.com/FauxFaux/ext4-rs", rev = "1858f9d11ba3454f5a274275e059f631fb7a3b01" }
 ff = { path = "../ff" }
 iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
