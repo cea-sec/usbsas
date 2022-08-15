@@ -7,7 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 libc = "0.2.129"
 log = "0.4.17"
-nix = "0.24.2"
+nix = "0.25.0"
 thiserror = "1.0.32"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-utils = { path = "../usbsas-utils" }
