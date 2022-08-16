@@ -101,10 +101,10 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
         let inner: Box<Box<T>> =
             unsafe { Box::from_raw((*(*self.vol).dev).d_private as *mut Box<T>) };
         if unsafe { n3g_c::ntfs_umount(self.vol, n3g_c::BOOL_TRUE) } != 0 {
-            return Err(Error::new(
+            Err(Error::new(
                 ErrorKind::Other,
                 format!("ntfs3g ntfs_umount error ({})", Error::last_os_error()),
-            ));
+            ))
         } else {
             Ok(*(*inner))
         }

@@ -1,4 +1,5 @@
 //! Protobuf generated code
+#![allow(clippy::derive_partial_eq_without_eq)]
 
 pub mod analyzer {
     include!(concat!(env!("OUT_DIR"), "/analyzer.rs"));

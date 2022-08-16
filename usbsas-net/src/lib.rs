@@ -119,7 +119,7 @@ impl HttpClient {
                         );
                         let resp = self
                             .client
-                            .request(method.clone(), &*url)
+                            .request(method.clone(), url)
                             .headers(self.headers.clone())
                             .send()?;
                         if !resp.status().is_success() {
@@ -147,11 +147,7 @@ impl HttpClient {
     fn get(&mut self, url: &str) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
-        let mut resp = self
-            .client
-            .get(&*url)
-            .headers(self.headers.clone())
-            .send()?;
+        let mut resp = self.client.get(url).headers(self.headers.clone()).send()?;
         #[cfg(feature = "authkrb")]
         if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
             resp = self.req_with_krb_auth(Method::GET, url)?;
@@ -168,7 +164,7 @@ impl HttpClient {
         if self.krb_service_name.is_some() {
             let resp = self
                 .client
-                .request(Method::OPTIONS, &*url)
+                .request(Method::OPTIONS, url)
                 .headers(self.headers.clone())
                 .send()?;
             if resp.status() == StatusCode::UNAUTHORIZED {
@@ -177,7 +173,7 @@ impl HttpClient {
         }
         Ok(self
             .client
-            .post(&*url)
+            .post(url)
             .headers(self.headers.clone())
             .body(body)
             .send()?)

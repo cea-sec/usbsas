@@ -73,7 +73,7 @@ pub(crate) struct UsbsasInfos {
     pub(crate) version: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum DevType {
     Usb,
     Net,
@@ -101,7 +101,7 @@ pub struct ReadDir {
     path_parent_display: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct USBDeviceDesc {
     vendorid: u32,
     productid: u32,
@@ -112,26 +112,26 @@ pub struct USBDeviceDesc {
     is_dst: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct NetDesc {
     longdescr: String,
     description: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct CmdDesc {
     longdescr: String,
     description: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum Desc {
     Usb(USBDeviceDesc),
     Net(NetDesc),
     Cmd(CmdDesc),
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DeviceDesc {
     dev: Desc,
     pub id: String,
