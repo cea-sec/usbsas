@@ -1224,7 +1224,7 @@ fn get_associated_report<'a>(
         0u32
     } else {
         *buffer
-            .get(0)
+            .first()
             .ok_or_else(|| Error::new(ErrorKind::Other, "Empty buffer"))? as u32
     };
 
