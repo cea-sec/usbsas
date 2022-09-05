@@ -8,6 +8,6 @@ license = "GPL-3.0"
 libc = "0.2.132"
 log = "0.4.17"
 nix = "0.25.0"
-thiserror = "1.0.33"
+thiserror = "1.0.34"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-utils = { path = "../usbsas-utils" }

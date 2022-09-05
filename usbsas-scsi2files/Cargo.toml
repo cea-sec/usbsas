@@ -8,7 +8,7 @@ license = "GPL-3.0"
 byteorder = "1.4.3"
 env_logger = "0.9.0"
 log = "0.4.17"
-thiserror = "1.0.33"
+thiserror = "1.0.34"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-dev2scsi = { path = "../usbsas-dev2scsi" }
 usbsas-fsrw = { path = "../usbsas-fsrw" }
