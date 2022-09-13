@@ -285,7 +285,9 @@ impl MassStorageComm {
             dev_size: 0,
             partition_sector_start: 0,
             comm: Arc::new(RwLock::new(comm)),
-            cache: RwLock::new(lru::LruCache::new(1024)),
+            cache: RwLock::new(lru::LruCache::new(
+                std::num::NonZeroUsize::new(1024).unwrap(),
+            )),
         }
     }
 
