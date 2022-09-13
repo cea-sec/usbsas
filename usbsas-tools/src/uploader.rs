@@ -83,10 +83,11 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     Ok(())
 }
 
-fn analyze(bundle_path: &str, id: &str) -> Result<()> {
+fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::analyzer::response::Msg;
     let mut analyzer = UsbsasChildSpawner::new()
         .arg(bundle_path)
+        .arg(config_path)
         .spawn::<usbsas_net::Analyzer, proto::analyzer::Request>()?;
 
     analyzer.comm.send(proto::analyzer::Request {
@@ -167,7 +168,7 @@ fn main() -> Result<()> {
     if let Some(path) = matches.get_one::<String>("bundle") {
         if let Some(id) = matches.get_one::<String>("ID") {
             if matches.contains_id("analyze") {
-                analyze(path, id)?;
+                analyze(config_path, path, id)?;
                 return Ok(());
             }
             upload(config_path, path, id)?;
