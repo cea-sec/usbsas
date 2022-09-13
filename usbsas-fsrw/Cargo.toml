@@ -6,14 +6,14 @@ license = "GPL-3.0"
 
 [dependencies]
 anyhow = "1.0.64"
-ext4 = { git = "https://github.com/FauxFaux/ext4-rs", rev = "1858f9d11ba3454f5a274275e059f631fb7a3b01" }
+ext4 = { git = "https://github.com/FauxFaux/ext4-rs", rev = "292c80fdf99533d6ac700a588497cd9f52631614" }
 ff = { path = "../ff" }
 iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
 libc = "0.2.132"
 log = "0.4.17"
 ntfs = "0.2.0"
 ntfs3g = { path = "../ntfs3g" }
-positioned-io = "0.2.2"
+positioned-io2 = "0.3.4"
 thiserror = "1.0.34"
 time = "0.3.14"
 usbsas-proto = { path = "../usbsas-proto" }

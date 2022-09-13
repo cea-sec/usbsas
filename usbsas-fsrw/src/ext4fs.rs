@@ -1,6 +1,6 @@
 use crate::FSRead;
 use crate::{Error, Result};
-use positioned_io::ReadAt;
+use positioned_io2::ReadAt;
 use std::io::{Read, Seek, SeekFrom};
 use usbsas_proto::common::{FileInfo, FileType};
 

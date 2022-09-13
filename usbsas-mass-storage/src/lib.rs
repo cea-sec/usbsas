@@ -1,6 +1,6 @@
 //! Mass storage structs used by usbsas processes.
 
-use positioned_io::ReadAt;
+use positioned_io2::ReadAt;
 use std::{
     io::{self, ErrorKind, Read, Seek, SeekFrom},
     sync::{Arc, RwLock},
@@ -216,7 +216,7 @@ impl<T: UsbContext> Seek for MassStorage<T> {
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> positioned_io2::ReadAt for MassStorage<T> {
+impl<T: UsbContext> ReadAt for MassStorage<T> {
     fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
         self.read_exact_at(pos, buf)?;
         Ok(buf.len())
