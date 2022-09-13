@@ -13,7 +13,7 @@ libc = "0.2.132"
 log = "0.4.17"
 ntfs = "0.2.0"
 ntfs3g = { path = "../ntfs3g" }
-positioned-io = "0.2.2"
+positioned-io = "0.3.0"
 thiserror = "1.0.34"
 time = "0.3.14"
 usbsas-proto = { path = "../usbsas-proto" }

@@ -935,7 +935,7 @@ dependencies = [
  "bitflags",
  "byteorder 1.4.3",
  "crc 1.8.1",
- "positioned-io",
+ "positioned-io 0.2.2",
  "thiserror",
 ]
 
@@ -1975,6 +1975,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "positioned-io"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "173e3686d2cec75681bebc1d84d8ed1e22a0336ccde102ac1d2d134679173ad8"
+dependencies = [
+ "byteorder 1.4.3",
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "positioned-io2"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3010,7 +3021,7 @@ dependencies = [
  "log",
  "ntfs",
  "ntfs3g",
- "positioned-io",
+ "positioned-io 0.3.0",
  "thiserror",
  "time",
  "usbsas-proto",
@@ -3035,7 +3046,7 @@ version = "0.1.1"
 dependencies = [
  "log",
  "lru",
- "positioned-io",
+ "positioned-io 0.3.0",
  "positioned-io2",
  "rusb",
  "usbsas-comm",
