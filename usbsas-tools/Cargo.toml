@@ -12,7 +12,7 @@ indicatif = { version = "0.17.0", optional = true }
 libc = { version = "0.2.132", optional = true }
 log = "0.4.17"
 tempfile = { version = "3.3.0", optional = true }
-thiserror = "1.0.34"
+thiserror = "1.0.35"
 time = { version = "0.3.14", optional = true }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config", optional = true }
