@@ -20,7 +20,7 @@ use usbsas_proto::{
     common::{FileInfo, FileType},
     files::request::Msg,
 };
-use usbsas_utils::READ_FILE_MAX_SIZE;
+use usbsas_utils::{READ_FILE_MAX_SIZE, TAR_DATA_DIR};
 
 #[derive(Error, Debug)]
 enum Error {
@@ -117,17 +117,22 @@ impl LoadMetadataState {
     fn run(self, _comm: &mut Comm<proto::files::Request>) -> Result<State> {
         let mut metadata = HashMap::new();
         let mut archive = Archive::new(self.tar);
+        let data_dir = TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/";
 
         // Read tar headers once
         for entry in archive.entries()? {
             let entry = entry?;
+            let path_name = entry.path()?.to_path_buf().to_string_lossy().to_string();
+            if path_name == "infos.json" {
+                continue;
+            }
             let ftype = match entry.header().entry_type() {
                 tar::EntryType::Directory => FileType::Directory,
                 tar::EntryType::Regular => FileType::Regular,
                 _ => continue,
             };
             metadata.insert(
-                entry.path()?.to_path_buf().to_string_lossy().to_string(),
+                path_name.trim_start_matches(&data_dir).to_owned(),
                 Attrs {
                     ftype,
                     size: entry.header().size()?,

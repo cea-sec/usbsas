@@ -522,9 +522,6 @@ impl CopyFilesState {
                     error!("Aborting, dest dev too small");
                     return Ok(State::WaitEnd(WaitEndState {}));
                 }
-
-                // Unlock files2tar with 0 (simple tar)
-                children.files2tar.comm.write_all(&[0_u8])?;
                 match OutFsType::from_i32(usb.fstype)
                     .ok_or_else(|| Error::Error("bad fstype".into()))?
                 {
@@ -532,12 +529,11 @@ impl CopyFilesState {
                     _ => None,
                 }
             }
-            Destination::Net(_) | Destination::Cmd(_) => {
-                // Unlock files2tar with 1 (bundle tar)
-                children.files2tar.comm.write_all(&[1_u8])?;
-                None
-            }
+            Destination::Net(_) | Destination::Cmd(_) => None,
         };
+
+        // Unlock files2tar
+        children.files2tar.comm.write_all(&[0_u8])?;
         children.files2tar.locked = false;
 
         comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
@@ -1428,7 +1424,7 @@ impl Children {
             error!("Couldn't end files2fs: {}", err);
         };
         if self.files2tar.locked {
-            self.files2tar.comm.write_all(&[2_u8]).ok();
+            self.files2tar.comm.write_all(&[1_u8]).ok();
         }
         if let Err(err) = self.files2tar.comm.end(proto::writetar::RequestEnd {}) {
             error!("Couldn't end files2tar: {}", err);

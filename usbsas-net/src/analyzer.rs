@@ -15,6 +15,7 @@ use usbsas_config::{conf_parse, conf_read};
 use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::analyzer::request::Msg;
+use usbsas_utils::TAR_DATA_DIR;
 
 protoresponse!(
     CommAnalyzer,
@@ -201,7 +202,21 @@ impl RunningState {
             let res: JsonRes = resp.json()?;
             trace!("res: {:#?}", &res);
             match res.status.as_str() {
-                "scanned" => return Ok(res.files.unwrap_or_default()),
+                "scanned" => {
+                    // Remove infos.json entry and filter TAR_DATA_DIR prefix
+                    // from file names
+                    let mut result = res.files.unwrap_or_default();
+                    let _ = result.remove_entry("infos.json");
+                    return Ok(HashMap::from_iter(result.iter().map(|(k, v)| {
+                        (
+                            k.trim_start_matches(
+                                &(TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/"),
+                            )
+                            .to_owned(),
+                            v.to_owned(),
+                        )
+                    })));
+                }
                 "uploaded" | "processing" => sleep(Duration::from_secs(1)),
                 _ => return Err(Error::Remote),
             }

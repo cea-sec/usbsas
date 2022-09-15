@@ -31,8 +31,6 @@ enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
-const TAR_BLOCK_SIZE: usize = 512;
-
 pub(crate) trait ArchiveWriter {
     fn init(&mut self) -> Result<()>;
     fn newfile(&mut self, path: &str, ftype: FileType, size: u64, timestamp: i64) -> Result<()>;

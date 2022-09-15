@@ -44,7 +44,6 @@ impl State {
 
 struct InitState {
     archive_path: String,
-    with_infos: bool,
 }
 
 impl InitState {
@@ -55,11 +54,7 @@ impl InitState {
             .open(&self.archive_path)?;
         let outfd = archive_file.as_raw_fd();
 
-        let mut archive: Box<dyn ArchiveWriter> = if self.with_infos {
-            Box::new(TarWriter::new(archive_file, Some("data/".into())))
-        } else {
-            Box::new(TarWriter::new(archive_file, None))
-        };
+        let mut archive: Box<dyn ArchiveWriter> = Box::new(TarWriter::new(archive_file));
 
         usbsas_privileges::files2tar::drop_priv(comm.input_fd(), comm.output_fd(), outfd)?;
 
@@ -186,15 +181,8 @@ pub struct Files2Tar {
 }
 
 impl Files2Tar {
-    fn new(
-        comm: Comm<proto::writetar::Request>,
-        archive_path: String,
-        with_infos: bool,
-    ) -> Result<Self> {
-        let state = State::Init(InitState {
-            archive_path,
-            with_infos,
-        });
+    fn new(comm: Comm<proto::writetar::Request>, archive_path: String) -> Result<Self> {
+        let state = State::Init(InitState { archive_path });
         Ok(Files2Tar { comm, state })
     }
 
@@ -227,13 +215,10 @@ impl UsbsasProcess for Files2Tar {
             if let Some(fname) = args.get(0) {
                 let mut comm = Comm::from_raw_fd(read_fd, write_fd);
                 match comm.read_u8()? {
-                    // 0: create a "flat" tar for the remote analyzer
-                    0 => Files2Tar::new(comm, fname.to_string(), false)?.main_loop()?,
-                    // 1: create a tar in which files will be stored under the "/data" directory.
-                    //    "/info.json" will also be added with information about the transfer.
-                    1 => Files2Tar::new(comm, fname.to_string(), true)?.main_loop()?,
-                    // 2: unlock to exit value
-                    2 => Files2Tar {
+                    // 0: unlock to start writing files in a tar
+                    0 => Files2Tar::new(comm, fname.to_string())?.main_loop()?,
+                    // 1: unlock to exit value
+                    1 => Files2Tar {
                         comm,
                         state: State::WaitEnd(WaitEndState {}),
                     }
