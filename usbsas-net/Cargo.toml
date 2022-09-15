@@ -16,7 +16,7 @@ usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
-usbsas-utils = { path = "../usbsas-utils", optional = true }
+usbsas-utils = { path = "../usbsas-utils" }
 
 [features]
 authkrb = ["base64", "libgssapi"]

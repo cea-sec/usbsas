@@ -2924,6 +2924,7 @@ dependencies = [
  "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-utils",
 ]
 
 [[package]]

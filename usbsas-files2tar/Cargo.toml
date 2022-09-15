@@ -17,3 +17,4 @@ usbsas-comm = { path = "../usbsas-comm" }
 usbsas-privileges = { path = "../usbsas-privileges" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
+usbsas-utils = { path = "../usbsas-utils" }
