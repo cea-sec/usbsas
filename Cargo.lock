@@ -355,7 +355,7 @@ dependencies = [
  "cexpr 0.6.0",
  "clang-sys",
  "clap 2.34.0",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -378,7 +378,7 @@ dependencies = [
  "cexpr 0.6.0",
  "clang-sys",
  "clap 3.2.22",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -874,9 +874,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
+checksum = "c90bf5f19754d10198ccb95b70664fc925bd1fc090a0fd9a6ebc54acc8cd6272"
 dependencies = [
  "atty",
  "humantime",
@@ -1243,7 +1243,7 @@ version = "0.1.0"
 dependencies = [
  "dbus",
  "dbus-crossroads",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "err-derive",
  "lazy_static",
  "log",
@@ -1254,7 +1254,7 @@ name = "hid-user"
 version = "0.1.0"
 dependencies = [
  "bitfield",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "rusb",
  "x11",
@@ -2830,7 +2830,7 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "clamav-rs",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "futures",
  "log",
  "serde",
@@ -2844,7 +2844,7 @@ dependencies = [
 name = "usbsas-cmdexec"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "thiserror",
  "usbsas-comm",
@@ -2878,7 +2878,7 @@ version = "0.1.1"
 dependencies = [
  "bootsector",
  "byteorder",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "rusb",
  "thiserror",
@@ -2895,7 +2895,7 @@ name = "usbsas-files2fs"
 version = "0.1.0"
 dependencies = [
  "bitvec 1.0.1",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "fscommon",
  "log",
  "thiserror",
@@ -2913,7 +2913,7 @@ name = "usbsas-files2tar"
 version = "0.1.0"
 dependencies = [
  "byteorder",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "serde_json",
  "tar",
@@ -2931,7 +2931,7 @@ dependencies = [
 name = "usbsas-filter"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "serde",
  "thiserror",
@@ -2949,7 +2949,7 @@ version = "0.1.0"
 dependencies = [
  "bitvec 1.0.1",
  "byteorder",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "rusb",
  "thiserror",
@@ -2984,7 +2984,7 @@ dependencies = [
 name = "usbsas-identificator"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "thiserror",
  "usbsas-comm",
@@ -3032,7 +3032,7 @@ name = "usbsas-net"
 version = "0.1.0"
 dependencies = [
  "base64",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "libgssapi",
  "log",
  "reqwest",
@@ -3090,7 +3090,7 @@ name = "usbsas-scsi2files"
 version = "0.1.1"
 dependencies = [
  "byteorder",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "thiserror",
  "usbsas-comm",
@@ -3141,7 +3141,7 @@ name = "usbsas-tar2files"
 version = "0.1.0"
 dependencies = [
  "byteorder",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "tar",
  "thiserror",
@@ -3157,7 +3157,7 @@ name = "usbsas-tools"
 version = "0.1.0"
 dependencies = [
  "clap 3.2.22",
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "fuse_mt",
  "indicatif",
  "libc",
@@ -3182,7 +3182,7 @@ dependencies = [
 name = "usbsas-usbdev"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "rusb",
  "thiserror",
@@ -3224,7 +3224,7 @@ dependencies = [
 name = "usbsas-utils"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.9.0",
+ "env_logger 0.9.1",
  "log",
  "serde_json",
  "thiserror",
