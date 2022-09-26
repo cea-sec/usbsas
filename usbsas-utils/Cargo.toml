@@ -8,7 +8,7 @@ license = "GPL-3.0"
 env_logger = "0.9.1"
 log = "0.4.17"
 serde_json = { version = "1.0.85", optional = true }
-thiserror = { version = "1.0.35", optional = true }
+thiserror = { version = "1.0.36", optional = true }
 time = { version = "0.3.14", features = ["formatting"], optional = true }
 
 [features]
