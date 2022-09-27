@@ -10,7 +10,7 @@ byteorder = "1.4.3"
 env_logger = "0.9.1"
 log = "0.4.17"
 rusb = "0.9.1"
-thiserror = "1.0.36"
+thiserror = "1.0.37"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
