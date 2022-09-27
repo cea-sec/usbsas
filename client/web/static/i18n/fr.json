@@ -79,5 +79,6 @@
     "usb-copy": "Copie USB",
     "usb-dest-descr": "Insérez un périphérique USB (qui sera effacé)",
     "usb-dev": "Périphérique USB",
+    "warn-empty-select": "Veuillez sélectionner le périphérique source et la destination",
     "warn4gb": "(les fichiers de plus de 4GB ne sont pas supportés)"
 }

@@ -79,5 +79,6 @@
     "usb-copy": "USB Copy",
     "usb-dest-descr": "Plug a USB device (which will be erased)",
     "usb-dev": "USB device",
+    "warn-empty-select": "Please select input device and destination",
     "warn4gb": "(files larger than 4GB aren't supported)"
 }
