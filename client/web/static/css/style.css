@@ -428,6 +428,10 @@ div.progress {
   left: 3px;
 }
 
+#warn-select > .modal-dialog {
+  top: 30%;
+}
+
 @keyframes file_filtered {
   from {
     opacity: 1;

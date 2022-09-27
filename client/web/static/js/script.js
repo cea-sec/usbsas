@@ -1087,14 +1087,9 @@ function render_device_choice() {
       }
     }
   }
-  if (devices.device_in !== undefined && devices.device_out !== undefined) {
-    let next_b = document.querySelector("#next-button");
-    next_b.onclick = function() { check_render_device_choice() };
-    next_b.removeAttribute("disabled");
-  } else {
-    document.querySelector("#next-button").setAttribute("disabled", "disabled");
-  }
-
+  let next_b = document.querySelector("#next-button");
+  next_b.onclick = function() { check_render_device_choice() };
+  next_b.removeAttribute("disabled");
 }
 
 function check_render_device_choice() {
@@ -1131,6 +1126,9 @@ function check_render_device_choice() {
       throw_error(langDocument["errseldev"] + ": " + this.response);
     };
     request.send();
+  } else {
+    document.querySelector("#warn-select").style.display = "block";
+    document.querySelector("#warn-select").className = "modal fade show";
   }
   render_device_choice();
 }
@@ -1616,5 +1614,9 @@ ready(() => {
   document.querySelector("#modal-close-btn").addEventListener("click", (e) => {
     document.querySelector("#modalInfos").className = "modal fade";
     document.querySelector("#modalInfos").style.display = "none";
+  });
+  document.querySelector("#warn-select-close-btn").addEventListener("click", (e) => {
+    document.querySelector("#warn-select").className = "modal fade";
+    document.querySelector("#warn-select").style.display = "none";
   });
 });
