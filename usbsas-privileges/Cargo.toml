@@ -11,4 +11,4 @@ cc = "1.0.73"
 libc = "0.2.133"
 procfs = { version = "0.14.1", default-features = false }
 syscallz = "0.16.1"
-thiserror = "1.0.36"
+thiserror = "1.0.37"

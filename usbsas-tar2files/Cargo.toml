@@ -9,7 +9,7 @@ byteorder = "1.4.3"
 env_logger = "0.9.1"
 log = "0.4.17"
 tar = "0.4.38"
-thiserror = "1.0.36"
+thiserror = "1.0.37"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-privileges = { path = "../usbsas-privileges" }
 usbsas-process = { path = "../usbsas-process" }
