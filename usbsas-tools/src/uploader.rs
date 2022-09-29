@@ -136,7 +136,7 @@ fn main() -> Result<()> {
                 .short('c')
                 .long("config")
                 .help("Path of the configuration file")
-                .takes_value(true)
+                .num_args(1)
                 .default_value(usbsas_utils::USBSAS_CONFIG)
                 .required(false),
         )
@@ -145,14 +145,14 @@ fn main() -> Result<()> {
                 .value_name("FILE")
                 .index(1)
                 .help("Bundle to upload or test")
-                .takes_value(true)
+                .num_args(1)
                 .required(true),
         )
         .arg(
             Arg::new("ID")
                 .index(2)
                 .help("ID of the user")
-                .takes_value(true)
+                .num_args(1)
                 .required(true),
         )
         .arg(

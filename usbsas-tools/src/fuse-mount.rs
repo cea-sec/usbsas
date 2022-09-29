@@ -251,7 +251,7 @@ fn main() -> Result<()> {
                 .value_name("BUSNUM")
                 .value_parser(clap::value_parser!(u32))
                 .help("Bus number of the device to mount")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("devnum")
@@ -260,14 +260,14 @@ fn main() -> Result<()> {
                 .value_name("DEVNUM")
                 .value_parser(clap::value_parser!(u32))
                 .help("Dev number of the device to mount")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("mountpoint")
                 .index(3)
                 .required(true)
                 .help("Path to mount the device")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("part-num")
@@ -277,7 +277,7 @@ fn main() -> Result<()> {
                 .value_parser(clap::value_parser!(u32))
                 .help("Partition number to mount")
                 .default_value("1")
-                .takes_value(true),
+                .num_args(1),
         )
         .get_matches();
 

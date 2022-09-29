@@ -7,7 +7,7 @@ fn main() -> io::Result<()> {
                 .short('c')
                 .long("config")
                 .help("Path of the configuration file")
-                .takes_value(true)
+                .num_args(1)
                 .required(false)
                 .default_value(usbsas_utils::USBSAS_CONFIG),
         )
@@ -16,7 +16,7 @@ fn main() -> io::Result<()> {
                 .short('a')
                 .long("addr")
                 .help("IP address to listen to")
-                .takes_value(true)
+                .num_args(1)
                 .required(false)
                 .default_value("127.0.0.1"),
         )
@@ -25,7 +25,7 @@ fn main() -> io::Result<()> {
                 .short('p')
                 .long("port")
                 .help("Port to listen on")
-                .takes_value(true)
+                .num_args(1)
                 .required(false)
                 .default_value("8080"),
         )
