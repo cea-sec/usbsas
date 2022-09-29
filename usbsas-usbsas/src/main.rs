@@ -1664,7 +1664,7 @@ fn main() -> Result<()> {
                 .short('c')
                 .long("config")
                 .help("Path of the configuration file")
-                .takes_value(true)
+                .num_args(1)
                 .default_value(usbsas_utils::USBSAS_CONFIG)
                 .required(false),
         )
@@ -1673,7 +1673,7 @@ fn main() -> Result<()> {
                 .value_name("OUT_TAR")
                 .index(1)
                 .help("Output tar filename")
-                .takes_value(true)
+                .num_args(1)
                 .required(true),
         )
         .arg(
@@ -1681,7 +1681,7 @@ fn main() -> Result<()> {
                 .value_name("OUT_FS")
                 .index(2)
                 .help("Output fs filename")
-                .takes_value(true)
+                .num_args(1)
                 .required(true),
         )
         .arg(
@@ -1689,7 +1689,7 @@ fn main() -> Result<()> {
                 .short('a')
                 .long("analyze")
                 .help("Analyze files with antivirus server")
-                .takes_value(false),
+                .num_args(0),
         );
 
     #[cfg(feature = "log-json")]
@@ -1698,7 +1698,7 @@ fn main() -> Result<()> {
             .short('s')
             .long("sessionid")
             .help("Session id")
-            .takes_value(true)
+            .num_args(1)
             .required(true),
     );
 

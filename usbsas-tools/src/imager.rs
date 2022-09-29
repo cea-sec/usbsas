@@ -289,7 +289,7 @@ fn main() -> Result<()> {
                 .short('c')
                 .long("config")
                 .help("Path of the configuration file")
-                .takes_value(true)
+                .num_args(1)
                 .default_value(usbsas_utils::USBSAS_CONFIG)
                 .required(false),
         )
@@ -300,7 +300,7 @@ fn main() -> Result<()> {
                 .value_name("FILE")
                 .help("Path of the output file")
                 .conflicts_with("stdout")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("busnum")
@@ -310,7 +310,7 @@ fn main() -> Result<()> {
                 .value_name("BUSNUM")
                 .value_parser(clap::value_parser!(u32))
                 .help("Bus number of the device to clone")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("devnum")
@@ -320,7 +320,7 @@ fn main() -> Result<()> {
                 .value_name("DEVNUM")
                 .value_parser(clap::value_parser!(u32))
                 .help("Device number of the device to clone")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("stdout")
@@ -328,7 +328,7 @@ fn main() -> Result<()> {
                 .long("stdout")
                 .help("Output to stdout")
                 .conflicts_with("output")
-                .takes_value(false),
+                .num_args(0),
         )
         .get_matches();
 
