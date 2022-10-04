@@ -20,7 +20,7 @@ rand = "0.8.5"
 serde = { version = "1.0.145", features = ["derive"] }
 serde_json = "1.0.85"
 sha2 = "0.10.6"
-systemstat = "0.2.0"
+systemstat = "0.2.1"
 tempfile = "3.3.0"
 time = "0.3.14"
 toml = "0.5.9"
