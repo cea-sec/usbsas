@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-time = "0.3.14"
+time = "0.3.15"
 
 [build-dependencies]
 bindgen = "0.60.1"
