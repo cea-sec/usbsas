@@ -3178,6 +3178,7 @@ dependencies = [
 name = "usbsas-tools"
 version = "0.1.0"
 dependencies = [
+ "bitvec 1.0.1",
  "clap 4.0.10",
  "env_logger 0.9.1",
  "fuse_mt",
@@ -3190,6 +3191,7 @@ dependencies = [
  "usbsas-comm",
  "usbsas-config",
  "usbsas-dev2scsi",
+ "usbsas-fs2dev",
  "usbsas-net",
  "usbsas-privileges",
  "usbsas-process",
