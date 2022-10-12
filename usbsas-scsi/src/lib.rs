@@ -102,42 +102,70 @@ impl<T: UsbContext> ScsiUsb<T> {
         Ok(csw[12])
     }
 
-    fn read_bulk(&mut self, data: &mut [u8]) -> Result<usize, io::Error> {
-        match self.handle.read_bulk(self.endpoint_in, data, self.timeout) {
-            Ok(size) => {
-                if size != data.len() {
-                    Err(io::Error::new(ErrorKind::Other, "Usb read_bulk size error"))
-                } else {
-                    Ok(size)
+    fn read_bulk(&mut self, data: &mut [u8]) -> Result<(), io::Error> {
+        let mut buffer = data;
+        while !buffer.is_empty() {
+            let size = match self
+                .handle
+                .read_bulk(self.endpoint_in, buffer, self.timeout)
+            {
+                Ok(size) => {
+                    if size == 0 {
+                        return Err(io::Error::new(
+                            ErrorKind::Other,
+                            "usb read_bulk returned null size",
+                        ));
+                    } else if size > buffer.len() {
+                        return Err(io::Error::new(
+                            ErrorKind::Other,
+                            "usb read_bulk returned invalid size",
+                        ));
+                    }
+                    size
                 }
-            }
-            Err(err) => Err(io::Error::new(
-                ErrorKind::Other,
-                format!("Usb read_bulk error: {}", err),
-            )),
+                Err(err) => {
+                    return Err(io::Error::new(
+                        ErrorKind::Other,
+                        format!("Usb read_bulk error: {}", err),
+                    ));
+                }
+            };
+            buffer = &mut buffer[size..];
         }
+        Ok(())
     }
 
-    fn write_bulk(&mut self, data: &[u8]) -> Result<usize, io::Error> {
-        match self
-            .handle
-            .write_bulk(self.endpoint_out, data, self.timeout)
-        {
-            Ok(size) => {
-                if size != data.len() {
-                    Err(io::Error::new(
-                        ErrorKind::Other,
-                        "Usb write_bulk size error",
-                    ))
-                } else {
-                    Ok(size)
+    fn write_bulk(&mut self, data: &[u8]) -> Result<(), io::Error> {
+        let mut buffer = data;
+        while !buffer.is_empty() {
+            let size = match self
+                .handle
+                .write_bulk(self.endpoint_in, buffer, self.timeout)
+            {
+                Ok(size) => {
+                    if size == 0 {
+                        return Err(io::Error::new(
+                            ErrorKind::Other,
+                            "usb write_bulk returned null size",
+                        ));
+                    } else if size > buffer.len() {
+                        return Err(io::Error::new(
+                            ErrorKind::Other,
+                            "usb write_bulk returned invalid size",
+                        ));
+                    }
+                    size
                 }
-            }
-            Err(err) => Err(io::Error::new(
-                ErrorKind::Other,
-                format!("Usb write_bulk error: {}", err),
-            )),
+                Err(err) => {
+                    return Err(io::Error::new(
+                        ErrorKind::Other,
+                        format!("Usb write_bulk error: {}", err),
+                    ));
+                }
+            };
+            buffer = &buffer[size..];
         }
+        Ok(())
     }
 
     fn bulk_transfer_read(
