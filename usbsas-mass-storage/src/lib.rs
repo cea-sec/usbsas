@@ -98,9 +98,7 @@ impl<T: UsbContext> MassStorage<T> {
                         }
 
                         if let [Some(ep0), Some(ep1)] = endpoints {
-                            if handle.kernel_driver_active(interface.number())? {
-                                handle.detach_kernel_driver(interface.number())?;
-                            }
+                            handle.set_auto_detach_kernel_driver(true)?;
                             handle.claim_interface(interface.number())?;
                             let scsiusb: ScsiUsb<T> = ScsiUsb::new(
                                 handle,
