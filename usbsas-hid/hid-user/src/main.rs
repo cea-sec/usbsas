@@ -83,9 +83,7 @@ fn open_device(busnum: u8, devnum: u8) -> Result<UsbDevice, rusb::Error> {
                         if endp.transfer_type() == TransferType::Interrupt
                             && endp.direction() == Direction::In
                         {
-                            if handle.kernel_driver_active(interface.number())? {
-                                handle.detach_kernel_driver(interface.number())?;
-                            }
+                            handle.set_auto_detach_kernel_driver(true)?;
                             handle.claim_interface(interface.number())?;
                             log::debug!(
                                 "Found interface: {} endpoint {:x}",
