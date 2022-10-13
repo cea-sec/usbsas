@@ -140,7 +140,7 @@ impl<T: UsbContext> ScsiUsb<T> {
         while !buffer.is_empty() {
             let size = match self
                 .handle
-                .write_bulk(self.endpoint_in, buffer, self.timeout)
+                .write_bulk(self.endpoint_out, buffer, self.timeout)
             {
                 Ok(size) => {
                     if size == 0 {
