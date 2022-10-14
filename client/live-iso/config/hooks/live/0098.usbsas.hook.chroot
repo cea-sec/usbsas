@@ -3,7 +3,7 @@
 set -e
 
 VER=0.1.2
-SRV_VER=0.1.1
+SRV_VER=0.1.2
 ASRV_VER=0.1.1
 KSK_VER=0.1.3
 HID_VER=0.1.0
