@@ -11,7 +11,7 @@ clamav-rs = "0.5.5"
 env_logger = "0.9.1"
 futures = "0.3.25"
 log = "0.4.17"
-serde = { version = "1.0.145", features = ["derive"] }
+serde = { version = "1.0.147", features = ["derive"] }
 serde_json = "1.0.87"
 tar = "0.4.38"
 tempfile = "3.3.0"
