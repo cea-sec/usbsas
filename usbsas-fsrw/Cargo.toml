@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-anyhow = "1.0.65"
+anyhow = "1.0.66"
 ext4 = { git = "https://github.com/FauxFaux/ext4-rs", rev = "292c80fdf99533d6ac700a588497cd9f52631614" }
 ff = { path = "../ff" }
 iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
@@ -15,5 +15,5 @@ ntfs = "0.2.0"
 ntfs3g = { path = "../ntfs3g" }
 positioned-io2 = "0.3.4"
 thiserror = "1.0.37"
-time = "0.3.15"
+time = "0.3.16"
 usbsas-proto = { path = "../usbsas-proto" }

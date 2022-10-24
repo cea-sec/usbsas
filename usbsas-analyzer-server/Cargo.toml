@@ -9,10 +9,10 @@ license = "GPL-3.0"
 actix-web = "4.2.1"
 clamav-rs = "0.5.5"
 env_logger = "0.9.1"
-futures = "0.3.24"
+futures = "0.3.25"
 log = "0.4.17"
-serde = { version = "1.0.145", features = ["derive"] }
-serde_json = "1.0.86"
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = "1.0.87"
 tar = "0.4.38"
 tempfile = "3.3.0"
 uuid = { version = "1.2.1", features = ["v4"] }
