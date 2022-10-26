@@ -8,7 +8,7 @@ license = "GPL-3.0"
 cc = "1.0.73"
 
 [dependencies]
-libc = "0.2.136"
+libc = "0.2.137"
 procfs = { version = "0.14.1", default-features = false }
 syscallz = "0.16.1"
 thiserror = "1.0.37"
