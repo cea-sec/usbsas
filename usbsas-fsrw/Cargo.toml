@@ -9,7 +9,7 @@ anyhow = "1.0.66"
 ext4 = { git = "https://github.com/FauxFaux/ext4-rs", rev = "292c80fdf99533d6ac700a588497cd9f52631614" }
 ff = { path = "../ff" }
 iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
-libc = "0.2.136"
+libc = "0.2.137"
 log = "0.4.17"
 ntfs = "0.2.0"
 ntfs3g = { path = "../ntfs3g" }
