@@ -1534,7 +1534,7 @@ fn main() -> Result<(), Error> {
                     )
                 };
                 if context.change_surface {
-                    let value = if context.surface_touched { 1 } else { 0 };
+                    let value = i32::from(context.surface_touched);
                     unsafe {
                         XTestFakeButtonEvent(context.screen.display, 1, value, CurrentTime);
                     };

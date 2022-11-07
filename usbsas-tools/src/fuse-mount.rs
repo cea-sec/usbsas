@@ -223,7 +223,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
             result_entries.push(DirectoryEntry {
                 name: attrs
                     .path
-                    .trim_start_matches(&dir_str.trim_start_matches('/'))
+                    .trim_start_matches(dir_str.trim_start_matches('/'))
                     .trim_start_matches('/')
                     .into(),
                 kind: ftype,
@@ -308,7 +308,7 @@ fn main() -> Result<()> {
     let usbsas_fs = UsbsasFS::new(busnum, devnum, partnum)?;
     fuse_mt::mount(
         fuse_mt::FuseMT::new(usbsas_fs, 0),
-        &mountpoint,
+        mountpoint,
         &fuse_options,
     )
     .unwrap();
