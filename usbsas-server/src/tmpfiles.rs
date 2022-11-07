@@ -22,7 +22,7 @@ impl TmpFiles {
             .prefix("usbsas_out_")
             .suffix(".tar")
             .rand_bytes(6)
-            .tempfile_in(&out_directory)?
+            .tempfile_in(out_directory)?
             .keep()?;
         let out_tar = out_tar.as_path().display().to_string();
 
@@ -30,7 +30,7 @@ impl TmpFiles {
             .prefix("usbsas_fs_")
             .suffix(".bin")
             .rand_bytes(6)
-            .tempfile_in(&out_directory)?
+            .tempfile_in(out_directory)?
             .keep()?;
         let out_fs = out_fs.as_path().display().to_string();
         Ok((out_tar, out_fs))

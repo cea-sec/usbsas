@@ -203,8 +203,8 @@ impl Fingerprinter for UsbDevice {
     fn fingerprint(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"Usb:");
-        hasher.update(&self.busnum.to_le_bytes());
-        hasher.update(&self.devnum.to_le_bytes());
+        hasher.update(self.busnum.to_le_bytes());
+        hasher.update(self.devnum.to_le_bytes());
         hasher.update(&self.manufacturer);
         hasher.update(&self.description);
         hasher.update(&self.serial);
@@ -423,7 +423,7 @@ impl AppState {
 
         let new_comm = AppState::start_usbsas(
             &*self.config.lock()?,
-            &*self.config_path.lock()?,
+            &self.config_path.lock()?,
             &*self.tmpfiles.lock()?,
             #[cfg(feature = "log-json")]
             &new_session_id,
@@ -600,7 +600,7 @@ impl AppState {
         let mut hmac = self.hmac.lock()?;
 
         if !parent_path.is_empty() {
-            parent_path = parent_path.verify(&mut *hmac)?.to_vec();
+            parent_path = parent_path.verify(&mut hmac)?.to_vec();
         }
 
         let parent_path_str = String::from_utf8(parent_path)?;
@@ -612,7 +612,7 @@ impl AppState {
         // Build information for each element in current path
         let mut files = Vec::new();
         for infos in dir_info.filesinfo {
-            let path_b64 = base64::encode(&infos.path.clone().into_bytes().authent(&mut *hmac))
+            let path_b64 = base64::encode(&infos.path.clone().into_bytes().authent(&mut hmac))
                 .replace('\n', "");
             files.push(ReadDir {
                 ftype: infos.ftype,
@@ -641,7 +641,7 @@ impl AppState {
         let mut selected: Vec<String> = Vec::new();
         for path in &req_selected {
             selected.push(String::from_utf8(
-                base64::decode(&path)?.verify(&mut *hmac)?.to_vec(),
+                base64::decode(path)?.verify(&mut hmac)?.to_vec(),
             )?);
         }
         selected.sort();

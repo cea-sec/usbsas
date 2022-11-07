@@ -20,7 +20,7 @@ fn main() {
 
     // Set version for env!() macro
     let output = Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
+        .args(["rev-parse", "--short", "HEAD"])
         .output()
         .expect("can't get git hash");
     let git_hash = String::from_utf8(output.stdout).expect("can't parse git output");

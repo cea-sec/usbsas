@@ -6,12 +6,12 @@ license = "GPL-3.0"
 
 [dependencies]
 byteorder = "1.4.3"
-env_logger = "0.9.1"
+env_logger = "0.9.3"
 log = "0.4.17"
 serde_json = "1.0.87"
 tar = "0.4.38"
 thiserror = "1.0.37"
-time = "0.3.16"
+time = "0.3.17"
 uname = "0.1.1"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-privileges = { path = "../usbsas-privileges" }
