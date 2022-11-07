@@ -7,7 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 bitvec = "1.0.1"
 byteorder = "1.4.3"
-env_logger = "0.9.1"
+env_logger = "0.9.3"
 log = "0.4.17"
 rusb = "0.9.1"
 thiserror = "1.0.37"

@@ -9,7 +9,7 @@ description = "usbsas web server"
 actix-files = "0.6.2"
 actix-web = "4.2.1"
 base64 = "0.13.1"
-clap = "4.0.18"
+clap = "4.0.20"
 err-derive = "0.3.1"
 futures = "0.3.25"
 hmac = { version = "0.12.1", features = ["reset"] }
@@ -20,9 +20,9 @@ rand = "0.8.5"
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = "1.0.87"
 sha2 = "0.10.6"
-systemstat = "0.2.1"
+systemstat = "0.2.2"
 tempfile = "3.3.0"
-time = "0.3.16"
+time = "0.3.17"
 toml = "0.5.9"
 uname = "0.1.1"
 usbsas-comm = { path = "../usbsas-comm" }
@@ -33,7 +33,7 @@ usbsas-utils = { path = "../usbsas-utils" }
 uuid = { version = "1.2.1", features = ["v4"], optional = true }
 
 [dev-dependencies]
-assert_cmd = "2.0.5"
+assert_cmd = "2.0.6"
 reqwest = { version = "0.11.12", features = ["blocking", "json"] }
 
 [features]
