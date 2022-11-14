@@ -10,5 +10,5 @@ cc = "1.0.76"
 [dependencies]
 libc = "0.2.137"
 procfs = { version = "0.14.1", default-features = false }
-syscallz = "0.16.1"
+syscallz = "0.16.2"
 thiserror = "1.0.37"
