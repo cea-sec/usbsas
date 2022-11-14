@@ -575,8 +575,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "clamav-rs"
 version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2270a8023f99eaeaa8ce6b240b55e0aec0c8ea10edadec337018ca0174c22430"
+source = "git+https://github.com/losynix/clamav-rs?branch=c_char_i8#e80c4a0e1c1dfb24a3e5ade915c3648ef55cce54"
 dependencies = [
  "bitflags",
  "clamav-rs-bindings",
