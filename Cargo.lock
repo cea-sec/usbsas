@@ -2506,9 +2506,9 @@ dependencies = [
 
 [[package]]
 name = "syscallz"
-version = "0.16.1"
+version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d94a506596d31342f15e130c31b7356b12bd1e74d316af44ff8a2d47011f9a17"
+checksum = "110ff7f267e583b58489bb0b01fa62ce71c032cd193df3affe9b3b51369aa6ad"
 dependencies = [
  "log",
  "pkg-config",
