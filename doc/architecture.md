@@ -74,8 +74,8 @@ their information.
 
 Requests: `Devices`
 
-syscalls: `openat()`; `read()`; `write()`; `close()`; `recvmsg()`; `poll()`;
-`clock_nanosleep()`; some `ioctl()`
+syscalls: `openat()`; `read()`; `write()`; `close()`; `recvmsg()`;
+`recvfrom()`;`poll()`; `clock_nanosleep()`; some `ioctl()`
 
 ### dev2scsi
 
