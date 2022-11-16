@@ -18,6 +18,7 @@ pub fn thread_drop_priv(libusb_fds: crate::LibusbFds) -> Result<()> {
     ctx.allow_syscall(Syscall::write)?;
     ctx.allow_syscall(Syscall::close)?;
     ctx.allow_syscall(Syscall::recvmsg)?;
+    ctx.allow_syscall(Syscall::recvfrom)?;
     ctx.allow_syscall(Syscall::clock_nanosleep)?;
 
     // Allow some ioctls
