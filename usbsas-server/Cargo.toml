@@ -30,7 +30,7 @@ usbsas-config = { path = "../usbsas-config" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }
-uuid = { version = "1.2.1", features = ["v4"], optional = true }
+uuid = { version = "1.2.2", features = ["v4"], optional = true }
 
 [dev-dependencies]
 assert_cmd = "2.0.6"
