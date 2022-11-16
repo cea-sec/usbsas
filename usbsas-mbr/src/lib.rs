@@ -1,8 +1,6 @@
 //! Master boot record parser
 
 use byteorder::{ByteOrder, LittleEndian};
-use log::error;
-use packed_struct::prelude::*;
 
 use std::io::{self, ErrorKind};
 
@@ -21,8 +19,7 @@ pub const MBR_SIZE: usize = 512;
 pub const SECTOR_START: u64 = 0x3f;
 
 /// mbr partition entry structure
-#[derive(Debug, Default, PackedStruct)]
-#[packed_struct(endian = "lsb")]
+#[derive(Debug, Default)]
 pub struct MbrPartitionEntry {
     pub boot_indicator: u8,
     pub start_head: u8,
@@ -54,10 +51,27 @@ impl MbrPartitionEntry {
     }
 
     pub fn to_bytes(&self) -> io::Result<[u8; 16]> {
-        self.pack().map_err(|err| {
-            error!("pack() error");
-            io::Error::new(io::ErrorKind::Other, err)
-        })
+        let mut buf: [u8; 16] = [
+            self.boot_indicator,
+            self.start_head,
+            self.start_sector,
+            self.start_cylinder,
+            self.partition_type,
+            self.end_head,
+            self.end_sector,
+            self.end_cylinder,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ];
+        LittleEndian::write_u32(&mut buf[8..12], self.start_in_lba);
+        LittleEndian::write_u32(&mut buf[12..16], self.size_in_lba);
+        Ok(buf)
     }
 }
 
