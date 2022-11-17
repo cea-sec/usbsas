@@ -369,9 +369,9 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.61.0"
+version = "0.62.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a022e58a142a46fea340d68012b9201c094e93ec3d033a944a24f8fd4a4f09a"
+checksum = "c6720a8b7b2d39dd533285ed438d458f65b31b5c257e6ac7bb3d7e82844dd722"
 dependencies = [
  "bitflags",
  "cexpr 0.6.0",
@@ -930,7 +930,7 @@ dependencies = [
 name = "ff"
 version = "0.1.0"
 dependencies = [
- "bindgen 0.61.0",
+ "bindgen 0.62.0",
  "cc",
  "time",
 ]
@@ -1723,7 +1723,7 @@ dependencies = [
 name = "ntfs3g"
 version = "0.1.0"
 dependencies = [
- "bindgen 0.61.0",
+ "bindgen 0.62.0",
  "cc",
  "libc",
 ]
