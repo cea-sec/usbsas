@@ -7,7 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 env_logger = "0.9.3"
 log = "0.4.17"
-serde_json = { version = "1.0.88", optional = true }
+serde_json = { version = "1.0.89", optional = true }
 thiserror = { version = "1.0.37", optional = true }
 time = { version = "0.3.17", features = ["formatting"], optional = true }
 
