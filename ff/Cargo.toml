@@ -8,5 +8,5 @@ license = "GPL-3.0"
 time = "0.3.17"
 
 [build-dependencies]
-bindgen = "0.62.0"
+bindgen = "0.63.0"
 cc = "1.0.77"
