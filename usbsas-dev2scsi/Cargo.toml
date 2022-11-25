@@ -5,12 +5,12 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-bootsector = "0.2.0"
-byteorder = "1.4.3"
-env_logger = "0.9.3"
-log = "0.4.17"
-rusb = "0.9.1"
-thiserror = "1.0.37"
+bootsector = "0.2"
+byteorder = "1.4"
+env_logger = "0.10"
+log = "0.4"
+rusb = "0.9"
+thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }

@@ -6,12 +6,12 @@ license = "GPL-3.0"
 description = "usbsas userland HID manager"
 
 [dependencies]
-env_logger = "0.9.3"
-log = "0.4.17"
-dbus-crossroads = "0.5.1"
-dbus = "0.9.6"
-lazy_static = "1.4.0"
-err-derive = "0.3.1"
+env_logger = "0.10"
+log = "0.4"
+dbus-crossroads = "0.5"
+dbus = "0.9"
+lazy_static = "1.4"
+err-derive = "0.3"
 
 # cargo-deb
 [package.metadata.deb]

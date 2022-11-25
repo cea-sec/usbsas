@@ -5,13 +5,13 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-base64 = { version = "0.13.1", optional = true }
-env_logger = "0.9.3"
-libgssapi = { version = "0.6.3", optional = true }
-log = "0.4.17"
-reqwest = { version = "0.11.13", features = ["blocking", "json"] }
-serde = { version = "1.0.147", features = ["derive"] }
-thiserror = "1.0.37"
+base64 = { version = "0.13", optional = true }
+env_logger = "0.10"
+libgssapi = { version = "0.6", optional = true }
+log = "0.4"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-process = { path = "../usbsas-process" }

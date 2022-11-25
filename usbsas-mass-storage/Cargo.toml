@@ -5,10 +5,10 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-log = "0.4.17"
-lru = "0.8.1"
-positioned-io2 = "0.3.4"
-rusb = "0.9.1"
+log = "0.4"
+lru = "0.8"
+positioned-io2 = "0.3"
+rusb = "0.9"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-scsi = { path = "../usbsas-scsi" }

@@ -5,10 +5,10 @@ edition = "2021"
 license = "GPL-3.0"
 
 [build-dependencies]
-cc = "1.0.77"
+cc = "1.0"
 
 [dependencies]
-libc = "0.2.137"
-procfs = { version = "0.14.1", default-features = false }
-syscallz = "0.16.2"
-thiserror = "1.0.37"
+libc = "0.2"
+procfs = { version = "0.14", default-features = false }
+syscallz = "0.16"
+thiserror = "1.0"

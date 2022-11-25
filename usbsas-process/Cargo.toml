@@ -5,9 +5,9 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-libc = "0.2.137"
-log = "0.4.17"
-nix = "0.25.0"
-thiserror = "1.0.37"
+libc = "0.2"
+log = "0.4"
+nix = "0.25"
+thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-utils = { path = "../usbsas-utils" }
