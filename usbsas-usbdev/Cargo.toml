@@ -5,10 +5,10 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-env_logger = "0.10.0"
-log = "0.4.17"
-rusb = "0.9.1"
-thiserror = "1.0.37"
+env_logger = "0.10"
+log = "0.4"
+rusb = "0.9"
+thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }

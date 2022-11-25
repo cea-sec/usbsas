@@ -6,16 +6,16 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-actix-web = "4.2.1"
+actix-web = "4.2"
 clamav-rs = { git = "https://github.com/losynix/clamav-rs", branch = "c_char_i8" }
-env_logger = "0.10.0"
-futures = "0.3.25"
-log = "0.4.17"
-serde = { version = "1.0.147", features = ["derive"] }
-serde_json = "1.0.89"
-tar = "0.4.38"
-tempfile = "3.3.0"
-uuid = { version = "1.2.2", features = ["v4"] }
+env_logger = "0.10"
+futures = "0.3"
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tar = "0.4"
+tempfile = "3.3"
+uuid = { version = "1.2", features = ["v4"] }
 
 # cargo-deb
 [package.metadata.deb]

@@ -6,35 +6,35 @@ license = "GPL-3.0"
 description = "usbsas web server"
 
 [dependencies]
-actix-files = "0.6.2"
-actix-web = "4.2.1"
-base64 = "0.13.1"
-clap = "4.0.27"
-err-derive = "0.3.1"
-futures = "0.3.25"
-hmac = { version = "0.12.1", features = ["reset"] }
-log = "0.4.17"
-mac_address = "1.1.4"
-nix = "0.25.0"
-rand = "0.8.5"
-serde = { version = "1.0.147", features = ["derive"] }
-serde_json = "1.0.89"
-sha2 = "0.10.6"
-systemstat = "0.2.2"
-tempfile = "3.3.0"
-time = "0.3.17"
-toml = "0.5.9"
-uname = "0.1.1"
+actix-files = "0.6"
+actix-web = "4.2"
+base64 = "0.13"
+clap = "4.0"
+err-derive = "0.3"
+futures = "0.3"
+hmac = { version = "0.12", features = ["reset"] }
+log = "0.4"
+mac_address = "1.1"
+nix = "0.25"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+systemstat = "0.2"
+tempfile = "3.3"
+time = "0.3"
+toml = "0.5"
+uname = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }
-uuid = { version = "1.2.2", features = ["v4"], optional = true }
+uuid = { version = "1.2", features = ["v4"], optional = true }
 
 [dev-dependencies]
-assert_cmd = "2.0.6"
-reqwest = { version = "0.11.13", features = ["blocking", "json"] }
+assert_cmd = "2.0"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
 
 [features]
 log-json = ["usbsas-utils/log-json", "uuid"]

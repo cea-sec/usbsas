@@ -6,8 +6,8 @@ links = "X11,Xtst"
 license = "GPL-3.0"
 
 [dependencies]
-bitfield = "0.14.0"
-env_logger = "0.10.0"
-log = "0.4.17"
-rusb = "0.9.1"
-x11 = "2.20.1"
+bitfield = "0.14"
+env_logger = "0.10"
+log = "0.4"
+rusb = "0.9"
+x11 = "2.20"

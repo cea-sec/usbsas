@@ -5,11 +5,11 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-bitvec = "1.0.1"
-env_logger = "0.10.0"
+bitvec = "1.0"
+env_logger = "0.10"
 fscommon = { git = "https://github.com/rafalh/rust-fscommon", rev = "248292ca9dd3a90d2dc345564f38858ef455526f" }
-log = "0.4.17"
-thiserror = "1.0.37"
+log = "0.4"
+thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-fsrw = { path = "../usbsas-fsrw" }
 usbsas-mbr = { path = "../usbsas-mbr" }

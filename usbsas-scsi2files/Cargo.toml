@@ -5,10 +5,10 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-byteorder = "1.4.3"
-env_logger = "0.10.0"
-log = "0.4.17"
-thiserror = "1.0.37"
+byteorder = "1.4"
+env_logger = "0.10"
+log = "0.4"
+thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-dev2scsi = { path = "../usbsas-dev2scsi" }
 usbsas-fsrw = { path = "../usbsas-fsrw" }
