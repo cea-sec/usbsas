@@ -1637,6 +1637,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1713,21 +1722,21 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
- "memoffset",
+ "memoffset 0.6.5",
 ]
 
 [[package]]
 name = "nix"
-version = "0.25.0"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e322c04a9e3440c327fca7b6c8a63e6890a32fa2ad689db972425f07e0d22abb"
+checksum = "46a58d1d356c6597d08cde02c2f09d785b09e28711837b1ed667dc652c08a694"
 dependencies = [
- "autocfg",
  "bitflags",
  "cfg-if",
  "libc",
- "memoffset",
+ "memoffset 0.7.1",
  "pin-utils",
+ "static_assertions",
 ]
 
 [[package]]
@@ -1764,7 +1773,7 @@ dependencies = [
  "derive_more",
  "displaydoc",
  "enumn",
- "memoffset",
+ "memoffset 0.6.5",
  "strum_macros 0.24.3",
  "time",
 ]
@@ -3081,7 +3090,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "log",
- "nix 0.25.0",
+ "nix 0.26.1",
  "thiserror",
  "usbsas-comm",
  "usbsas-utils",
@@ -3136,7 +3145,7 @@ dependencies = [
  "hmac",
  "log",
  "mac_address",
- "nix 0.25.0",
+ "nix 0.26.1",
  "rand",
  "reqwest",
  "serde",
