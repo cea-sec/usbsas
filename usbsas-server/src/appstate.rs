@@ -59,8 +59,14 @@ pub(crate) struct TargetDevice {
 }
 
 enum CopyDestination {
-    Usb { busnum: u32, devnum: u32 },
-    Net,
+    Usb {
+        busnum: u32,
+        devnum: u32,
+    },
+    Net {
+        url: String,
+        krb_service_name: Option<String>,
+    },
     Cmd,
 }
 
@@ -455,12 +461,14 @@ impl AppState {
     fn list_alt_targets(&self) -> Result<Vec<TargetDevice>, ServiceError> {
         let config = self.config.lock()?;
         let mut targets = vec![];
-        if let Some(network) = &config.network {
-            targets.push(TargetDevice {
-                device: Device::Net(network.clone()),
-                is_src: false,
-                is_dst: true,
-            });
+        if let Some(networks) = &config.networks {
+            for network in networks {
+                targets.push(TargetDevice {
+                    device: Device::Net(network.clone()),
+                    is_src: false,
+                    is_dst: true,
+                });
+            }
         }
         if let Some(cmd) = &config.command {
             targets.push(TargetDevice {
@@ -528,7 +536,12 @@ impl AppState {
                             devnum: usb.devnum,
                         });
                     }
-                    Device::Net(_) => out_dev = Some(CopyDestination::Net),
+                    Device::Net(ref net) => {
+                        out_dev = Some(CopyDestination::Net {
+                            url: net.url.clone(),
+                            krb_service_name: net.krb_service_name.clone(),
+                        })
+                    }
                     Device::Cmd(_) => out_dev = Some(CopyDestination::Cmd),
                 }
             }
@@ -666,9 +679,15 @@ impl AppState {
                     fstype: fstype.into(),
                 })
             }
-            CopyDestination::Net { .. } => {
+            CopyDestination::Net {
+                url,
+                krb_service_name,
+            } => {
                 debug!("do copy net");
-                proto::usbsas::request_copy_start::Destination::Net(proto::usbsas::DestNet {})
+                proto::usbsas::request_copy_start::Destination::Net(proto::common::DestNet {
+                    url: url.to_owned(),
+                    krb_service_name: krb_service_name.clone().unwrap_or_else(|| String::from("")),
+                })
             }
             CopyDestination::Cmd { .. } => {
                 debug!("do copy cmd");

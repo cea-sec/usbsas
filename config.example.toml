@@ -21,11 +21,18 @@ out_directory = "/tmp/"
 # description, longdescr and url are mandatory, krb_service_name is optional.
 # If krb_service_name is specified, mutual HTTP authentication with Kerberos
 # will be performed with the remote server prior to upload.
-#[network]
-#description = "Network XXX"
-#longdescr = "Send files on network XXX"
-#url = "http://127.0.0.1:8042/api/uploadbundle"
-#krb_service_name = "HTTP@your.domain"
+
+# [[networks]]
+# description = "Network XXX"
+# longdescr = "Send files on network XXX"
+# url = "http://127.0.0.1:8042/api/uploadbundle"
+# krb_service_name = "HTTP@your.domain"
+
+# [[networks]]
+# description = "Network YYY"
+# longdescr = "Send files on network YYY"
+# url = "http://127.0.0.1:8043/api/uploadbundle"
+# krb_service_name = "HTTP@your.domain"
 
 
 # Destination "command". (Optional)

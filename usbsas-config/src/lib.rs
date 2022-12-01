@@ -78,7 +78,7 @@ pub struct Config {
     pub env_vars: Option<Vec<String>>,
     pub message: Option<String>,
     pub command: Option<Command>,
-    pub network: Option<Network>,
+    pub networks: Option<Vec<Network>>,
     pub filters: Option<Vec<Filter>>,
     pub post_copy: Option<PostCopy>,
     pub analyzer: Option<Analyzer>,

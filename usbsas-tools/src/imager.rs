@@ -141,7 +141,7 @@ impl Imager {
         let index = if devices.len() == 1 {
             0
         } else {
-            eprintln!("Multiple devices found, which one should be imaged ?",);
+            eprintln!("Multiple devices found, which one should be imaged ?");
             for (index, dev) in devices.iter().enumerate() {
                 eprintln!(
                     "{}: {} - {} (Serial: {}, VID/PID: {}/{})",

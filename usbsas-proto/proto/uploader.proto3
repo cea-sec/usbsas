@@ -1,10 +1,12 @@
 syntax = "proto3";
 package uploader;
+import public "common.proto3";
 
 /* Requests */
 
 message RequestUpload {
   string id = 1;
+  common.DestNet dstnet = 2;
 };
 
 message RequestEnd {

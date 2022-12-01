@@ -1,6 +1,6 @@
 out_directory = "/tmp/"
 
-[network]
+[[networks]]
 description = "Network"
 longdescr = "Send files on a remote server"
 url = "http://127.0.0.1:8042/api/uploadbundle"
