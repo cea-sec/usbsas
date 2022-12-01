@@ -131,6 +131,7 @@ impl InitState {
         let config = conf_parse(&config_str)?;
         let rules = config
             .filters
+            .unwrap_or_default()
             .into_iter()
             .map(|f| Rule {
                 contain: f.contain,

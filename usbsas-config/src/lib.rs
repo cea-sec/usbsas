@@ -79,7 +79,7 @@ pub struct Config {
     pub message: Option<String>,
     pub command: Option<Command>,
     pub network: Option<Network>,
-    pub filters: Vec<Filter>,
+    pub filters: Option<Vec<Filter>>,
     pub post_copy: Option<PostCopy>,
     pub analyzer: Option<Analyzer>,
     pub usb_port_accesses: Option<UsbPortAccesses>,
