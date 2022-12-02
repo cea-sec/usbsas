@@ -7,7 +7,6 @@ use std::{
     os::unix::io::RawFd,
 };
 use usbsas_comm::{protoresponse, Comm};
-use usbsas_config::{conf_parse, conf_read};
 use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::uploader::request::Msg;
@@ -66,13 +65,10 @@ impl State {
 
 struct InitState {
     tarpath: String,
-    config_path: String,
 }
 
 struct RunningState {
     file: Option<File>,
-    url: String,
-    http_client: HttpClient,
 }
 
 struct WaitEndState {}
@@ -80,18 +76,8 @@ struct WaitEndState {}
 impl InitState {
     fn run(self, _comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
         let file = File::open(&self.tarpath)?;
-        let config_str = conf_read(&self.config_path)?;
-        let config = conf_parse(&config_str)?;
-        let net_conf = config.network.ok_or(Error::Conf)?;
 
-        Ok(State::Running(RunningState {
-            file: Some(file),
-            url: net_conf.url,
-            http_client: HttpClient::new(
-                #[cfg(feature = "authkrb")]
-                net_conf.krb_service_name,
-            )?,
-        }))
+        Ok(State::Running(RunningState { file: Some(file) }))
     }
 }
 
@@ -100,7 +86,7 @@ impl RunningState {
         let req: proto::uploader::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::Upload(req) => {
-                if let Err(err) = self.upload(comm, &req.id) {
+                if let Err(err) = self.upload(comm, req) {
                     error!("upload error: {}", err);
                     comm.error(proto::uploader::ResponseError {
                         err: format!("{}", err),
@@ -115,9 +101,22 @@ impl RunningState {
         }
     }
 
-    fn upload(&mut self, comm: &mut Comm<proto::uploader::Request>, id: &str) -> Result<()> {
+    fn upload(
+        &mut self,
+        comm: &mut Comm<proto::uploader::Request>,
+        req: proto::uploader::RequestUpload,
+    ) -> Result<()> {
         trace!("upload");
-        self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
+        let dstnet = req.dstnet.ok_or(Error::BadRequest)?;
+        let url = format!("{}/{}", dstnet.url.trim_end_matches('/'), req.id);
+        let mut http_client = HttpClient::new(
+            #[cfg(feature = "authkrb")]
+            if !dstnet.krb_service_name.is_empty() {
+                Some(dstnet.krb_service_name)
+            } else {
+                None
+            },
+        )?;
         let file = self
             .file
             .take()
@@ -135,7 +134,7 @@ impl RunningState {
 
         let body = Body::sized(filereaderprogress, filesize);
 
-        let resp = self.http_client.post(&self.url, body)?;
+        let resp = http_client.post(&url, body)?;
         if !resp.status().is_success() {
             return Err(Error::Upload(format!(
                 "Unknown status code {:?}",
@@ -176,16 +175,9 @@ pub struct Uploader {
 }
 
 impl Uploader {
-    fn new(
-        comm: Comm<proto::uploader::Request>,
-        tarpath: String,
-        config_path: String,
-    ) -> Result<Self> {
+    fn new(comm: Comm<proto::uploader::Request>, tarpath: String) -> Result<Self> {
         log::info!("uploader: {}", tarpath);
-        let state = State::Init(InitState {
-            tarpath,
-            config_path,
-        });
+        let state = State::Init(InitState { tarpath });
         Ok(Uploader { comm, state })
     }
 
@@ -215,19 +207,15 @@ impl UsbsasProcess for Uploader {
         args: Option<Vec<String>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         if let Some(args) = args {
-            if args.len() == 2 {
-                Uploader::new(
-                    Comm::from_raw_fd(read_fd, write_fd),
-                    args[0].to_owned(),
-                    args[1].to_owned(),
-                )?
-                .main_loop()
-                .map(|_| log::debug!("uploader exit"))?;
+            if args.len() == 1 {
+                Uploader::new(Comm::from_raw_fd(read_fd, write_fd), args[0].to_owned())?
+                    .main_loop()
+                    .map(|_| log::debug!("uploader exit"))?;
                 return Ok(());
             }
         }
         Err(Box::new(Error::Error(
-            "uploader need a fname and a config_path arg".to_string(),
+            "uploader need a fname as arg".to_string(),
         )))
     }
 }

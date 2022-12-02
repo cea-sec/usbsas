@@ -141,7 +141,7 @@ impl Imager {
         let index = if devices.len() == 1 {
             0
         } else {
-            eprintln!("Multiple devices found, which one should be imaged ?",);
+            eprintln!("Multiple devices found, which one should be imaged ?");
             for (index, dev) in devices.iter().enumerate() {
                 eprintln!(
                     "{}: {} - {} (Serial: {}, VID/PID: {}/{})",
@@ -328,7 +328,7 @@ fn main() -> Result<()> {
                 .long("stdout")
                 .help("Output to stdout")
                 .conflicts_with("output")
-                .num_args(0),
+                .action(clap::ArgAction::SetTrue),
         )
         .get_matches();
 
@@ -341,7 +341,7 @@ fn main() -> Result<()> {
                 return Err(err.into());
             }
         }
-    } else if matches.contains_id("stdout") {
+    } else if matches.get_flag("stdout") {
         None
     } else {
         let config = conf_parse(&conf_read(config_path)?)?;

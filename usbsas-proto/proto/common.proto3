@@ -18,6 +18,11 @@ enum OutFsType {
   EXFAT = 2;
 };
 
+message DestNet {
+  string url = 1;
+  string krb_service_name = 2;
+};
+
 message FileInfo {
   string path = 1;
   FileType ftype = 2;

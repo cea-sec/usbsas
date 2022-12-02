@@ -1,8 +1,10 @@
 //! Tool to test usbsas's upload / analyze features with a remote server.
 
 use clap::{Arg, Command};
+use std::io::{self, Write};
 use thiserror::Error;
 use usbsas_comm::{protorequest, Comm};
+use usbsas_config::{conf_parse, conf_read};
 use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
 
@@ -22,6 +24,8 @@ enum Error {
     Upload(String),
     #[error("analyze error: {0}")]
     Analyze(String),
+    #[error("Error: {0}")]
+    Error(String),
 }
 type Result<T> = std::result::Result<T, Error>;
 
@@ -43,13 +47,55 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::uploader::response::Msg;
     let mut uploader = UsbsasChildSpawner::new()
         .arg(bundle_path)
-        .arg(config_path)
         .spawn::<usbsas_net::Uploader, proto::uploader::Request>()?;
+
+    let config = conf_parse(&conf_read(config_path)?)?;
+
+    let networks = &config
+        .networks
+        .ok_or_else(|| Error::Error("No networks in conf".into()))?;
+
+    let network = if networks.len() == 1 {
+        &networks[0]
+    } else {
+        eprintln!("Multiple networks available, which one to upload to ?");
+        for (index, net) in networks.iter().enumerate() {
+            eprintln!("{}: {:?}", index + 1, net);
+        }
+        let n = loop {
+            eprint!("[1-{}]: ", networks.len());
+            io::stdout().flush().expect("couldn't flush stdout");
+            let mut input = String::new();
+            match io::stdin().read_line(&mut input) {
+                Ok(_) => match input.trim().parse::<usize>() {
+                    Ok(n) => {
+                        if n > 0 && n <= networks.len() {
+                            break n - 1;
+                        } else {
+                            log::error!("Index out of range");
+                        }
+                    }
+                    Err(err) => log::error!("Couldn't parse input: {}", err),
+                },
+                Err(err) => log::error!("Couldn't read input: {}", err),
+            }
+        };
+        &networks[n]
+    };
 
     log::info!("Uploading bundle");
     uploader.comm.send(proto::uploader::Request {
         msg: Some(proto::uploader::request::Msg::Upload(
-            proto::uploader::RequestUpload { id: id.to_string() },
+            proto::uploader::RequestUpload {
+                id: id.to_string(),
+                dstnet: Some(proto::common::DestNet {
+                    url: network.url.to_owned(),
+                    krb_service_name: network
+                        .krb_service_name
+                        .to_owned()
+                        .unwrap_or_else(|| String::from("")),
+                }),
+            },
         )),
     })?;
 
@@ -159,6 +205,7 @@ fn main() -> Result<()> {
             Arg::new("analyze")
                 .short('a')
                 .long("analyze")
+                .action(clap::ArgAction::SetTrue)
                 .help("Analyze instead of upload"),
         );
 
@@ -167,11 +214,12 @@ fn main() -> Result<()> {
 
     if let Some(path) = matches.get_one::<String>("bundle") {
         if let Some(id) = matches.get_one::<String>("ID") {
-            if matches.contains_id("analyze") {
+            if matches.get_flag("analyze") {
                 analyze(config_path, path, id)?;
-                return Ok(());
+            } else {
+                upload(config_path, path, id)?;
             }
-            upload(config_path, path, id)?;
+            return Ok(());
         }
     }
 

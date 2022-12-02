@@ -49,8 +49,6 @@ enum Error {
     Remote,
     #[error("State error")]
     State,
-    #[error("Network configuration error")]
-    Conf,
     #[error("{0}")]
     Upload(String),
 }

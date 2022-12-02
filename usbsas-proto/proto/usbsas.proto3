@@ -49,9 +49,6 @@ message DestUSB {
   common.OutFsType fstype = 3;
 };
 
-message DestNet {
-};
-
 message DestCmd {
 };
 
@@ -62,7 +59,7 @@ message RequestPostCopyCmd {
 message RequestCopyStart {
   oneof destination {
     DestUSB usb = 1;
-    DestNet net = 2;
+    common.DestNet net = 2;
     DestCmd cmd = 3;
   };
   repeated string selected = 4;

@@ -1053,9 +1053,9 @@ impl UploadOrCmdState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        match self.destination {
+        match &self.destination {
             Destination::Usb(_) => unreachable!("already handled"),
-            Destination::Net(_) => self.upload_files(comm, children)?,
+            Destination::Net(dest_net) => self.upload_files(comm, children, dest_net.clone())?,
             Destination::Cmd(_) => {
                 trace!("exec cmd");
                 children.cmdexec.comm.exec(proto::cmdexec::RequestExec {})?;
@@ -1081,6 +1081,7 @@ impl UploadOrCmdState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
+        dstnet: proto::common::DestNet,
     ) -> Result<()> {
         use proto::uploader::response::Msg;
         trace!("upload bundle");
@@ -1088,6 +1089,7 @@ impl UploadOrCmdState {
             msg: Some(proto::uploader::request::Msg::Upload(
                 proto::uploader::RequestUpload {
                     id: self.id.clone(),
+                    dstnet: Some(dstnet),
                 },
             )),
         })?;
@@ -1596,7 +1598,6 @@ impl Usbsas {
 
         let uploader = UsbsasChildSpawner::new()
             .arg(out_tar)
-            .arg(config_path)
             .spawn::<usbsas_net::Uploader, proto::uploader::Request>()?;
         pipes_read.push(uploader.comm.input_fd());
         pipes_write.push(uploader.comm.output_fd());
@@ -1689,7 +1690,7 @@ fn main() -> Result<()> {
                 .short('a')
                 .long("analyze")
                 .help("Analyze files with antivirus server")
-                .num_args(0),
+                .action(clap::ArgAction::SetTrue),
         );
 
     #[cfg(feature = "log-json")]
@@ -1719,7 +1720,7 @@ fn main() -> Result<()> {
 
     let comm = Comm::from_env()?;
 
-    let usbsas = Usbsas::new(comm, config, outtar, outfs, matches.contains_id("analyze"))?;
+    let usbsas = Usbsas::new(comm, config, outtar, outfs, matches.get_flag("analyze"))?;
 
     usbsas.main_loop()?;
 
