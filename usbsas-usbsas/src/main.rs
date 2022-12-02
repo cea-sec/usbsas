@@ -1690,7 +1690,7 @@ fn main() -> Result<()> {
                 .short('a')
                 .long("analyze")
                 .help("Analyze files with antivirus server")
-                .num_args(0),
+                .action(clap::ArgAction::SetTrue),
         );
 
     #[cfg(feature = "log-json")]
@@ -1720,7 +1720,7 @@ fn main() -> Result<()> {
 
     let comm = Comm::from_env()?;
 
-    let usbsas = Usbsas::new(comm, config, outtar, outfs, matches.contains_id("analyze"))?;
+    let usbsas = Usbsas::new(comm, config, outtar, outfs, matches.get_flag("analyze"))?;
 
     usbsas.main_loop()?;
 

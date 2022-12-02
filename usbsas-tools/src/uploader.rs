@@ -24,7 +24,7 @@ enum Error {
     Upload(String),
     #[error("analyze error: {0}")]
     Analyze(String),
-    #[error("Rrror: {0}")]
+    #[error("Error: {0}")]
     Error(String),
 }
 type Result<T> = std::result::Result<T, Error>;
@@ -58,7 +58,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let network = if networks.len() == 1 {
         &networks[0]
     } else {
-        eprintln!("Multiple networks available, which on to upload to ?");
+        eprintln!("Multiple networks available, which one to upload to ?");
         for (index, net) in networks.iter().enumerate() {
             eprintln!("{}: {:?}", index + 1, net);
         }
@@ -205,6 +205,7 @@ fn main() -> Result<()> {
             Arg::new("analyze")
                 .short('a')
                 .long("analyze")
+                .action(clap::ArgAction::SetTrue)
                 .help("Analyze instead of upload"),
         );
 
@@ -213,11 +214,12 @@ fn main() -> Result<()> {
 
     if let Some(path) = matches.get_one::<String>("bundle") {
         if let Some(id) = matches.get_one::<String>("ID") {
-            if matches.contains_id("analyze") {
+            if matches.get_flag("analyze") {
                 analyze(config_path, path, id)?;
-                return Ok(());
+            } else {
+                upload(config_path, path, id)?;
             }
-            upload(config_path, path, id)?;
+            return Ok(());
         }
     }
 
