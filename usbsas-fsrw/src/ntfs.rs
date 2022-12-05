@@ -2,6 +2,7 @@ use crate::{Error, Result};
 use crate::{FSRead, FSWrite, WriteSeek};
 use ntfs::NtfsReadSeek;
 use std::{
+    collections::HashMap,
     convert::TryFrom,
     io::{Read, Seek, SeekFrom, Write},
 };
@@ -175,12 +176,15 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
     fn read_dir(&mut self, path: &str) -> Result<Vec<FileInfo>> {
         log::trace!("readdir {}", path);
         let ntfs_dir = ntfs_file_from_path(&self.fs, &mut self.reader, path)?;
-        let mut ntfs_entries = Vec::new();
+        let mut ntfs_entries: HashMap<u64, FileInfo> = HashMap::new();
 
         let ntfs_index = ntfs_dir.directory_index(&mut self.reader)?;
         let mut index_entries = ntfs_index.entries();
         while let Some(entry) = index_entries.next(&mut self.reader) {
             let ntfs_file = entry?.to_file(&self.fs, &mut self.reader)?;
+            if ntfs_entries.contains_key(&ntfs_file.file_record_number()) {
+                continue;
+            }
             // Filter MFT metafiles (https://en.wikipedia.org/wiki/NTFS#Metafiles)
             if ntfs_file.file_record_number() < 27 {
                 continue;
@@ -193,19 +197,22 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
             // See get_attr() above
             let ts =
                 ntfs_file.info()?.creation_time().nt_timestamp() as i64 / 10000000 - 11644473600;
-            ntfs_entries.push(FileInfo {
-                path: format!("{}/{}", path, name_string),
-                size: ntfs_file_size(&ntfs_file, &mut self.reader)?,
-                ftype: if ntfs_file.is_directory() {
-                    FileType::Directory.into()
-                } else {
-                    FileType::Regular.into()
+            ntfs_entries.insert(
+                ntfs_file.file_record_number(),
+                FileInfo {
+                    path: format!("{}/{}", path, name_string),
+                    size: ntfs_file_size(&ntfs_file, &mut self.reader)?,
+                    ftype: if ntfs_file.is_directory() {
+                        FileType::Directory.into()
+                    } else {
+                        FileType::Regular.into()
+                    },
+                    timestamp: ts,
                 },
-                timestamp: ts,
-            });
+            );
         }
 
-        Ok(ntfs_entries)
+        Ok(Vec::from_iter(ntfs_entries.into_values()))
     }
 
     fn read_file(
