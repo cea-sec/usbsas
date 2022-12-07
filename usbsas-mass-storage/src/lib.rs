@@ -284,7 +284,9 @@ impl MassStorageComm {
             partition_sector_start: 0,
             comm: Arc::new(RwLock::new(comm)),
             cache: RwLock::new(lru::LruCache::new(
-                std::num::NonZeroUsize::new(1024).unwrap(),
+                // TODO: add an option to change this value in the configuration file
+                // 32768 * 8 * 512 = 128MB (at most, count isn't always MAX_SECTORS_COUNT_CACHE)
+                std::num::NonZeroUsize::new(32768).unwrap(),
             )),
         }
     }
