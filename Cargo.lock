@@ -53,7 +53,7 @@ dependencies = [
  "actix-service",
  "actix-utils",
  "ahash",
- "base64",
+ "base64 0.13.1",
  "bitflags",
  "brotli",
  "bytes",
@@ -320,6 +320,12 @@ name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
+
+[[package]]
+name = "base64"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "bindgen"
@@ -2192,7 +2198,7 @@ version = "0.11.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68cc60575865c7831548863cc02356512e3f1dc2f3f82cb837d7fc4cc8f3c97c"
 dependencies = [
- "base64",
+ "base64 0.13.1",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -3059,7 +3065,7 @@ dependencies = [
 name = "usbsas-net"
 version = "0.1.1"
 dependencies = [
- "base64",
+ "base64 0.20.0",
  "env_logger 0.10.0",
  "libgssapi",
  "log",
@@ -3138,7 +3144,7 @@ dependencies = [
  "actix-files",
  "actix-web",
  "assert_cmd",
- "base64",
+ "base64 0.20.0",
  "clap 4.0.29",
  "err-derive",
  "futures",
