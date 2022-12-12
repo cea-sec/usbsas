@@ -53,7 +53,7 @@ dependencies = [
  "actix-service",
  "actix-utils",
  "ahash",
- "base64",
+ "base64 0.13.1",
  "bitflags",
  "brotli",
  "bytes",
@@ -320,6 +320,12 @@ name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
+
+[[package]]
+name = "base64"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "bindgen"
@@ -1399,9 +1405,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.6.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec947b7a4ce12e3b87e353abae7ce124d025b6c7d6c5aea5cc0bcf92e9510ded"
+checksum = "11b0d96e660696543b251e58030cf9787df56da39dab19ad60eae7353040917e"
 
 [[package]]
 name = "is-terminal"
@@ -1883,9 +1889,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
+checksum = "cf1c2c742266c2f1041c914ba65355a83ae8747b05f208319784083583494b4b"
 
 [[package]]
 name = "peeking_take_while"
@@ -1929,9 +1935,9 @@ checksum = "6ac9a59f73473f1b8d852421e59e64809f025994837ef743615c6d0c5b305160"
 
 [[package]]
 name = "portable-atomic"
-version = "0.3.15"
+version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15eb2c6e362923af47e13c23ca5afb859e83d54452c55b0b9ac763b8f7c1ac16"
+checksum = "ac662b3a6490de378b0ee15cf2dfff7127aebfe0b19acc65e7fbca3d299c3788"
 
 [[package]]
 name = "positioned-io2"
@@ -2045,9 +2051,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.11.3"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e330bf1316db56b12c2bcfa399e8edddd4821965ea25ddb2c134b610b1c1c604"
+checksum = "276470f7f281b0ed53d2ae42dd52b4a8d08853a3c70e7fe95882acbb98a6ae94"
 dependencies = [
  "bytes",
  "heck 0.4.0",
@@ -2180,7 +2186,7 @@ version = "0.11.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68cc60575865c7831548863cc02356512e3f1dc2f3f82cb837d7fc4cc8f3c97c"
 dependencies = [
- "base64",
+ "base64 0.13.1",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -2318,18 +2324,18 @@ checksum = "e25dfac463d778e353db5be2449d1cce89bd6fd23c9f1ea21310ce6e5a1b29c4"
 
 [[package]]
 name = "serde"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "256b9932320c590e707b94576e3cc1f7c9024d0ee6612dfbcf1cb106cbe8e055"
+checksum = "e326c9ec8042f1b5da33252c8a37e9ffbd2c9bef0155215b6e6c80c790e05f91"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4eae9b04cbffdfd550eb462ed33bc6a1b68c935127d008b27444d08380f94e4"
+checksum = "42a3df25b0713732468deadad63ab9da1f1fd75a48a15024b50363f128db627e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2867,7 +2873,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-config"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "lazy_static",
  "log",
@@ -2967,7 +2973,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-fsrw"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "ext4",
@@ -3011,7 +3017,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-mbr"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byteorder",
  "log",
@@ -3031,9 +3037,9 @@ dependencies = [
 
 [[package]]
 name = "usbsas-net"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
- "base64",
+ "base64 0.20.0",
  "env_logger 0.10.0",
  "libgssapi",
  "log",
@@ -3049,7 +3055,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-privileges"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cc",
  "libc",
@@ -3072,7 +3078,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-proto"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "prost",
  "prost-build",
@@ -3107,12 +3113,12 @@ dependencies = [
 
 [[package]]
 name = "usbsas-server"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "actix-files",
  "actix-web",
  "assert_cmd",
- "base64",
+ "base64 0.20.0",
  "clap 4.0.29",
  "err-derive",
  "futures",
@@ -3140,7 +3146,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-tar2files"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "byteorder",
  "env_logger 0.10.0",
@@ -3156,7 +3162,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-tools"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bitvec",
  "clap 4.0.29",
@@ -3200,7 +3206,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-usbsas"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "clap 4.0.29",
  "log",
