@@ -182,6 +182,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
         let mut file_cache = HashMap::new();
         let root_dir = fs.root_directory(&mut reader)?;
         file_cache.insert("".to_owned(), root_dir.file_record_number());
+        file_cache.insert("/".to_owned(), root_dir.file_record_number());
         Ok(NTFS {
             reader,
             fs,
