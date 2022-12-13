@@ -204,7 +204,11 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
 
     fn readdir(&self, _req: RequestInfo, path: &Path, _fh: u64) -> ResultReaddir {
         log::trace!("readdir: {:?}", path);
-        let dir_str = path.to_string_lossy().to_string();
+        let mut dir_str = path.to_string_lossy().to_string();
+
+        if dir_str == "/" {
+            dir_str = "".to_owned();
+        }
 
         let mut scsi2files = self.scsi2files.write().unwrap();
 
@@ -212,7 +216,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
         let rep = scsi2files
             .comm
             .readdir(proto::files::RequestReadDir {
-                path: dir_str.trim_start_matches('/').to_string(),
+                path: dir_str.to_string(),
             })
             .unwrap();
         for attrs in rep.filesinfo {
@@ -223,7 +227,8 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
             result_entries.push(DirectoryEntry {
                 name: attrs
                     .path
-                    .trim_start_matches(dir_str.trim_start_matches('/'))
+                    .strip_prefix(&dir_str)
+                    .ok_or(libc::ENOENT)?
                     .trim_start_matches('/')
                     .into(),
                 kind: ftype,

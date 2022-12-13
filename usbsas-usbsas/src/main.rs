@@ -611,23 +611,35 @@ impl CopyFilesState {
             };
             match FileType::from_i32(rep.ftype) {
                 Some(FileType::Regular) => {
-                    if !all_entries.contains(&entry) {
-                        files.push(entry.clone());
-                        all_entries.insert(entry);
+                    if all_entries.insert(entry.clone()) {
+                        files.push(entry);
                         total_size += rep.size;
                     }
                 }
                 Some(FileType::Directory) => {
-                    if !all_entries.contains(&entry) {
-                        directories.push(entry.clone());
-                        all_entries.insert(entry.clone());
-                    }
-                    let rep = children
-                        .scsi2files
-                        .comm
-                        .readdir(proto::files::RequestReadDir { path: entry })?;
-                    for file in rep.filesinfo.iter() {
-                        todo.push_back(file.path.clone());
+                    let mut todo_dir = VecDeque::from(vec![entry]);
+                    while let Some(dir) = todo_dir.pop_front() {
+                        if all_entries.insert(dir.clone()) {
+                            directories.push(dir.clone());
+                        }
+                        let rep = children
+                            .scsi2files
+                            .comm
+                            .readdir(proto::files::RequestReadDir { path: dir })?;
+                        for file in rep.filesinfo.iter() {
+                            match FileType::from_i32(file.ftype) {
+                                Some(FileType::Regular) => {
+                                    if all_entries.insert(file.path.clone()) {
+                                        files.push(file.path.clone());
+                                        total_size += file.size;
+                                    }
+                                }
+                                Some(FileType::Directory) => {
+                                    todo_dir.push_back(file.path.clone());
+                                }
+                                _ => errors.push(file.path.clone()),
+                            }
+                        }
                     }
                 }
                 _ => errors.push(entry),

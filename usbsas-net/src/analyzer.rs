@@ -203,19 +203,16 @@ impl RunningState {
             trace!("res: {:#?}", &res);
             match res.status.as_str() {
                 "scanned" => {
-                    // Remove infos.json entry and filter TAR_DATA_DIR prefix
-                    // from file names
-                    let mut result = res.files.unwrap_or_default();
-                    let _ = result.remove_entry("infos.json");
-                    return Ok(HashMap::from_iter(result.iter().map(|(k, v)| {
-                        (
-                            k.trim_start_matches(
+                    let result = res.files.unwrap_or_default();
+                    // Filter paths not in TAR_DATA_DIR
+                    return Ok(HashMap::from_iter(result.iter().filter_map(
+                        |(path, status)| {
+                            path.strip_prefix(
                                 &(TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/"),
                             )
-                            .to_owned(),
-                            v.to_owned(),
-                        )
-                    })));
+                            .map(|stripped_path| (stripped_path.to_owned(), status.to_owned()))
+                        },
+                    )));
                 }
                 "uploaded" | "processing" => sleep(Duration::from_secs(1)),
                 _ => return Err(Error::Remote),

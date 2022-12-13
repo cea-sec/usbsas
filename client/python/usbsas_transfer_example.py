@@ -85,7 +85,8 @@ def open_dev_and_part(comm, device):
     ok_or_exit(comm, rep, "error opening first partition")
 
 def list_files(comm):
-    rep = comm.read_dir(path="/")
+    # path = "" for root directory
+    rep = comm.read_dir(path="")
     ok_or_exit(comm, rep, "error listing files")
     return [f.path for f in rep.filesinfo]
 

@@ -881,7 +881,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             }
                             Some(HidUsagePage::Vendor) => HidUsage::Unknown(value as u16),
                             _ => {
-                                log::warn!("Unknown usage: {:?}", value);
+                                log::debug!("Unknown usage: {:?}", value);
                                 HidUsage::Unknown(value as u16)
                             }
                         };
@@ -1326,7 +1326,7 @@ fn parse_generic_desktop_control(
                 // TODO
             }
             usage => {
-                log::warn!("Unsupported item {:?}", usage);
+                log::debug!("Unsupported item {:?}", usage);
             }
         };
     }
@@ -1361,7 +1361,7 @@ fn parse_digitizer(
                 context.change_surface = true;
             }
             usage => {
-                log::warn!("Unsupported item {:?}", usage);
+                log::debug!("Unsupported item {:?}", usage);
             }
         }
     }

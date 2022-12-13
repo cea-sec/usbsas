@@ -131,15 +131,19 @@ impl LoadMetadataState {
                 tar::EntryType::Regular => FileType::Regular,
                 _ => continue,
             };
-            metadata.insert(
-                path_name.trim_start_matches(&data_dir).to_owned(),
-                Attrs {
-                    ftype,
-                    size: entry.header().size()?,
-                    timestamp: i64::try_from(entry.header().mtime()?)?,
-                    offset: entry.raw_file_position(),
-                },
-            );
+            if let Some(name) = path_name.strip_prefix(&data_dir) {
+                metadata.insert(
+                    name.to_owned(),
+                    Attrs {
+                        ftype,
+                        size: entry.header().size()?,
+                        timestamp: i64::try_from(entry.header().mtime()?)?,
+                        offset: entry.raw_file_position(),
+                    },
+                );
+            } else {
+                log::debug!("file '{}' not in '{}' dir, ignoring", path_name, data_dir);
+            }
         }
 
         Ok(State::MainLoop(MainLoopState {
@@ -230,7 +234,8 @@ impl MainLoopState {
             .filter(|(entry, _)| {
                 entry.starts_with(path)
                     && !entry
-                        .trim_start_matches(path)
+                        .strip_prefix(path)
+                        .unwrap()
                         .trim_start_matches('/')
                         .contains('/')
                     && entry != &path
