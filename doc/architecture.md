@@ -115,7 +115,7 @@ files2tar writes files in a tar archive. It can be started in two modes
 depending on the transfer destination. If data is copied to another USB device,
 files will be stored directly in the tar for analysis. If data is uploaded to a
 remote server, files will be stored in the tar under a "/data/" directory and a
-"/infos.json" file containing information about the input device, hostname etc.
+"/config.json" file containing information about the input device, hostname etc.
 will be added.
 
 Requests: `NewFile`, `WriteFile`, `EndFile`, `Close`

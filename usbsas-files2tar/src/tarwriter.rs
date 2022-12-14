@@ -95,7 +95,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
         header.set_size(infos.as_bytes().len() as u64);
         header.set_entry_type(tar::EntryType::Regular);
         header.set_mode(0o644);
-        header.set_path("infos.json")?;
+        header.set_path("config.json")?;
         header.set_mtime(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)?
