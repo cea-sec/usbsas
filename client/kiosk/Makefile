@@ -1,5 +1,5 @@
 VER := $(shell grep 'Version' usbsas-kiosk/DEBIAN/control | cut -d' ' -f2)
-NWJS_VER=0.69.1
+NWJS_VER=0.71.0
 
 PKG=../../target/debian/usbsas-kiosk_$(VER)_amd64.deb
 
