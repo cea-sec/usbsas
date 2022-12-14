@@ -146,6 +146,12 @@ class CommUsbsas(Comm):
         self.send_req(req)
         return self.recv_resp()
 
+    def copy_files_net(self, selected, url):
+        req = proto_usbsas.RequestCopyStart(selected=selected)
+        req.net.url = url
+        self.send_req(req)
+        return self.recv_resp()
+
     def wipe(self, busnum, devnum, fstype, quick):
         self.send_req(proto_usbsas.RequestWipe(
             busnum=busnum, devnum=devnum, fstype=fstype, quick=quick
