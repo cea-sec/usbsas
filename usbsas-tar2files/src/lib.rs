@@ -123,7 +123,7 @@ impl LoadMetadataState {
         for entry in archive.entries()? {
             let entry = entry?;
             let path_name = entry.path()?.to_path_buf().to_string_lossy().to_string();
-            if path_name == "infos.json" {
+            if path_name == "config.json" {
                 continue;
             }
             let ftype = match entry.header().entry_type() {
