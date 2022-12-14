@@ -1085,12 +1085,18 @@ impl ResponseStream {
         self.done()
     }
 
-    fn done(&mut self) -> Result<(), ServiceError> {
+    pub fn done(&mut self) -> Result<(), ServiceError> {
         self.done.store(true, Ordering::Relaxed);
         if let Some(waker) = self.waker.lock()?.take() {
             waker.wake();
         }
         Ok(())
+    }
+}
+
+impl Drop for ResponseStream {
+    fn drop(&mut self) {
+        self.done().ok();
     }
 }
 

@@ -74,14 +74,14 @@ def wait_2_devices(comm):
             return rep.devices
         time.sleep(1)
 
-def open_dev_and_part(comm, device):
+def open_dev_and_part(comm, device, index=0):
     print("Opening first partition of first device")
     rep = comm.open_device(device.busnum, device.devnum)
     ok_or_exit(comm, rep, "error opening device")
     rep = comm.partitions()
     ok_or_exit(comm, rep, "error reading partitions")
     print("Opening part")
-    rep = comm.open_partition(index=0)
+    rep = comm.open_partition(index)
     ok_or_exit(comm, rep, "error opening first partition")
 
 def list_files(comm):
@@ -90,8 +90,21 @@ def list_files(comm):
     ok_or_exit(comm, rep, "error listing files")
     return [f.path for f in rep.filesinfo]
 
-def copy(comm, files, device):
+def copy_usb(comm, files, device):
     rep = comm.copy_files_usb(selected=files, busnum=device.busnum, devnum=device.devnum)
+    ok_or_exit(comm, rep, "error starting copy")
+    print("Starting copy")
+    while True:
+        rep = comm.recv_resp()
+        ok_or_exit(comm, rep, "error during copy")
+        if isinstance(rep, proto_usbsas.ResponseCopyDone):
+            print("Transfer done, report:")
+            print(rep)
+            return
+        print(rep)
+
+def copy_net(comm, files, url):
+    rep = comm.copy_files_net(selected=files, url=url)
     ok_or_exit(comm, rep, "error starting copy")
     print("Starting copy")
     while True:
@@ -135,7 +148,7 @@ def main():
     files = list_files(comm)
     comm.id()
     if confirm_copy(devices):
-        copy(comm, files, devices[1])
+        copy_usb(comm, files, devices[1])
     end(comm)
     sys.exit(0)
 
