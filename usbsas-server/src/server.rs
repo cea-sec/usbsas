@@ -2,7 +2,7 @@ use crate::appstate::{AppState, CopyIn, DeviceDesc, ReadDirQuery, ResponseStream
 use crate::error::ServiceError;
 use crate::srv_infos::get_server_infos;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use log::info;
+use log::{debug, error, info};
 use std::{
     collections::HashMap,
     io::{self, ErrorKind},
@@ -90,11 +90,18 @@ async fn copy(
     let resp_stream = ResponseStream::new();
     let resp_stream_clone = resp_stream.clone();
     thread::spawn(move || {
-        let _ = data.copy(
+        match data.copy(
             files.selected.to_owned(),
             files.fsfmt.to_owned(),
             resp_stream_clone,
-        );
+        ) {
+            Ok(_) => {
+                debug!("Copy succeeded");
+            }
+            Err(_) => {
+                error!("Copy failed");
+            }
+        };
     });
     Ok(HttpResponse::Ok().streaming(resp_stream))
 }
