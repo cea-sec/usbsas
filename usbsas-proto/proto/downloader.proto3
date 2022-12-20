@@ -5,6 +5,7 @@ package downloader;
 
 message RequestDownload {
   string id = 1;
+  bool decompress = 2;
 };
 
 message RequestEnd {

@@ -918,6 +918,7 @@ impl DownloadTarState {
             msg: Some(proto::downloader::request::Msg::Download(
                 proto::downloader::RequestDownload {
                     id: remote_path.to_string(),
+                    decompress: true,
                 },
             )),
         })?;

@@ -191,7 +191,10 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     log::info!("Downloading bundle");
     downloader.comm.send(proto::downloader::Request {
         msg: Some(proto::downloader::request::Msg::Download(
-            proto::downloader::RequestDownload { id: id.to_string() },
+            proto::downloader::RequestDownload {
+                id: id.to_string(),
+                decompress: false,
+            },
         )),
     })?;
 

@@ -7,6 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 base64 = { version = "0.20", optional = true }
 env_logger = "0.10"
+flate2 = "1.0"
 libgssapi = { version = "0.6", optional = true }
 log = "0.4"
 reqwest = { version = "0.11", features = ["blocking", "json"] }

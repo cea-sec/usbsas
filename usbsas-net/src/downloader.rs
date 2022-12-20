@@ -1,4 +1,5 @@
 use crate::{Error, HttpClient, Result};
+use flate2::read::GzDecoder;
 use log::{error, trace};
 use std::{
     fs::File,
@@ -104,7 +105,7 @@ impl RunningState {
         let req: proto::downloader::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::Download(req) => {
-                if let Err(err) = self.download(comm, &req.id) {
+                if let Err(err) = self.download(comm, &req.id, req.decompress) {
                     error!("download error: {}", err);
                     comm.error(proto::downloader::ResponseError {
                         err: format!("{}", err),
@@ -119,7 +120,12 @@ impl RunningState {
         }
     }
 
-    fn download(mut self, comm: &mut Comm<proto::downloader::Request>, id: &str) -> Result<()> {
+    fn download(
+        mut self,
+        comm: &mut Comm<proto::downloader::Request>,
+        id: &str,
+        decompress: bool,
+    ) -> Result<()> {
         trace!("download");
         self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
 
@@ -150,9 +156,18 @@ impl RunningState {
             offset: 0,
         };
 
-        resp.copy_to(&mut filewriterprogress)?;
+        let actual_filesize = match decompress {
+            true => {
+                let mut gz_decoder = GzDecoder::new(resp);
+                std::io::copy(&mut gz_decoder, &mut filewriterprogress)?
+            }
+            false => resp.copy_to(&mut filewriterprogress)?,
+        };
 
-        comm.download(proto::downloader::ResponseDownload { filesize })?;
+        comm.download(proto::downloader::ResponseDownload {
+            filesize: actual_filesize,
+        })?;
+
         Ok(())
     }
 }
