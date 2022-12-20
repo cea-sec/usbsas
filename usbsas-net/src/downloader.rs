@@ -1,5 +1,4 @@
 use crate::{Error, HttpClient, Result};
-use flate2::read::GzDecoder;
 use log::{error, trace};
 use std::{
     fs::File,
@@ -17,6 +16,7 @@ protoresponse!(
     downloader,
     download = Download[ResponseDownload],
     downloadstatus = DownloadStatus[ResponseDownloadStatus],
+    archiveinfos = ArchiveInfos[ResponseArchiveInfos],
     end = End[ResponseEnd],
     error = Error[ResponseError]
 );
@@ -101,45 +101,64 @@ impl InitState {
 }
 
 impl RunningState {
-    fn run(self, comm: &mut Comm<proto::downloader::Request>) -> Result<State> {
-        let req: proto::downloader::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
-            Msg::Download(req) => {
-                if let Err(err) = self.download(comm, &req.id, req.decompress) {
-                    error!("download error: {}", err);
-                    comm.error(proto::downloader::ResponseError {
-                        err: format!("{}", err),
-                    })?;
-                };
-                Ok(State::WaitEnd(WaitEndState {}))
-            }
-            Msg::End(_) => {
-                comm.end(proto::downloader::ResponseEnd {})?;
-                Ok(State::End)
+    fn run(mut self, comm: &mut Comm<proto::downloader::Request>) -> Result<State> {
+        let mut filesize = None;
+        loop {
+            let req: proto::downloader::Request = comm.recv()?;
+            match req.msg.ok_or(Error::BadRequest)? {
+                Msg::ArchiveInfos(req) => {
+                    match self.archive_infos(comm, &req.id) {
+                        Ok(size) => filesize = Some(size),
+                        Err(err) => {
+                            error!("download error: {}", err);
+                            comm.error(proto::downloader::ResponseError {
+                                err: format!("{}", err),
+                            })?;
+                        }
+                    };
+                }
+                Msg::Download(_) => {
+                    if let Some(size) = filesize {
+                        if let Err(err) = self.download(comm, size) {
+                            error!("download error: {}", err);
+                            comm.error(proto::downloader::ResponseError {
+                                err: format!("{}", err),
+                            })?;
+                        };
+                        return Ok(State::WaitEnd(WaitEndState {}));
+                    } else {
+                        comm.error(proto::downloader::ResponseError {
+                            err: "can't download before knowing the size".to_owned(),
+                        })?;
+                    }
+                }
+                Msg::End(_) => {
+                    comm.end(proto::downloader::ResponseEnd {})?;
+                    return Ok(State::End);
+                }
             }
         }
     }
 
-    fn download(
-        mut self,
+    fn archive_infos(
+        &mut self,
         comm: &mut Comm<proto::downloader::Request>,
         id: &str,
-        decompress: bool,
-    ) -> Result<()> {
-        trace!("download");
+    ) -> Result<u64> {
+        trace!("req size");
         self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
 
-        let comm_progress = comm.try_clone()?;
-
-        let mut resp = self.http_client.get(&self.url)?;
+        let resp = self.http_client.head(&self.url)?;
         if !resp.status().is_success() {
-            return Err(Error::Upload(format!(
+            return Err(Error::Error(format!(
                 "Unknown status code {:?}",
                 resp.status()
             )));
         }
 
-        let filesize = resp
+        // Even if the archive is gzipped, we're expecting its uncompressed size
+        // here
+        let size = resp
             .headers()
             .get("Content-Length")
             .ok_or(Error::BadResponse)?
@@ -147,7 +166,28 @@ impl RunningState {
             .map_err(|_| Error::BadResponse)?
             .parse::<u64>()
             .map_err(|_| Error::BadResponse)?;
-        trace!("file size : {}", filesize);
+
+        trace!("files size: {}", size);
+
+        comm.archiveinfos(proto::downloader::ResponseArchiveInfos { size })?;
+
+        Ok(size)
+    }
+
+    fn download(
+        mut self,
+        comm: &mut Comm<proto::downloader::Request>,
+        filesize: u64,
+    ) -> Result<()> {
+        trace!("download");
+        let comm_progress = comm.try_clone()?;
+        let mut resp = self.http_client.get(&self.url)?;
+        if !resp.status().is_success() {
+            return Err(Error::Error(format!(
+                "Unknown status code {:?}",
+                resp.status()
+            )));
+        }
 
         let mut filewriterprogress = FileWriterProgress {
             comm: comm_progress,
@@ -156,18 +196,8 @@ impl RunningState {
             offset: 0,
         };
 
-        let actual_filesize = match decompress {
-            true => {
-                let mut gz_decoder = GzDecoder::new(resp);
-                std::io::copy(&mut gz_decoder, &mut filewriterprogress)?
-            }
-            false => resp.copy_to(&mut filewriterprogress)?,
-        };
-
-        comm.download(proto::downloader::ResponseDownload {
-            filesize: actual_filesize,
-        })?;
-
+        resp.copy_to(&mut filewriterprogress)?;
+        comm.download(proto::downloader::ResponseDownload {})?;
         Ok(())
     }
 }

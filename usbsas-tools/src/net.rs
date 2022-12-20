@@ -42,6 +42,7 @@ protorequest!(
     CommDownloader,
     downloader,
     download = Download[RequestDownload, ResponseDownload],
+    archiveinfos = ArchiveInfos[RequestArchiveInfos, ResponseArchiveInfos],
     end = End[RequestEnd, ResponseEnd]
 );
 
@@ -188,13 +189,15 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         .arg(config_path)
         .spawn::<usbsas_net::Downloader, proto::downloader::Request>()?;
 
+    let _ = downloader
+        .comm
+        .archiveinfos(proto::downloader::RequestArchiveInfos { id: id.to_string() })?
+        .size;
+
     log::info!("Downloading bundle");
     downloader.comm.send(proto::downloader::Request {
         msg: Some(proto::downloader::request::Msg::Download(
-            proto::downloader::RequestDownload {
-                id: id.to_string(),
-                decompress: false,
-            },
+            proto::downloader::RequestDownload { id: id.to_string() },
         )),
     })?;
 
@@ -205,8 +208,8 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
                 log::debug!("status: {}/{}", status.current_size, status.total_size);
                 continue;
             }
-            Msg::Download(msg) => {
-                log::debug!("Download complete (size: {})", msg.filesize);
+            Msg::Download(_) => {
+                log::debug!("Download complete");
                 break;
             }
             Msg::Error(err) => {

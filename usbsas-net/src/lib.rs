@@ -47,9 +47,9 @@ enum Error {
     Error(String),
     #[error("Bad Request")]
     BadRequest,
-    #[error("Bad Response")]
-    BadResponse,
     #[error("Remote server error")]
+    BadResponse,
+    #[error("Bad Response")]
     Remote,
     #[error("State error")]
     State,
@@ -70,6 +70,7 @@ impl HttpClient {
     fn new(#[cfg(feature = "authkrb")] krb_service_name: Option<String>) -> Result<Self> {
         let client = Client::builder()
             .timeout(None)
+            .gzip(true)
             .connect_timeout(Duration::from_secs(30))
             .build()?;
         Ok(Self {
@@ -153,6 +154,17 @@ impl HttpClient {
         #[cfg(feature = "authkrb")]
         if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
             resp = self.req_with_krb_auth(Method::GET, url)?;
+        }
+        Ok(resp)
+    }
+
+    fn head(&mut self, url: &str) -> Result<Response> {
+        self.headers
+            .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
+        let mut resp = self.client.head(url).headers(self.headers.clone()).send()?;
+        #[cfg(feature = "authkrb")]
+        if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
+            resp = self.req_with_krb_auth(Method::HEAD, url)?;
         }
         Ok(resp)
     }

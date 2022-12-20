@@ -157,6 +157,7 @@ protorequest!(
     CommDownloader,
     downloader,
     download = Download[RequestDownload, ResponseDownload],
+    archiveinfos = ArchiveInfos[RequestArchiveInfos, ResponseArchiveInfos],
     end = End[RequestEnd, ResponseEnd]
 );
 
@@ -241,7 +242,10 @@ impl InitState {
                                     bundle_path: src.pin.to_string(),
                                 }))
                             }
-                            _ => Err(Error::BadRequest),
+                            _ => {
+                                log::error!("CopyStart req not export in init state");
+                                Err(Error::BadRequest)
+                            },
                         }
                     } else {
                         error!("empty id");
@@ -833,11 +837,18 @@ impl DownloadTarState {
         trace!("req download tar");
         info!("Usbsas export for user: {}", self.id);
 
-        let total_files_size = 0;
+        let remote_path = self.id.clone() + "/" + &self.bundle_path;
+
+        let total_files_size = children
+            .downloader
+            .comm
+            .archiveinfos(proto::downloader::RequestArchiveInfos {
+                id: remote_path.clone(),
+            })?
+            .size;
         comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
 
-        let remote_path = self.id.clone() + "/" + &self.bundle_path + ".tgz";
-        let tar_size = self.download_tar(comm, children, &remote_path)?;
+        self.download_tar(comm, children, &remote_path)?;
 
         // max_file_size is 4GB if we're writing a FAT fs, None otherwise
         let max_file_size: Option<u64> = match self.destination {
@@ -854,7 +865,7 @@ impl DownloadTarState {
                     .size;
                 // Check dest dev is large enough
                 // XXX try to be more precise about this
-                if tar_size > (dev_size * 98 / 100) {
+                if total_files_size > (dev_size * 98 / 100) {
                     comm.notenoughspace(proto::usbsas::ResponseNotEnoughSpace {
                         max_size: dev_size,
                     })?;
@@ -911,19 +922,17 @@ impl DownloadTarState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
         remote_path: &String,
-    ) -> Result<u64> {
+    ) -> Result<()> {
         use proto::downloader::response::Msg;
         trace!("download tar file");
         children.downloader.comm.send(proto::downloader::Request {
             msg: Some(proto::downloader::request::Msg::Download(
                 proto::downloader::RequestDownload {
                     id: remote_path.to_string(),
-                    decompress: true,
                 },
             )),
         })?;
 
-        let filesize;
         loop {
             let rep: proto::downloader::Response = children.downloader.comm.recv()?;
             match rep.msg.ok_or(Error::BadRequest)? {
@@ -931,8 +940,7 @@ impl DownloadTarState {
                     log::debug!("status: {}/{}", status.current_size, status.total_size);
                     continue;
                 }
-                Msg::Download(d) => {
-                    filesize = d.filesize;
+                Msg::Download(_) => {
                     break;
                 }
                 Msg::Error(err) => {
@@ -953,7 +961,7 @@ impl DownloadTarState {
 
         log::info!("Bundle successfully downloaded");
         comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
-        Ok(filesize)
+        Ok(())
     }
 
     /// Extract all files names / paths from tar bundle
@@ -1011,7 +1019,7 @@ impl DownloadTarState {
                 }
                 Some(FileType::Directory) => {
                     if !all_entries.contains(&entry) {
-                        if entry != "" {
+                        if !entry.is_empty() {
                             directories.push(String::from("/") + &entry);
                         }
                         all_entries.insert(entry.clone());
