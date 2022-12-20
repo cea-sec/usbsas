@@ -44,6 +44,8 @@ enum Error {
     Privileges(#[from] usbsas_privileges::Error),
     #[error("process error: {0}")]
     Process(#[from] usbsas_process::Error),
+    #[error("Not enough space on destination device")]
+    NotEnoughSpace,
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -511,6 +513,7 @@ impl CopyFilesState {
         let mut errors = vec![];
         let mut all_directories = vec![];
         let mut all_files = vec![];
+
         let total_files_size = self.selected_to_files_list(
             children,
             &mut errors,
@@ -522,7 +525,6 @@ impl CopyFilesState {
         let all_files_filtered = self.filter_files(children, all_files, &mut filtered)?;
         let all_directories_filtered =
             self.filter_files(children, all_directories, &mut filtered)?;
-
         let mut all_entries_filtered = vec![];
         all_entries_filtered.append(&mut all_directories_filtered.clone());
         all_entries_filtered.append(&mut all_files_filtered.clone());
@@ -536,40 +538,13 @@ impl CopyFilesState {
             warn!("Aborting copy, no files survived filter");
             return Ok(State::WaitEnd(WaitEndState {}));
         }
-
-        // max_file_size is 4GB if we're writing a FAT fs, None otherwise
-        let max_file_size = match self.destination {
-            Destination::Usb(ref usb) => {
-                // Unlock fs2dev to get dev_size
-                children.fs2dev.comm.write_all(
-                    &(((u64::from(usb.devnum)) << 32) | (u64::from(usb.busnum))).to_ne_bytes(),
-                )?;
-                children.fs2dev.locked = false;
-                let dev_size = children
-                    .fs2dev
-                    .comm
-                    .size(proto::fs2dev::RequestDevSize {})?
-                    .size;
-                // Check dest dev is large enough
-                // XXX try to be more precise about this
-                if total_files_size > (dev_size * 98 / 100) {
-                    comm.notenoughspace(proto::usbsas::ResponseNotEnoughSpace {
-                        max_size: dev_size,
-                    })?;
-                    error!("Aborting, dest dev too small");
-                    return Ok(State::WaitEnd(WaitEndState {}));
-                }
-                match OutFsType::from_i32(usb.fstype)
-                    .ok_or_else(|| Error::Error("bad fstype".into()))?
-                {
-                    OutFsType::Fat => Some(0xFFFF_FFFF),
-                    _ => None,
-                }
-            }
-            Destination::Net(_) | Destination::Cmd(_) => None,
+        let max_file_size = match children.check_dst_size(comm, &self.destination, total_files_size)
+        {
+            Ok(max_size) => max_size,
+            Err(Error::NotEnoughSpace) => return Ok(State::WaitEnd(WaitEndState {})),
+            Err(err) => return Err(err),
         };
 
-        // Unlock files2tar
         children.files2tar.comm.write_all(&[0_u8])?;
         children.files2tar.locked = false;
 
@@ -837,6 +812,9 @@ impl DownloadTarState {
         trace!("req download tar");
         info!("Usbsas export for user: {}", self.id);
 
+        let mut errors = vec![];
+        let mut all_directories = vec![];
+        let mut all_files = vec![];
         let remote_path = self.id.clone() + "/" + &self.bundle_path;
 
         let total_files_size = children
@@ -846,49 +824,19 @@ impl DownloadTarState {
                 id: remote_path.clone(),
             })?
             .size;
-        comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
-
-        self.download_tar(comm, children, &remote_path)?;
-
-        // max_file_size is 4GB if we're writing a FAT fs, None otherwise
-        let max_file_size: Option<u64> = match self.destination {
-            Destination::Usb(ref usb) => {
-                // Unlock fs2dev to get dev_size
-                children.fs2dev.comm.write_all(
-                    &(((u64::from(usb.devnum)) << 32) | (u64::from(usb.busnum))).to_ne_bytes(),
-                )?;
-                children.fs2dev.locked = false;
-                let dev_size = children
-                    .fs2dev
-                    .comm
-                    .size(proto::fs2dev::RequestDevSize {})?
-                    .size;
-                // Check dest dev is large enough
-                // XXX try to be more precise about this
-                if total_files_size > (dev_size * 98 / 100) {
-                    comm.notenoughspace(proto::usbsas::ResponseNotEnoughSpace {
-                        max_size: dev_size,
-                    })?;
-                    error!("Aborting, dest dev too small");
-                    return Ok(State::WaitEnd(WaitEndState {}));
-                }
-                match OutFsType::from_i32(usb.fstype)
-                    .ok_or_else(|| Error::Error("bad fstype".into()))?
-                {
-                    OutFsType::Fat => Some(0xFFFF_FFFF),
-                    _ => None,
-                }
-            }
-            Destination::Net(_) | Destination::Cmd(_) => None,
+        let max_file_size = match children.check_dst_size(comm, &self.destination, total_files_size)
+        {
+            Ok(max_size) => max_size,
+            Err(Error::NotEnoughSpace) => return Ok(State::WaitEnd(WaitEndState {})),
+            Err(err) => return Err(err),
         };
 
-        // Unlock files2tar
+        children.files2tar.comm.write_all(&[1_u8])?;
+        children.files2tar.locked = false;
+        comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
+        self.download_tar(comm, children, &remote_path)?;
         children.tar2files.comm.write_all(&[1_u8])?;
         children.tar2files.locked = false;
-
-        let mut errors = vec![];
-        let mut all_directories = vec![];
-        let mut all_files = vec![];
         self.tar_to_files_list(
             children,
             &mut errors,
@@ -908,12 +856,16 @@ impl DownloadTarState {
                 usb,
                 analyze: false,
             })),
-            Destination::Net(_) | Destination::Cmd(_) => Ok(State::UploadOrCmd(UploadOrCmdState {
-                errors,
-                filtered: Vec::new(),
-                id: self.id,
-                destination: self.destination,
-            })),
+            Destination::Net(_) | Destination::Cmd(_) => {
+                children.tar2files.comm.write_all(&[0_u8])?;
+                children.tar2files.locked = false;
+                Ok(State::UploadOrCmd(UploadOrCmdState {
+                    errors,
+                    filtered: Vec::new(),
+                    id: self.id,
+                    destination: self.destination,
+                }))
+            }
         }
     }
 
@@ -954,7 +906,7 @@ impl DownloadTarState {
             }
         }
 
-        log::info!("Bundle successfully downloaded");
+        log::debug!("Bundle successfully downloaded");
         comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
         Ok(())
     }
@@ -1671,6 +1623,48 @@ impl Children {
             }
         }
         Ok(())
+    }
+
+    // If destination is USB, check that device will have enough space to stores
+    // src files.
+    // Returns max size of a single file (4GB if dest is FAT, None otherwise)
+    fn check_dst_size(
+        &mut self,
+        comm: &mut Comm<proto::usbsas::Request>,
+        destination: &Destination,
+        total_files_size: u64,
+    ) -> Result<Option<u64>> {
+        // max_file_size is 4GB if we're writing a FAT fs, None otherwise
+        match destination {
+            Destination::Usb(ref usb) => {
+                // Unlock fs2dev to get dev_size
+                self.fs2dev.comm.write_all(
+                    &(((u64::from(usb.devnum)) << 32) | (u64::from(usb.busnum))).to_ne_bytes(),
+                )?;
+                self.fs2dev.locked = false;
+                let dev_size = self
+                    .fs2dev
+                    .comm
+                    .size(proto::fs2dev::RequestDevSize {})?
+                    .size;
+                // Check dest dev is large enough
+                // XXX try to be more precise about this
+                if total_files_size > (dev_size * 98 / 100) {
+                    comm.notenoughspace(proto::usbsas::ResponseNotEnoughSpace {
+                        max_size: dev_size,
+                    })?;
+                    error!("Aborting, dest dev too small");
+                    return Err(Error::NotEnoughSpace);
+                }
+                match OutFsType::from_i32(usb.fstype)
+                    .ok_or_else(|| Error::Error("bad fstype".into()))?
+                {
+                    OutFsType::Fat => Ok(Some(0xFFFF_FFFF)),
+                    _ => Ok(None),
+                }
+            }
+            Destination::Net(_) | Destination::Cmd(_) => Ok(None),
+        }
     }
 
     fn end_all(&mut self) -> Result<()> {
