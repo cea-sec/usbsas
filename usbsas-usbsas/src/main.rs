@@ -954,11 +954,6 @@ impl DownloadTarState {
             }
         }
 
-        children
-            .downloader
-            .comm
-            .end(proto::downloader::RequestEnd {})?;
-
         log::info!("Bundle successfully downloaded");
         comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
         Ok(())
@@ -1035,6 +1030,8 @@ impl DownloadTarState {
                 _ => errors.push(entry),
             }
         }
+        files.sort();
+        directories.sort();
         Ok(total_size)
     }
 }
