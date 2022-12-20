@@ -1,0 +1,46 @@
+syntax = "proto3";
+package downloader;
+
+/* Requests */
+
+message RequestDownload {
+  string id = 1;
+};
+
+message RequestEnd {
+};
+
+message Request {
+  oneof msg {
+    RequestDownload Download = 1;
+    RequestEnd End = 2;
+  }
+};
+
+
+/* Response */
+
+message ResponseDownloadStatus {
+  uint64 current_size = 1;
+  uint64 total_size = 2;
+}
+
+message ResponseDownload {
+  uint64 filesize = 1;
+}
+
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseDownload Download = 1;
+    ResponseDownloadStatus DownloadStatus = 2;
+    ResponseEnd End = 3;
+    ResponseError Error = 4;
+  }
+};

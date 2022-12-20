@@ -1,9 +1,11 @@
-//! usbsas's uploader and analyzer processes.
+//! usbsas's uploader, downloader and analyzer processes.
 
 pub mod analyzer;
+pub mod downloader;
 pub mod uploader;
 
 pub use analyzer::Analyzer;
+pub use downloader::Downloader;
 pub use uploader::Uploader;
 
 #[cfg(feature = "authkrb")]
@@ -45,6 +47,8 @@ enum Error {
     Error(String),
     #[error("Bad Request")]
     BadRequest,
+    #[error("Bad Response")]
+    BadResponse,
     #[error("Remote server error")]
     Remote,
     #[error("State error")]

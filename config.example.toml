@@ -35,6 +35,18 @@ out_directory = "/tmp/"
 # krb_service_name = "HTTP@your.domain"
 
 
+# Source "network". (Optional)
+# Download a bundle from a remote network, to write it to an USB device.
+# description, longdescr and url are mandatory, krb_service_name is optional.
+# If krb_service_name is specified, mutual HTTP authentication with Kerberos
+# will be performed with the remote server prior to downupload.
+#[source_network]
+#description = "Source Network XXX"
+#longdescr = "Export files from network XXX"
+#url = "http://127.0.0.1:8042/api/downloadbundle"
+#krb_service_name = "HTTP@your.domain"
+
+
 # Destination "command". (Optional)
 # Execute a command.
 # "%SOURCE_FILE%" in command_args will be replaced with the filename of the
