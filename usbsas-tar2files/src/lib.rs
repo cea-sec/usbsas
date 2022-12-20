@@ -133,7 +133,7 @@ impl LoadMetadataState {
             };
             if let Some(name) = path_name.strip_prefix(&data_dir) {
                 metadata.insert(
-                    name.to_owned(),
+                    name.trim_end_matches('/').to_owned(),
                     Attrs {
                         ftype,
                         size: entry.header().size()?,
@@ -186,7 +186,7 @@ impl MainLoopState {
     }
 
     fn get_entry(&self, path: &str) -> Result<&Attrs> {
-        let path = path.trim_start_matches('/');
+        let path = path.trim_start_matches('/').trim_end_matches('/');
         self.metadata
             .get(path)
             .ok_or_else(|| Error::Error(format!("didn't find {} in metadata", path)))
