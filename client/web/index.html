@@ -279,6 +279,28 @@
           </details>
         </div>
 
+        <div id="pinpad" class="d-none pinpad">
+          <div>
+            <h5 data-langkey="export-details" style="text-justify: center;"></h5>
+            <div id="pin-dial">
+              <h5 data-langkey="pin-prompt" style="text-justify: center;"></h5>
+              <input type="password" id="pin-display" /></br>
+              <button class="pin-button" onclick="add_pin_char('1');">1</button>
+              <button class="pin-button" onclick="add_pin_char('2');">2</button>
+              <button class="pin-button" onclick="add_pin_char('3');">3</button>
+              <button class="pin-button" onclick="add_pin_char('4');">4</button>
+              <button class="pin-button" onclick="add_pin_char('5');">5</button>
+              <button class="pin-button" onclick="add_pin_char('6');">6</button>
+              <button class="pin-button" onclick="add_pin_char('7');">7</button>
+              <button class="pin-button" onclick="add_pin_char('8');">8</button>
+              <button class="pin-button" onclick="add_pin_char('9');">9</button>
+              <button class="pin-button pin-clear" onclick="clear_pin();" data-langkey="pin-clear"></button>
+              <button class="pin-button" onclick="add_pin_char('0');">0</button>
+              <button class="pin-button pin-enter" onclick="end_get_pin();" data-langkey="pin-ok"></button>
+            </div>
+          </div>
+        </div>
+
         <div class="d-flex flex-row-reverse button-bar">
           <button
             id="launch-button"

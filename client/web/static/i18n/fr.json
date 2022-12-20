@@ -80,5 +80,10 @@
     "usb-dest-descr": "Insérez un périphérique USB (qui sera effacé)",
     "usb-dev": "Périphérique USB",
     "warn-empty-select": "Veuillez sélectionner le périphérique source et la destination",
-    "warn4gb": "(les fichiers de plus de 4GB ne sont pas supportés)"
+    "warn4gb": "(les fichiers de plus de 4GB ne sont pas supportés)",
+    "export-details": "Export vers un périphérique USB",
+    "pin-prompt": "Veuillez entrer le code PIN de l'export",
+    "pin-ok": "Valider",
+    "pin-clear": "Effacer",
+    "pin-missing": "PIN manquant"
 }

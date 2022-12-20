@@ -94,6 +94,10 @@ body[data-state="WAIT_SOURCE"] #doc-button {
   display: flex !important;
 }
 
+body[data-state="WAIT_PIN"] #pinpad {
+  display: flex !important;
+}
+
 body[data-state="TOOLS"] #tools {
   display: block !important;
 }
@@ -495,4 +499,86 @@ tr.infos {
 
 table.td {
   padding: 0px;
+}
+
+#pin-dial {
+  width: 700px;
+  height: 750px;
+  margin: 50px auto;
+  background: #fff;
+  padding: 35px 25px;
+  text-align: center;
+  box-shadow: 0px 5px 5px -0px rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+}
+
+#pin-display {
+  padding: 0 40px;
+  border-radius: 5px;
+  width: 95%;
+  margin: auto;
+  border: 1px solid rgb(228, 220, 220);
+  outline: none;
+  font-size: 60px;
+  color: transparent;
+  text-shadow: 0 0 0 rgb(71, 71, 71);
+  text-align: center;
+}
+
+.pin-button {
+  border: none;
+  background: none;
+  font-size: 3.5em;
+  border-radius: 50%;
+  height: 19%;
+  font-weight: 550;
+  width: 20%;
+  color: transparent;
+  text-shadow: 0 0 0 rgb(102, 101, 101);
+  margin: 7px 20px;
+}
+
+.pin-button:focus {
+  outline: none;
+}
+
+.pin-clear {
+  font-size: 2em !important;
+}
+
+.pin-enter {
+  font-size: 2em !important;
+}
+
+.pin-button:hover {
+  box-shadow: #506ce8 0 0 3px 3px;
+}
+
+.pin-button:active {
+  background: #506ce8;
+  color: #fff;
+}
+
+.pin-clear:hover {
+  box-shadow: #ff3c41 0 0 3px 3px;
+}
+
+.pin-clear:active {
+  background: #ff3c41;
+  color: #fff;
+
+}
+
+.pin-enter:hover {
+  box-shadow: #47cf73 0 0 3px 3px;
+}
+
+.pin-enter:active {
+  background: #47cf73;
+  color: #fff;
+}
+
+.pinpad {
+	display: flex;
+	justify-content: center;
 }

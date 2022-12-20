@@ -7,6 +7,7 @@
 //   - WAIT_ID
 //   - SELECT_PARTITION
 //   - SELECT_FILES
+//   - WAIT_PIN
 //   - COPY
 //   - END
 //   - WAIT_REMOVAL
@@ -898,6 +899,10 @@ function do_copy() {
   var fsfmt = document.querySelector("#fsfmt");
   var post_body = selected.toJSON();
   post_body.fsfmt = fsfmt.options[fsfmt.selectedIndex].value;
+  var pin_input = document.querySelector("#pin-display").getAttribute("value");
+  if (pin_input != "") {
+    post_body.download_pin = pin_input;
+  }
 
   fetch("/copy", {
     method: "POST",
@@ -942,6 +947,31 @@ function select_partition(partition) {
     throw_error(langDocument["errgetdev"]);
   };
   request.send();
+}
+
+function add_pin_char(i) {
+  var old_pin = document.querySelector("#pin-display").getAttribute("value");
+  document.querySelector("#pin-display").setAttribute("value", old_pin + i);
+}
+
+function clear_pin() {
+  document.querySelector("#pin-display").setAttribute("value", "");
+}
+
+function get_pin() {
+  clear_pin();
+  document.querySelector("#cancel-button").classList.remove("d-none");
+  if (devices.device_out.dev_type == "Usb") {
+    document.querySelector("#copy-options").classList.remove('d-none');
+  }
+}
+
+function end_get_pin() {
+  if (document.querySelector("#pin-display").getAttribute("value") == "") {
+    throw_error(langDocument["pin-missing"]);
+  } else {
+    do_id_and_copy();
+  }
 }
 
 function partition_choice() {
@@ -1020,7 +1050,7 @@ function render_device_choice() {
       a.classList.add("list-group-item-action");
       a.href = "#";
       if (type == "in" && device.is_src) {
-        if (state == "WAIT_SOURCE") {
+        if (state == "WAIT_SOURCE" && device.dev_type == "Usb") {
           set_state("WAIT_DESTINATION");
           updateElementLang(document.querySelector("#usb-arrow p"), "insert-dest");
           document.querySelector("#usb-arrow img").src = "static/img/device_out.svg";
@@ -1032,6 +1062,10 @@ function render_device_choice() {
             devices.device_in = undefined;
           } else {
             devices.device_in = device;
+            if (devices.device_out != undefined && devices.device_out.dev_type == "Net"
+              && device.dev_type == "Net") {
+                devices.device_out = undefined;
+            }
             if (Devices.compare(devices.device_out, device)) {
               devices.device_out = undefined;
             }
@@ -1046,6 +1080,10 @@ function render_device_choice() {
             devices.device_out = undefined;
           } else {
             devices.device_out = device;
+            if (devices.device_in != undefined && devices.device_in.dev_type == "Net"
+              && device.dev_type == "Net") {
+                devices.device_in = undefined;
+            }
             if (Devices.compare(devices.device_in, device)) {
               devices.device_in = undefined;
             }
@@ -1074,7 +1112,7 @@ function render_device_choice() {
 
       a.appendChild(h4);
       a.appendChild(p);
-      if (type == "in" && device.dev_type == "Usb") {
+      if (type == "in") {
         document.querySelector("#device-in").appendChild(a);
         if (Devices.compare(device, devices.device_in)) {
           a.classList.add("active");
@@ -1113,8 +1151,14 @@ function check_render_device_choice() {
     document.querySelector("#destination-descr").innerText = destination_descr;
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
-        set_state("SELECT_PARTITION");
-        partition_choice();
+	if (devices.device_in.dev_type == "Net") {
+		set_state("WAIT_PIN");
+		get_pin();
+	}
+	else {
+	        set_state("SELECT_PARTITION");
+	        partition_choice();
+	}
       } else {
         devices.device_in = undefined;
         devices.device_out = undefined;
