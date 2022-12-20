@@ -21,6 +21,7 @@ struct IntegrationTester {
     client: Client,
     mock_input_dev: String,
     mock_output_dev: String,
+    working_dir: String,
     usbsas_server: Child,
     analyzer_server: Child,
 }
@@ -32,6 +33,14 @@ impl IntegrationTester {
             .to_string()
             + "/test_data/";
 
+        let working_dir = String::from("/tmp/usbsas-tests");
+
+        if let Err(err) = fs::create_dir(&working_dir) {
+            if !(err.kind() == io::ErrorKind::AlreadyExists) {
+                panic!("couldn't create working dir: {}", err)
+            }
+        }
+
         // Untar mock input dev if none was supplied
         let mock_input_dev = match env::var("USBSAS_MOCK_INPUT_DEV") {
             Ok(input) => {
@@ -39,8 +48,8 @@ impl IntegrationTester {
                 input
             }
             Err(_) => {
-                let input = "/tmp/mock_input_dev.img";
-                let input_file = std::fs::File::create(input).unwrap();
+                let input = format!("{}/mock_input_dev.img", working_dir);
+                let input_file = std::fs::File::create(&input).unwrap();
                 Command::new("gzip")
                     .arg("-dc")
                     .arg(format!("{}/mock_input_dev.img.gz", test_data_dir))
@@ -48,7 +57,7 @@ impl IntegrationTester {
                     .stderr(Stdio::null())
                     .status()
                     .expect("Couldn't uncompress mock input dev");
-                env::set_var("USBSAS_MOCK_IN_DEV", input);
+                env::set_var("USBSAS_MOCK_IN_DEV", &input);
                 String::from(input)
             }
         };
@@ -60,10 +69,10 @@ impl IntegrationTester {
                 output
             }
             Err(_) => {
-                let output = "/tmp/mock_output_dev.img";
+                let output = format!("{}/mock_output_dev.img", working_dir);
                 Command::new("dd")
                     .arg("if=/dev/zero")
-                    .arg("of=".to_string() + output)
+                    .arg(format!("of={}", &output))
                     .arg("bs=1M")
                     .arg("iflag=fullblock")
                     .arg("count=128")
@@ -71,7 +80,7 @@ impl IntegrationTester {
                     .stderr(Stdio::null())
                     .status()
                     .expect("Couldn't create mock output dev");
-                env::set_var("USBSAS_MOCK_OUT_DEV", output);
+                env::set_var("USBSAS_MOCK_OUT_DEV", &output);
                 String::from(output)
             }
         };
@@ -86,6 +95,7 @@ impl IntegrationTester {
         // Start analyzer server
         let analyzer_server = Command::cargo_bin("usbsas-analyzer-server")
             .expect("Couldn't run analyzer server")
+            .args(&["-d", &working_dir])
             .spawn()
             .expect("Couldn't run analyzer server");
 
@@ -110,6 +120,7 @@ impl IntegrationTester {
             client: client,
             mock_input_dev,
             mock_output_dev,
+            working_dir,
             usbsas_server,
             analyzer_server,
         }
@@ -444,9 +455,9 @@ impl Drop for IntegrationTester {
             Err(e) => println!("Couldn't kill analyzer server: {}", e),
             Ok(_) => (),
         }
-        // Remove mock {in,out}put dev
-        let _ = fs::remove_file(&self.mock_input_dev).ok();
-        let _ = fs::remove_file(&self.mock_output_dev).ok();
+        sleep(Duration::from_secs(1));
+        // Remove working dir
+        let _ = fs::remove_dir_all(&self.working_dir).ok();
     }
 }
 

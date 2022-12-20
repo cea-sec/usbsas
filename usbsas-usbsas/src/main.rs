@@ -245,7 +245,7 @@ impl InitState {
                             _ => {
                                 log::error!("CopyStart req not export in init state");
                                 Err(Error::BadRequest)
-                            },
+                            }
                         }
                     } else {
                         error!("empty id");

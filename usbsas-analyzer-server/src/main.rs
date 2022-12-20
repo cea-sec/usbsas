@@ -7,13 +7,14 @@ use clamav_rs::{
     db, engine,
     scan_settings::{ScanSettings, ScanSettingsBuilder},
 };
+use clap::{Arg, Command};
 use futures::StreamExt;
 use serde_json::json;
 use std::{
     collections::HashMap,
     fs,
     io::{self, Read, Seek, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Mutex,
     thread,
 };
@@ -26,7 +27,7 @@ struct AnalyzeStatus {
 }
 
 struct AppState {
-    working_dir: Mutex<TempDir>,
+    working_dir: Mutex<String>,
     current_scans: Mutex<HashMap<String, AnalyzeStatus>>,
     clamav_engine: Mutex<engine::Engine>,
     clamav_settings: Mutex<ScanSettings>,
@@ -36,7 +37,7 @@ impl AppState {
     fn analyze(&self, bundle_id: String, tar: String) -> Result<(), actix_web::Error> {
         let tmpdir = tempfile::Builder::new()
             .prefix(&bundle_id)
-            .tempdir_in(self.working_dir.lock().unwrap().path())
+            .tempdir_in(PathBuf::from(&*self.working_dir.lock().unwrap()))
             .unwrap();
         let mut archive = Archive::new(fs::File::open(&tar).unwrap());
         // XXX TODO maybe mmap archive file and use clamav's scan_map function instead of unpacking
@@ -131,11 +132,7 @@ impl AppState {
         mut body: web::Payload,
     ) -> Result<(String, String), actix_web::Error> {
         let bundle_id = uuid::Uuid::new_v4().simple().to_string();
-        let out_file_name = format!(
-            "{}/{}.tar",
-            self.working_dir.lock().unwrap().path().to_string_lossy(),
-            bundle_id
-        );
+        let out_file_name = format!("{}/{}.tar", self.working_dir.lock().unwrap(), bundle_id);
         let mut out_file = fs::File::create(out_file_name.clone()).unwrap();
 
         while let Some(bytes) = body.next().await {
@@ -188,13 +185,11 @@ async fn scan_result(
             || current_scans[&bundle_id].status == "error"
         {
             let entry = current_scans.remove(&bundle_id).unwrap();
-            fs::remove_file(
-                data.working_dir
-                    .lock()
-                    .unwrap()
-                    .path()
-                    .join(format!("{}.tar", bundle_id)),
-            )
+            fs::remove_file(&format!(
+                "{}/{}.tar",
+                data.working_dir.lock().unwrap(),
+                bundle_id
+            ))
             .unwrap();
             json!({
                 "id": bundle_id,
@@ -244,7 +239,7 @@ async fn head_bundle_size(
     let (id, bundle_id) = params.into_inner();
     let (bundle_path, mut size) = find_bundle(&format!(
         "{}/{}/{}",
-        data.working_dir.lock().unwrap().path().to_string_lossy(),
+        data.working_dir.lock().unwrap(),
         id,
         bundle_id
     ))?;
@@ -283,7 +278,7 @@ async fn download_bundle(
     let (id, bundle_id) = params.into_inner();
     let (bundle_path, _) = find_bundle(&format!(
         "{}/{}/{}",
-        data.working_dir.lock().unwrap().path().to_string_lossy(),
+        data.working_dir.lock().unwrap(),
         id,
         bundle_id
     ))?;
@@ -300,8 +295,8 @@ fn init_clamav() -> (engine::Engine, ScanSettings) {
     let settings = ScanSettingsBuilder::new().build();
     let engine = engine::Engine::new();
     engine
-    .load_databases(&db::default_directory())
-    .expect("clamav database load failed");
+        .load_databases(&db::default_directory())
+        .expect("clamav database load failed");
     engine.compile().expect("clamav compile failed");
     log::info!("clamav initialized, starting server");
     (engine, settings)
@@ -310,14 +305,36 @@ fn init_clamav() -> (engine::Engine, ScanSettings) {
 #[actix_web::main]
 async fn main() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
-    let (engine, settings) = init_clamav();
-    let app_data = web::Data::new(AppState {
-        working_dir: Mutex::new(
-            tempfile::Builder::new()
+
+    let command = Command::new("usbsas-analyzer-server")
+        .about("simple usbsas remote server for integrations tests")
+        .version("0.1")
+        .arg(
+            Arg::new("working-dir")
+                .value_name("WORKING-DIR")
+                .short('d')
+                .long("working-dir")
+                .num_args(1)
+                .required(false),
+        );
+
+    let matches = command.get_matches();
+
+    let (working_path, _temp_dir): (String, Option<TempDir>) =
+        if let Some(wp) = matches.get_one::<String>("working-dir") {
+            (wp.to_owned(), None)
+        } else {
+            let tmpdir = tempfile::Builder::new()
                 .prefix("usbsas-analyzer")
                 .tempdir_in("/tmp")
-                .unwrap(),
-        ),
+                .unwrap();
+            let working_path = tmpdir.path().to_string_lossy().to_string();
+            (working_path, Some(tmpdir))
+        };
+
+    let (engine, settings) = init_clamav();
+    let app_data = web::Data::new(AppState {
+        working_dir: Mutex::new(working_path),
         current_scans: Mutex::new(HashMap::new()),
         clamav_engine: Mutex::new(engine),
         clamav_settings: Mutex::new(settings),
