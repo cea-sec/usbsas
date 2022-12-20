@@ -652,7 +652,7 @@ impl AppState {
         // Build information for each element in current path
         let mut files = Vec::new();
         for infos in dir_info.filesinfo {
-            let path_b64 = base64::encode(&infos.path.clone().into_bytes().authent(&mut hmac))
+            let path_b64 = base64::encode(infos.path.clone().into_bytes().authent(&mut hmac))
                 .replace('\n', "");
             files.push(ReadDir {
                 ftype: infos.ftype,

@@ -210,7 +210,7 @@ impl Imager {
                 return Err(Error::Error("Couldn't open device".to_string()));
             };
 
-        let mut todo = dev_size as u64;
+        let mut todo = dev_size;
         let mut sector_count: u64 = READ_FILE_MAX_SIZE / block_size;
         let mut offset: u64 = 0;
 

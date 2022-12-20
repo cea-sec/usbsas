@@ -195,11 +195,11 @@ impl<T: UsbContext> CopyingState<T> {
         let mut buffer = vec![0; BUFFER_MAX_WRITE_SIZE as usize];
 
         for (sector_start, sector_stop) in self.fs_bv {
-            let sector_start_pos = (sector_start * SECTOR_SIZE) as u64;
+            let sector_start_pos = sector_start * SECTOR_SIZE;
             self.fs.seek(SeekFrom::Start(sector_start_pos))?;
 
             let sector_count = sector_stop - sector_start;
-            let sector_write_size = (sector_count * SECTOR_SIZE) as u64;
+            let sector_write_size = sector_count * SECTOR_SIZE;
 
             let (size, pad) = if sector_start_pos + sector_write_size > fs_size {
                 let size = fs_size - sector_start_pos;
@@ -216,8 +216,8 @@ impl<T: UsbContext> CopyingState<T> {
 
             self.mass_storage.scsi_write_10(
                 &mut buffer[..size as usize + pad as usize],
-                sector_start as u64,
-                sector_count as u64,
+                sector_start,
+                sector_count,
             )?;
 
             current_size += sector_write_size;
@@ -245,7 +245,7 @@ impl<T: UsbContext> WipingState<T> {
         trace!(
             "wipe device; size: {} total sectors: {}",
             total_size,
-            total_size / SECTOR_SIZE as u64
+            total_size / SECTOR_SIZE
         );
 
         while todo > 0 {
@@ -259,11 +259,8 @@ impl<T: UsbContext> WipingState<T> {
                 sector_count = todo / SECTOR_SIZE;
                 buffer.truncate(todo as usize);
             }
-            self.mass_storage.scsi_write_10(
-                &mut buffer,
-                sector_index as u64,
-                sector_count as u64,
-            )?;
+            self.mass_storage
+                .scsi_write_10(&mut buffer, sector_index, sector_count)?;
             current_size += buffer.len() as u64;
             comm.copystatus(proto::fs2dev::ResponseCopyStatus {
                 current_size,

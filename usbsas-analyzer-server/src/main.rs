@@ -39,7 +39,7 @@ impl AppState {
             .prefix(&bundle_id)
             .tempdir_in(PathBuf::from(&*self.working_dir.lock().unwrap()))
             .unwrap();
-        let mut archive = Archive::new(fs::File::open(&tar).unwrap());
+        let mut archive = Archive::new(fs::File::open(tar).unwrap());
         // XXX TODO maybe mmap archive file and use clamav's scan_map function instead of unpacking
         if let Err(err) = archive.unpack(tmpdir.path()) {
             log::error!("err: {}, not a tar ?", err);
@@ -185,7 +185,7 @@ async fn scan_result(
             || current_scans[&bundle_id].status == "error"
         {
             let entry = current_scans.remove(&bundle_id).unwrap();
-            fs::remove_file(&format!(
+            fs::remove_file(format!(
                 "{}/{}.tar",
                 data.working_dir.lock().unwrap(),
                 bundle_id

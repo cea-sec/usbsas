@@ -72,7 +72,7 @@ pub extern "C" fn ntfs_dev_write(
     let mut inner: Box<Box<dyn crate::ReadWriteSeek>> =
         unsafe { Box::from_raw((*dev).d_private as *mut Box<dyn crate::ReadWriteSeek>) };
 
-    let slice = unsafe { std::slice::from_raw_parts(buf as *mut u8, count as usize) };
+    let slice = unsafe { std::slice::from_raw_parts(buf as *mut u8, count) };
 
     let write_ret = inner.write_all(slice);
     std::mem::forget(inner);

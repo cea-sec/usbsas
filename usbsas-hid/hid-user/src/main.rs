@@ -111,7 +111,7 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
     match size {
         1 => match buffer.pop() {
             Some(value) => {
-                let value: u8 = value as u8;
+                let value: u8 = value;
                 Ok(value as u32)
             }
 
@@ -120,7 +120,7 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
         2 => match (buffer.pop(), buffer.pop()) {
             (Some(value_l), Some(value_h)) => {
                 let value: u16 = ((value_h as u16) << 8) | (value_l as u16);
-                let value: u16 = value as u16;
+                let value: u16 = value;
                 Ok(value as u32)
             }
 
@@ -132,8 +132,8 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
                     | ((value_b2 as u32) << 16)
                     | ((value_b1 as u32) << 8)
                     | (value_b0 as u32);
-                let value: u32 = value as u32;
-                Ok(value as u32)
+                let value: u32 = value;
+                Ok(value)
             }
 
             _ => Err(Error::new(ErrorKind::Other, "Buffer too short")),
@@ -170,7 +170,7 @@ fn get_item_value_i32(size: u8, buffer: &mut Vec<u8>) -> Result<i32, Error> {
                     | ((value_b1 as u32) << 8)
                     | (value_b0 as u32);
                 let value: i32 = value as i32;
-                Ok(value as i32)
+                Ok(value)
             }
             _ => Err(Error::new(ErrorKind::Other, "Buffer too short")),
         },
@@ -1005,7 +1005,7 @@ fn get_i8(
 
     if bit_offset + length <= 8 {
         let byte = buffer[byte_offset as usize];
-        let mut value = byte as u8;
+        let mut value = byte;
         // Clear the high bits
         value <<= 8 - (bit_offset + length);
         value >>= 8 - length;
@@ -1052,7 +1052,7 @@ fn get_i16(
     bit_offset %= 8;
 
     if bit_offset + length <= 8 {
-        let byte = buffer[byte_offset as usize] as u8;
+        let byte = buffer[byte_offset as usize];
         let mut value = byte as u16;
 
         // Clear the high bits
@@ -1114,7 +1114,7 @@ fn get_u16(
     bit_offset -= (bit_offset / 8) * 8;
 
     if bit_offset + length <= 8 {
-        let byte = buffer[byte_offset as usize] as u8;
+        let byte = buffer[byte_offset as usize];
         let mut value = byte as u16;
 
         // Clear the high bits
@@ -1291,13 +1291,12 @@ fn parse_generic_desktop_control(
                 match item.coordinatestate {
                     CoordinateState::Abs => {
                         if context.finger_touch {
-                            context.cursor_x =
-                                ((value as i32) * context.screen.width) / item.logical_max;
+                            context.cursor_x = ((value) * context.screen.width) / item.logical_max;
                         }
                     }
                     CoordinateState::Rel => {
                         let logical_center_x = (item.logical_max + item.logical_min) / 2;
-                        context.cursor_x += value as i32 - logical_center_x;
+                        context.cursor_x += value - logical_center_x;
                     }
                 }
             }
@@ -1306,13 +1305,12 @@ fn parse_generic_desktop_control(
                 match item.coordinatestate {
                     CoordinateState::Abs => {
                         if context.finger_touch {
-                            context.cursor_y =
-                                ((value as i32) * context.screen.height) / item.logical_max;
+                            context.cursor_y = (value * context.screen.height) / item.logical_max;
                         }
                     }
                     CoordinateState::Rel => {
                         let logical_center_y = (item.logical_max + item.logical_min) / 2;
-                        context.cursor_y += value as i32 - logical_center_y;
+                        context.cursor_y += value - logical_center_y;
                     }
                 }
             }
@@ -1381,7 +1379,7 @@ fn parse_button(context: &mut DisplayContext, item: &HidItem, buffer: &[u8]) -> 
                     XTestFakeButtonEvent(
                         context.screen.display,
                         context.button_num as u32 + 1,
-                        button_value as i32 & 1,
+                        button_value & 1,
                         CurrentTime,
                     );
                 }

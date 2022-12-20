@@ -22,7 +22,7 @@ pub fn drop_priv(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<(
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 1, None),
-            Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
+            Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;
     // ioctl(2, TCGETS, ..)
@@ -31,7 +31,7 @@ pub fn drop_priv(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<(
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 2, None),
-            Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
+            Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;
     // ioctl(2, TIOCGWINSZ, ..)
@@ -40,7 +40,7 @@ pub fn drop_priv(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<(
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 2, None),
-            Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ as u64, None),
+            Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ, None),
         ],
     )?;
 

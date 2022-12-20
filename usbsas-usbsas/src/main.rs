@@ -1465,7 +1465,7 @@ impl ImgDiskState {
             .comm
             .imgdisk(proto::writefs::RequestImgDisk {})?;
 
-        let mut todo = self.device.dev_size as u64;
+        let mut todo = self.device.dev_size;
         let mut sector_count: u64 = READ_FILE_MAX_SIZE / self.device.sector_size as u64;
         let mut offset = 0;
 

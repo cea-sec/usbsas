@@ -157,7 +157,7 @@ impl<T: UsbContext> MassStorage<T> {
             .write()
             .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
             .scsi_read_10(&mut buf_check, offset + count - 1, 1)?;
-        if buf_check != buffer[(buffer.len() - buf_check.len()) as usize..] {
+        if buf_check != buffer[(buffer.len() - buf_check.len())..] {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
                 "Couldn't verify write(10)",
@@ -302,7 +302,7 @@ impl MassStorageComm {
     pub fn read_sectors(&self, offset: u64, count: u64) -> Result<Vec<u8>, io::Error> {
         // Don't cache data if we're reading a lot of sectors,
         // it's probably a file (only read once) and not FS stuff
-        if count <= MAX_SECTORS_COUNT_CACHE as u64 {
+        if count <= MAX_SECTORS_COUNT_CACHE {
             if let Some(data) = self
                 .cache
                 .write()
@@ -319,7 +319,7 @@ impl MassStorageComm {
             .write()
             .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {}", err)))?
             .readsectors(proto::scsi::RequestReadSectors { offset, count })?;
-        if count <= MAX_SECTORS_COUNT_CACHE as u64 {
+        if count <= MAX_SECTORS_COUNT_CACHE {
             self.cache
                 .write()
                 .map_err(|err| {
@@ -339,8 +339,7 @@ impl Read for MassStorageComm {
         let sectors_to_read = (read_offset + count + (block_size - 1)) / block_size;
         let offset = self.seek / block_size;
 
-        let data =
-            self.read_sectors(offset + self.partition_sector_start as u64, sectors_to_read)?;
+        let data = self.read_sectors(offset + self.partition_sector_start, sectors_to_read)?;
 
         self.seek += buf.len() as u64;
 
@@ -387,9 +386,8 @@ impl ReadAt for MassStorageComm {
         let block_size = self.block_size as u64;
         let read_offset = pos % block_size;
         let sectors_to_read = (read_offset + count + (block_size - 1)) / block_size;
-        let offset = (pos / block_size) as u64;
-        let data =
-            self.read_sectors(offset + self.partition_sector_start as u64, sectors_to_read)?;
+        let offset = pos / block_size;
+        let data = self.read_sectors(offset + self.partition_sector_start, sectors_to_read)?;
         let data = data[(read_offset as usize)..(read_offset as usize + count as usize)].to_vec();
         for (i, c) in data.iter().enumerate() {
             buf[i] = *c;
