@@ -51,7 +51,7 @@ impl InitState {
         let archive_file = fs::OpenOptions::new()
             .read(false)
             .write(true)
-            .open(&self.archive_path)?;
+            .open(self.archive_path)?;
         let outfd = archive_file.as_raw_fd();
 
         let mut archive: Box<dyn ArchiveWriter> = Box::new(TarWriter::new(archive_file));

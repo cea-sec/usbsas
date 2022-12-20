@@ -25,11 +25,7 @@ impl<T: ReadAt> FSRead<T> for Ext4<T> {
             ext4::FileType::Directory => FileType::Directory,
             _ => FileType::Other,
         };
-        Ok((
-            file_type,
-            inode.stat.size,
-            inode.stat.ctime.epoch_secs as i64,
-        ))
+        Ok((file_type, inode.stat.size, inode.stat.ctime.epoch_secs))
     }
 
     fn read_dir(&mut self, path: &str) -> Result<Vec<FileInfo>> {
@@ -53,7 +49,7 @@ impl<T: ReadAt> FSRead<T> for Ext4<T> {
                         path: format!("{}/{}", path, &entry.name),
                         ftype: file_type.into(),
                         size: inode.stat.size,
-                        timestamp: inode.stat.ctime.epoch_secs as i64,
+                        timestamp: inode.stat.ctime.epoch_secs,
                     });
                 }
             }

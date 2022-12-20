@@ -32,8 +32,8 @@ users = { version = "0.11", optional = true }
 imager = ["indicatif", "tempfile", "usbsas-config", "usbsas-dev2scsi", "usbsas-usbdev", "usbsas-utils"]
 fswriter = ["bitvec", "usbsas-fs2dev"]
 fuse-mount = ["fuse_mt", "libc", "time", "usbsas-scsi2files", "users"]
-uploader = ["usbsas-net"]
-default = ["imager", "fswriter", "fuse-mount", "uploader"]
+net = ["usbsas-net"]
+default = ["imager", "fswriter", "fuse-mount", "net"]
 
 [[bin]]
 name = "usbsas-imager"
@@ -41,9 +41,9 @@ path = "src/imager.rs"
 required-features = ["imager"]
 
 [[bin]]
-name = "usbsas-uploader"
-path = "src/uploader.rs"
-required-features = ["uploader"]
+name = "usbsas-net"
+path = "src/net.rs"
+required-features = ["net"]
 
 [[bin]]
 name = "usbsas-fuse-mount"
@@ -66,6 +66,6 @@ systemd-units = { enable = false }
 assets = [
   ["target/release/usbsas-fuse-mount", "usr/bin/", "755"],
   ["target/release/usbsas-imager", "usr/bin/", "755"],
-  ["target/release/usbsas-uploader", "usr/bin/", "755"],
+  ["target/release/usbsas-net", "usr/bin/", "755"],
   ["target/release/usbsas-fswriter", "usr/bin/", "755"],
 ]

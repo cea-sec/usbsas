@@ -17,6 +17,10 @@ pub mod common {
     include!(concat!(env!("OUT_DIR"), "/common.rs"));
 }
 
+pub mod downloader {
+    include!(concat!(env!("OUT_DIR"), "/downloader.rs"));
+}
+
 pub mod files {
     include!(concat!(env!("OUT_DIR"), "/files.rs"));
 }

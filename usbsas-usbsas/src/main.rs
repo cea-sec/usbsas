@@ -20,7 +20,7 @@ use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::*,
-    usbsas::{request::Msg, request_copy_start::Destination},
+    usbsas::{request::Msg, request_copy_start::Destination, request_copy_start::Source},
 };
 #[cfg(not(feature = "mock"))]
 use usbsas_usbdev::UsbDev;
@@ -34,6 +34,8 @@ enum Error {
     Error(String),
     #[error("analyze error: {0}")]
     Analyze(String),
+    #[error("download error: {0}")]
+    Download(String),
     #[error("upload error: {0}")]
     Upload(String),
     #[error("int error: {0}")]
@@ -42,6 +44,8 @@ enum Error {
     Privileges(#[from] usbsas_privileges::Error),
     #[error("process error: {0}")]
     Process(#[from] usbsas_process::Error),
+    #[error("Not enough space on destination device")]
+    NotEnoughSpace,
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -152,6 +156,14 @@ protorequest!(
 );
 
 protorequest!(
+    CommDownloader,
+    downloader,
+    download = Download[RequestDownload, ResponseDownload],
+    archiveinfos = ArchiveInfos[RequestArchiveInfos, ResponseArchiveInfos],
+    end = End[RequestEnd, ResponseEnd]
+);
+
+protorequest!(
     CommCmdExec,
     cmdexec,
     exec = Exec[RequestExec, ResponseExec],
@@ -171,6 +183,7 @@ enum State {
     DevOpened(DevOpenedState),
     PartitionOpened(PartitionOpenedState),
     CopyFiles(CopyFilesState),
+    DownloadTar(DownloadTarState),
     WriteFiles(WriteFilesState),
     UploadOrCmd(UploadOrCmdState),
     TransferDone(TransferDoneState),
@@ -187,6 +200,7 @@ impl State {
             State::DevOpened(s) => s.run(comm, children),
             State::PartitionOpened(s) => s.run(comm, children),
             State::CopyFiles(s) => s.run(comm, children),
+            State::DownloadTar(s) => s.run(comm, children),
             State::WriteFiles(s) => s.run(comm, children),
             State::UploadOrCmd(s) => s.run(comm, children),
             State::TransferDone(s) => s.run(comm, children),
@@ -217,6 +231,27 @@ impl InitState {
                     match self.open_device(comm, children, req.device.ok_or(Error::BadRequest)?) {
                         Ok(device) => return Ok(State::DevOpened(DevOpenedState { device, id })),
                         Err(err) => Err(err),
+                    }
+                }
+                Msg::CopyStart(req) => {
+                    trace!("Received CopyStart while in init state, expect export transfer");
+                    if let Some(ref id_str) = id {
+                        match req.source.ok_or(Error::BadRequest)? {
+                            Source::SrcNet(src) => {
+                                return Ok(State::DownloadTar(DownloadTarState {
+                                    id: id_str.clone(),
+                                    destination: req.destination.ok_or(Error::BadRequest)?,
+                                    bundle_path: src.pin.to_string(),
+                                }))
+                            }
+                            _ => {
+                                log::error!("CopyStart req not export in init state");
+                                Err(Error::BadRequest)
+                            }
+                        }
+                    } else {
+                        error!("empty id");
+                        Err(Error::BadRequest)
                     }
                 }
                 Msg::Wipe(req) => {
@@ -390,18 +425,22 @@ impl PartitionOpenedState {
                 Msg::Id(_) => children.id(comm, &mut self.id),
                 Msg::GetAttr(req) => self.get_attr(comm, children, req.path),
                 Msg::ReadDir(req) => self.read_dir(comm, children, req.path),
-                Msg::CopyStart(req) => {
-                    if let Some(id) = self.id {
-                        return Ok(State::CopyFiles(CopyFilesState {
-                            device: self.device,
-                            id,
-                            selected: req.selected,
-                            destination: req.destination.ok_or(Error::BadRequest)?,
-                        }));
+                Msg::CopyStart(req) => match req.source.ok_or(Error::BadRequest)? {
+                    Source::SrcUsb(_) => {
+                        if let Some(id) = self.id {
+                            return Ok(State::CopyFiles(CopyFilesState {
+                                device: self.device,
+                                id,
+                                selected: req.selected,
+                                destination: req.destination.ok_or(Error::BadRequest)?,
+                            }));
+                        } else {
+                            error!("empty id");
+                            Err(Error::BadRequest)
+                        }
                     }
-                    error!("empty id");
-                    Err(Error::BadRequest)
-                }
+                    _ => Err(Error::BadRequest),
+                },
                 Msg::End(_) => {
                     children.end_wait_all(comm)?;
                     break;
@@ -474,6 +513,7 @@ impl CopyFilesState {
         let mut errors = vec![];
         let mut all_directories = vec![];
         let mut all_files = vec![];
+
         let total_files_size = self.selected_to_files_list(
             children,
             &mut errors,
@@ -485,7 +525,6 @@ impl CopyFilesState {
         let all_files_filtered = self.filter_files(children, all_files, &mut filtered)?;
         let all_directories_filtered =
             self.filter_files(children, all_directories, &mut filtered)?;
-
         let mut all_entries_filtered = vec![];
         all_entries_filtered.append(&mut all_directories_filtered.clone());
         all_entries_filtered.append(&mut all_files_filtered.clone());
@@ -499,40 +538,13 @@ impl CopyFilesState {
             warn!("Aborting copy, no files survived filter");
             return Ok(State::WaitEnd(WaitEndState {}));
         }
-
-        // max_file_size is 4GB if we're writing a FAT fs, None otherwise
-        let max_file_size = match self.destination {
-            Destination::Usb(ref usb) => {
-                // Unlock fs2dev to get dev_size
-                children.fs2dev.comm.write_all(
-                    &(((u64::from(usb.devnum)) << 32) | (u64::from(usb.busnum))).to_ne_bytes(),
-                )?;
-                children.fs2dev.locked = false;
-                let dev_size = children
-                    .fs2dev
-                    .comm
-                    .size(proto::fs2dev::RequestDevSize {})?
-                    .size;
-                // Check dest dev is large enough
-                // XXX try to be more precise about this
-                if total_files_size > (dev_size * 98 / 100) {
-                    comm.notenoughspace(proto::usbsas::ResponseNotEnoughSpace {
-                        max_size: dev_size,
-                    })?;
-                    error!("Aborting, dest dev too small");
-                    return Ok(State::WaitEnd(WaitEndState {}));
-                }
-                match OutFsType::from_i32(usb.fstype)
-                    .ok_or_else(|| Error::Error("bad fstype".into()))?
-                {
-                    OutFsType::Fat => Some(0xFFFF_FFFF),
-                    _ => None,
-                }
-            }
-            Destination::Net(_) | Destination::Cmd(_) => None,
+        let max_file_size = match children.check_dst_size(comm, &self.destination, total_files_size)
+        {
+            Ok(max_size) => max_size,
+            Err(Error::NotEnoughSpace) => return Ok(State::WaitEnd(WaitEndState {})),
+            Err(err) => return Err(err),
         };
 
-        // Unlock files2tar
         children.files2tar.comm.write_all(&[0_u8])?;
         children.files2tar.locked = false;
 
@@ -558,6 +570,7 @@ impl CopyFilesState {
                     filtered,
                     id: self.id,
                     usb,
+                    analyze: true,
                 }))
             }
             Destination::Net(_) | Destination::Cmd(_) => {
@@ -784,6 +797,197 @@ impl CopyFilesState {
     }
 }
 
+struct DownloadTarState {
+    destination: Destination,
+    id: String,
+    bundle_path: String,
+}
+
+impl DownloadTarState {
+    fn run(
+        mut self,
+        comm: &mut Comm<proto::usbsas::Request>,
+        children: &mut Children,
+    ) -> Result<State> {
+        trace!("req download tar");
+        info!("Usbsas export for user: {}", self.id);
+
+        let mut errors = vec![];
+        let mut all_directories = vec![];
+        let mut all_files = vec![];
+        let remote_path = self.id.clone() + "/" + &self.bundle_path;
+
+        let total_files_size = children
+            .downloader
+            .comm
+            .archiveinfos(proto::downloader::RequestArchiveInfos {
+                id: remote_path.clone(),
+            })?
+            .size;
+        let max_file_size = match children.check_dst_size(comm, &self.destination, total_files_size)
+        {
+            Ok(max_size) => max_size,
+            Err(Error::NotEnoughSpace) => return Ok(State::WaitEnd(WaitEndState {})),
+            Err(err) => return Err(err),
+        };
+
+        children.files2tar.comm.write_all(&[1_u8])?;
+        children.files2tar.locked = false;
+        comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
+        self.download_tar(comm, children, &remote_path)?;
+        children.tar2files.comm.write_all(&[1_u8])?;
+        children.tar2files.locked = false;
+        self.tar_to_files_list(
+            children,
+            &mut errors,
+            &mut all_files,
+            &mut all_directories,
+            max_file_size,
+        )?;
+
+        match self.destination {
+            Destination::Usb(usb) => Ok(State::WriteFiles(WriteFilesState {
+                directories: all_directories,
+                dirty: Vec::new(),
+                errors,
+                files: all_files,
+                filtered: Vec::new(),
+                id: self.id,
+                usb,
+                analyze: false,
+            })),
+            Destination::Net(_) | Destination::Cmd(_) => {
+                children.tar2files.comm.write_all(&[0_u8])?;
+                children.tar2files.locked = false;
+                Ok(State::UploadOrCmd(UploadOrCmdState {
+                    errors,
+                    filtered: Vec::new(),
+                    id: self.id,
+                    destination: self.destination,
+                }))
+            }
+        }
+    }
+
+    fn download_tar(
+        &mut self,
+        comm: &mut Comm<proto::usbsas::Request>,
+        children: &mut Children,
+        remote_path: &String,
+    ) -> Result<()> {
+        use proto::downloader::response::Msg;
+        trace!("download tar file");
+        children.downloader.comm.send(proto::downloader::Request {
+            msg: Some(proto::downloader::request::Msg::Download(
+                proto::downloader::RequestDownload {
+                    id: remote_path.to_string(),
+                },
+            )),
+        })?;
+
+        loop {
+            let rep: proto::downloader::Response = children.downloader.comm.recv()?;
+            match rep.msg.ok_or(Error::BadRequest)? {
+                Msg::DownloadStatus(status) => {
+                    log::debug!("status: {}/{}", status.current_size, status.total_size);
+                    continue;
+                }
+                Msg::Download(_) => {
+                    break;
+                }
+                Msg::Error(err) => {
+                    log::error!("Download error: {:?}", err);
+                    return Err(Error::Download(err.err));
+                }
+                _ => {
+                    log::error!("bad resp");
+                    return Err(Error::BadRequest);
+                }
+            }
+        }
+
+        log::debug!("Bundle successfully downloaded");
+        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
+        Ok(())
+    }
+
+    /// Extract all files names / paths from tar bundle
+    fn tar_to_files_list(
+        &mut self,
+        children: &mut Children,
+        errors: &mut Vec<String>,
+        files: &mut Vec<String>,
+        directories: &mut Vec<String>,
+        max_file_size: Option<u64>,
+    ) -> Result<u64> {
+        let mut total_size: u64 = 0;
+        let mut todo = VecDeque::from([String::from("")]);
+        let mut all_entries = HashSet::new();
+        while let Some(entry) = todo.pop_front() {
+            let mut parts = entry.trim_start_matches('/').split('/');
+            // Remove last (file basename)
+            let _ = parts.next_back();
+            let mut parent = String::from("");
+            for dir in parts {
+                parent.push('/');
+                parent.push_str(dir);
+                if !directories.contains(&parent) {
+                    directories.push(parent.clone());
+                }
+            }
+            let rep = match children
+                .tar2files
+                .comm
+                .getattr(proto::files::RequestGetAttr {
+                    path: entry.clone(),
+                }) {
+                Ok(rep) => rep,
+                Err(_) => {
+                    errors.push(entry);
+                    continue;
+                }
+            };
+            match FileType::from_i32(rep.ftype) {
+                Some(FileType::Regular) => {
+                    if !all_entries.contains(&entry) {
+                        let file_too_large = match max_file_size {
+                            Some(m) => rep.size > m,
+                            None => false,
+                        };
+                        if file_too_large {
+                            error!("File '{}' is too large", &entry);
+                            errors.push(String::from("/") + &entry);
+                        } else {
+                            files.push(String::from("/") + &entry);
+                            total_size += rep.size;
+                        }
+                        all_entries.insert(entry);
+                    }
+                }
+                Some(FileType::Directory) => {
+                    if !all_entries.contains(&entry) {
+                        if !entry.is_empty() {
+                            directories.push(String::from("/") + &entry);
+                        }
+                        all_entries.insert(entry.clone());
+                    }
+                    let rep = children
+                        .tar2files
+                        .comm
+                        .readdir(proto::files::RequestReadDir { path: entry })?;
+                    for file in rep.filesinfo.iter() {
+                        todo.push_back(file.path.clone());
+                    }
+                }
+                _ => errors.push(entry),
+            }
+        }
+        files.sort();
+        directories.sort();
+        Ok(total_size)
+    }
+}
+
 struct WriteFilesState {
     directories: Vec<String>,
     dirty: Vec<String>,
@@ -792,6 +996,7 @@ struct WriteFilesState {
     filtered: Vec<String>,
     id: String,
     usb: proto::usbsas::DestUsb,
+    analyze: bool,
 }
 
 impl WriteFilesState {
@@ -800,7 +1005,9 @@ impl WriteFilesState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        self.analyze_files(comm, children)?;
+        if self.analyze {
+            self.analyze_files(comm, children)?;
+        }
 
         // Abort if no files survived antivirus
         if self.files.is_empty() {
@@ -1258,7 +1465,7 @@ impl ImgDiskState {
             .comm
             .imgdisk(proto::writefs::RequestImgDisk {})?;
 
-        let mut todo = self.device.dev_size as u64;
+        let mut todo = self.device.dev_size;
         let mut sector_count: u64 = READ_FILE_MAX_SIZE / self.device.sector_size as u64;
         let mut offset = 0;
 
@@ -1365,6 +1572,7 @@ struct Children {
     analyzer: Option<UsbsasChild<proto::analyzer::Request>>,
     identificator: UsbsasChild<proto::identificator::Request>,
     cmdexec: UsbsasChild<proto::cmdexec::Request>,
+    downloader: UsbsasChild<proto::downloader::Request>,
     files2fs: UsbsasChild<proto::writefs::Request>,
     files2tar: UsbsasChild<proto::writetar::Request>,
     filter: UsbsasChild<proto::filter::Request>,
@@ -1417,6 +1625,48 @@ impl Children {
         Ok(())
     }
 
+    // If destination is USB, check that device will have enough space to stores
+    // src files.
+    // Returns max size of a single file (4GB if dest is FAT, None otherwise)
+    fn check_dst_size(
+        &mut self,
+        comm: &mut Comm<proto::usbsas::Request>,
+        destination: &Destination,
+        total_files_size: u64,
+    ) -> Result<Option<u64>> {
+        // max_file_size is 4GB if we're writing a FAT fs, None otherwise
+        match destination {
+            Destination::Usb(ref usb) => {
+                // Unlock fs2dev to get dev_size
+                self.fs2dev.comm.write_all(
+                    &(((u64::from(usb.devnum)) << 32) | (u64::from(usb.busnum))).to_ne_bytes(),
+                )?;
+                self.fs2dev.locked = false;
+                let dev_size = self
+                    .fs2dev
+                    .comm
+                    .size(proto::fs2dev::RequestDevSize {})?
+                    .size;
+                // Check dest dev is large enough
+                // XXX try to be more precise about this
+                if total_files_size > (dev_size * 98 / 100) {
+                    comm.notenoughspace(proto::usbsas::ResponseNotEnoughSpace {
+                        max_size: dev_size,
+                    })?;
+                    error!("Aborting, dest dev too small");
+                    return Err(Error::NotEnoughSpace);
+                }
+                match OutFsType::from_i32(usb.fstype)
+                    .ok_or_else(|| Error::Error("bad fstype".into()))?
+                {
+                    OutFsType::Fat => Ok(Some(0xFFFF_FFFF)),
+                    _ => Ok(None),
+                }
+            }
+            Destination::Net(_) | Destination::Cmd(_) => Ok(None),
+        }
+    }
+
     fn end_all(&mut self) -> Result<()> {
         trace!("req end");
         if let Some(ref mut analyzer) = self.analyzer {
@@ -1433,6 +1683,9 @@ impl Children {
         };
         if let Err(err) = self.cmdexec.comm.end(proto::cmdexec::RequestEnd {}) {
             error!("Couldn't end cmdexec: {}", err);
+        };
+        if let Err(err) = self.downloader.comm.end(proto::downloader::RequestEnd {}) {
+            error!("Couldn't end downloader: {}", err);
         };
         if let Err(err) = self.files2fs.comm.end(proto::writefs::RequestEnd {}) {
             error!("Couldn't end files2fs: {}", err);
@@ -1485,6 +1738,10 @@ impl Children {
         trace!("waiting cmdexec");
         if let Err(err) = self.cmdexec.wait() {
             error!("Waiting cmdexec failed: {}", err);
+        };
+        trace!("waiting downloader");
+        if let Err(err) = self.downloader.wait() {
+            error!("Waiting downloader failed: {}", err);
         };
         trace!("waiting files2fs");
         if let Err(err) = self.files2fs.wait() {
@@ -1564,6 +1821,13 @@ impl Usbsas {
         pipes_read.push(cmdexec.comm.input_fd());
         pipes_write.push(cmdexec.comm.output_fd());
 
+        let downloader = UsbsasChildSpawner::new()
+            .arg(out_tar)
+            .arg(config_path)
+            .spawn::<usbsas_net::Downloader, proto::downloader::Request>()?;
+        pipes_read.push(downloader.comm.input_fd());
+        pipes_write.push(downloader.comm.output_fd());
+
         let usbdev = UsbsasChildSpawner::new()
             .arg(config_path)
             .spawn::<UsbDev, proto::usbdev::Request>()?;
@@ -1634,6 +1898,7 @@ impl Usbsas {
             analyzer,
             identificator,
             cmdexec,
+            downloader,
             files2fs,
             files2tar,
             filter,

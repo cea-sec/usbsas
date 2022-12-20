@@ -4,6 +4,7 @@ fn main() {
         "proto/identificator.proto3",
         "proto/cmdexec.proto3",
         "proto/common.proto3",
+        "proto/downloader.proto3",
         "proto/files.proto3",
         "proto/filter.proto3",
         "proto/fs2dev.proto3",

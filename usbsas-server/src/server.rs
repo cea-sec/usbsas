@@ -93,6 +93,7 @@ async fn copy(
         match data.copy(
             files.selected.to_owned(),
             files.fsfmt.to_owned(),
+            files.download_pin.to_owned(),
             resp_stream_clone,
         ) {
             Ok(_) => {

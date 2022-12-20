@@ -52,6 +52,13 @@ message DestUSB {
 message DestCmd {
 };
 
+message SrcUSB {
+};
+
+message SrcNet {
+  uint64 pin = 1;
+};
+
 message RequestPostCopyCmd {
   common.OutFileType outfiletype = 1;
 };
@@ -61,6 +68,10 @@ message RequestCopyStart {
     DestUSB usb = 1;
     common.DestNet net = 2;
     DestCmd cmd = 3;
+  };
+  oneof source {
+    SrcUSB src_usb = 5;
+    SrcNet src_net = 6;
   };
   repeated string selected = 4;
 };

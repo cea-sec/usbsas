@@ -1,9 +1,14 @@
-out_directory = "/tmp/"
+out_directory = "/tmp/usbsas-tests"
 
 [[networks]]
 description = "Network"
 longdescr = "Send files on a remote server"
 url = "http://127.0.0.1:8042/api/uploadbundle"
+
+[source_network]
+description = "Source Network"
+longdescr = "Export files from network"
+url = "http://127.0.0.1:8042/api/downloadbundle"
 
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"

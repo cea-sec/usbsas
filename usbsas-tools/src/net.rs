@@ -1,4 +1,4 @@
-//! Tool to test usbsas's upload / analyze features with a remote server.
+//! Tool to test usbsas's upload / download / analyze features with a remote server.
 
 use clap::{Arg, Command};
 use std::io::{self, Write};
@@ -26,6 +26,8 @@ enum Error {
     Analyze(String),
     #[error("Error: {0}")]
     Error(String),
+    #[error("download error: {0}")]
+    Download(String),
 }
 type Result<T> = std::result::Result<T, Error>;
 
@@ -33,6 +35,14 @@ protorequest!(
     CommUploader,
     uploader,
     upload = Upload[RequestUpload, ResponseUpload],
+    end = End[RequestEnd, ResponseEnd]
+);
+
+protorequest!(
+    CommDownloader,
+    downloader,
+    download = Download[RequestDownload, ResponseDownload],
+    archiveinfos = ArchiveInfos[RequestArchiveInfos, ResponseArchiveInfos],
     end = End[RequestEnd, ResponseEnd]
 );
 
@@ -172,10 +182,60 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     Ok(())
 }
 
+fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
+    use proto::downloader::response::Msg;
+    let mut downloader = UsbsasChildSpawner::new()
+        .arg(bundle_path)
+        .arg(config_path)
+        .spawn::<usbsas_net::Downloader, proto::downloader::Request>()?;
+
+    let _ = downloader
+        .comm
+        .archiveinfos(proto::downloader::RequestArchiveInfos { id: id.to_string() })?
+        .size;
+
+    log::info!("Downloading bundle");
+    downloader.comm.send(proto::downloader::Request {
+        msg: Some(proto::downloader::request::Msg::Download(
+            proto::downloader::RequestDownload { id: id.to_string() },
+        )),
+    })?;
+
+    loop {
+        let rep: proto::downloader::Response = downloader.comm.recv()?;
+        match rep.msg.ok_or(Error::BadRequest)? {
+            Msg::DownloadStatus(status) => {
+                log::debug!("status: {}/{}", status.current_size, status.total_size);
+                continue;
+            }
+            Msg::Download(_) => {
+                log::debug!("Download complete");
+                break;
+            }
+            Msg::Error(err) => {
+                log::error!("Download error: {:?}", err);
+                return Err(Error::Download(err.err));
+            }
+            _ => {
+                log::error!("bad resp");
+                return Err(Error::BadRequest);
+            }
+        }
+    }
+
+    if let Err(err) = downloader.comm.end(proto::downloader::RequestEnd {}) {
+        log::error!("Couldn't end downloader: {}", err);
+    };
+
+    log::info!("Bundle successfully downloaded");
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
-    let command = Command::new("usbsas-uploader")
-        .about("Test uploading or analyzing a usbsas bundle")
+    let command = Command::new("usbsas-net")
+        .about("Test uploading, downloading or analyzing a usbsas bundle")
         .version("1.0")
         .arg(
             clap::Arg::new("config")
@@ -187,40 +247,48 @@ fn main() -> Result<()> {
                 .required(false),
         )
         .arg(
+            Arg::new("action")
+                .value_name("ACTION")
+                .index(1)
+                .help("Action to perform: upload, analyze or download")
+                .num_args(1)
+                .required(true),
+        )
+        .arg(
             Arg::new("bundle")
                 .value_name("FILE")
-                .index(1)
+                .index(2)
                 .help("Bundle to upload or test")
                 .num_args(1)
                 .required(true),
         )
         .arg(
             Arg::new("ID")
-                .index(2)
+                .index(3)
                 .help("ID of the user")
                 .num_args(1)
                 .required(true),
-        )
-        .arg(
-            Arg::new("analyze")
-                .short('a')
-                .long("analyze")
-                .action(clap::ArgAction::SetTrue)
-                .help("Analyze instead of upload"),
         );
 
     let matches = command.get_matches();
     let config_path = matches.get_one::<String>("config").unwrap();
 
-    if let Some(path) = matches.get_one::<String>("bundle") {
-        if let Some(id) = matches.get_one::<String>("ID") {
-            if matches.get_flag("analyze") {
-                analyze(config_path, path, id)?;
-            } else {
-                upload(config_path, path, id)?;
+    match (
+        matches.get_one::<String>("action"),
+        matches.get_one::<String>("bundle"),
+        matches.get_one::<String>("ID"),
+    ) {
+        (Some(action), Some(path), Some(id)) => match action.as_str() {
+            "upload" => upload(config_path, path, id)?,
+            "analyze" => analyze(config_path, path, id)?,
+            "download" => download(config_path, path, id)?,
+            _ => {
+                return Err(Error::Error(
+                    "Bad action specified, either: upload, analyze or download".to_owned(),
+                ))
             }
-            return Ok(());
-        }
+        },
+        _ => return Err(Error::Error("args parse failed".to_owned())),
     }
 
     Ok(())

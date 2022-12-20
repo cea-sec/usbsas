@@ -75,7 +75,7 @@ struct WaitEndState {}
 
 impl InitState {
     fn run(self, _comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
-        let file = File::open(&self.tarpath)?;
+        let file = File::open(self.tarpath)?;
 
         Ok(State::Running(RunningState { file: Some(file) }))
     }

@@ -176,7 +176,7 @@ impl WaitFsInfosState {
             return Err(Error::FSError("fs size not multiple of sector size".into()));
         }
 
-        if dev_size % SECTOR_SIZE as u64 != 0 {
+        if dev_size % SECTOR_SIZE != 0 {
             return Err(Error::FSError(
                 "dev size not multiple of sector size".into(),
             ));

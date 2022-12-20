@@ -21,16 +21,23 @@ struct IntegrationTester {
     client: Client,
     mock_input_dev: String,
     mock_output_dev: String,
+    working_dir: String,
     usbsas_server: Child,
     analyzer_server: Child,
 }
 
 impl IntegrationTester {
     fn new() -> Self {
-        let test_data_dir = env::var("CARGO_MANIFEST_DIR")
-            .expect("no CARGO_MANIFEST_DIR env var")
-            .to_string()
-            + "/test_data/";
+        let test_data_dir =
+            env::var("CARGO_MANIFEST_DIR").expect("no CARGO_MANIFEST_DIR env var") + "/test_data/";
+
+        let working_dir = String::from("/tmp/usbsas-tests");
+
+        if let Err(err) = fs::create_dir(&working_dir) {
+            if err.kind() != io::ErrorKind::AlreadyExists {
+                panic!("couldn't create working dir: {}", err)
+            }
+        }
 
         // Untar mock input dev if none was supplied
         let mock_input_dev = match env::var("USBSAS_MOCK_INPUT_DEV") {
@@ -39,8 +46,8 @@ impl IntegrationTester {
                 input
             }
             Err(_) => {
-                let input = "/tmp/mock_input_dev.img";
-                let input_file = std::fs::File::create(input).unwrap();
+                let input = format!("{}/mock_input_dev.img", working_dir);
+                let input_file = std::fs::File::create(&input).unwrap();
                 Command::new("gzip")
                     .arg("-dc")
                     .arg(format!("{}/mock_input_dev.img.gz", test_data_dir))
@@ -48,22 +55,22 @@ impl IntegrationTester {
                     .stderr(Stdio::null())
                     .status()
                     .expect("Couldn't uncompress mock input dev");
-                env::set_var("USBSAS_MOCK_IN_DEV", input);
-                String::from(input)
+                env::set_var("USBSAS_MOCK_IN_DEV", &input);
+                input
             }
         };
 
-        // Create mock output dev in none was supplied
+        // Create mock output dev if none was supplied
         let mock_output_dev = match env::var("USBSAS_MOCK_OUTPUT_DEV") {
             Ok(output) => {
                 println!("Using {} as output dev", output);
                 output
             }
             Err(_) => {
-                let output = "/tmp/mock_output_dev.img";
+                let output = format!("{}/mock_output_dev.img", working_dir);
                 Command::new("dd")
                     .arg("if=/dev/zero")
-                    .arg("of=".to_string() + output)
+                    .arg(format!("of={}", &output))
                     .arg("bs=1M")
                     .arg("iflag=fullblock")
                     .arg("count=128")
@@ -71,21 +78,32 @@ impl IntegrationTester {
                     .stderr(Stdio::null())
                     .status()
                     .expect("Couldn't create mock output dev");
-                env::set_var("USBSAS_MOCK_OUT_DEV", output);
-                String::from(output)
+                env::set_var("USBSAS_MOCK_OUT_DEV", &output);
+                output
             }
         };
+
+        // Copy export bundle in working_dir
+        let _ = fs::create_dir(format!("{}/Tartempion", working_dir));
+        Command::new("cp")
+            .arg(format!("{}/bundle_test.tar.gz", test_data_dir))
+            .arg(format!("{}/Tartempion/123456.tar.gz", working_dir))
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("Couldn't copy bundle test");
 
         // Start usbsas server
         let usbsas_server = Command::cargo_bin("usbsas-server")
             .expect("Couldn't run usbsas server")
-            .args(&["-c", &format!("{}/config_test.toml", test_data_dir)])
+            .args(["-c", &format!("{}/config_test.toml", test_data_dir)])
             .spawn()
             .expect("Couldn't run usbsas server");
 
         // Start analyzer server
         let analyzer_server = Command::cargo_bin("usbsas-analyzer-server")
             .expect("Couldn't run analyzer server")
+            .args(["-d", &working_dir])
             .spawn()
             .expect("Couldn't run analyzer server");
 
@@ -107,9 +125,10 @@ impl IntegrationTester {
 
         IntegrationTester {
             api: "http://localhost:8080/".into(),
-            client: client,
+            client,
             mock_input_dev,
             mock_output_dev,
+            working_dir,
             usbsas_server,
             analyzer_server,
         }
@@ -152,7 +171,7 @@ impl IntegrationTester {
             .json()?;
         for (path, file) in new_files.iter() {
             if file.ftype == 2 {
-                self.list_files_recursive(files, &path)?;
+                self.list_files_recursive(files, path)?;
             }
         }
         files.extend(new_files);
@@ -161,6 +180,7 @@ impl IntegrationTester {
 
     fn do_copy(
         &self,
+        input_type: &appstate::DevType,
         output_type: &appstate::DevType,
         part_type: &str,
         dirty_path: &[&str],
@@ -176,18 +196,18 @@ impl IntegrationTester {
             .send()?
             .json()?;
 
-        // Find input dev (first USB)
+        // Find input dev
         let input_dev = devices.swap_remove(
             devices
                 .iter()
-                .position(|dev| dev.dev_type == appstate::DevType::Usb)
-                .expect("Couldn't find input usb dev"),
+                .position(|dev| dev.dev_type == *input_type && dev.is_src)
+                .expect("Couldn't find input dev"),
         );
         // Find output dev
         let output_dev = devices.swap_remove(
             devices
                 .iter()
-                .position(|dev| dev.dev_type == *output_type)
+                .position(|dev| dev.dev_type == *output_type && dev.is_dst)
                 .expect("Couldn't find output dev"),
         );
 
@@ -201,54 +221,62 @@ impl IntegrationTester {
             .send()?;
         assert!(resp.status().is_success());
 
-        // Get partitions
-        let partitions: Vec<appstate::Partition> = self
-            .client
-            .get(&format!("{}{}", self.api, "devices/dirty"))
-            .send()?
-            .json()?;
-        assert!(partitions.len() >= 1);
+        let post_payload = match *input_type {
+            appstate::DevType::Usb => {
+                // Get partitions
+                let partitions: Vec<appstate::Partition> = self
+                    .client
+                    .get(&format!("{}{}", self.api, "devices/dirty"))
+                    .send()?
+                    .json()?;
+                assert!(!partitions.is_empty());
 
-        // Find partition
-        let part_index = partitions
-            .iter()
-            .find(|&part| part.type_str == part_type)
-            .unwrap()
-            .index;
+                // Find partition
+                let part_index = partitions
+                    .iter()
+                    .find(|&part| part.type_str == part_type)
+                    .unwrap()
+                    .index;
 
-        // Open partition
-        let resp = self
-            .client
-            .get(&format!(
-                "{}{}{}",
-                self.api, "devices/dirty/open/", part_index
-            ))
-            .send()?;
-        assert!(resp.status().is_success());
+                // Open partition
+                let resp = self
+                    .client
+                    .get(&format!(
+                        "{}{}{}",
+                        self.api, "devices/dirty/open/", part_index
+                    ))
+                    .send()?;
+                assert!(resp.status().is_success());
 
-        // Read / directory
-        let mut files: HashMap<String, appstate::ReadDir> = HashMap::new();
+                // Read / directory
+                let mut files: HashMap<String, appstate::ReadDir> = HashMap::new();
 
-        // "" for listing root dir
-        self.list_files_recursive(&mut files, "")?;
+                // "" for listing root dir
+                self.list_files_recursive(&mut files, "")?;
 
-        let all_path: Vec<&&str> = ok_path
-            .iter()
-            .chain(error_path.iter())
-            .chain(dirty_path.iter())
-            .chain(filtered_path.iter())
-            .collect();
-        files
-            .values()
-            .for_each(|file| assert!(all_path.contains(&&file.path_display.as_str())));
-        // Filter directories of ok_path to ensure usbsas will still create them if they have children selected.
-        let selected = files
-            .iter()
-            .filter(|(_, v)| v.ftype != 2 || !ok_path.contains(&(&*v.path_display)))
-            .collect::<HashMap<&String, &appstate::ReadDir>>();
-        // Select all files
-        let post_payload = serde_json::json!({"selected": selected.into_keys().collect::<Vec<&String>>(),
-            "fsfmt": fsfmt});
+                let all_path: Vec<&&str> = ok_path
+                    .iter()
+                    .chain(error_path.iter())
+                    .chain(dirty_path.iter())
+                    .chain(filtered_path.iter())
+                    .collect();
+                files
+                    .values()
+                    .for_each(|file| assert!(all_path.contains(&&file.path_display.as_str())));
+                // Filter directories of ok_path to ensure usbsas will still
+                // create them if they have children selected.
+                let selected = files
+                    .iter()
+                    .filter(|(_, v)| v.ftype != 2 || !ok_path.contains(&(&*v.path_display)))
+                    .collect::<HashMap<&String, &appstate::ReadDir>>();
+                // Select all files
+                serde_json::json!({"selected": selected.into_keys().collect::<Vec<&String>>(), "fsfmt": fsfmt})
+            }
+            appstate::DevType::Net => {
+                serde_json::json!({"selected": Vec::<String>::new(), "fsfmt": fsfmt, "download_pin": "123456"})
+            }
+            _ => panic!("input_dev shouldn't be this"),
+        };
 
         // Get id before copy
         let id = loop {
@@ -276,6 +304,7 @@ impl IntegrationTester {
 
     fn transfer(
         &self,
+        input_type: appstate::DevType,
         output_type: appstate::DevType,
         part_type: &str,
         dirty_path: &[&str],
@@ -287,6 +316,7 @@ impl IntegrationTester {
     ) {
         let resp = self
             .do_copy(
+                &input_type,
                 &output_type,
                 part_type,
                 dirty_path,
@@ -298,12 +328,12 @@ impl IntegrationTester {
             .expect("copy failed");
 
         for line in resp.split("\r\n") {
-            if line == "" {
+            if line.is_empty() {
                 continue;
             }
-            let status: StatusJson = serde_json::from_str(&line).expect("quiche");
-            if status.status == "final_report".to_string() {
-                let report: appstate::ReportCopy = serde_json::from_str(&line).expect("plop");
+            let status: StatusJson = serde_json::from_str(line).expect("quiche");
+            if status.status == *"final_report" {
+                let report: appstate::ReportCopy = serde_json::from_str(line).expect("plop");
                 assert_eq!(report.dirty_path, dirty_path, "dirty path mismatch");
                 assert_eq!(report.error_path, error_path, "error_path mismatch");
                 assert_eq!(
@@ -320,7 +350,7 @@ impl IntegrationTester {
                 .expect("failed to execute sha1sum");
             let sha1sum = String::from_utf8(sha1sum_cmd.stdout).unwrap();
             assert_eq!(
-                sha1sum.split_whitespace().nth(0).unwrap().to_string(),
+                sha1sum.split_whitespace().next().unwrap().to_string(),
                 expected_sha1sum
             );
         }
@@ -360,18 +390,18 @@ impl IntegrationTester {
         assert!(resp.status().is_success());
 
         for line in resp.text()?.split("\r\n") {
-            if line == "" {
+            if line.is_empty() {
                 continue;
             }
-            let status: StatusJson = serde_json::from_str(&line).unwrap();
-            if status.status == "wipe_end".to_string() {
+            let status: StatusJson = serde_json::from_str(line).unwrap();
+            if status.status == *"wipe_end" {
                 let sha1sum_cmd = Command::new("sha1sum")
                     .args(&[self.mock_input_dev.clone()])
                     .output()
                     .expect("failed to execute sha1sum");
                 let sha1sum = String::from_utf8(sha1sum_cmd.stdout).unwrap();
                 assert_eq!(
-                    sha1sum.split_whitespace().nth(0).unwrap().to_string(),
+                    sha1sum.split_whitespace().next().unwrap().to_string(),
                     expected_sha1sum
                 );
                 return Ok(());
@@ -382,6 +412,7 @@ impl IntegrationTester {
 
     fn dev_too_small(
         &self,
+        input_type: appstate::DevType,
         output_type: appstate::DevType,
         part_type: &str,
         dirty_path: &[&str],
@@ -403,6 +434,7 @@ impl IntegrationTester {
 
         let resp = self
             .do_copy(
+                &input_type,
                 &output_type,
                 part_type,
                 dirty_path,
@@ -414,14 +446,14 @@ impl IntegrationTester {
             .expect("copy failed");
 
         for line in resp.split("\r\n") {
-            if line == "" {
+            if line.is_empty() {
                 continue;
             }
-            let status: StatusJson = serde_json::from_str(&line).unwrap();
-            if status.status == "copy_not_enough_space".to_string() {
+            let status: StatusJson = serde_json::from_str(line).unwrap();
+            if status.status == *"copy_not_enough_space" {
                 return;
             }
-            if status.status == "final_report".to_string() {
+            if status.status == *"final_report" {
                 panic!("test transfer shouldn't finish");
             }
         }
@@ -431,22 +463,16 @@ impl IntegrationTester {
 impl Drop for IntegrationTester {
     fn drop(&mut self) {
         // Send SIGTERM instead of SIGKILL so the signal is forwarded to sons
-        loop {
-            match signal::kill(Pid::from_raw(self.usbsas_server.id() as i32), SIGTERM) {
-                Err(err) => {
-                    println!("Couldn't sigterm usbsas server: {}", err);
-                    sleep(Duration::from_secs(1));
-                }
-                Ok(_) => break,
-            }
+        while let Err(err) = signal::kill(Pid::from_raw(self.usbsas_server.id() as i32), SIGTERM) {
+            println!("Couldn't sigterm usbsas server: {}", err);
+            sleep(Duration::from_secs(1));
         }
-        match self.analyzer_server.kill() {
-            Err(e) => println!("Couldn't kill analyzer server: {}", e),
-            Ok(_) => (),
+        if let Err(e) = self.analyzer_server.kill() {
+            println!("Couldn't kill analyzer server: {}", e);
         }
-        // Remove mock {in,out}put dev
-        let _ = fs::remove_file(&self.mock_input_dev).ok();
-        let _ = fs::remove_file(&self.mock_output_dev).ok();
+        sleep(Duration::from_secs(1));
+        // Remove working dir
+        let _ = fs::remove_dir_all(&self.working_dir).ok();
     }
 }
 
@@ -478,6 +504,7 @@ fn integration_test() {
     // Test usb transfer FAT -> ExFAT
     tester.transfer(
         appstate::DevType::Usb,
+        appstate::DevType::Usb,
         "FAT",
         &dirty_path,
         &error_path,
@@ -490,6 +517,7 @@ fn integration_test() {
 
     // Test usb transfer NTFS -> FAT
     tester.transfer(
+        appstate::DevType::Usb,
         appstate::DevType::Usb,
         "NTFS",
         &dirty_path,
@@ -504,6 +532,7 @@ fn integration_test() {
     // Test usb transfer ext4 -> NTFS
     tester.transfer(
         appstate::DevType::Usb,
+        appstate::DevType::Usb,
         "Linux/Ext",
         &dirty_path,
         &error_path,
@@ -516,6 +545,7 @@ fn integration_test() {
 
     // Test upload
     tester.transfer(
+        appstate::DevType::Usb,
         appstate::DevType::Net,
         "FAT",
         &[],
@@ -527,8 +557,23 @@ fn integration_test() {
     );
     tester.reset();
 
+    // Test download
+    tester.transfer(
+        appstate::DevType::Net,
+        appstate::DevType::Usb,
+        "",
+        &[],
+        &[],
+        &[],
+        &[&ok_path[..], &[], &[]].concat(),
+        "903dc5219a4de94a75449ee607da49edc5b78e77",
+        "ntfs",
+    );
+    tester.reset();
+
     // Test transfer when output device is too small
     tester.dev_too_small(
+        appstate::DevType::Usb,
         appstate::DevType::Usb,
         "FAT",
         &dirty_path,

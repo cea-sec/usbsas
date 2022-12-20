@@ -303,10 +303,7 @@ fn main() -> Result<()> {
     };
 
     // indexes are from 0
-    let mut partnum = partnum;
-    if partnum > 0 {
-        partnum -= 1;
-    }
+    let partnum = partnum.saturating_sub(1);
 
     let fuse_options: Vec<&OsStr> = vec![OsStr::new("-o"), OsStr::new("ro,nodev,noexec,nosuid")];
 

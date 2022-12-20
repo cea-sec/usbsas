@@ -1,18 +1,20 @@
-//! Very basic remote analyse / upload server for `usbsas` using `clamav`.
-//! Mainly used for example and tests.
+//! Very basic remote analyse / upload / download server for `usbsas` using `clamav`.
+//! Mainly used for example and integration tests.
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_files::NamedFile;
+use actix_web::{get, head, http::header, post, web, App, HttpResponse, HttpServer, Responder};
 use clamav_rs::{
     db, engine,
     scan_settings::{ScanSettings, ScanSettingsBuilder},
 };
+use clap::{Arg, Command};
 use futures::StreamExt;
 use serde_json::json;
 use std::{
     collections::HashMap,
     fs,
-    io::{self, Write},
-    path::Path,
+    io::{self, Read, Seek, Write},
+    path::{Path, PathBuf},
     sync::Mutex,
     thread,
 };
@@ -25,7 +27,7 @@ struct AnalyzeStatus {
 }
 
 struct AppState {
-    working_dir: Mutex<TempDir>,
+    working_dir: Mutex<String>,
     current_scans: Mutex<HashMap<String, AnalyzeStatus>>,
     clamav_engine: Mutex<engine::Engine>,
     clamav_settings: Mutex<ScanSettings>,
@@ -35,9 +37,9 @@ impl AppState {
     fn analyze(&self, bundle_id: String, tar: String) -> Result<(), actix_web::Error> {
         let tmpdir = tempfile::Builder::new()
             .prefix(&bundle_id)
-            .tempdir_in(self.working_dir.lock().unwrap().path())
+            .tempdir_in(PathBuf::from(&*self.working_dir.lock().unwrap()))
             .unwrap();
-        let mut archive = Archive::new(fs::File::open(&tar).unwrap());
+        let mut archive = Archive::new(fs::File::open(tar).unwrap());
         // XXX TODO maybe mmap archive file and use clamav's scan_map function instead of unpacking
         if let Err(err) = archive.unpack(tmpdir.path()) {
             log::error!("err: {}, not a tar ?", err);
@@ -130,11 +132,7 @@ impl AppState {
         mut body: web::Payload,
     ) -> Result<(String, String), actix_web::Error> {
         let bundle_id = uuid::Uuid::new_v4().simple().to_string();
-        let out_file_name = format!(
-            "{}/{}.tar",
-            self.working_dir.lock().unwrap().path().to_string_lossy(),
-            bundle_id
-        );
+        let out_file_name = format!("{}/{}.tar", self.working_dir.lock().unwrap(), bundle_id);
         let mut out_file = fs::File::create(out_file_name.clone()).unwrap();
 
         while let Some(bytes) = body.next().await {
@@ -187,13 +185,11 @@ async fn scan_result(
             || current_scans[&bundle_id].status == "error"
         {
             let entry = current_scans.remove(&bundle_id).unwrap();
-            fs::remove_file(
-                data.working_dir
-                    .lock()
-                    .unwrap()
-                    .path()
-                    .join(format!("{}.tar", bundle_id)),
-            )
+            fs::remove_file(format!(
+                "{}/{}.tar",
+                data.working_dir.lock().unwrap(),
+                bundle_id
+            ))
             .unwrap();
             json!({
                 "id": bundle_id,
@@ -211,6 +207,7 @@ async fn scan_result(
         Ok(HttpResponse::NotFound().finish())
     }
 }
+
 #[post("/api/uploadbundle/{id}")]
 async fn upload_bundle(
     body: web::Payload,
@@ -219,6 +216,78 @@ async fn upload_bundle(
 ) -> Result<impl Responder, actix_web::Error> {
     let (_, _) = data.recv_file(body).await?;
     Ok(HttpResponse::Ok())
+}
+
+fn find_bundle(filename: &str) -> Result<(String, u64), actix_web::Error> {
+    for ext in ["tar", "tar.gz", "gz"] {
+        let bundle_path = format!("{}.{}", filename, ext);
+        if let Ok(metadata) = fs::metadata(&bundle_path) {
+            return Ok((bundle_path, metadata.len()));
+        }
+    }
+    Err(actix_web::error::ErrorNotFound(io::Error::new(
+        io::ErrorKind::NotFound,
+        "Bundle not found",
+    )))
+}
+
+#[head("/api/downloadbundle/{id}/{bundle_id}")]
+async fn head_bundle_size(
+    params: web::Path<(String, String)>,
+    data: web::Data<AppState>,
+) -> Result<impl Responder, actix_web::Error> {
+    let (id, bundle_id) = params.into_inner();
+    let (bundle_path, mut size) = find_bundle(&format!(
+        "{}/{}/{}",
+        data.working_dir.lock().unwrap(),
+        id,
+        bundle_id
+    ))?;
+
+    // usbsas expects uncompressed size of files with HEAD requests
+
+    // XXX FIXME Dirty hack 1:
+    // /!\ The following only work if the gzipped tar is < 4GB (as it's stored
+    // %4GB), but good enough for this integration tests server
+    if bundle_path.ends_with("gz") {
+        let mut f = fs::File::open(&bundle_path)?;
+        f.seek(io::SeekFrom::End(-4)).unwrap();
+        let mut buf = vec![0; 4];
+        f.read_exact(&mut buf).unwrap();
+        size = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as u64;
+        log::debug!("filename: {}, uncompressed size: {}", bundle_path, size);
+    }
+    log::debug!("filename: {}, size: {}", bundle_path, size);
+
+    // XXX FIXME Dirty hack 2:
+    // Since Content-Length is automatically set as the size of the body (we
+    // can't set it manually), lie with an empty sized stream. Since it's a HEAD
+    // request, the body will not be sent and the stream will never be polled
+    // but the Content-Length header will have the value we want. see:
+    // https://github.com/actix/actix-web/issues/1439
+    let dummy_stream: futures::stream::Empty<Result<actix_web::web::Bytes, actix_web::Error>> =
+        futures::stream::empty();
+    Ok(HttpResponse::Ok().body(actix_web::body::SizedStream::new(size, dummy_stream)))
+}
+
+#[get("/api/downloadbundle/{id}/{bundle_id}")]
+async fn download_bundle(
+    params: web::Path<(String, String)>,
+    data: web::Data<AppState>,
+) -> Result<impl Responder, actix_web::Error> {
+    let (id, bundle_id) = params.into_inner();
+    let (bundle_path, _) = find_bundle(&format!(
+        "{}/{}/{}",
+        data.working_dir.lock().unwrap(),
+        id,
+        bundle_id
+    ))?;
+    let named_file = if bundle_path.ends_with("gz") {
+        NamedFile::open(bundle_path)?.set_content_encoding(header::ContentEncoding::Gzip)
+    } else {
+        NamedFile::open(bundle_path)?
+    };
+    Ok(named_file)
 }
 
 fn init_clamav() -> (engine::Engine, ScanSettings) {
@@ -236,14 +305,36 @@ fn init_clamav() -> (engine::Engine, ScanSettings) {
 #[actix_web::main]
 async fn main() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
-    let (engine, settings) = init_clamav();
-    let app_data = web::Data::new(AppState {
-        working_dir: Mutex::new(
-            tempfile::Builder::new()
+
+    let command = Command::new("usbsas-analyzer-server")
+        .about("simple usbsas remote server for integrations tests")
+        .version("0.1")
+        .arg(
+            Arg::new("working-dir")
+                .value_name("WORKING-DIR")
+                .short('d')
+                .long("working-dir")
+                .num_args(1)
+                .required(false),
+        );
+
+    let matches = command.get_matches();
+
+    let (working_path, _temp_dir): (String, Option<TempDir>) =
+        if let Some(wp) = matches.get_one::<String>("working-dir") {
+            (wp.to_owned(), None)
+        } else {
+            let tmpdir = tempfile::Builder::new()
                 .prefix("usbsas-analyzer")
                 .tempdir_in("/tmp")
-                .unwrap(),
-        ),
+                .unwrap();
+            let working_path = tmpdir.path().to_string_lossy().to_string();
+            (working_path, Some(tmpdir))
+        };
+
+    let (engine, settings) = init_clamav();
+    let app_data = web::Data::new(AppState {
+        working_dir: Mutex::new(working_path),
         current_scans: Mutex::new(HashMap::new()),
         clamav_engine: Mutex::new(engine),
         clamav_settings: Mutex::new(settings),
@@ -254,6 +345,8 @@ async fn main() -> io::Result<()> {
             .service(scan_bundle)
             .service(scan_result)
             .service(upload_bundle)
+            .service(head_bundle_size)
+            .service(download_bundle)
     })
     .bind("127.0.0.1:8042")?
     .run()
