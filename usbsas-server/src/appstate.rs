@@ -70,6 +70,13 @@ enum CopyDestination {
     Cmd,
 }
 
+enum CopySource {
+    Usb {
+        opendev: proto::usbsas::RequestOpenDevice,
+    },
+    Net,
+}
+
 /// Public device structures we can send to web clients.
 
 #[derive(Serialize, Debug)]
@@ -262,6 +269,7 @@ pub(crate) struct ReadDirQuery {
 pub(crate) struct CopyIn {
     pub(crate) selected: Vec<String>,
     pub(crate) fsfmt: String,
+    pub(crate) download_pin: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -477,6 +485,13 @@ impl AppState {
                 is_dst: true,
             });
         }
+        if let Some(source_network) = &config.source_network {
+            targets.push(TargetDevice {
+                device: Device::Net(source_network.clone()),
+                is_src: true,
+                is_dst: false,
+            });
+        }
         Ok(targets)
     }
 
@@ -506,10 +521,10 @@ impl AppState {
 
     pub(crate) fn device_select(
         &self,
-        fingerprint_dirty: String,
+        fingerprint_in: String,
         fingerprint_out: String,
     ) -> Result<(), ServiceError> {
-        if fingerprint_dirty == fingerprint_out {
+        if fingerprint_in == fingerprint_out {
             return Err(ServiceError::Error(
                 "Output cannot be the same as input".to_string(),
             ));
@@ -517,18 +532,28 @@ impl AppState {
 
         let devices = self.list_all_devices()?;
 
-        let mut dirty = None;
+        let mut in_dev = None;
         let mut out_dev = None;
         for dev in devices {
             let fingerprint = dev.device.fingerprint();
-            if fingerprint_dirty == fingerprint {
-                if let Device::Usb(ref usb) = &dev.device {
-                    dirty = Some(proto::usbsas::RequestOpenDevice {
-                        device: Some(usb.to_owned()),
-                    });
+            if fingerprint_in == fingerprint {
+                debug!("in_dev set");
+                match &dev.device {
+                    Device::Usb(ref usb) => {
+                        in_dev = Some(CopySource::Usb {
+                            opendev: proto::usbsas::RequestOpenDevice {
+                                device: Some(usb.to_owned()),
+                            },
+                        });
+                    }
+                    Device::Net(_) => {
+                        in_dev = Some(CopySource::Net);
+                    }
+                    Device::Cmd(_) => in_dev = None,
                 }
             }
             if fingerprint_out == fingerprint {
+                debug!("out_dev set");
                 match &dev.device {
                     Device::Usb(ref usb) => {
                         out_dev = Some(CopyDestination::Usb {
@@ -547,19 +572,21 @@ impl AppState {
             }
         }
 
-        let dirty = match (dirty, &out_dev) {
-            (Some(dirty), Some(_)) => dirty,
+        let in_dev = match (in_dev, &out_dev) {
+            (Some(CopySource::Net), Some(_)) => {
+                *self.out_dev.lock()? = out_dev;
+                return Ok(());
+            }
+            (Some(CopySource::Usb { opendev }), Some(_)) => opendev,
             (_, _) => {
-                error!("Cannot find diry or out dev");
-                return Err(ServiceError::Error(
-                    "Cannot find dirty or out dev".to_string(),
-                ));
+                error!("Cannot find in or out dev");
+                return Err(ServiceError::Error("Cannot find in or out dev".to_string()));
             }
         };
 
         self.comm
             .lock()?
-            .opendev(dirty)
+            .opendev(in_dev)
             .map_err(|err| ServiceError::Error(format!("couldn't open input device: {}", err)))?;
         *self.out_dev.lock()? = out_dev;
 
@@ -644,9 +671,26 @@ impl AppState {
         &self,
         req_selected: Vec<String>,
         fsfmt: String,
+        download_pin: Option<String>,
         resp_stream: ResponseStream,
     ) -> Result<(), ServiceError> {
         use proto::usbsas::response::Msg;
+        let mut src_is_net = false;
+
+        let source = match download_pin {
+            Some(pin) => {
+                let pin = pin
+                    .parse::<u64>()
+                    .map_err(|_| ServiceError::InternalServerError)?;
+                src_is_net = true;
+                Some(proto::usbsas::request_copy_start::Source::SrcNet(
+                    proto::usbsas::SrcNet { pin },
+                ))
+            }
+            None => Some(proto::usbsas::request_copy_start::Source::SrcUsb(
+                proto::usbsas::SrcUsb {},
+            )),
+        };
 
         let mut progress = 0.0;
         let mut resp_stream = resp_stream;
@@ -705,6 +749,7 @@ impl AppState {
                 proto::usbsas::RequestCopyStart {
                     destination: Some(destination),
                     selected,
+                    source,
                 },
             )),
         })?;
@@ -760,7 +805,7 @@ impl AppState {
         }
         progress = current_progress + 30.0;
 
-        if self.config.lock()?.analyzer.is_some() {
+        if self.config.lock()?.analyzer.is_some() && !src_is_net {
             if let Some(CopyDestination::Usb { .. }) = *out_dev {
                 resp_stream.report_progress("analyzing", progress)?;
                 current_progress = progress;
