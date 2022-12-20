@@ -47,6 +47,8 @@ enum Error {
     Error(String),
     #[error("Bad Request")]
     BadRequest,
+    #[error("No conf")]
+    NoConf,
     #[error("Remote server error")]
     BadResponse,
     #[error("Bad Response")]

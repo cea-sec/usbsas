@@ -85,9 +85,7 @@ impl InitState {
         let file = File::create(&self.tarpath)?;
         let config_str = conf_read(&self.config_path)?;
         let config = conf_parse(&config_str)?;
-        let net_conf = config
-            .source_network
-            .ok_or_else(|| Error::Error("Missing source network in conf".to_owned()))?;
+        let net_conf = config.source_network.ok_or(Error::NoConf)?;
 
         Ok(State::Running(RunningState {
             file,
@@ -249,6 +247,10 @@ impl Downloader {
             state = match state.run(&mut comm) {
                 Ok(State::End) => break,
                 Ok(state) => state,
+                Err(Error::NoConf) => {
+                    log::info!("No configuration for downloader, parking");
+                    State::WaitEnd(WaitEndState {})
+                }
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::downloader::ResponseError {
