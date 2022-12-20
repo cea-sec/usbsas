@@ -148,8 +148,8 @@ pub enum Desc {
 pub struct DeviceDesc {
     dev: Desc,
     pub id: String,
-    is_src: bool,
-    is_dst: bool,
+    pub is_src: bool,
+    pub is_dst: bool,
     pub dev_type: DevType,
 }
 

@@ -28,15 +28,13 @@ struct IntegrationTester {
 
 impl IntegrationTester {
     fn new() -> Self {
-        let test_data_dir = env::var("CARGO_MANIFEST_DIR")
-            .expect("no CARGO_MANIFEST_DIR env var")
-            .to_string()
-            + "/test_data/";
+        let test_data_dir =
+            env::var("CARGO_MANIFEST_DIR").expect("no CARGO_MANIFEST_DIR env var") + "/test_data/";
 
         let working_dir = String::from("/tmp/usbsas-tests");
 
         if let Err(err) = fs::create_dir(&working_dir) {
-            if !(err.kind() == io::ErrorKind::AlreadyExists) {
+            if err.kind() != io::ErrorKind::AlreadyExists {
                 panic!("couldn't create working dir: {}", err)
             }
         }
@@ -58,7 +56,7 @@ impl IntegrationTester {
                     .status()
                     .expect("Couldn't uncompress mock input dev");
                 env::set_var("USBSAS_MOCK_IN_DEV", &input);
-                String::from(input)
+                input
             }
         };
 
@@ -81,21 +79,21 @@ impl IntegrationTester {
                     .status()
                     .expect("Couldn't create mock output dev");
                 env::set_var("USBSAS_MOCK_OUT_DEV", &output);
-                String::from(output)
+                output
             }
         };
 
         // Start usbsas server
         let usbsas_server = Command::cargo_bin("usbsas-server")
             .expect("Couldn't run usbsas server")
-            .args(&["-c", &format!("{}/config_test.toml", test_data_dir)])
+            .args(["-c", &format!("{}/config_test.toml", test_data_dir)])
             .spawn()
             .expect("Couldn't run usbsas server");
 
         // Start analyzer server
         let analyzer_server = Command::cargo_bin("usbsas-analyzer-server")
             .expect("Couldn't run analyzer server")
-            .args(&["-d", &working_dir])
+            .args(["-d", &working_dir])
             .spawn()
             .expect("Couldn't run analyzer server");
 
@@ -117,7 +115,7 @@ impl IntegrationTester {
 
         IntegrationTester {
             api: "http://localhost:8080/".into(),
-            client: client,
+            client,
             mock_input_dev,
             mock_output_dev,
             working_dir,
@@ -163,7 +161,7 @@ impl IntegrationTester {
             .json()?;
         for (path, file) in new_files.iter() {
             if file.ftype == 2 {
-                self.list_files_recursive(files, &path)?;
+                self.list_files_recursive(files, path)?;
             }
         }
         files.extend(new_files);
@@ -198,7 +196,7 @@ impl IntegrationTester {
         let output_dev = devices.swap_remove(
             devices
                 .iter()
-                .position(|dev| dev.dev_type == *output_type)
+                .position(|dev| dev.dev_type == *output_type && dev.is_dst)
                 .expect("Couldn't find output dev"),
         );
 
@@ -218,7 +216,7 @@ impl IntegrationTester {
             .get(&format!("{}{}", self.api, "devices/dirty"))
             .send()?
             .json()?;
-        assert!(partitions.len() >= 1);
+        assert!(!partitions.is_empty());
 
         // Find partition
         let part_index = partitions
@@ -309,12 +307,12 @@ impl IntegrationTester {
             .expect("copy failed");
 
         for line in resp.split("\r\n") {
-            if line == "" {
+            if line.is_empty() {
                 continue;
             }
-            let status: StatusJson = serde_json::from_str(&line).expect("quiche");
-            if status.status == "final_report".to_string() {
-                let report: appstate::ReportCopy = serde_json::from_str(&line).expect("plop");
+            let status: StatusJson = serde_json::from_str(line).expect("quiche");
+            if status.status == *"final_report" {
+                let report: appstate::ReportCopy = serde_json::from_str(line).expect("plop");
                 assert_eq!(report.dirty_path, dirty_path, "dirty path mismatch");
                 assert_eq!(report.error_path, error_path, "error_path mismatch");
                 assert_eq!(
@@ -331,7 +329,7 @@ impl IntegrationTester {
                 .expect("failed to execute sha1sum");
             let sha1sum = String::from_utf8(sha1sum_cmd.stdout).unwrap();
             assert_eq!(
-                sha1sum.split_whitespace().nth(0).unwrap().to_string(),
+                sha1sum.split_whitespace().next().unwrap().to_string(),
                 expected_sha1sum
             );
         }
@@ -371,18 +369,18 @@ impl IntegrationTester {
         assert!(resp.status().is_success());
 
         for line in resp.text()?.split("\r\n") {
-            if line == "" {
+            if line.is_empty() {
                 continue;
             }
-            let status: StatusJson = serde_json::from_str(&line).unwrap();
-            if status.status == "wipe_end".to_string() {
+            let status: StatusJson = serde_json::from_str(line).unwrap();
+            if status.status == *"wipe_end" {
                 let sha1sum_cmd = Command::new("sha1sum")
                     .args(&[self.mock_input_dev.clone()])
                     .output()
                     .expect("failed to execute sha1sum");
                 let sha1sum = String::from_utf8(sha1sum_cmd.stdout).unwrap();
                 assert_eq!(
-                    sha1sum.split_whitespace().nth(0).unwrap().to_string(),
+                    sha1sum.split_whitespace().next().unwrap().to_string(),
                     expected_sha1sum
                 );
                 return Ok(());
@@ -425,14 +423,14 @@ impl IntegrationTester {
             .expect("copy failed");
 
         for line in resp.split("\r\n") {
-            if line == "" {
+            if line.is_empty() {
                 continue;
             }
-            let status: StatusJson = serde_json::from_str(&line).unwrap();
-            if status.status == "copy_not_enough_space".to_string() {
+            let status: StatusJson = serde_json::from_str(line).unwrap();
+            if status.status == *"copy_not_enough_space" {
                 return;
             }
-            if status.status == "final_report".to_string() {
+            if status.status == *"final_report" {
                 panic!("test transfer shouldn't finish");
             }
         }
@@ -442,18 +440,12 @@ impl IntegrationTester {
 impl Drop for IntegrationTester {
     fn drop(&mut self) {
         // Send SIGTERM instead of SIGKILL so the signal is forwarded to sons
-        loop {
-            match signal::kill(Pid::from_raw(self.usbsas_server.id() as i32), SIGTERM) {
-                Err(err) => {
-                    println!("Couldn't sigterm usbsas server: {}", err);
-                    sleep(Duration::from_secs(1));
-                }
-                Ok(_) => break,
-            }
+        while let Err(err) = signal::kill(Pid::from_raw(self.usbsas_server.id() as i32), SIGTERM) {
+            println!("Couldn't sigterm usbsas server: {}", err);
+            sleep(Duration::from_secs(1));
         }
-        match self.analyzer_server.kill() {
-            Err(e) => println!("Couldn't kill analyzer server: {}", e),
-            Ok(_) => (),
+        if let Err(e) = self.analyzer_server.kill() {
+            println!("Couldn't kill analyzer server: {}", e);
         }
         sleep(Duration::from_secs(1));
         // Remove working dir
