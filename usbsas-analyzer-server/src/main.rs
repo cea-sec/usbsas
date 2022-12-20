@@ -1,7 +1,8 @@
-//! Very basic remote analyse / upload server for `usbsas` using `clamav`.
-//! Mainly used for example and tests.
+//! Very basic remote analyse / upload / download server for `usbsas` using `clamav`.
+//! Mainly used for example and integration tests.
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_files::NamedFile;
+use actix_web::{get, head, http::header, post, web, App, HttpResponse, HttpServer, Responder};
 use clamav_rs::{
     db, engine,
     scan_settings::{ScanSettings, ScanSettingsBuilder},
@@ -11,7 +12,7 @@ use serde_json::json;
 use std::{
     collections::HashMap,
     fs,
-    io::{self, Write},
+    io::{self, Read, Seek, Write},
     path::Path,
     sync::Mutex,
     thread,
@@ -211,6 +212,7 @@ async fn scan_result(
         Ok(HttpResponse::NotFound().finish())
     }
 }
+
 #[post("/api/uploadbundle/{id}")]
 async fn upload_bundle(
     body: web::Payload,
@@ -221,13 +223,85 @@ async fn upload_bundle(
     Ok(HttpResponse::Ok())
 }
 
+fn find_bundle(filename: &str) -> Result<(String, u64), actix_web::Error> {
+    for ext in ["tar", "tar.gz", "gz"] {
+        let bundle_path = format!("{}.{}", filename, ext);
+        if let Ok(metadata) = fs::metadata(&bundle_path) {
+            return Ok((bundle_path, metadata.len()));
+        }
+    }
+    Err(actix_web::error::ErrorNotFound(io::Error::new(
+        io::ErrorKind::NotFound,
+        "Bundle not found",
+    )))
+}
+
+#[head("/api/downloadbundle/{id}/{bundle_id}")]
+async fn head_bundle_size(
+    params: web::Path<(String, String)>,
+    data: web::Data<AppState>,
+) -> Result<impl Responder, actix_web::Error> {
+    let (id, bundle_id) = params.into_inner();
+    let (bundle_path, mut size) = find_bundle(&format!(
+        "{}/{}/{}",
+        data.working_dir.lock().unwrap().path().to_string_lossy(),
+        id,
+        bundle_id
+    ))?;
+
+    // usbsas expects uncompressed size of files with HEAD requests
+
+    // XXX FIXME Dirty hack 1:
+    // /!\ The following only work if the gzipped tar is < 4GB (as it's stored
+    // %4GB), but good enough for this integration tests server
+    if bundle_path.ends_with("gz") {
+        let mut f = fs::File::open(&bundle_path)?;
+        f.seek(io::SeekFrom::End(-4)).unwrap();
+        let mut buf = vec![0; 4];
+        f.read_exact(&mut buf).unwrap();
+        size = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as u64;
+        log::debug!("filename: {}, uncompressed size: {}", bundle_path, size);
+    }
+    log::debug!("filename: {}, size: {}", bundle_path, size);
+
+    // XXX FIXME Dirty hack 2:
+    // Since Content-Length is automatically set as the size of the body (we
+    // can't set it manually), lie with an empty sized stream. Since it's a HEAD
+    // request, the body will not be sent and the stream will never be polled
+    // but the Content-Length header will have the value we want. see:
+    // https://github.com/actix/actix-web/issues/1439
+    let dummy_stream: futures::stream::Empty<Result<actix_web::web::Bytes, actix_web::Error>> =
+        futures::stream::empty();
+    Ok(HttpResponse::Ok().body(actix_web::body::SizedStream::new(size, dummy_stream)))
+}
+
+#[get("/api/downloadbundle/{id}/{bundle_id}")]
+async fn download_bundle(
+    params: web::Path<(String, String)>,
+    data: web::Data<AppState>,
+) -> Result<impl Responder, actix_web::Error> {
+    let (id, bundle_id) = params.into_inner();
+    let (bundle_path, _) = find_bundle(&format!(
+        "{}/{}/{}",
+        data.working_dir.lock().unwrap().path().to_string_lossy(),
+        id,
+        bundle_id
+    ))?;
+    let named_file = if bundle_path.ends_with("gz") {
+        NamedFile::open(bundle_path)?.set_content_encoding(header::ContentEncoding::Gzip)
+    } else {
+        NamedFile::open(bundle_path)?
+    };
+    Ok(named_file)
+}
+
 fn init_clamav() -> (engine::Engine, ScanSettings) {
     clamav_rs::initialize().expect("couldn't init clamav");
     let settings = ScanSettingsBuilder::new().build();
     let engine = engine::Engine::new();
     engine
-        .load_databases(&db::default_directory())
-        .expect("clamav database load failed");
+    .load_databases(&db::default_directory())
+    .expect("clamav database load failed");
     engine.compile().expect("clamav compile failed");
     log::info!("clamav initialized, starting server");
     (engine, settings)
@@ -254,6 +328,8 @@ async fn main() -> io::Result<()> {
             .service(scan_bundle)
             .service(scan_result)
             .service(upload_bundle)
+            .service(head_bundle_size)
+            .service(download_bundle)
     })
     .bind("127.0.0.1:8042")?
     .run()
