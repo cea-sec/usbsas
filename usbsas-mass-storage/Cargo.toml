@@ -6,7 +6,7 @@ license = "GPL-3.0"
 
 [dependencies]
 log = "0.4"
-lru = "0.8"
+lru = "0.9"
 positioned-io2 = "0.3"
 rusb = "0.9"
 usbsas-comm = { path = "../usbsas-comm" }
