@@ -1,5 +1,5 @@
-From be0dd6f3c630c98aa68155d30016d92af7ea6e91 Mon Sep 17 00:00:00 2001
-Date: Thu, 17 Feb 2022 15:23:27 +0100
+From 8ccbac8f9f7ea7c0ee371283b19512662a1e0d5e Mon Sep 17 00:00:00 2001
+Date: Tue, 3 Jan 2023 16:14:27 +0100
 Subject: [PATCH] Modifications for usbsas
 
 ---
@@ -17,10 +17,10 @@ Subject: [PATCH] Modifications for usbsas
  create mode 100644 unix_io.h
 
 diff --git a/mft.c b/mft.c
-index d0a601f..4f2c620 100644
+index aefbb5f..9ea7894 100644
 --- a/mft.c
 +++ b/mft.c
-@@ -1916,9 +1916,9 @@ found_free_rec:
+@@ -1925,9 +1925,9 @@ found_free_rec:
  	/* Initialize time, allocated and data size in ntfs_inode struct. */
  	ni->data_size = ni->allocated_size = 0;
  	ni->flags = const_cpu_to_le32(0);
@@ -906,5 +906,5 @@ index 42800a2..600d648 100644
  
  extern int ntfs_version_is_supported(ntfs_volume *vol);
 -- 
-2.35.1
+2.39.0
 
