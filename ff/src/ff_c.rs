@@ -10,6 +10,7 @@ impl FATFS {
         FATFS {
             fs_type: 0,
             pdrv: std::ptr::null_mut(),
+            ldrv: 0,
             n_fats: 0,
             wflag: 0,
             fsi_flag: 0,

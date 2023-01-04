@@ -510,7 +510,7 @@ fn integration_test() {
         &error_path,
         &filtered_path,
         &ok_path,
-        "a9353e77e6a409a4143ff2d1fa26bb37c03b5872",
+        "44679f5770467f2de6faf6b60b5f7268536f7c68",
         "exfat",
     );
     tester.reset();
@@ -524,7 +524,7 @@ fn integration_test() {
         &error_path,
         &filtered_path,
         &ok_path,
-        "daae66b7ddcae5a7873d415d1f4d3b17fcdfb621",
+        "308f59cb6dfe4930364e5c56fd751390f57b91dc",
         "fat32",
     );
     tester.reset();
@@ -585,7 +585,7 @@ fn integration_test() {
 
     // Test quick wipe & mkfs fat32
     tester
-        .wipe("fat32", true, "a38a4728650cce9a8314aaa322f8c8dd576d3e44")
+        .wipe("fat32", true, "b127d51b0988cf50dca2fc403d646cc94cd3f23d")
         .expect("wipe failed");
     tester.reset();
 
