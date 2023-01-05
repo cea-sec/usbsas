@@ -1892,7 +1892,7 @@ impl Usbsas {
         };
 
         trace!("enter seccomp");
-        usbsas_sandbox::usbsas::drop_priv(pipes_read, pipes_write)?;
+        usbsas_sandbox::usbsas::seccomp(pipes_read, pipes_write)?;
 
         let children = Children {
             analyzer,

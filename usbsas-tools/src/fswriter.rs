@@ -51,7 +51,7 @@ impl FsWriter {
             .wait_on_startup()
             .spawn::<usbsas_fs2dev::Fs2Dev, proto::fs2dev::Request>()?;
 
-        usbsas_sandbox::fswriter::drop_priv(
+        usbsas_sandbox::fswriter::seccomp(
             fs.as_raw_fd(),
             fs2dev.comm.input_fd(),
             fs2dev.comm.output_fd(),

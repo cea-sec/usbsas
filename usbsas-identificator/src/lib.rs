@@ -52,7 +52,7 @@ struct RunningState {
 
 impl InitState {
     fn run(self, comm: &mut Comm<proto::identificator::Request>) -> Result<State> {
-        usbsas_sandbox::identificator::drop_priv(comm.input_fd(), comm.output_fd())?;
+        usbsas_sandbox::identificator::seccomp(comm.input_fd(), comm.output_fd())?;
         Ok(State::Running(RunningState { current_id: None }))
     }
 }

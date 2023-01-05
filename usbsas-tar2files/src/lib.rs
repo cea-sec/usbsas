@@ -98,7 +98,7 @@ impl InitState {
         Ok(match comm.read_u8()? {
             1 => {
                 let tar = File::open(self.tarpath)?;
-                usbsas_sandbox::tar2files::drop_priv(
+                usbsas_sandbox::tar2files::seccomp(
                     comm.input_fd(),
                     comm.output_fd(),
                     Some(tar.as_raw_fd()),
@@ -106,7 +106,7 @@ impl InitState {
                 State::LoadMetadata(LoadMetadataState { tar })
             }
             _ => {
-                usbsas_sandbox::tar2files::drop_priv(comm.input_fd(), comm.output_fd(), None)?;
+                usbsas_sandbox::tar2files::seccomp(comm.input_fd(), comm.output_fd(), None)?;
                 State::WaitEnd(WaitEndState {})
             }
         })

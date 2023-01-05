@@ -1,9 +1,10 @@
-use crate::Result;
+use crate::{seccomp, Result};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
-pub fn drop_priv(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()> {
-    let mut ctx = crate::new_context_with_common_rules(vec![fd_in_file, comm_in], vec![comm_out])?;
+pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()> {
+    let mut ctx =
+        seccomp::new_context_with_common_rules(vec![fd_in_file, comm_in], vec![comm_out])?;
 
     // Allow lseek on out_fs
     ctx.set_rule_for_syscall(

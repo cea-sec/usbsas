@@ -157,7 +157,7 @@ impl<T: UsbContext> InitState<T> {
 
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
-            usbsas_sandbox::fs2dev::drop_priv(
+            usbsas_sandbox::fs2dev::seccomp(
                 comm.input_fd(),
                 comm.output_fd(),
                 None,
@@ -168,7 +168,7 @@ impl<T: UsbContext> InitState<T> {
             let fs = File::open(self.fs_fname)?;
             let mass_storage = MassStorage::from_busnum_devnum(self.context, busnum, devnum)?;
             #[cfg(not(feature = "mock"))]
-            usbsas_sandbox::fs2dev::drop_priv(
+            usbsas_sandbox::fs2dev::seccomp(
                 comm.input_fd(),
                 comm.output_fd(),
                 Some(fs.as_raw_fd()),

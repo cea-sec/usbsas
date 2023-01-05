@@ -96,7 +96,7 @@ impl InitState {
             .spawn::<usbsas_dev2scsi::Dev2Scsi, proto::scsi::Request>()?;
         let UsbsasChild { comm, .. } = dev2scsi;
 
-        usbsas_sandbox::scsi2files::drop_priv(
+        usbsas_sandbox::scsi2files::seccomp(
             vec![comm_parent.input_fd(), comm.input_fd()],
             vec![comm_parent.output_fd(), comm.output_fd()],
         )?;

@@ -125,7 +125,7 @@ impl InitState {
             .read(true)
             .write(true)
             .open(self.fs_fname)?;
-        usbsas_sandbox::files2fs::drop_priv(comm.input_fd(), comm.output_fd(), fs.as_raw_fd())?;
+        usbsas_sandbox::files2fs::seccomp(comm.input_fd(), comm.output_fd(), fs.as_raw_fd())?;
         Ok(State::WaitFsInfos(WaitFsInfosState { fs }))
     }
 }

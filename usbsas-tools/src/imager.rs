@@ -110,7 +110,7 @@ impl Imager {
             None
         };
 
-        usbsas_sandbox::imager::drop_priv(pipes_read, pipes_write)?;
+        usbsas_sandbox::imager::seccomp(pipes_read, pipes_write)?;
 
         Ok(Imager {
             usbdev,

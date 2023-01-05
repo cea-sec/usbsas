@@ -101,7 +101,7 @@ impl<T: UsbContext> InitState<T> {
         // to the EndState
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
-            usbsas_sandbox::dev2scsi::drop_priv(
+            usbsas_sandbox::dev2scsi::seccomp(
                 comm.input_fd(),
                 comm.output_fd(),
                 usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
@@ -121,7 +121,7 @@ impl<T: UsbContext> InitState<T> {
         };
 
         #[cfg(not(feature = "mock"))]
-        usbsas_sandbox::dev2scsi::drop_priv(
+        usbsas_sandbox::dev2scsi::seccomp(
             comm.input_fd(),
             comm.output_fd(),
             usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,

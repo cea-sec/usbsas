@@ -126,7 +126,7 @@ impl InitState {
     fn run(self, comm: &mut Comm<proto::filter::Request>) -> Result<State> {
         let config_str = conf_read(&self.config_path)?;
 
-        usbsas_sandbox::filter::drop_priv(comm.input_fd(), comm.output_fd())?;
+        usbsas_sandbox::filter::seccomp(comm.input_fd(), comm.output_fd())?;
 
         let config = conf_parse(&config_str)?;
         let rules = config

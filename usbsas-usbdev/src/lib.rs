@@ -86,7 +86,7 @@ fn handle_events_loop(
     context: rusb::Context,
     current_devices: Arc<Mutex<CurrentDevices>>,
 ) -> Result<()> {
-    usbsas_sandbox::usbdev::thread_drop_priv(usbsas_sandbox::get_libusb_opened_fds(0, 0)?)?;
+    usbsas_sandbox::usbdev::thread_seccomp(usbsas_sandbox::get_libusb_opened_fds(0, 0)?)?;
     loop {
         trace!("waiting libusb event");
         if let Err(err) = context.handle_events(None) {
@@ -359,7 +359,7 @@ impl InitState {
         let cur_dev_clone = current_devices.clone();
         thread::spawn(|| handle_events_loop(context_clone, cur_dev_clone));
 
-        usbsas_sandbox::usbdev::drop_priv(
+        usbsas_sandbox::usbdev::seccomp(
             comm.input_fd(),
             comm.output_fd(),
             usbsas_sandbox::get_libusb_opened_fds(0, 0)?,
