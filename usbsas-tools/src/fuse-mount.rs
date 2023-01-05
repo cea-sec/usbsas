@@ -21,8 +21,8 @@ enum Error {
     Tryfromint(#[from] std::num::TryFromIntError),
     #[error("partition error: {0}")]
     Partition(String),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
 }

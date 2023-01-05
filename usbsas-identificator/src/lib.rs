@@ -11,8 +11,8 @@ use usbsas_proto::identificator::request::Msg;
 enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -52,7 +52,7 @@ struct RunningState {
 
 impl InitState {
     fn run(self, comm: &mut Comm<proto::identificator::Request>) -> Result<State> {
-        usbsas_privileges::identificator::drop_priv(comm.input_fd(), comm.output_fd())?;
+        usbsas_sandbox::identificator::drop_priv(comm.input_fd(), comm.output_fd())?;
         Ok(State::Running(RunningState { current_id: None }))
     }
 }

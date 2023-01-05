@@ -19,8 +19,8 @@ enum Error {
     IO(#[from] std::io::Error),
     #[error("{0}")]
     Error(String),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
     #[error("Bad Request")]
@@ -51,7 +51,7 @@ impl FsWriter {
             .wait_on_startup()
             .spawn::<usbsas_fs2dev::Fs2Dev, proto::fs2dev::Request>()?;
 
-        usbsas_privileges::fswriter::drop_priv(
+        usbsas_sandbox::fswriter::drop_priv(
             fs.as_raw_fd(),
             fs2dev.comm.input_fd(),
             fs2dev.comm.output_fd(),

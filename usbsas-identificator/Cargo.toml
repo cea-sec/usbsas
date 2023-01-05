@@ -9,6 +9,6 @@ env_logger = "0.10"
 log = "0.4"
 thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
-usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }

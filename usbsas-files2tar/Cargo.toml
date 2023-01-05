@@ -14,7 +14,7 @@ thiserror = "1.0"
 time = "0.3"
 uname = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
-usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }

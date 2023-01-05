@@ -20,9 +20,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("io error: {0}")]
+    #[error("syscallz error: {0}")]
     Syscallz(#[from] syscallz::Error),
-    #[error("io error: {0}")]
+    #[error("procfs error: {0}")]
     Procfs(#[from] procfs::ProcError),
     #[error("{0}")]
     Error(String),

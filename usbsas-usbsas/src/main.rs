@@ -40,8 +40,8 @@ enum Error {
     Upload(String),
     #[error("int error: {0}")]
     Tryfromint(#[from] std::num::TryFromIntError),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process error: {0}")]
     Process(#[from] usbsas_process::Error),
     #[error("Not enough space on destination device")]
@@ -1892,7 +1892,7 @@ impl Usbsas {
         };
 
         trace!("enter seccomp");
-        usbsas_privileges::usbsas::drop_priv(pipes_read, pipes_write)?;
+        usbsas_sandbox::usbsas::drop_priv(pipes_read, pipes_write)?;
 
         let children = Children {
             analyzer,

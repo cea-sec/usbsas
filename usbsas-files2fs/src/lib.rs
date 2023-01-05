@@ -41,8 +41,8 @@ enum Error {
     FSError(String),
     #[error("fsrw: {0}")]
     Fsrw(#[from] usbsas_fsrw::Error),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -125,7 +125,7 @@ impl InitState {
             .read(true)
             .write(true)
             .open(self.fs_fname)?;
-        usbsas_privileges::files2fs::drop_priv(comm.input_fd(), comm.output_fd(), fs.as_raw_fd())?;
+        usbsas_sandbox::files2fs::drop_priv(comm.input_fd(), comm.output_fd(), fs.as_raw_fd())?;
         Ok(State::WaitFsInfos(WaitFsInfosState { fs }))
     }
 }
