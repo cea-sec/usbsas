@@ -27,7 +27,7 @@ enum Error {
     Persist(#[from] tempfile::PersistError),
     #[error("privileges: {0}")]
     Privileges(#[from] usbsas_privileges::Error),
-    #[error("privileges: {0}")]
+    #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
 }
 type Result<T> = std::result::Result<T, Error>;

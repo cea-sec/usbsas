@@ -16,7 +16,7 @@ enum Error {
     Tryfromint(#[from] std::num::TryFromIntError),
     #[error("privileges: {0}")]
     Privileges(#[from] usbsas_privileges::Error),
-    #[error("privileges: {0}")]
+    #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
     #[error("Bad Request")]
     BadRequest,
