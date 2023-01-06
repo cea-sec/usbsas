@@ -142,7 +142,7 @@ class CommUsbsas(Comm):
         req = proto_usbsas.RequestCopyStart(selected=selected)
         req.usb.busnum = busnum
         req.usb.devnum = devnum
-        req.usb.fstype = 1 # NTFS
+        req.usb.fstype = proto_usbsas.NTFS
         req.src_usb.SetInParent()
         self.send_req(req)
         return self.recv_resp()
