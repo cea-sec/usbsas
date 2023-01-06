@@ -39,7 +39,7 @@ enum Error {
     Tryfromint(#[from] std::num::TryFromIntError),
     #[error("{0}")]
     FSError(String),
-    #[error("privileges: {0}")]
+    #[error("fsrw: {0}")]
     Fsrw(#[from] usbsas_fsrw::Error),
     #[error("privileges: {0}")]
     Privileges(#[from] usbsas_privileges::Error),
