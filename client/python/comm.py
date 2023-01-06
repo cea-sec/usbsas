@@ -143,12 +143,14 @@ class CommUsbsas(Comm):
         req.usb.busnum = busnum
         req.usb.devnum = devnum
         req.usb.fstype = 1 # NTFS
+        req.src_usb.SetInParent()
         self.send_req(req)
         return self.recv_resp()
 
     def copy_files_net(self, selected, url):
         req = proto_usbsas.RequestCopyStart(selected=selected)
         req.net.url = url
+        req.src_usb.SetInParent()
         self.send_req(req)
         return self.recv_resp()
 
