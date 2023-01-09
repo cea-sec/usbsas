@@ -20,6 +20,7 @@ const SCSI_WRITE_10: u8 = 0x2A;
 const SCSI_INQUIRY: u8 = 0x12;
 const SCSI_REQUEST_SENSE: u8 = 0x3;
 const SCSI_MAX_READ_SECTORS: u64 = 0x800;
+const ACK_TRYCOUNT: u8 = 3;
 
 //#[derive(Debug, Default)]
 pub struct ScsiUsb<T: UsbContext> {
@@ -91,12 +92,29 @@ impl<T: UsbContext> ScsiUsb<T> {
 
     fn ack_data(&mut self) -> Result<u8, io::Error> {
         let mut csw: [u8; 13] = [0; 13];
-        if self
+        let mut tried = 0;
+        while let Err(err) = self
             .handle
             .read_bulk(self.endpoint_in, &mut csw, self.timeout)
-            .is_err()
         {
-            return Err(io::Error::new(ErrorKind::Other, "Usb ack error"));
+            if let rusb::Error::Timeout = err {
+                tried += 1;
+                if tried == ACK_TRYCOUNT {
+                    return Err(io::Error::new(
+                        ErrorKind::Other,
+                        format!("Usb ack error: {} ({} times)", err, tried),
+                    ));
+                } else {
+                    log::warn!("usb ack timed out, retrying");
+                    csw = [0; 13];
+                    continue;
+                }
+            } else {
+                return Err(io::Error::new(
+                    ErrorKind::Other,
+                    format!("Usb ack error: {}", err),
+                ));
+            }
         }
         self.tag += 1;
         Ok(csw[12])
