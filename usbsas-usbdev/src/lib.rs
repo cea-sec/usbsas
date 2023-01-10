@@ -27,8 +27,8 @@ enum Error {
     Error(String),
     #[error("rusb error: {0}")]
     Rusb(#[from] rusb::Error),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Poison error")]
     Poison,
     #[error("Bad Request")]
@@ -86,7 +86,7 @@ fn handle_events_loop(
     context: rusb::Context,
     current_devices: Arc<Mutex<CurrentDevices>>,
 ) -> Result<()> {
-    usbsas_privileges::usbdev::thread_drop_priv(usbsas_privileges::get_libusb_opened_fds(0, 0)?)?;
+    usbsas_sandbox::usbdev::thread_seccomp(usbsas_sandbox::get_libusb_opened_fds(0, 0)?)?;
     loop {
         trace!("waiting libusb event");
         if let Err(err) = context.handle_events(None) {
@@ -359,10 +359,10 @@ impl InitState {
         let cur_dev_clone = current_devices.clone();
         thread::spawn(|| handle_events_loop(context_clone, cur_dev_clone));
 
-        usbsas_privileges::usbdev::drop_priv(
+        usbsas_sandbox::usbdev::seccomp(
             comm.input_fd(),
             comm.output_fd(),
-            usbsas_privileges::get_libusb_opened_fds(0, 0)?,
+            usbsas_sandbox::get_libusb_opened_fds(0, 0)?,
         )?;
 
         Ok(State::Running(RunningState {

@@ -34,8 +34,8 @@ enum Error {
     Error(String),
     #[error("rusb error: {0}")]
     Rusb(#[from] rusb::Error),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -157,22 +157,22 @@ impl<T: UsbContext> InitState<T> {
 
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
-            usbsas_privileges::fs2dev::drop_priv(
+            usbsas_sandbox::fs2dev::seccomp(
                 comm.input_fd(),
                 comm.output_fd(),
                 None,
-                usbsas_privileges::get_libusb_opened_fds(busnum, devnum)?,
+                usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
             )?;
             Ok(State::WaitEnd(WaitEndState))
         } else {
             let fs = File::open(self.fs_fname)?;
             let mass_storage = MassStorage::from_busnum_devnum(self.context, busnum, devnum)?;
             #[cfg(not(feature = "mock"))]
-            usbsas_privileges::fs2dev::drop_priv(
+            usbsas_sandbox::fs2dev::seccomp(
                 comm.input_fd(),
                 comm.output_fd(),
                 Some(fs.as_raw_fd()),
-                usbsas_privileges::get_libusb_opened_fds(busnum, devnum)?,
+                usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
             )?;
             Ok(State::DevOpened(DevOpenedState { fs, mass_storage }))
         }

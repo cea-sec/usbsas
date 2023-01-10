@@ -27,8 +27,8 @@ enum Error {
     Tryfromint(#[from] std::num::TryFromIntError),
     #[error("rusb error: {0}")]
     Rusb(#[from] rusb::Error),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("partition error: {0}")]
     Partition(String),
     #[error("Bad Request")]
@@ -101,10 +101,10 @@ impl<T: UsbContext> InitState<T> {
         // to the EndState
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
-            usbsas_privileges::dev2scsi::drop_priv(
+            usbsas_sandbox::dev2scsi::seccomp(
                 comm.input_fd(),
                 comm.output_fd(),
-                usbsas_privileges::get_libusb_opened_fds(busnum, devnum)?,
+                usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
             )?;
             return Ok(State::WaitEnd(WaitEndState {}));
         }
@@ -121,10 +121,10 @@ impl<T: UsbContext> InitState<T> {
         };
 
         #[cfg(not(feature = "mock"))]
-        usbsas_privileges::dev2scsi::drop_priv(
+        usbsas_sandbox::dev2scsi::seccomp(
             comm.input_fd(),
             comm.output_fd(),
-            usbsas_privileges::get_libusb_opened_fds(busnum, devnum)?,
+            usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
         )?;
 
         comm.opendev(proto::scsi::ResponseOpenDevice {

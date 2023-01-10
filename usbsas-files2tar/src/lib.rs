@@ -22,8 +22,8 @@ enum Error {
     Error(String),
     #[error("system time: {0}")]
     SystemTime(#[from] std::time::SystemTimeError),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]

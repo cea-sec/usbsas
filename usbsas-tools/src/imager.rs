@@ -25,8 +25,8 @@ enum Error {
     Error(String),
     #[error("persist error: {0}")]
     Persist(#[from] tempfile::PersistError),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
 }
@@ -110,7 +110,7 @@ impl Imager {
             None
         };
 
-        usbsas_privileges::imager::drop_priv(pipes_read, pipes_write)?;
+        usbsas_sandbox::imager::seccomp(pipes_read, pipes_write)?;
 
         Ok(Imager {
             usbdev,

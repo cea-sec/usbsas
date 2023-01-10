@@ -2917,9 +2917,9 @@ dependencies = [
  "usbsas-comm",
  "usbsas-mass-storage",
  "usbsas-mock",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
 ]
 
 [[package]]
@@ -2934,9 +2934,9 @@ dependencies = [
  "usbsas-comm",
  "usbsas-fsrw",
  "usbsas-mbr",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-utils",
 ]
 
@@ -2953,9 +2953,9 @@ dependencies = [
  "time",
  "uname",
  "usbsas-comm",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-utils",
 ]
 
@@ -2970,9 +2970,9 @@ dependencies = [
  "toml",
  "usbsas-comm",
  "usbsas-config",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
 ]
 
 [[package]]
@@ -2988,9 +2988,9 @@ dependencies = [
  "usbsas-comm",
  "usbsas-mass-storage",
  "usbsas-mock",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-utils",
 ]
 
@@ -3020,9 +3020,9 @@ dependencies = [
  "log",
  "thiserror",
  "usbsas-comm",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
 ]
 
 [[package]]
@@ -3077,17 +3077,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "usbsas-privileges"
-version = "0.1.1"
-dependencies = [
- "cc",
- "libc",
- "procfs",
- "syscallz",
- "thiserror",
-]
-
-[[package]]
 name = "usbsas-process"
 version = "0.1.0"
 dependencies = [
@@ -3105,6 +3094,17 @@ version = "0.1.1"
 dependencies = [
  "prost",
  "prost-build",
+]
+
+[[package]]
+name = "usbsas-sandbox"
+version = "0.1.1"
+dependencies = [
+ "cc",
+ "libc",
+ "procfs",
+ "syscallz",
+ "thiserror",
 ]
 
 [[package]]
@@ -3128,9 +3128,9 @@ dependencies = [
  "usbsas-dev2scsi",
  "usbsas-fsrw",
  "usbsas-mass-storage",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-utils",
 ]
 
@@ -3177,9 +3177,9 @@ dependencies = [
  "tar",
  "thiserror",
  "usbsas-comm",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-utils",
 ]
 
@@ -3202,9 +3202,9 @@ dependencies = [
  "usbsas-dev2scsi",
  "usbsas-fs2dev",
  "usbsas-net",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-scsi2files",
  "usbsas-usbdev",
  "usbsas-utils",
@@ -3222,9 +3222,9 @@ dependencies = [
  "usbsas-comm",
  "usbsas-config",
  "usbsas-mock",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
 ]
 
 [[package]]
@@ -3244,9 +3244,9 @@ dependencies = [
  "usbsas-mass-storage",
  "usbsas-mock",
  "usbsas-net",
- "usbsas-privileges",
  "usbsas-process",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-scsi2files",
  "usbsas-tar2files",
  "usbsas-usbdev",

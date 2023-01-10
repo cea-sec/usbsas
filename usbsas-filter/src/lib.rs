@@ -19,8 +19,8 @@ enum Error {
     IO(#[from] std::io::Error),
     #[error("{0}")]
     Error(String),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -126,7 +126,7 @@ impl InitState {
     fn run(self, comm: &mut Comm<proto::filter::Request>) -> Result<State> {
         let config_str = conf_read(&self.config_path)?;
 
-        usbsas_privileges::filter::drop_priv(comm.input_fd(), comm.output_fd())?;
+        usbsas_sandbox::filter::seccomp(comm.input_fd(), comm.output_fd())?;
 
         let config = conf_parse(&config_str)?;
         let rules = config

@@ -30,8 +30,8 @@ enum Error {
     Error(String),
     #[error("int error: {0}")]
     Tryfromint(#[from] std::num::TryFromIntError),
-    #[error("privileges: {0}")]
-    Privileges(#[from] usbsas_privileges::Error),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -98,7 +98,7 @@ impl InitState {
         Ok(match comm.read_u8()? {
             1 => {
                 let tar = File::open(self.tarpath)?;
-                usbsas_privileges::tar2files::drop_priv(
+                usbsas_sandbox::tar2files::seccomp(
                     comm.input_fd(),
                     comm.output_fd(),
                     Some(tar.as_raw_fd()),
@@ -106,7 +106,7 @@ impl InitState {
                 State::LoadMetadata(LoadMetadataState { tar })
             }
             _ => {
-                usbsas_privileges::tar2files::drop_priv(comm.input_fd(), comm.output_fd(), None)?;
+                usbsas_sandbox::tar2files::seccomp(comm.input_fd(), comm.output_fd(), None)?;
                 State::WaitEnd(WaitEndState {})
             }
         })

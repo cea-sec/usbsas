@@ -20,7 +20,7 @@ usbsas-config = { path = "../usbsas-config", optional = true }
 usbsas-dev2scsi = { path = "../usbsas-dev2scsi", optional = true }
 usbsas-fs2dev = { path = "../usbsas-fs2dev", optional = true }
 usbsas-net = { path = "../usbsas-net", optional = true }
-usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-scsi2files = { path = "../usbsas-scsi2files", optional = true }

@@ -56,7 +56,7 @@ impl InitState {
 
         let mut archive: Box<dyn ArchiveWriter> = Box::new(TarWriter::new(archive_file));
 
-        usbsas_privileges::files2tar::drop_priv(comm.input_fd(), comm.output_fd(), outfd)?;
+        usbsas_sandbox::files2tar::seccomp(comm.input_fd(), comm.output_fd(), outfd)?;
 
         archive.init()?;
         Ok(State::WaitNewFile(WaitNewFileState { archive }))

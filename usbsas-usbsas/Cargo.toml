@@ -18,7 +18,7 @@ usbsas-identificator = { path = "../usbsas-identificator" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
 usbsas-net = { path = "../usbsas-net" }
-usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-scsi2files = { path = "../usbsas-scsi2files" }

@@ -13,7 +13,7 @@ usbsas-comm = { path = "../usbsas-comm" }
 usbsas-dev2scsi = { path = "../usbsas-dev2scsi" }
 usbsas-fsrw = { path = "../usbsas-fsrw" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
-usbsas-privileges = { path = "../usbsas-privileges" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }

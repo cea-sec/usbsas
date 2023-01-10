@@ -1,7 +1,7 @@
 # usbsas architecture
 
 * [Communication](#communication)
-* [Privileges](#privileges)
+* [Sandboxing](#sandboxing)
 * [Processes](#processes)
 * [HID](#hid)
 
@@ -14,7 +14,7 @@ antivirus server. The diagram above should be read from left to right.
 
 Processes communicate with each other via `protobuf` serialized data (see
 [Communication](#communication)). Every process is tightly sandboxed with
-`seccomp` (see [Privileges](#privileges)).
+`seccomp` (see [Sandboxing](#sandboxing)).
 
 ## Communication
 
@@ -25,7 +25,7 @@ parent. Data is serialized with `protobuf`.
 
 Messages can be found in `usbsas-proto/proto`.
 
-## Privileges
+## Sandboxing
 
 Each process has its own `seccomp` rules (apart from the ones doing net stuff
 (for now): `analyzer`, `uploader` and `cmdexec`). During their initialization
