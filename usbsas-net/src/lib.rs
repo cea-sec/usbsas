@@ -8,6 +8,7 @@ pub use analyzer::Analyzer;
 pub use downloader::Downloader;
 pub use uploader::Uploader;
 
+use base64::{engine as b64eng, Engine as _};
 #[cfg(feature = "authkrb")]
 use libgssapi::{
     context::{ClientCtx, CtxFlags, SecurityContext},
@@ -119,8 +120,12 @@ impl HttpClient {
                     Ok(Some(client_token)) => {
                         self.headers.insert(
                             reqwest::header::AUTHORIZATION,
-                            format!("Negotiate {}", &base64::encode(client_token.as_ref()))
-                                .parse()?,
+                            format!(
+                                "Negotiate {}",
+                                &b64eng::general_purpose::STANDARD_NO_PAD
+                                    .encode(client_token.as_ref())
+                            )
+                            .parse()?,
                         );
                         let resp = self
                             .client
@@ -132,7 +137,10 @@ impl HttpClient {
                         }
                         let authenticate_h =
                             resp.headers().get("www-authenticate").ok_or(Error::Nego)?;
-                        server_token = Some(base64::decode(&authenticate_h.to_str()?[10..])?);
+                        server_token = Some(
+                            b64eng::general_purpose::STANDARD_NO_PAD
+                                .decode(&authenticate_h.to_str()?[10..])?,
+                        );
                         resp_ret = Some(resp);
                     }
                     Err(err) => {

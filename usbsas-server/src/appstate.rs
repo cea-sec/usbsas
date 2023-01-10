@@ -1,6 +1,7 @@
 use crate::error::{AuthentError, ServiceError};
 use crate::tmpfiles::TmpFiles;
 use actix_web::web;
+use base64::{engine as b64eng, Engine as _};
 use futures::task::{Context, Poll, Waker};
 use hmac::{Hmac, Mac};
 use log::{debug, error};
@@ -636,7 +637,7 @@ impl AppState {
 
     pub(crate) fn read_dir(&self, path: &str) -> Result<Vec<ReadDir>, ServiceError> {
         let parent_path_b64 = path.replace(' ', "+");
-        let mut parent_path = base64::decode(&parent_path_b64)?;
+        let mut parent_path = b64eng::general_purpose::STANDARD_NO_PAD.decode(&parent_path_b64)?;
         let mut hmac = self.hmac.lock()?;
 
         if !parent_path.is_empty() {
@@ -652,7 +653,8 @@ impl AppState {
         // Build information for each element in current path
         let mut files = Vec::new();
         for infos in dir_info.filesinfo {
-            let path_b64 = base64::encode(infos.path.clone().into_bytes().authent(&mut hmac))
+            let path_b64 = b64eng::general_purpose::STANDARD_NO_PAD
+                .encode(infos.path.clone().into_bytes().authent(&mut hmac))
                 .replace('\n', "");
             files.push(ReadDir {
                 ftype: infos.ftype,
@@ -698,7 +700,10 @@ impl AppState {
         let mut selected: Vec<String> = Vec::new();
         for path in &req_selected {
             selected.push(String::from_utf8(
-                base64::decode(path)?.verify(&mut hmac)?.to_vec(),
+                b64eng::general_purpose::STANDARD_NO_PAD
+                    .decode(path)?
+                    .verify(&mut hmac)?
+                    .to_vec(),
             )?);
         }
         selected.sort();
