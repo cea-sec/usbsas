@@ -4,19 +4,15 @@
 //! file with the output of the transfer as argument.
 
 use log::{error, info, trace};
-use std::{
-    os::unix::io::RawFd,
-    process::{Command, Stdio},
-};
+use std::process::{Command, Stdio};
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read, Command as CmdConf, PostCopy};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::{cmdexec::request::Msg, common::OutFileType};
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
@@ -30,7 +26,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommCmdExec,
@@ -210,7 +206,7 @@ pub struct CmdExec {
 }
 
 impl CmdExec {
-    fn new(
+    pub fn new(
         comm: Comm<proto::cmdexec::Request>,
         out_tar: String,
         out_fs: String,
@@ -226,7 +222,7 @@ impl CmdExec {
         })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -242,30 +238,5 @@ impl CmdExec {
             };
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for CmdExec {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if args.len() == 3 {
-                CmdExec::new(
-                    Comm::from_raw_fd(read_fd, write_fd),
-                    args[0].to_owned(),
-                    args[1].to_owned(),
-                    args[2].to_owned(),
-                )?
-                .main_loop()
-                .map(|_| log::debug!("cmdexec: exiting"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "CmdExec needs tarpath and fspath args".to_string(),
-        )))
     }
 }

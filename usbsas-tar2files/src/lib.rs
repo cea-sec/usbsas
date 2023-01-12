@@ -3,18 +3,17 @@
 //! etc. requests
 
 use byteorder::ReadBytesExt;
-use log::{error, info, trace};
+use log::{debug, error, trace};
 use std::{
     collections::HashMap,
     convert::TryFrom,
     fs::File,
     io::{prelude::*, SeekFrom},
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::AsRawFd,
 };
 use tar::Archive;
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::{FileInfo, FileType},
@@ -23,7 +22,7 @@ use usbsas_proto::{
 use usbsas_utils::{READ_FILE_MAX_SIZE, TAR_DATA_DIR};
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
@@ -37,7 +36,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommReadTar,
@@ -209,7 +208,7 @@ impl MainLoopState {
         file_offset: u64,
         size: usize,
     ) -> Result<()> {
-        trace!("req_readfile {}", path);
+        debug!("req_readfile {}", path);
 
         if size as u64 > READ_FILE_MAX_SIZE {
             return Err(Error::Error("max read size exceeded".to_string()));
@@ -226,7 +225,7 @@ impl MainLoopState {
     }
 
     fn readdir(&mut self, comm: &mut Comm<proto::files::Request>, path: &str) -> Result<()> {
-        info!("req read_dir {}", path);
+        debug!("req read_dir {}", path);
         let path = path.trim_start_matches('/');
         let filesinfo = self
             .metadata
@@ -277,12 +276,12 @@ pub struct Tar2Files {
 }
 
 impl Tar2Files {
-    fn new(comm: Comm<proto::files::Request>, tarpath: String) -> Result<Self> {
+    pub fn new(comm: Comm<proto::files::Request>, tarpath: String) -> Result<Self> {
         let state = State::Init(InitState { tarpath });
         Ok(Tar2Files { comm, state })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -298,26 +297,5 @@ impl Tar2Files {
             }
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for Tar2Files {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if let Some(fname) = args.get(0) {
-                log::info!("tar2files: {}", fname);
-                Tar2Files::new(Comm::from_raw_fd(read_fd, write_fd), fname.to_owned())?
-                    .main_loop()
-                    .map(|_| log::debug!("tar2files exit"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "tar2files needs a tar fname arg".to_string(),
-        )))
     }
 }

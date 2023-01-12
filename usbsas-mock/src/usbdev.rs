@@ -1,19 +1,18 @@
 use log::{error, trace};
-use std::{env, os::unix::io::RawFd};
+use std::env;
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::common::Device as UsbDevice;
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("Bad Request")]
     BadRequest,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommUsbdev,
@@ -29,7 +28,7 @@ pub struct MockUsbDev {
 }
 
 impl MockUsbDev {
-    fn new(comm: Comm<proto::usbdev::Request>) -> Result<Self> {
+    pub fn new(comm: Comm<proto::usbdev::Request>, _: String) -> Result<Self> {
         let mut devices = Vec::new();
 
         // Fake input device
@@ -73,7 +72,7 @@ impl MockUsbDev {
             .map_err(|e| e.into())
     }
 
-    fn main_loop(&mut self) -> Result<()> {
+    pub fn main_loop(&mut self) -> Result<()> {
         trace!("main loop");
         loop {
             let req: proto::usbdev::Request = self.comm.recv()?;
@@ -94,19 +93,6 @@ impl MockUsbDev {
                 }
             }
         }
-        Ok(())
-    }
-}
-
-impl UsbsasProcess for MockUsbDev {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        _args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        MockUsbDev::new(Comm::from_raw_fd(read_fd, write_fd))?
-            .main_loop()
-            .map(|_| log::debug!("mockusbdev exit"))?;
         Ok(())
     }
 }

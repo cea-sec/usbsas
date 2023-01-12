@@ -6,13 +6,11 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{self, Read},
-    os::unix::io::RawFd,
     thread::sleep,
     time::Duration,
 };
 use usbsas_comm::{protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::analyzer::request::Msg;
 use usbsas_utils::TAR_DATA_DIR;
@@ -106,7 +104,7 @@ impl InitState {
                 )?,
             }))
         } else {
-            error!("No analyzer conf, parking");
+            log::warn!("No analyzer conf, parking");
             Ok(State::WaitEnd(WaitEndState {}))
         }
     }
@@ -249,12 +247,11 @@ pub struct Analyzer {
 }
 
 impl Analyzer {
-    fn new(
+    pub fn new(
         comm: Comm<proto::analyzer::Request>,
         tarpath: String,
         config_path: String,
     ) -> Result<Self> {
-        log::info!("analyzer: {:?}", tarpath);
         let state = State::Init(InitState {
             tarpath,
             config_path,
@@ -262,7 +259,7 @@ impl Analyzer {
         Ok(Analyzer { comm, state })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -278,29 +275,5 @@ impl Analyzer {
             };
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for Analyzer {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if args.len() == 2 {
-                Analyzer::new(
-                    Comm::from_raw_fd(read_fd, write_fd),
-                    args[0].to_owned(),
-                    args[1].to_owned(),
-                )?
-                .main_loop()
-                .map(|_| log::debug!("analyzer: exiting"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "analyzer needs a tar filename arg".to_string(),
-        )))
     }
 }

@@ -7,7 +7,6 @@ use log::{debug, error, info, trace};
 use rusb::constants::LIBUSB_CLASS_MASS_STORAGE;
 use rusb::UsbContext;
 use std::{
-    os::unix::io::RawFd,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -15,16 +14,18 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read, UsbPortAccesses};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::{common::Device as UsbDevice, usbdev::request::Msg};
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
     Error(String),
+    #[cfg(feature = "mock")]
+    #[error("mock: {0}")]
+    Mock(#[from] usbsas_mock::usbdev::Error),
     #[error("rusb error: {0}")]
     Rusb(#[from] rusb::Error),
     #[error("sandbox: {0}")]
@@ -41,7 +42,7 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
         Error::Poison
     }
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommUsbdev,
@@ -430,7 +431,7 @@ pub struct UsbDev {
 }
 
 impl UsbDev {
-    fn new(comm: Comm<proto::usbdev::Request>, config_path: String) -> Result<Self> {
+    pub fn new(comm: Comm<proto::usbdev::Request>, config_path: String) -> Result<Self> {
         if !rusb::has_hotplug() {
             error!("libusb doesn't support hotplug");
             std::process::exit(1);
@@ -441,7 +442,7 @@ impl UsbDev {
         })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -457,25 +458,5 @@ impl UsbDev {
             }
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for UsbDev {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if args.len() == 1 {
-                UsbDev::new(Comm::from_raw_fd(read_fd, write_fd), args[0].to_owned())?
-                    .main_loop()
-                    .map(|_| debug!("usbdev: exiting"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "usbdev needs a config_path arg".to_string(),
-        )))
     }
 }

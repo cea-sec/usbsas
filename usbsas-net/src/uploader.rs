@@ -4,10 +4,8 @@ use reqwest::blocking::Body;
 use std::{
     fs::File,
     io::{self, Read},
-    os::unix::io::RawFd,
 };
 use usbsas_comm::{protoresponse, Comm};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::uploader::request::Msg;
 
@@ -175,13 +173,12 @@ pub struct Uploader {
 }
 
 impl Uploader {
-    fn new(comm: Comm<proto::uploader::Request>, tarpath: String) -> Result<Self> {
-        log::info!("uploader: {}", tarpath);
+    pub fn new(comm: Comm<proto::uploader::Request>, tarpath: String) -> Result<Self> {
         let state = State::Init(InitState { tarpath });
         Ok(Uploader { comm, state })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -197,25 +194,5 @@ impl Uploader {
             };
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for Uploader {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if args.len() == 1 {
-                Uploader::new(Comm::from_raw_fd(read_fd, write_fd), args[0].to_owned())?
-                    .main_loop()
-                    .map(|_| log::debug!("uploader exit"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "uploader need a fname as arg".to_string(),
-        )))
     }
 }

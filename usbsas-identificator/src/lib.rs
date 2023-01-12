@@ -1,14 +1,12 @@
 //! Dummy identificator
 
-use std::os::unix::io::RawFd;
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::identificator::request::Msg;
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("sandbox: {0}")]
@@ -18,7 +16,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommIdentificator,
@@ -92,14 +90,14 @@ pub struct Identificator {
 }
 
 impl Identificator {
-    fn new(comm: Comm<proto::identificator::Request>) -> Result<Self> {
+    pub fn new(comm: Comm<proto::identificator::Request>) -> Result<Self> {
         Ok(Identificator {
             comm,
             state: State::Init(InitState {}),
         })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm)? {
@@ -107,19 +105,6 @@ impl Identificator {
                 state => state,
             }
         }
-        Ok(())
-    }
-}
-
-impl UsbsasProcess for Identificator {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        _args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        Identificator::new(Comm::from_raw_fd(read_fd, write_fd))?
-            .main_loop()
-            .map(|_| log::debug!("identificator: exit"))?;
         Ok(())
     }
 }

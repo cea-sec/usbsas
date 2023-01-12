@@ -17,22 +17,17 @@ thiserror = "1.0"
 time = { version = "0.3", optional = true }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config", optional = true }
-usbsas-dev2scsi = { path = "../usbsas-dev2scsi", optional = true }
-usbsas-fs2dev = { path = "../usbsas-fs2dev", optional = true }
-usbsas-net = { path = "../usbsas-net", optional = true }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
-usbsas-scsi2files = { path = "../usbsas-scsi2files", optional = true }
-usbsas-usbdev = { path = "../usbsas-usbdev", optional = true }
 usbsas-utils = { path = "../usbsas-utils", optional = true }
 users = { version = "0.11", optional = true }
 
 [features]
-imager = ["indicatif", "tempfile", "usbsas-config", "usbsas-dev2scsi", "usbsas-usbdev", "usbsas-utils"]
-fswriter = ["bitvec", "usbsas-fs2dev"]
-fuse-mount = ["fuse_mt", "libc", "time", "usbsas-scsi2files", "users"]
-net = ["usbsas-net"]
+imager = ["indicatif", "tempfile", "usbsas-config", "usbsas-utils"]
+fswriter = ["bitvec"]
+fuse-mount = ["fuse_mt", "libc", "time", "users"]
+net = []
 default = ["imager", "fswriter", "fuse-mount", "net"]
 
 [[bin]]

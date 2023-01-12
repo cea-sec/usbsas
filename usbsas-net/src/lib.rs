@@ -26,7 +26,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("reqwest error: {0}")]
@@ -59,7 +59,7 @@ enum Error {
     #[error("{0}")]
     Upload(String),
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 // Wrapper around reqwest::Client to transparently perform kerberos authentication
 pub(crate) struct HttpClient {

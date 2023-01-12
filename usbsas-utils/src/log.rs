@@ -8,7 +8,7 @@ use {
 };
 
 #[cfg(feature = "log-json")]
-pub fn init_logger(session_id: Arc<RwLock<String>>) {
+pub fn init_server_logger(session_id: Arc<RwLock<String>>) {
     let mut builder = Builder::from_env(Env::default().filter_or("RUST_LOG", "info"));
     builder.format(move |buf, record| {
         write!(buf, "{{")?;
@@ -22,10 +22,32 @@ pub fn init_logger(session_id: Arc<RwLock<String>>) {
         write!(buf, " \"level\":\"{}\",", record.level())?;
         write!(buf, " \"target\":\"{}\",", record.target())?;
         write!(buf, " \"msg\":{},", serde_json::to_string(&record.args())?)?;
-        #[cfg(feature = "log-json")]
-        {
-            write!(buf, " \"transfer_id\":\"{}\"", session_id.read().unwrap())?;
-        }
+        write!(buf, " \"transfer_id\":\"{}\"", session_id.read().unwrap())?;
+        writeln!(buf, "}}")?;
+
+        Ok(())
+    });
+    builder.init();
+}
+
+#[cfg(feature = "log-json")]
+pub fn init_logger() {
+    let session_id: String = std::env::var("USBSAS_SESSION_ID").unwrap_or_else(|_| "0".into());
+
+    let mut builder = Builder::from_env(Env::default().filter_or("RUST_LOG", "info"));
+    builder.format(move |buf, record| {
+        write!(buf, "{{")?;
+        write!(
+            buf,
+            "\"ts\":\"{}\",",
+            time::OffsetDateTime::now_utc()
+                .format(&time::format_description::well_known::Rfc3339)
+                .unwrap()
+        )?;
+        write!(buf, " \"level\":\"{}\",", record.level())?;
+        write!(buf, " \"target\":\"{}\",", record.target())?;
+        write!(buf, " \"msg\":{},", serde_json::to_string(&record.args())?)?;
+        write!(buf, " \"transfer_id\":\"{}\"", session_id)?;
         writeln!(buf, "}}")?;
 
         Ok(())

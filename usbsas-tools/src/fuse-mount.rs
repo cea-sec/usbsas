@@ -88,8 +88,8 @@ struct UsbsasFS {
 impl UsbsasFS {
     fn new(busnum: u32, devnum: u32, partnum: u32) -> Result<Self> {
         log::debug!("Opening device {} {}", busnum, devnum);
-        let mut scsi2files = UsbsasChildSpawner::new()
-            .spawn::<usbsas_scsi2files::Scsi2Files, proto::files::Request>()?;
+        let mut scsi2files =
+            UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<proto::files::Request>()?;
         let _ = scsi2files
             .comm
             .opendevice(proto::files::RequestOpenDevice { busnum, devnum })?;

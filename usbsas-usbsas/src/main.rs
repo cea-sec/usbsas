@@ -14,17 +14,13 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{protorequest, protoresponse, Comm};
 use usbsas_mass_storage::UsbDevice;
-#[cfg(feature = "mock")]
-use usbsas_mock::usbdev::MockUsbDev as UsbDev;
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::*,
     usbsas::{request::Msg, request_copy_start::Destination, request_copy_start::Source},
 };
-#[cfg(not(feature = "mock"))]
-use usbsas_usbdev::UsbDev;
-use usbsas_utils::READ_FILE_MAX_SIZE;
+use usbsas_utils::{self, clap::UsbsasClap, READ_FILE_MAX_SIZE};
 
 #[derive(Error, Debug)]
 enum Error {
@@ -220,7 +216,6 @@ impl InitState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        debug!("started usbsas");
         let mut id: Option<String> = None;
         loop {
             let req: proto::usbsas::Request = comm.recv()?;
@@ -1808,81 +1803,81 @@ impl Usbsas {
         pipes_read.push(comm.input_fd());
         pipes_write.push(comm.output_fd());
 
-        let identificator = UsbsasChildSpawner::new()
-            .spawn::<usbsas_identificator::Identificator, proto::identificator::Request>()?;
+        let identificator = UsbsasChildSpawner::new("usbsas-identificator")
+            .spawn::<proto::identificator::Request>()?;
         pipes_read.push(identificator.comm.input_fd());
         pipes_write.push(identificator.comm.output_fd());
 
-        let cmdexec = UsbsasChildSpawner::new()
+        let cmdexec = UsbsasChildSpawner::new("usbsas-cmdexec")
             .arg(out_tar)
             .arg(out_fs)
-            .arg(config_path)
-            .spawn::<usbsas_cmdexec::CmdExec, proto::cmdexec::Request>()?;
+            .args(&["-c", config_path])
+            .spawn::<proto::cmdexec::Request>()?;
         pipes_read.push(cmdexec.comm.input_fd());
         pipes_write.push(cmdexec.comm.output_fd());
 
-        let downloader = UsbsasChildSpawner::new()
+        let downloader = UsbsasChildSpawner::new("usbsas-downloader")
             .arg(out_tar)
-            .arg(config_path)
-            .spawn::<usbsas_net::Downloader, proto::downloader::Request>()?;
+            .args(&["-c", config_path])
+            .spawn::<proto::downloader::Request>()?;
         pipes_read.push(downloader.comm.input_fd());
         pipes_write.push(downloader.comm.output_fd());
 
-        let usbdev = UsbsasChildSpawner::new()
-            .arg(config_path)
-            .spawn::<UsbDev, proto::usbdev::Request>()?;
+        let usbdev = UsbsasChildSpawner::new("usbsas-usbdev")
+            .args(&["-c", config_path])
+            .spawn::<proto::usbdev::Request>()?;
         pipes_read.push(usbdev.comm.input_fd());
         pipes_write.push(usbdev.comm.output_fd());
 
-        let scsi2files = UsbsasChildSpawner::new()
-            .spawn::<usbsas_scsi2files::Scsi2Files, proto::files::Request>()?;
+        let scsi2files =
+            UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<proto::files::Request>()?;
         pipes_read.push(scsi2files.comm.input_fd());
         pipes_write.push(scsi2files.comm.output_fd());
 
-        let files2tar = UsbsasChildSpawner::new()
+        let files2tar = UsbsasChildSpawner::new("usbsas-files2tar")
             .arg(out_tar)
             .wait_on_startup()
-            .spawn::<usbsas_files2tar::Files2Tar, proto::writetar::Request>()?;
+            .spawn::<proto::writetar::Request>()?;
         pipes_read.push(files2tar.comm.input_fd());
         pipes_write.push(files2tar.comm.output_fd());
 
-        let files2fs = UsbsasChildSpawner::new()
+        let files2fs = UsbsasChildSpawner::new("usbsas-files2fs")
             .arg(out_fs)
-            .spawn::<usbsas_files2fs::Files2Fs, proto::writefs::Request>()?;
+            .spawn::<proto::writefs::Request>()?;
         pipes_read.push(files2fs.comm.input_fd());
         pipes_write.push(files2fs.comm.output_fd());
 
-        let filter = UsbsasChildSpawner::new()
-            .arg(config_path)
-            .spawn::<usbsas_filter::Filter, proto::filter::Request>()?;
+        let filter = UsbsasChildSpawner::new("usbsas-filter")
+            .args(&["-c", config_path])
+            .spawn::<proto::filter::Request>()?;
         pipes_read.push(filter.comm.input_fd());
         pipes_write.push(filter.comm.output_fd());
 
-        let fs2dev = UsbsasChildSpawner::new()
+        let fs2dev = UsbsasChildSpawner::new("usbsas-fs2dev")
             .arg(out_fs)
             .wait_on_startup()
-            .spawn::<usbsas_fs2dev::Fs2Dev, proto::fs2dev::Request>()?;
+            .spawn::<proto::fs2dev::Request>()?;
         pipes_read.push(fs2dev.comm.input_fd());
         pipes_write.push(fs2dev.comm.output_fd());
 
-        let tar2files = UsbsasChildSpawner::new()
+        let tar2files = UsbsasChildSpawner::new("usbsas-tar2files")
             .arg(out_tar)
             .wait_on_startup()
-            .spawn::<usbsas_tar2files::Tar2Files, proto::files::Request>()?;
+            .spawn::<proto::files::Request>()?;
         pipes_read.push(tar2files.comm.input_fd());
         pipes_write.push(tar2files.comm.output_fd());
 
-        let uploader = UsbsasChildSpawner::new()
+        let uploader = UsbsasChildSpawner::new("usbsas-uploader")
             .arg(out_tar)
-            .spawn::<usbsas_net::Uploader, proto::uploader::Request>()?;
+            .spawn::<proto::uploader::Request>()?;
         pipes_read.push(uploader.comm.input_fd());
         pipes_write.push(uploader.comm.output_fd());
 
         let analyzer = if analyze {
-            let analyzer = UsbsasChildSpawner::new()
+            let analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
                 .arg(out_tar)
-                .arg(config_path)
-                .spawn::<usbsas_net::Analyzer, proto::analyzer::Request>()?;
+                .args(&["-c", config_path])
+                .spawn::<proto::analyzer::Request>()?;
             pipes_read.push(analyzer.comm.input_fd());
             pipes_write.push(analyzer.comm.output_fd());
 
@@ -1936,71 +1931,31 @@ impl Usbsas {
 }
 
 fn main() -> Result<()> {
-    let cmd = clap::Command::new("usbsas-usbsas")
-        .arg(
-            clap::Arg::new("config")
-                .short('c')
-                .long("config")
-                .help("Path of the configuration file")
-                .num_args(1)
-                .default_value(usbsas_utils::USBSAS_CONFIG)
-                .required(false),
-        )
-        .arg(
-            clap::Arg::new("outtar")
-                .value_name("OUT_TAR")
-                .index(1)
-                .help("Output tar filename")
-                .num_args(1)
-                .required(true),
-        )
-        .arg(
-            clap::Arg::new("outfs")
-                .value_name("OUT_FS")
-                .index(2)
-                .help("Output fs filename")
-                .num_args(1)
-                .required(true),
-        )
+    usbsas_utils::log::init_logger();
+    let matches = usbsas_utils::clap::new_usbsas_cmd("usbsas-usbsas")
+        .add_config_arg()
+        .add_tar_path_arg()
+        .add_fs_path_arg()
         .arg(
             clap::Arg::new("analyze")
                 .short('a')
                 .long("analyze")
                 .help("Analyze files with antivirus server")
                 .action(clap::ArgAction::SetTrue),
-        );
-
-    #[cfg(feature = "log-json")]
-    let cmd = cmd.arg(
-        clap::Arg::new("sessionid")
-            .short('s')
-            .long("sessionid")
-            .help("Session id")
-            .num_args(1)
-            .required(true),
-    );
-
-    let matches = cmd.get_matches();
+        )
+        .get_matches();
     let config = matches.get_one::<String>("config").unwrap();
-    let outtar = matches.get_one::<String>("outtar").unwrap();
-    let outfs = matches.get_one::<String>("outfs").unwrap();
+    let tar_path = matches.get_one::<String>("tar_path").unwrap();
+    let fs_path = matches.get_one::<String>("fs_path").unwrap();
 
-    #[cfg(feature = "log-json")]
-    usbsas_utils::log::init_logger(Arc::new(RwLock::new(
-        matches.get_one::<String>("sessionid").unwrap().to_string(),
-    )));
-
-    #[cfg(not(feature = "log-json"))]
-    usbsas_utils::log::init_logger();
-
-    info!("Starting usbsas");
-
-    let comm = Comm::from_env()?;
-
-    let usbsas = Usbsas::new(comm, config, outtar, outfs, matches.get_flag("analyze"))?;
-
-    usbsas.main_loop()?;
-
-    trace!("stop");
-    Ok(())
+    info!("start ({}): {} {}", std::process::id(), tar_path, fs_path);
+    Usbsas::new(
+        Comm::from_env()?,
+        config,
+        tar_path,
+        fs_path,
+        matches.get_flag("analyze"),
+    )?
+    .main_loop()
+    .map(|_| log::debug!("exit"))
 }

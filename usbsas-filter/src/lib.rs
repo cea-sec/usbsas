@@ -5,16 +5,14 @@
 use log::debug;
 #[cfg(test)]
 use serde::{Deserialize, Serialize};
-use std::os::unix::io::RawFd;
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::{filter::request::Msg, filter::FilterResult};
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
@@ -26,7 +24,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommFilter,
@@ -181,14 +179,14 @@ pub struct Filter {
 }
 
 impl Filter {
-    fn new(comm: Comm<proto::filter::Request>, config_path: String) -> Result<Self> {
+    pub fn new(comm: Comm<proto::filter::Request>, config_path: String) -> Result<Self> {
         Ok(Filter {
             comm,
             state: State::Init(InitState { config_path }),
         })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm)? {
@@ -197,26 +195,6 @@ impl Filter {
             }
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for Filter {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if args.len() == 1 {
-                Filter::new(Comm::from_raw_fd(read_fd, write_fd), args[0].to_owned())?
-                    .main_loop()
-                    .map(|_| log::debug!("filter: exiting"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "filter needs a config_path arg".to_string(),
-        )))
     }
 }
 

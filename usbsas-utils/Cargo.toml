@@ -5,6 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
+clap = "4.0"
 env_logger = "0.10"
 log = "0.4"
 serde_json = { version = "1.0", optional = true }

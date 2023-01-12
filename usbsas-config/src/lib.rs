@@ -2,28 +2,8 @@
 //! separated so that processes can read the file, enter `seccomp` and parse it
 //! after.
 
-use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::{fs, io};
-
-// Default environment variables to keep when forking
-lazy_static! {
-    static ref DEFAULT_ENV_VARS: Vec<String> = {
-        vec![
-            "TERM",
-            "LANG",
-            "KRB5CCNAME",
-            "PATH",
-            "RUST_LOG",
-            "RUST_BACKTRACE",
-            "USBSAS_MOCK_IN_DEV",
-            "USBSAS_MOCK_OUT_DEV",
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect()
-    };
-}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Network {
@@ -75,7 +55,6 @@ pub struct UsbPortAccesses {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub out_directory: String,
-    pub env_vars: Option<Vec<String>>,
     pub message: Option<String>,
     pub command: Option<Command>,
     pub networks: Option<Vec<Network>>,
@@ -84,16 +63,6 @@ pub struct Config {
     pub post_copy: Option<PostCopy>,
     pub analyzer: Option<Analyzer>,
     pub usb_port_accesses: Option<UsbPortAccesses>,
-}
-
-impl Config {
-    pub fn env_vars(&self) -> impl Iterator<Item = &str> {
-        self.env_vars
-            .as_ref()
-            .unwrap_or(&DEFAULT_ENV_VARS)
-            .iter()
-            .map(|s| s.as_str())
-    }
 }
 
 pub fn conf_read(config_path: &str) -> io::Result<String> {

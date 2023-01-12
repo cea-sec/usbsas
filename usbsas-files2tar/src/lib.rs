@@ -15,7 +15,7 @@ mod tarwriter;
 pub use crate::files2tar::Files2Tar;
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
@@ -29,7 +29,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) trait ArchiveWriter {
     fn init(&mut self) -> Result<()>;

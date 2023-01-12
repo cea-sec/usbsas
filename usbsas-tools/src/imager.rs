@@ -84,9 +84,9 @@ impl Imager {
         let mut pipes_write = vec![];
 
         log::debug!("Starting usbsas children");
-        let dev2scsi = UsbsasChildSpawner::new()
+        let dev2scsi = UsbsasChildSpawner::new("usbsas-dev2scsi")
             .wait_on_startup()
-            .spawn::<usbsas_dev2scsi::Dev2Scsi, proto::scsi::Request>()?;
+            .spawn::<proto::scsi::Request>()?;
         pipes_read.push(dev2scsi.comm.input_fd());
         pipes_write.push(dev2scsi.comm.output_fd());
 
@@ -100,9 +100,9 @@ impl Imager {
 
         // If busnum and devnum were not specified we need usbdev to select the device
         let usbdev = if busdevnum.is_none() {
-            let usbdev = UsbsasChildSpawner::new()
+            let usbdev = UsbsasChildSpawner::new("usbsas-usbdev")
                 .arg(config_path)
-                .spawn::<usbsas_usbdev::UsbDev, proto::usbdev::Request>()?;
+                .spawn::<proto::usbdev::Request>()?;
             pipes_read.push(usbdev.comm.input_fd());
             pipes_write.push(usbdev.comm.output_fd());
             Some(usbdev)
