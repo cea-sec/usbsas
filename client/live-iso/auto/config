@@ -1,14 +1,13 @@
 #!/bin/sh
 
-set -e
+set -eu
 
 MIRROR="https://deb.debian.org"
-VER=$(grep ^VER config/hooks/live/0098.usbsas.hook.chroot | sed 's/VER=//')
 
 lb config noauto \
 	--distribution bullseye \
 	--architecture amd64 \
-	--image-name "usbsas-${VER}" \
+	--image-name "usbsas-${USBSAS_ISO_VER}" \
 	--apt-recommends false \
 	--security true \
 	--source false \

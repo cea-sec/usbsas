@@ -2,25 +2,12 @@
 
 set -e
 
-VER=0.1.3
-SRV_VER=0.1.3
-ASRV_VER=0.1.1
-KSK_VER=0.1.4
-HID_VER=0.1.0
-
-apt install -y --no-install-recommends wget
-
-wget \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-server_${SRV_VER}_amd64.deb" \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-analyzer-server_${ASRV_VER}_amd64.deb" \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-kiosk_${KSK_VER}_amd64.deb" \
-    "https://github.com/cea-sec/usbsas/releases/download/v${VER}/usbsas-hid_${HID_VER}_amd64.deb"
-
 apt install -y --no-install-recommends -o Dpkg::Options::="--force-confold" \
-    ./usbsas-server_${SRV_VER}_amd64.deb \
-    ./usbsas-analyzer-server_${ASRV_VER}_amd64.deb \
-    ./usbsas-kiosk_${KSK_VER}_amd64.deb \
-    ./usbsas-hid_${HID_VER}_amd64.deb
+    /usbsas-core_*_amd64.deb \
+    /usbsas-server_*_amd64.deb \
+    /usbsas-analyzer-server_*_amd64.deb \
+    /usbsas-kiosk_*_amd64.deb \
+    /usbsas-hid_*_amd64.deb
 
 freshclam
 
@@ -35,3 +22,5 @@ sed -i '/^\[Unit\]$/a Requires=usbsas-rmmod.service' /usr/lib/systemd/system/usb
 
 systemctl disable systemd-networkd
 systemctl disable networking
+
+rm /usbsas-*.deb

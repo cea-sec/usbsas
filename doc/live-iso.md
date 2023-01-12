@@ -18,13 +18,12 @@ regularly to have an up-to-date clamAV database.
 # Build the image
 
 The ISO image is built with [DebianLive](https://wiki.debian.org/DebianLive)
-tools.
+tools and `make`.
 
 ```shell
 $ cd client/live-iso
 $ sudo apt install live-build
-$ lb config
-$ sudo lb build
+$ make
 ```
 
 The resulting image will be `usbsas-0.1.1-amd64.hybrid.iso`.
