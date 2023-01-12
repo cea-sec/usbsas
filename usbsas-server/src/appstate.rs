@@ -9,9 +9,8 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fs, path,
+    fs,
     pin::Pin,
-    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -19,9 +18,9 @@ use std::{
 };
 use usbsas_comm::{protorequest, Comm};
 use usbsas_config::{conf_parse, conf_read, Config};
+use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
 use usbsas_proto::common::OutFileType;
-use usbsas_utils::{INPUT_PIPE_FD_VAR, OUTPUT_PIPE_FD_VAR, USBSAS_BIN_PATH};
 
 protorequest!(
     CommUsbsas,
@@ -389,41 +388,21 @@ impl AppState {
     ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
         debug!("starting usbsas");
 
-        let mut command = Command::new(path::Path::new(USBSAS_BIN_PATH).join("usbsas-usbsas"));
-        command.arg(&tmpfiles.out_tar);
-        command.arg(&tmpfiles.out_fs);
+        let mut usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas")
+            .arg(&tmpfiles.out_tar)
+            .arg(&tmpfiles.out_fs)
+            .args(&["-c", config_path]);
 
         if config.analyzer.is_some() {
-            command.arg("--analyze");
+            usbsas_cmd = usbsas_cmd.arg("--analyze");
         }
 
-        command.args(["-c", config_path]);
-
         #[cfg(feature = "log-json")]
-        command.args(["--sessionid", sessionid]);
+        std::env::set_var("USBSAS_SESSION_ID", sessionid);
 
-        command.env_clear();
-        config
-            .env_vars()
-            .into_iter()
-            .map(|k| std::env::var(k).map(|v| (k, v)))
-            .filter_map(Result::ok)
-            .for_each(|(k, v)| {
-                command.env(k, v);
-            });
+        let usbsas_child = usbsas_cmd.spawn::<proto::usbsas::Request>()?;
 
-        let (child_to_parent_rd, child_to_parent_wr) = usbsas_process::pipe()?;
-        let (parent_to_child_rd, parent_to_child_wr) = usbsas_process::pipe()?;
-        usbsas_process::set_cloexec(child_to_parent_rd)?;
-        usbsas_process::set_cloexec(parent_to_child_wr)?;
-        command.env(INPUT_PIPE_FD_VAR, parent_to_child_rd.to_string());
-        command.env(OUTPUT_PIPE_FD_VAR, child_to_parent_wr.to_string());
-
-        let _ = command.spawn()?;
-        usbsas_process::close(parent_to_child_rd)?;
-        usbsas_process::close(child_to_parent_wr)?;
-
-        Ok(Comm::from_raw_fd(child_to_parent_rd, parent_to_child_wr))
+        Ok(usbsas_child.comm)
     }
 
     pub(crate) fn reset(&self) -> Result<(), ServiceError> {

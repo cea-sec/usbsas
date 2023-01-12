@@ -5,9 +5,10 @@ use nix::{
     fcntl::{FcntlArg, FdFlag},
     unistd,
 };
-use std::{io, os::unix::io::RawFd};
+use std::{io, os::unix::io::RawFd, path, process};
 use thiserror::Error;
 use usbsas_comm::Comm;
+use usbsas_utils::{INPUT_PIPE_FD_VAR, OUTPUT_PIPE_FD_VAR, USBSAS_BIN_PATH};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -22,22 +23,29 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait UsbsasProcess {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>>;
-}
+// Default environment variables to keep when spawning processes
+const DEFAULT_ENV_VARS: &[&str] = &[
+    "TERM",
+    "LANG",
+    "KRB5CCNAME",
+    "PATH",
+    "RUST_LOG",
+    "RUST_BACKTRACE",
+    "USBSAS_SESSION_ID",
+    "USBSAS_MOCK_IN_DEV",
+    "USBSAS_MOCK_OUT_DEV",
+];
 
-pub struct UsbsasChildSpawner {
+pub struct UsbsasChildSpawner<'a> {
+    bin_path: &'a str,
     args: Option<Vec<String>>,
     wait_on_startup: bool,
 }
 
-impl UsbsasChildSpawner {
-    pub fn new() -> Self {
+impl<'a> UsbsasChildSpawner<'a> {
+    pub fn new(bin_path: &'a str) -> Self {
         Self {
+            bin_path,
             args: None,
             wait_on_startup: false,
         }
@@ -49,7 +57,15 @@ impl UsbsasChildSpawner {
         } else {
             self.args = Some(vec![arg.into()])
         }
+        self
+    }
 
+    pub fn args(mut self, args: &[&str]) -> Self {
+        if self.args.is_none() {
+            self.args = Some(vec![])
+        }
+        args.iter()
+            .for_each(|x| self.args.as_mut().unwrap().push(x.to_string()));
         self
     }
 
@@ -58,39 +74,35 @@ impl UsbsasChildSpawner {
         self
     }
 
-    pub fn spawn<T: UsbsasProcess, R>(self) -> Result<UsbsasChild<R>> {
+    pub fn spawn<R>(self) -> Result<UsbsasChild<R>> {
+        let mut command =
+            process::Command::new(path::Path::new(USBSAS_BIN_PATH).join(self.bin_path));
+
+        if let Some(args) = self.args {
+            command.args(args);
+        }
+
         let (child_to_parent_rd, child_to_parent_wr) = unistd::pipe()?;
         let (parent_to_child_rd, parent_to_child_wr) = unistd::pipe()?;
+        set_cloexec(child_to_parent_rd)?;
+        set_cloexec(parent_to_child_wr)?;
 
-        let child = match unsafe { unistd::fork() } {
-            Ok(unistd::ForkResult::Parent { child }) => {
-                log::info!(
-                    "Spawned child {} with pid {}",
-                    std::any::type_name::<T>(),
-                    child
-                );
-                child
-            }
-            Ok(unistd::ForkResult::Child) => {
-                unistd::close(child_to_parent_rd)?;
-                unistd::close(parent_to_child_wr)?;
-                T::spawn(parent_to_child_rd, child_to_parent_wr, self.args)
-                    .map_err(|err| Error::Error(format!("{}", err)))?;
-                log::debug!("Child {} exiting", std::any::type_name::<T>());
-                std::process::exit(0);
-            }
-            Err(err) => {
-                log::error!(
-                    "Failed to fork children {}: {}",
-                    std::any::type_name::<T>(),
-                    err
-                );
-                return Err(Error::Error("fork() error".to_string()));
-            }
-        };
+        command.env_clear();
+        command.env(INPUT_PIPE_FD_VAR, parent_to_child_rd.to_string());
+        command.env(OUTPUT_PIPE_FD_VAR, child_to_parent_wr.to_string());
+        DEFAULT_ENV_VARS
+            .iter()
+            .map(|k| std::env::var(k).map(|v| (k, v)))
+            .filter_map(std::result::Result::ok)
+            .for_each(|(k, v)| {
+                command.env(k, v);
+            });
+
+        let child = command.spawn()?;
 
         unistd::close(parent_to_child_rd)?;
         unistd::close(child_to_parent_wr)?;
+
         Ok(UsbsasChild {
             child,
             comm: Comm::from_raw_fd(child_to_parent_rd, parent_to_child_wr),
@@ -99,38 +111,20 @@ impl UsbsasChildSpawner {
     }
 }
 
-impl Default for UsbsasChildSpawner {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 pub struct UsbsasChild<R> {
-    pub child: unistd::Pid,
+    pub child: process::Child,
     pub comm: Comm<R>,
     pub locked: bool,
 }
 
 impl<R> UsbsasChild<R> {
-    pub fn wait(&self) -> Result<()> {
-        if let Err(err) = nix::sys::wait::waitpid(self.child, None) {
-            log::error!("Couldn't wait child {}: {}", self.child, err);
-            return Err(Error::Error("waitpid() error".to_string()));
-        }
-        Ok(())
+    pub fn wait(&mut self) -> Result<std::process::ExitStatus> {
+        Ok(self.child.wait()?)
     }
-}
-
-pub fn pipe() -> io::Result<(RawFd, RawFd)> {
-    Ok(nix::unistd::pipe()?)
 }
 
 fn fcntl(fd: RawFd, arg: FcntlArg) -> io::Result<libc::c_int> {
     Ok(nix::fcntl::fcntl(fd, arg)?)
-}
-
-pub fn close(fd: RawFd) -> io::Result<()> {
-    Ok(nix::unistd::close(fd)?)
 }
 
 pub fn set_cloexec(fd: RawFd) -> io::Result<libc::c_int> {

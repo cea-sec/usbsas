@@ -1,16 +1,9 @@
 use std::io;
+use usbsas_utils::clap::UsbsasClap;
 
 fn main() -> io::Result<()> {
-    let matches = clap::Command::new("usbsas-server")
-        .arg(
-            clap::Arg::new("config")
-                .short('c')
-                .long("config")
-                .help("Path of the configuration file")
-                .num_args(1)
-                .required(false)
-                .default_value(usbsas_utils::USBSAS_CONFIG),
-        )
+    let matches = usbsas_utils::clap::new_usbsas_cmd("usbsas-server")
+        .add_config_arg()
         .arg(
             clap::Arg::new("bind_addr")
                 .short('a')

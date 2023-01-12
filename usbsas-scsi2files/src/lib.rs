@@ -5,20 +5,19 @@ use log::{error, trace};
 use std::{
     convert::TryFrom,
     io::Write,
-    os::unix::io::RawFd,
     sync::{Arc, RwLock},
 };
 use thiserror::Error;
 use usbsas_comm::{protorequest, protoresponse, Comm};
 use usbsas_fsrw::{ext4fs, ff, iso9660fs, ntfs, FSRead};
 use usbsas_mass_storage::MassStorageComm;
-use usbsas_process::{UsbsasChild, UsbsasChildSpawner, UsbsasProcess};
+use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, files::request::Msg};
 use usbsas_utils::READ_FILE_MAX_SIZE;
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
@@ -38,7 +37,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommFiles,
@@ -91,9 +90,9 @@ struct InitState {}
 
 impl InitState {
     fn run(self, comm_parent: &mut Comm<proto::files::Request>) -> Result<State> {
-        let dev2scsi = UsbsasChildSpawner::new()
+        let dev2scsi = UsbsasChildSpawner::new("usbsas-dev2scsi")
             .wait_on_startup()
-            .spawn::<usbsas_dev2scsi::Dev2Scsi, proto::scsi::Request>()?;
+            .spawn::<proto::scsi::Request>()?;
         let UsbsasChild { comm, .. } = dev2scsi;
 
         usbsas_sandbox::scsi2files::seccomp(
@@ -383,12 +382,12 @@ pub struct Scsi2Files {
 }
 
 impl Scsi2Files {
-    fn new(comm: Comm<proto::files::Request>) -> Result<Self> {
+    pub fn new(comm: Comm<proto::files::Request>) -> Result<Self> {
         let state = State::Init(InitState {});
         Ok(Scsi2Files { comm, state })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -403,19 +402,6 @@ impl Scsi2Files {
                 }
             }
         }
-        Ok(())
-    }
-}
-
-impl UsbsasProcess for Scsi2Files {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        _args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        Scsi2Files::new(Comm::from_raw_fd(read_fd, write_fd))?
-            .main_loop()
-            .map(|_| log::debug!("scsi2files: exiting"))?;
         Ok(())
     }
 }

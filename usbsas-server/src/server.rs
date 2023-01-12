@@ -165,7 +165,7 @@ pub async fn start_server(
         )
     })?);
     #[cfg(feature = "log-json")]
-    usbsas_utils::log::init_logger(app_data.session_id.clone());
+    usbsas_utils::log::init_server_logger(app_data.session_id.clone());
     #[cfg(not(feature = "log-json"))]
     usbsas_utils::log::init_logger();
     HttpServer::new(move || {
@@ -177,7 +177,8 @@ pub async fn start_server(
                     .exclude("/id")
                     .exclude("/devices")
                     .exclude("/status")
-                    .exclude("/static"),
+                    .exclude("/static")
+                    .log_target("http"),
             )
             .service(id)
             .service(usbsas_infos)

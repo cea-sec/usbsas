@@ -12,13 +12,12 @@ use std::{
     convert::TryFrom,
     fs::{self, File},
     io::{Seek, SeekFrom, Write},
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::AsRawFd,
 };
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 use usbsas_fsrw::{ff, ntfs, FSWrite};
 use usbsas_mbr::SECTOR_START;
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::{FileType, OutFsType},
@@ -30,7 +29,7 @@ mod sparsefile;
 use sparsefile::{FileBitVec, SparseFile};
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
@@ -48,7 +47,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommWritefs,
@@ -460,12 +459,12 @@ pub struct Files2Fs {
 }
 
 impl Files2Fs {
-    fn new(comm: Comm<proto::writefs::Request>, fs_fname: String) -> Result<Self> {
+    pub fn new(comm: Comm<proto::writefs::Request>, fs_fname: String) -> Result<Self> {
         let state = State::Init(InitState { fs_fname });
         Ok(Files2Fs { comm, state })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -481,26 +480,5 @@ impl Files2Fs {
             };
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for Files2Fs {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if let Some(fname) = args.get(0) {
-                log::info!("files2fs {:?}", fname);
-                Files2Fs::new(Comm::from_raw_fd(read_fd, write_fd), fname.to_owned())?
-                    .main_loop()
-                    .map(|_| log::debug!("files2fs: exiting"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "files2fs needs a fs filename as arg".to_string(),
-        )))
     }
 }

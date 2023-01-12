@@ -6,21 +6,18 @@ use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
 #[cfg(not(feature = "mock"))]
 use rusb::UsbContext;
-use std::{convert::TryFrom, io::prelude::*, os::unix::io::RawFd, str};
+use std::{convert::TryFrom, io::prelude::*, str};
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 #[cfg(not(feature = "mock"))]
 use usbsas_mass_storage::{self, MassStorage};
 #[cfg(feature = "mock")]
-use usbsas_mock::mass_storage::{
-    MockContext, MockMassStorage as MassStorage, MockUsbContext as UsbContext,
-};
-use usbsas_process::UsbsasProcess;
+use usbsas_mock::mass_storage::{MockMassStorage as MassStorage, MockUsbContext as UsbContext};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("int error: {0}")]
@@ -36,7 +33,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommScsi,
@@ -88,7 +85,6 @@ struct WaitEndState {}
 
 impl<T: UsbContext> InitState<T> {
     fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<State<T>> {
-        trace!("waiting unlock");
         let mut buf = vec![0u8; 8];
         comm.read_exact(&mut buf)?;
 
@@ -414,18 +410,18 @@ impl WaitEndState {
     }
 }
 
-struct Dev2ScsiContext<T: UsbContext> {
+pub struct Dev2Scsi<T: UsbContext> {
     comm: Comm<proto::scsi::Request>,
     state: State<T>,
 }
 
-impl<T: UsbContext> Dev2ScsiContext<T> {
-    fn new(comm: Comm<proto::scsi::Request>, context: T) -> Result<Self> {
+impl<T: UsbContext> Dev2Scsi<T> {
+    pub fn new(comm: Comm<proto::scsi::Request>, context: T) -> Result<Self> {
         let state = State::Init(InitState { context });
-        Ok(Dev2ScsiContext { comm, state })
+        Ok(Dev2Scsi { comm, state })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -440,30 +436,6 @@ impl<T: UsbContext> Dev2ScsiContext<T> {
                 }
             }
         }
-        Ok(())
-    }
-}
-
-// Wrapper to avoid impl UsbsasProcess for Dev2Scsi<T>
-pub struct Dev2Scsi {}
-
-impl UsbsasProcess for Dev2Scsi {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        _args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        #[cfg(not(feature = "mock"))]
-        assert!(rusb::supports_detach_kernel_driver());
-        Dev2ScsiContext::new(
-            Comm::from_raw_fd(read_fd, write_fd),
-            #[cfg(not(feature = "mock"))]
-            rusb::Context::new()?,
-            #[cfg(feature = "mock")]
-            MockContext {},
-        )?
-        .main_loop()
-        .map(|_| log::debug!("exit dev2scsi"))?;
         Ok(())
     }
 }

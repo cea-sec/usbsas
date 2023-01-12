@@ -46,10 +46,10 @@ struct FsWriter {
 impl FsWriter {
     fn new(fs_path: String, busnum: u32, devnum: u32) -> Result<Self> {
         let fs = File::open(&fs_path)?;
-        let mut fs2dev = UsbsasChildSpawner::new()
+        let mut fs2dev = UsbsasChildSpawner::new("usbsas-fs2dev")
             .arg(&fs_path)
             .wait_on_startup()
-            .spawn::<usbsas_fs2dev::Fs2Dev, proto::fs2dev::Request>()?;
+            .spawn::<proto::fs2dev::Request>()?;
 
         usbsas_sandbox::fswriter::seccomp(
             fs.as_raw_fd(),

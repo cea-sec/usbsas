@@ -55,9 +55,9 @@ protorequest!(
 
 fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::uploader::response::Msg;
-    let mut uploader = UsbsasChildSpawner::new()
+    let mut uploader = UsbsasChildSpawner::new("usbsas-uploader")
         .arg(bundle_path)
-        .spawn::<usbsas_net::Uploader, proto::uploader::Request>()?;
+        .spawn::<proto::uploader::Request>()?;
 
     let config = conf_parse(&conf_read(config_path)?)?;
 
@@ -141,10 +141,10 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
 
 fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::analyzer::response::Msg;
-    let mut analyzer = UsbsasChildSpawner::new()
+    let mut analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
         .arg(bundle_path)
-        .arg(config_path)
-        .spawn::<usbsas_net::Analyzer, proto::analyzer::Request>()?;
+        .args(&["-c", config_path])
+        .spawn::<proto::analyzer::Request>()?;
 
     analyzer.comm.send(proto::analyzer::Request {
         msg: Some(proto::analyzer::request::Msg::Analyze(
@@ -184,10 +184,10 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
 
 fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::downloader::response::Msg;
-    let mut downloader = UsbsasChildSpawner::new()
+    let mut downloader = UsbsasChildSpawner::new("usbsas-downloader")
         .arg(bundle_path)
-        .arg(config_path)
-        .spawn::<usbsas_net::Downloader, proto::downloader::Request>()?;
+        .args(&["-c", config_path])
+        .spawn::<proto::downloader::Request>()?;
 
     let _ = downloader
         .comm

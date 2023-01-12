@@ -1,13 +1,8 @@
 use crate::{tarwriter::TarWriter, ArchiveWriter};
 use crate::{Error, Result};
-use byteorder::ReadBytesExt;
 use log::{error, trace};
-use std::{
-    fs,
-    os::unix::io::{AsRawFd, RawFd},
-};
+use std::{fs, os::unix::io::AsRawFd};
 use usbsas_comm::{protoresponse, Comm};
-use usbsas_process::UsbsasProcess;
 use usbsas_proto as proto;
 use usbsas_proto::{common::FileType, writetar::request::Msg};
 
@@ -181,12 +176,16 @@ pub struct Files2Tar {
 }
 
 impl Files2Tar {
-    fn new(comm: Comm<proto::writetar::Request>, archive_path: String) -> Result<Self> {
+    pub fn new(comm: Comm<proto::writetar::Request>, archive_path: String) -> Result<Self> {
         let state = State::Init(InitState { archive_path });
         Ok(Files2Tar { comm, state })
     }
+    pub fn new_end(comm: Comm<proto::writetar::Request>) -> Result<Self> {
+        let state = State::WaitEnd(WaitEndState {});
+        Ok(Files2Tar { comm, state })
+    }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -202,36 +201,5 @@ impl Files2Tar {
             }
         }
         Ok(())
-    }
-}
-
-impl UsbsasProcess for Files2Tar {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        if let Some(args) = args {
-            if let Some(fname) = args.get(0) {
-                let mut comm = Comm::from_raw_fd(read_fd, write_fd);
-                match comm.read_u8()? {
-                    // 0: unlock to start writing files in a tar
-                    0 => Files2Tar::new(comm, fname.to_string())?.main_loop()?,
-                    // 1: unlock to exit value
-                    1 => Files2Tar {
-                        comm,
-                        state: State::WaitEnd(WaitEndState {}),
-                    }
-                    .main_loop()?,
-                    _ => {
-                        return Err(Box::new(Error::Error("Bad unlock value".to_string())));
-                    }
-                }
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "files2tar needs a tarpath arg".to_string(),
-        )))
     }
 }

@@ -14,6 +14,5 @@ usbsas-comm = { path = "../usbsas-comm" }
 usbsas-fsrw = { path = "../usbsas-fsrw" }
 usbsas-mbr = { path = "../usbsas-mbr" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
-usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }

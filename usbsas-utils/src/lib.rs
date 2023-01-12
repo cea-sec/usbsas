@@ -2,6 +2,7 @@
 
 use std::env;
 
+pub mod clap;
 pub mod log;
 
 pub const INPUT_PIPE_FD_VAR: &str = "INPUT_PIPE_FD";
@@ -16,14 +17,6 @@ pub const USBSAS_CONFIG: &str = match option_env!("USBSAS_CONFIG") {
     None => "/etc/usbsas/config.toml",
 };
 pub const USBSAS_VERSION: &str = env!("GIT_HASH");
-
-#[macro_export]
-macro_rules! get_binary_path {
-    ($binary_name:expr) => {{
-        let path = USBSAS_BIN_PATH.trim_end_matches('/').to_owned() + "/" + $binary_name;
-        std::path::Path::new(&path.to_string())
-    }};
-}
 
 /// formats a byte array as an hexadecimal pretty string
 #[macro_export]

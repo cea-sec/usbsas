@@ -14,10 +14,21 @@ serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
-usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }
 
 [features]
 authkrb = ["base64", "libgssapi"]
 default = ["authkrb"]
+
+[[bin]]
+path = "src/bin/analyzer.rs"
+name = "usbsas-analyzer"
+
+[[bin]]
+path = "src/bin/uploader.rs"
+name = "usbsas-uploader"
+
+[[bin]]
+path = "src/bin/downloader.rs"
+name = "usbsas-downloader"

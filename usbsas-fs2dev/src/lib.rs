@@ -5,19 +5,15 @@ use bitvec::prelude::*;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{debug, error, trace};
 #[cfg(not(feature = "mock"))]
-use rusb::{Context, UsbContext};
+use rusb::UsbContext;
 use std::{
     fs::File,
     io::{prelude::*, SeekFrom},
-    os::unix::io::RawFd,
 };
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 #[cfg(feature = "mock")]
-use usbsas_mock::mass_storage::{
-    MockContext, MockMassStorage as MassStorage, MockUsbContext as UsbContext,
-};
-use usbsas_process::UsbsasProcess;
+use usbsas_mock::mass_storage::{MockMassStorage as MassStorage, MockUsbContext as UsbContext};
 use usbsas_proto as proto;
 use usbsas_utils::SECTOR_SIZE;
 #[cfg(not(feature = "mock"))]
@@ -27,7 +23,7 @@ use {
 };
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
@@ -41,7 +37,7 @@ enum Error {
     #[error("State error")]
     State,
 }
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 protoresponse!(
     CommFs2Dev,
@@ -150,10 +146,9 @@ impl Iterator for BitVecIterOnes {
 
 impl<T: UsbContext> InitState<T> {
     fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State<T>> {
-        debug!("waiting for busnum and devnum");
         let busnum = comm.read_u32::<LittleEndian>()?;
         let devnum = comm.read_u32::<LittleEndian>()?;
-        debug!("received busnum={} devnum={}", busnum, devnum);
+        debug!("unlocked with busnum={} devnum={}", busnum, devnum);
 
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
@@ -399,18 +394,21 @@ impl WaitEndState {
     }
 }
 
-struct Fs2DevContext<T: UsbContext> {
+pub struct Fs2Dev<T: UsbContext> {
     comm: Comm<proto::fs2dev::Request>,
     state: State<T>,
 }
 
-impl<T: UsbContext> Fs2DevContext<T> {
-    fn new(comm: Comm<proto::fs2dev::Request>, fs_fname: String, context: T) -> Result<Self> {
+impl<T: UsbContext> Fs2Dev<T> {
+    pub fn new(comm: Comm<proto::fs2dev::Request>, fs_fname: String, context: T) -> Result<Self> {
+        #[cfg(not(feature = "mock"))]
+        assert!(rusb::supports_detach_kernel_driver());
+
         let state = State::Init(InitState { fs_fname, context });
-        Ok(Fs2DevContext { comm, state })
+        Ok(Fs2Dev { comm, state })
     }
 
-    fn main_loop(self) -> Result<()> {
+    pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
             state = match state.run(&mut comm) {
@@ -426,39 +424,5 @@ impl<T: UsbContext> Fs2DevContext<T> {
             };
         }
         Ok(())
-    }
-}
-
-// Wrapper to avoid impl UsbsasProcess for Fs2Dev<T>
-pub struct Fs2Dev {}
-
-impl UsbsasProcess for Fs2Dev {
-    fn spawn(
-        read_fd: RawFd,
-        write_fd: RawFd,
-        args: Option<Vec<String>>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        #[cfg(not(feature = "mock"))]
-        assert!(rusb::supports_detach_kernel_driver());
-
-        if let Some(args) = args {
-            if let Some(fname) = args.get(0) {
-                debug!("fs2dev: {}", fname);
-                Fs2DevContext::new(
-                    Comm::from_raw_fd(read_fd, write_fd),
-                    fname.to_owned(),
-                    #[cfg(not(feature = "mock"))]
-                    Context::new()?,
-                    #[cfg(feature = "mock")]
-                    MockContext {},
-                )?
-                .main_loop()
-                .map(|_| debug!("fs2dev: exit"))?;
-                return Ok(());
-            }
-        }
-        Err(Box::new(Error::Error(
-            "fs2dev needs a fname arg".to_string(),
-        )))
     }
 }
