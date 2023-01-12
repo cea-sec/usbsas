@@ -18,3 +18,34 @@ usbsas-utils = { path = "../usbsas-utils" }
 
 [features]
 mock = ["usbsas-mock"]
+
+# cargo-deb
+[package.metadata.deb]
+name = "usbsas-core"
+maintainer = "usbsas"
+copyright = "usbsas"
+depends = "$auto"
+section = "utility"
+priority = "optional"
+maintainer-scripts = "debian/"
+triggers-file = "debian/triggers"
+assets = [
+  ["target/release/usbsas-usbsas", "usr/libexec/", "755"],
+  ["target/release/usbsas-analyzer", "usr/libexec/", "755"],
+  ["target/release/usbsas-cmdexec", "usr/libexec/", "755"],
+  ["target/release/usbsas-dev2scsi", "usr/libexec/", "755"],
+  ["target/release/usbsas-downloader", "usr/libexec/", "755"],
+  ["target/release/usbsas-files2fs", "usr/libexec/", "755"],
+  ["target/release/usbsas-files2tar", "usr/libexec/", "755"],
+  ["target/release/usbsas-filter", "usr/libexec/", "755"],
+  ["target/release/usbsas-fs2dev", "usr/libexec/", "755"],
+  ["target/release/usbsas-identificator", "usr/libexec/", "755"],
+  ["target/release/usbsas-scsi2files", "usr/libexec/", "755"],
+  ["target/release/usbsas-tar2files", "usr/libexec/", "755"],
+  ["target/release/usbsas-uploader", "usr/libexec/", "755"],
+  ["target/release/usbsas-usbdev", "usr/libexec/", "755"],
+  ["../config.example.toml", "etc/usbsas/config.toml", "644"],
+  ["assets/99-usbsas.rules", "etc/udev/rules.d/", "644"],
+  ["assets/usbsas.conf", "etc/modprobe.d/", "644"],
+]
+conf-files = ["/etc/usbsas/config.toml"]

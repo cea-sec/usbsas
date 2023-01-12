@@ -32,17 +32,24 @@ $ export USBSAS_WEBFILES_DIR="/usr/share/usbsas/web"
 $ export USBSAS_BIN_PATH="/usr/libexec"
 ```
 
-### usbsas-server
+### usbsas-core
 ```shell
 $ sudo apt install -y --no-install-recommends libssl-dev libkrb5-dev libseccomp-dev libusb-1.0-0-dev protobuf-compiler
 $ cargo build --release
+$ cargo-deb --manifest-path=usbsas-usbsas/Cargo.toml --no-build
+```
+
+The `usbsas-core` package contains usbsas processes. It will add a new user
+`usbsas` and a udev rule giving it ownership of plugged USB devices. `uas` and
+`usb_storage` kernel modules are prevented from loading with a modprobe
+configuration file.
+
+### usbsas-server
+```shell
 $ cargo-deb --manifest-path=usbsas-server/Cargo.toml --no-build
 ```
 
-The `usbsas-server` package contains usbsas and the web server. It will add a
-new user `usbsas` and a udev rule giving it ownership of plugged USB devices.
-`uas` and `usb_storage` kernel modules are prevented from loading with a
-modprobe configuration file.
+The `usbsas-server` package contains the web server and web files.
 
 ### usbsas-analyzer-server
 ```shell
@@ -81,7 +88,8 @@ manager. The installation of `usbsas-hid` is recommended but not mandatory.
 ## Install the Debian packages
 
 ```shell
-$ sudo apt install ./usbsas-server_0.1.1_amd64.deb \
+$ sudo apt install ./usbsas-core.1.1_amd64.deb \
+                   ./usbsas-server_0.1.1_amd64.deb \
                    ./usbsas-analyzer-server_0.1.0_amd64.deb \
                    ./usbsas-kiosk_0.1.1_amd64.deb \
                    ./usbsas-hid_0.1.0_amd64.deb

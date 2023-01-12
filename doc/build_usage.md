@@ -46,7 +46,7 @@ build target directory)
 ```shell
 $ cargo build --release
 ```
-Only `usbsas-server` is built by default, to build the analyzer-server:
+Only `usbsas` is built by default, to build the analyzer-server:
 
 ```shell
 $ cargo build --release -p usbsas-analyzer-server
