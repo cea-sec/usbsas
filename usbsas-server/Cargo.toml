@@ -43,18 +43,13 @@ log-json = ["usbsas-utils/log-json", "uuid"]
 [package.metadata.deb]
 maintainer = "usbsas"
 copyright = "usbsas"
-depends = "$auto"
+depends = "$auto, usbsas-core"
 section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
 systemd-units = { enable = false }
-triggers-file = "debian/triggers"
 assets = [
   ["target/release/usbsas-server", "usr/bin/", "755"],
-  ["target/release/usbsas-usbsas", "usr/libexec/", "755"],
-  ["../config.example.toml", "etc/usbsas/config.toml", "644"],
-  ["assets/99-usbsas.rules", "etc/udev/rules.d/", "644"],
-  ["assets/usbsas.conf", "etc/modprobe.d/", "644"],
   ["../client/web/*", "usr/share/usbsas/web/", "644"],
   ["../client/web/static/css/*", "usr/share/usbsas/web/static/css/", "644"],
   ["../client/web/static/js/*", "usr/share/usbsas/web/static/js/", "644"],
@@ -71,4 +66,3 @@ assets = [
   ["../client/web/static/fontawesome/sprites/*", "usr/share/usbsas/web/static/fontawesome/sprites/", "644"],
   ["../client/web/static/fontawesome/webfonts/*", "usr/share/usbsas/web/static/fontawesome/webfonts/", "644"],
 ]
-conf-files = ["/etc/usbsas/config.toml"]

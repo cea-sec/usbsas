@@ -54,7 +54,7 @@ required-features = ["fswriter"]
 [package.metadata.deb]
 maintainer = "usbsas"
 copyright = "usbsas"
-depends = "$auto, fuse3"
+depends = "$auto, usbsas-core, fuse3"
 section = "utility"
 priority = "optional"
 systemd-units = { enable = false }
