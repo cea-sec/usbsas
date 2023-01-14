@@ -9,7 +9,7 @@ license = "GPL-3.0"
 actix-files = "0.6"
 actix-web = "4.2"
 clamav-rs = { git = "https://github.com/losynix/clamav-rs", branch = "c_char_i8" }
-clap = "4.0"
+clap = "4.1"
 env_logger = "0.10"
 futures = "0.3"
 log = "0.4"

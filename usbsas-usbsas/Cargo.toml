@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-clap = "4.0"
+clap = "4.1"
 log = "0.4"
 thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
