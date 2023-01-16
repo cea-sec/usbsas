@@ -156,7 +156,7 @@ impl RunningState {
         // here
         let size = resp
             .headers()
-            .get("Content-Length")
+            .get("X-Uncompressed-Content-Length")
             .ok_or(Error::BadResponse)?
             .to_str()
             .map_err(|_| Error::BadResponse)?

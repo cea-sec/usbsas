@@ -259,15 +259,9 @@ async fn head_bundle_size(
     }
     log::debug!("filename: {}, size: {}", bundle_path, size);
 
-    // XXX FIXME Dirty hack 2:
-    // Since Content-Length is automatically set as the size of the body (we
-    // can't set it manually), lie with an empty sized stream. Since it's a HEAD
-    // request, the body will not be sent and the stream will never be polled
-    // but the Content-Length header will have the value we want. see:
-    // https://github.com/actix/actix-web/issues/1439
-    let dummy_stream: futures::stream::Empty<Result<actix_web::web::Bytes, actix_web::Error>> =
-        futures::stream::empty();
-    Ok(HttpResponse::Ok().body(actix_web::body::SizedStream::new(size, dummy_stream)))
+    Ok(HttpResponse::Ok()
+        .insert_header(("X-Uncompressed-Content-Length", size))
+        .finish())
 }
 
 #[get("/api/downloadbundle/{id}/{bundle_id}")]
