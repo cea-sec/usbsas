@@ -970,7 +970,7 @@ dependencies = [
 
 [[package]]
 name = "ff"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bindgen 0.63.0",
  "cc",
@@ -1268,7 +1268,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hid-dealer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dbus",
  "dbus-crossroads",
@@ -1279,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "hid-user"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bitfield",
  "env_logger 0.10.0",
@@ -1802,7 +1802,7 @@ dependencies = [
 
 [[package]]
 name = "ntfs3g"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bindgen 0.63.0",
  "cc",
@@ -2854,7 +2854,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-analyzer-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -2872,7 +2872,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-cmdexec"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger 0.10.0",
  "log",
@@ -2894,7 +2894,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-config"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "log",
  "serde",
@@ -2903,7 +2903,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-dev2scsi"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bootsector",
  "byteorder",
@@ -2921,7 +2921,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-files2fs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bitvec",
  "env_logger 0.10.0",
@@ -2938,7 +2938,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-files2tar"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "byteorder",
  "env_logger 0.10.0",
@@ -2955,7 +2955,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-filter"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger 0.10.0",
  "log",
@@ -2971,7 +2971,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-fs2dev"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bitvec",
  "byteorder",
@@ -2989,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-fsrw"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "ext4",
@@ -3007,7 +3007,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-identificator"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger 0.10.0",
  "log",
@@ -3020,7 +3020,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-mass-storage"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "log",
  "lru",
@@ -3040,7 +3040,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-mock"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "log",
  "positioned-io2",
@@ -3051,7 +3051,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-net"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "base64 0.21.0",
  "env_logger 0.10.0",
@@ -3068,7 +3068,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-process"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libc",
  "log",
@@ -3080,7 +3080,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-proto"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "prost",
  "prost-build",
@@ -3088,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-sandbox"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cc",
  "libc",
@@ -3099,7 +3099,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-scsi"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byteorder",
  "log",
@@ -3108,7 +3108,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-scsi2files"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "byteorder",
  "env_logger 0.10.0",
@@ -3125,7 +3125,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-server"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -3158,7 +3158,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-tar2files"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "byteorder",
  "env_logger 0.10.0",
@@ -3173,7 +3173,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-tools"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "bitvec",
  "clap 4.1.1",
@@ -3196,7 +3196,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-usbdev"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger 0.10.0",
  "log",
@@ -3212,7 +3212,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-usbsas"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "clap 4.1.1",
  "log",
@@ -3228,7 +3228,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-utils"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap 4.1.1",
  "env_logger 0.10.0",
