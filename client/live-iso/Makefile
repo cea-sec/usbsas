@@ -38,7 +38,7 @@ $(SRC_PKG_DIR)/usbsas-analyzer-server_$(ASRV_VER)_amd64.deb:
 	cargo build --release --manifest-path=../../usbsas-analyzer-server/Cargo.toml
 	cargo-deb --no-build --manifest-path=../../usbsas-analyzer-server/Cargo.toml
 
-$(SRC_PKG_DIR)/usbsas-hid$(SRV_VER)_amd64.deb:
+$(SRC_PKG_DIR)/usbsas-hid_$(HID_VER)_amd64.deb:
 	cargo build --release --manifest-path=../../usbsas-hid/hid-user/Cargo.toml
 	cargo build --release --manifest-path=../../usbsas-hid/hid-dealer/Cargo.toml
 	cargo-deb --no-build --manifest-path=../../usbsas-hid/hid-dealer/Cargo.toml
