@@ -1,5 +1,5 @@
 Package: usbsas-kiosk
-Version: 0.1.4
+Version: 0.1.5
 Maintainer: usbsas
 Architecture: amd64
 Section: utility
