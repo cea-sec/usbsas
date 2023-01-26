@@ -858,6 +858,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "enumflags2"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e75d4cd21b95383444831539909fbb14b9dc3fdceb2a6f5d36577329a1f55ccb"
+dependencies = [
+ "enumflags2_derive",
+]
+
+[[package]]
+name = "enumflags2_derive"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f58dc3c5e468259f19f2d46304a6b28f1c3d034442e14b322d2b850e36f6d5ae"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "enumn"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1486,6 +1506,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49409df3e3bf0856b916e2ceaca09ee28e6871cf7d9ce97a692cacfdb2a25a47"
 dependencies = [
  "wasm-bindgen",
+]
+
+[[package]]
+name = "landlock"
+version = "0.1.0"
+source = "git+https://github.com/landlock-lsm/rust-landlock?rev=99628b1b984ca7981f4edb6f6a6e8f6866f8f310#99628b1b984ca7981f4edb6f6a6e8f6866f8f310"
+dependencies = [
+ "enumflags2",
+ "libc",
+ "thiserror",
 ]
 
 [[package]]
@@ -3111,6 +3141,7 @@ dependencies = [
  "usbsas-comm",
  "usbsas-config",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-utils",
 ]
 
@@ -3139,7 +3170,9 @@ name = "usbsas-sandbox"
 version = "0.1.2"
 dependencies = [
  "cc",
+ "landlock",
  "libc",
+ "log",
  "procfs",
  "syscallz",
  "thiserror",

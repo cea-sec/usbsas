@@ -46,6 +46,8 @@ pub enum Error {
     B64(#[from] base64::DecodeError),
     #[error("{0}")]
     Error(String),
+    #[error("sandbox: {0}")]
+    Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("No conf")]

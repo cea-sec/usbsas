@@ -89,6 +89,18 @@ struct WaitEndState {}
 
 impl InitState {
     fn run(self, _comm: &mut Comm<proto::analyzer::Request>) -> Result<State> {
+        usbsas_sandbox::landlock(
+            Some(&[
+                &self.tarpath,
+                &self.config_path,
+                "/etc",
+                "/lib",
+                "/usr/lib/",
+                "/var/lib/usbsas",
+            ]),
+            None,
+        )?;
+
         let file = File::open(&self.tarpath)?;
         let config = conf_parse(&conf_read(&self.config_path)?)?;
 
