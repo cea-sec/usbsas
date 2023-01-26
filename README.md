@@ -1,8 +1,14 @@
-[![Build & Test](https://github.com/cea-sec/usbsas/actions/workflows/build_check_test.yml/badge.svg?branch=main)](https://github.com/cea-sec/usbsas/actions/workflows/build_check_test.yml?branch=main)
-
-# usbsas
-
-<p align="center"><img src="./doc/usbsas-logo.svg"/></p>
+<div align="center">
+  <p><img src="./doc/usbsas-logo.svg"/></p>
+  <p>
+    <a href="https://github.com/cea-sec/usbsas/actions/workflows/build_check_test.yml?branch=main">
+      <img src="https://github.com/cea-sec/usbsas/actions/workflows/build_check_test.yml/badge.svg?branch=main" alt="Build and Test">
+    </a>
+    <a href="https://www.gnu.org/licenses/gpl-3.0">
+      <img src="https://img.shields.io/badge/License-GPLv3-blue.svg">
+    </a>
+  </p>
+</div>
 
 usbsas is a free and open source (GPLv3) tool and framework for securely reading
 untrusted USB mass storage devices.
