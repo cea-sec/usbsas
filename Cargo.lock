@@ -106,9 +106,9 @@ dependencies = [
 
 [[package]]
 name = "actix-rt"
-version = "2.7.0"
+version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ea16c295198e958ef31930a6ef37d0fb64e9ca3b6116e6b93a8bdae96ee1000"
+checksum = "15265b6b8e2347670eb363c47fc8c75208b4a4994b27192f345fcbe707804f3e"
 dependencies = [
  "futures-core",
  "tokio",
@@ -116,9 +116,9 @@ dependencies = [
 
 [[package]]
 name = "actix-server"
-version = "2.1.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0da34f8e659ea1b077bb4637948b815cd3768ad5a188fdcd74ff4d84240cd824"
+checksum = "3e8613a75dd50cc45f473cee3c34d59ed677c0f7b44480ce3b8247d7dc519327"
 dependencies = [
  "actix-rt",
  "actix-service",
@@ -225,9 +225,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf6ccdb167abbf410dcb915cabd428929d7f6a04980b54a11f26a39f1c7f7107"
+checksum = "2c99f64d1e06488f620f932677e24bc6e2897582980441ae90a671415bd7ec2f"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -645,9 +645,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.1.1"
+version = "4.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ec7a4128863c188deefe750ac1d1dfe66c236909f845af04beed823638dc1b2"
+checksum = "f13b9c79b5d1dd500d20ef541215a6423c75829ef43117e1b4d17fd8af0b5d76"
 dependencies = [
  "bitflags",
  "clap_lex",
@@ -1220,7 +1220,7 @@ version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 dependencies = [
- "ahash 0.8.2",
+ "ahash 0.8.3",
 ]
 
 [[package]]
@@ -1664,6 +1664,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1789,9 +1798,9 @@ dependencies = [
 
 [[package]]
 name = "ntfs"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec07f6f5f66d12c3392ecc36b7a97d3e58eea4ac7774cef62166679f5a7ae8d3"
+checksum = "3fe35c4ad619a701276aa9d312e579d7d77b90026314bd39a9916712437d1d0a"
 dependencies = [
  "arrayvec 0.7.2",
  "binread",
@@ -1800,7 +1809,7 @@ dependencies = [
  "derive_more",
  "displaydoc",
  "enumn",
- "memoffset 0.6.5",
+ "memoffset 0.8.0",
  "strum_macros 0.24.3",
  "time",
 ]
@@ -2329,9 +2338,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "2.8.0"
+version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "645926f31b250a2dca3c232496c2d898d91036e45ca0e97e0e2390c54e11be36"
+checksum = "7c4437699b6d34972de58652c68b98cb5b53a4199ab126db8e20ec8ded29a721"
 dependencies = [
  "bitflags",
  "core-foundation",
@@ -2569,9 +2578,9 @@ dependencies = [
 
 [[package]]
 name = "systemstat"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5158fd55089515c923306476aaf3fa8ffc29a902561bf0017166a93218831c"
+checksum = "a24aec24a9312c83999a28e3ef9db7e2afd5c64bf47725b758cdc1cafd5b0bd2"
 dependencies = [
  "bytesize",
  "lazy_static",
@@ -2843,9 +2852,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-bidi"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0046be40136ef78dc325e0edefccf84ccddacd0afcc1ca54103fa3c61bbdab1d"
+checksum = "d54675592c1dbefd78cbd98db9bacd89886e1ca50692a0692baefffdeb92dd58"
 
 [[package]]
 name = "unicode-ident"
@@ -2898,7 +2907,7 @@ dependencies = [
  "actix-files",
  "actix-web",
  "clamav-rs",
- "clap 4.1.1",
+ "clap 4.1.4",
  "env_logger 0.10.0",
  "futures",
  "log",
@@ -3170,7 +3179,7 @@ dependencies = [
  "actix-web",
  "assert_cmd",
  "base64",
- "clap 4.1.1",
+ "clap 4.1.4",
  "err-derive",
  "futures",
  "hmac",
@@ -3215,7 +3224,7 @@ name = "usbsas-tools"
 version = "0.1.3"
 dependencies = [
  "bitvec",
- "clap 4.1.1",
+ "clap 4.1.4",
  "env_logger 0.10.0",
  "fuse_mt",
  "indicatif",
@@ -3253,7 +3262,7 @@ dependencies = [
 name = "usbsas-usbsas"
 version = "0.1.4"
 dependencies = [
- "clap 4.1.1",
+ "clap 4.1.4",
  "log",
  "thiserror",
  "usbsas-comm",
@@ -3269,7 +3278,7 @@ dependencies = [
 name = "usbsas-utils"
 version = "0.1.1"
 dependencies = [
- "clap 4.1.1",
+ "clap 4.1.4",
  "env_logger 0.10.0",
  "log",
  "serde_json",
