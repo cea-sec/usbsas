@@ -1664,6 +1664,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1789,9 +1798,9 @@ dependencies = [
 
 [[package]]
 name = "ntfs"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec07f6f5f66d12c3392ecc36b7a97d3e58eea4ac7774cef62166679f5a7ae8d3"
+checksum = "3fe35c4ad619a701276aa9d312e579d7d77b90026314bd39a9916712437d1d0a"
 dependencies = [
  "arrayvec 0.7.2",
  "binread",
@@ -1800,7 +1809,7 @@ dependencies = [
  "derive_more",
  "displaydoc",
  "enumn",
- "memoffset 0.6.5",
+ "memoffset 0.8.0",
  "strum_macros 0.24.3",
  "time",
 ]

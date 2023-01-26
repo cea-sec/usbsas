@@ -172,7 +172,7 @@ fn ntfs_file_size<T: Read + Seek>(ntfs_file: &ntfs::NtfsFile, reader: &mut T) ->
             Some(data_item) => data_item?,
             None => return Err(Error::FSError("No ntfs data stream".into())),
         };
-        Ok(data_item.to_attribute().value(reader)?.len())
+        Ok(data_item.to_attribute()?.value(reader)?.len())
     }
 }
 
@@ -267,7 +267,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
                 )))
             }
         };
-        let mut data_value = data_item.to_attribute().value(&mut self.reader)?;
+        let mut data_value = data_item.to_attribute()?.value(&mut self.reader)?;
         data_value.seek(&mut self.reader, SeekFrom::Start(offset))?;
 
         // read() while buffer isn't full or EOF is reached.
