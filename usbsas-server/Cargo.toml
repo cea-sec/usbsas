@@ -23,7 +23,7 @@ sha2 = "0.10"
 systemstat = "0.2"
 tempfile = "3.3"
 time = "0.3"
-toml = "0.6"
+toml = "0.7"
 uname = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
