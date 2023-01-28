@@ -126,7 +126,7 @@ impl RunningState {
                 Err(err) => {
                     error!("{}", err);
                     comm.error(proto::analyzer::ResponseError {
-                        err: format!("{}", err),
+                        err: format!("{err}"),
                     })?;
                 }
             }
@@ -268,7 +268,7 @@ impl Analyzer {
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::analyzer::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

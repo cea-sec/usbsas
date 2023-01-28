@@ -111,7 +111,7 @@ impl RunningState {
                 Err(err) => {
                     error!("{}", err);
                     comm.error(proto::cmdexec::ResponseError {
-                        err: format!("{}", err),
+                        err: format!("{err}"),
                     })?;
                 }
             }
@@ -168,7 +168,7 @@ impl RunningState {
                     }
                 }
                 Err(err) => {
-                    return Err(Error::Exec(format!("Can't get cmd result: {}", err)));
+                    return Err(Error::Exec(format!("Can't get cmd result: {err}")));
                 }
             }
             Ok(())
@@ -231,7 +231,7 @@ impl CmdExec {
                 Err(err) => {
                     error!("state run error: {}", err);
                     comm.error(proto::cmdexec::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

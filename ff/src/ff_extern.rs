@@ -28,7 +28,7 @@ pub extern "C" fn ff_disk_read(
         unsafe { Box::from_raw(pdrv as *mut Box<dyn WrapperFatFs>) };
 
     if let Err(err) = inner.seek(SeekFrom::Start(sector as u64 * inner.sector_size() as u64)) {
-        eprintln!("ff disk_read seek error: {}", err);
+        eprintln!("ff disk_read seek error: {err}");
         std::mem::forget(inner);
         return ff_c::DRESULT_RES_ERROR;
     }
@@ -58,7 +58,7 @@ pub extern "C" fn ff_disk_write(
         unsafe { Box::from_raw(pdrv as *mut Box<dyn WrapperFatFs>) };
 
     if let Err(err) = inner.seek(SeekFrom::Start(sector as u64 * inner.sector_size() as u64)) {
-        eprintln!("ff disk_write seek error: {}", err);
+        eprintln!("ff disk_write seek error: {err}");
         std::mem::forget(inner);
         return ff_c::DRESULT_RES_ERROR;
     }
@@ -66,7 +66,7 @@ pub extern "C" fn ff_disk_write(
         std::slice::from_raw_parts(buff, (count as u64 * inner.sector_size() as u64) as usize)
     };
     if let Err(err) = inner.write_all(slice) {
-        eprintln!("ff disk_write error: {}", err);
+        eprintln!("ff disk_write error: {err}");
         std::mem::forget(inner);
         return ff_c::DRESULT_RES_ERROR;
     }
@@ -85,7 +85,7 @@ pub extern "C" fn ff_disk_ioctl(
     let ret = match cmd as u32 {
         ff_c::CTRL_SYNC => {
             if let Err(err) = inner.flush() {
-                eprintln!("ff ioctl CTRL_SYNC failed: {}", err);
+                eprintln!("ff ioctl CTRL_SYNC failed: {err}");
                 ff_c::DRESULT_RES_ERROR
             } else {
                 ff_c::DRESULT_RES_OK
@@ -96,7 +96,7 @@ pub extern "C" fn ff_disk_ioctl(
             ff_c::DRESULT_RES_OK
         }
         _ => {
-            eprintln!("unsupported ioctl cmd: {}", cmd);
+            eprintln!("unsupported ioctl cmd: {cmd}");
             ff_c::DRESULT_RES_ERROR
         }
     };

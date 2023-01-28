@@ -225,7 +225,7 @@ end = ".lnk"
 
     #[test]
     fn test_filters_from_config() {
-        let rules: Rules = toml::from_str(&CONF).expect("can't parse toml");
+        let rules: Rules = toml::from_str(CONF).expect("can't parse toml");
         let rules = rules.into_lowercase();
         assert_eq!(rules.match_all("good"), FilterResult::PathOk);
         assert_eq!(rules.match_all("bad.lnk"), FilterResult::PathFiltered);

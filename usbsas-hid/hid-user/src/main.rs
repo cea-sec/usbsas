@@ -494,7 +494,7 @@ impl HidItem {
                 .map(|value| value as i32),
                 _ => Err(Error::new(
                     ErrorKind::Other,
-                    format!("Unsupported size for {:?}", self),
+                    format!("Unsupported size for {self:?}"),
                 )),
             }
         } else {
@@ -515,7 +515,7 @@ impl HidItem {
                 .map(|value| value as i32),
                 _ => Err(Error::new(
                     ErrorKind::Other,
-                    format!("Unsupported size for {:?}", self),
+                    format!("Unsupported size for {self:?}"),
                 )),
             }
         }
@@ -555,13 +555,13 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                 if report_count > MAX_REPORT_COUNT {
                                     return Err(Error::new(
                                         ErrorKind::Other,
-                                        format!("Strange report count {:?}", report_count),
+                                        format!("Strange report count {report_count:?}"),
                                     ));
                                 }
                                 if report_size > 32 {
                                     return Err(Error::new(
                                         ErrorKind::Other,
-                                        format!("Strange report size {:?}", report_size),
+                                        format!("Strange report size {report_size:?}"),
                                     ));
                                 }
 
@@ -592,7 +592,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             report => {
                                 return Err(Error::new(
                                     ErrorKind::Other,
-                                    format!("Report size or Report count not set {:?}", report),
+                                    format!("Report size or Report count not set {report:?}"),
                                 ));
                             }
                         }
@@ -615,7 +615,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             0x04 => "Named Array".to_string(),
                             0x05 => "Usage Switch".to_string(),
                             0x06 => "Usage Modified".to_string(),
-                            value => format!("Unknown: {}", value),
+                            value => format!("Unknown: {value}"),
                         };
 
                         log::debug!("{}Collection({})", gen_space(indent), description);
@@ -636,13 +636,13 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                 if report_count > MAX_REPORT_COUNT {
                                     return Err(Error::new(
                                         ErrorKind::Other,
-                                        format!("Strange report count {:?}", report_count),
+                                        format!("Strange report count {report_count:?}"),
                                     ));
                                 }
                                 if report_size > 32 {
                                     return Err(Error::new(
                                         ErrorKind::Other,
-                                        format!("Strange report size {:?}", report_size),
+                                        format!("Strange report size {report_size:?}"),
                                     ));
                                 }
 
@@ -673,7 +673,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             report => {
                                 return Err(Error::new(
                                     ErrorKind::Other,
-                                    format!("Report size or Report count not set {:?}", report),
+                                    format!("Report size or Report count not set {report:?}"),
                                 ));
                             }
                         }
@@ -693,7 +693,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                     }
 
                     btag => {
-                        panic!("Unknown btag {:b}", btag);
+                        panic!("Unknown btag {btag:b}");
                     }
                 }
             }
@@ -721,7 +721,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             0x0E => "Reserved".to_string(),
                             0x0F => "PID Page".to_string(),
                             0x10 => "Unicode".to_string(),
-                            value => format!("Unknown: {}", value),
+                            value => format!("Unknown: {value}"),
                         };
                         log::debug!("{}Usage_Page({})", gen_space(indent), description);
                         usage_page = Some(HidUsagePage::from_value(value as u16));
@@ -861,7 +861,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                     }
 
                     btag => {
-                        panic!("Unknown btag {:b}", btag);
+                        panic!("Unknown btag {btag:b}");
                     }
                 }
             }
@@ -902,7 +902,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                     }
 
                     btag => {
-                        panic!("Unknown btag {:b}", btag);
+                        panic!("Unknown btag {btag:b}");
                     }
                 }
             }
@@ -1201,7 +1201,7 @@ fn get_hid_descriptor(device: &UsbDevice) -> Result<Vec<u8>, Error> {
         .map_err(|err| {
             Error::new(
                 ErrorKind::Other,
-                format!("Error in get HID descriptor {:?}", err),
+                format!("Error in get HID descriptor {err:?}"),
             )
         })?;
     if len >= buffer.len() {
@@ -1439,31 +1439,23 @@ fn main() -> Result<(), Error> {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let busnum = env::var("BUSNUM").map_err(|err| {
-        Error::new(
-            ErrorKind::Other,
-            format!("Cannot get BUSNUM env: {:?}", err),
-        )
-    })?;
+    let busnum = env::var("BUSNUM")
+        .map_err(|err| Error::new(ErrorKind::Other, format!("Cannot get BUSNUM env: {err:?}")))?;
 
-    let devnum = env::var("DEVNUM").map_err(|err| {
-        Error::new(
-            ErrorKind::Other,
-            format!("Cannot get DEVNUM env: {:?}", err),
-        )
-    })?;
+    let devnum = env::var("DEVNUM")
+        .map_err(|err| Error::new(ErrorKind::Other, format!("Cannot get DEVNUM env: {err:?}")))?;
 
     let busnum = busnum.parse::<u8>().map_err(|err| {
         Error::new(
             ErrorKind::Other,
-            format!("BUSNUM is not an integer: {:?}", err),
+            format!("BUSNUM is not an integer: {err:?}"),
         )
     })?;
 
     let devnum = devnum.parse::<u8>().map_err(|err| {
         Error::new(
             ErrorKind::Other,
-            format!("DEVNUM is not an integer: {:?}", err),
+            format!("DEVNUM is not an integer: {err:?}"),
         )
     })?;
 
@@ -1472,7 +1464,7 @@ fn main() -> Result<(), Error> {
     log::info!("Busnum: {} Devnum: {}", busnum, devnum);
 
     let device = open_device(busnum, devnum)
-        .map_err(|err| Error::new(ErrorKind::Other, format!("Usb device error: {:?}", err)))?;
+        .map_err(|err| Error::new(ErrorKind::Other, format!("Usb device error: {err:?}")))?;
 
     let buffer = get_hid_descriptor(&device)?;
     let reports = parse_report(buffer)?;

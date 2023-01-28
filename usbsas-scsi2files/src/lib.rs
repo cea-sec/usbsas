@@ -135,7 +135,7 @@ impl ChildStartedState {
                 if let Err(err) = self.opendevice(comm, req.busnum, req.devnum) {
                     error!("err open device: {}, waiting end", err);
                     comm.error(proto::files::ResponseError {
-                        err: format!("{}", err),
+                        err: format!("{err}"),
                     })?;
                     return Ok(State::WaitEnd(WaitEndState {
                         child_comm: Some(self.usb_mass.comm.clone()),
@@ -247,7 +247,7 @@ impl PartitionsListedState {
                     Ok(fs) => Ok(State::PartitionOpened(PartitionOpenedState { fs })),
                     Err(err) => {
                         comm.error(proto::files::ResponseError {
-                            err: format!("{}", err),
+                            err: format!("{err}"),
                         })?;
                         Ok(State::WaitEnd(WaitEndState {
                             child_comm: Some(comm_bk),
@@ -303,7 +303,7 @@ impl PartitionOpenedState {
             };
             if let Err(err) = res {
                 comm.error(proto::files::ResponseError {
-                    err: format!("{}", err),
+                    err: format!("{err}"),
                 })?;
             };
         }
@@ -396,7 +396,7 @@ impl Scsi2Files {
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::files::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState { child_comm: None })
                 }

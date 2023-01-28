@@ -180,7 +180,7 @@ impl<T: UsbContext> CopyingState<T> {
         comm.startcopy(proto::fs2dev::ResponseStartCopy {})?;
 
         let fs_size = self.fs.seek(SeekFrom::End(0))?;
-        self.fs.seek(SeekFrom::Start(0))?;
+        self.fs.rewind()?;
 
         let total_size = self.fs_bv.count_ones() as u64 * SECTOR_SIZE;
 
@@ -417,7 +417,7 @@ impl<T: UsbContext> Fs2Dev<T> {
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::fs2dev::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

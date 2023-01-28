@@ -87,7 +87,7 @@ impl RunningState {
                 if let Err(err) = self.upload(comm, req) {
                     error!("upload error: {}", err);
                     comm.error(proto::uploader::ResponseError {
-                        err: format!("{}", err),
+                        err: format!("{err}"),
                     })?;
                 };
                 Ok(State::WaitEnd(WaitEndState {}))
@@ -187,7 +187,7 @@ impl Uploader {
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::uploader::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

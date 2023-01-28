@@ -35,22 +35,22 @@ impl IntegrationTester {
 
         if let Err(err) = fs::create_dir(&working_dir) {
             if err.kind() != io::ErrorKind::AlreadyExists {
-                panic!("couldn't create working dir: {}", err)
+                panic!("couldn't create working dir: {err}")
             }
         }
 
         // Untar mock input dev if none was supplied
         let mock_input_dev = match env::var("USBSAS_MOCK_INPUT_DEV") {
             Ok(input) => {
-                println!("Using {} as input dev", input);
+                println!("Using {input} as input dev");
                 input
             }
             Err(_) => {
-                let input = format!("{}/mock_input_dev.img", working_dir);
+                let input = format!("{working_dir}/mock_input_dev.img");
                 let input_file = std::fs::File::create(&input).unwrap();
                 Command::new("gzip")
                     .arg("-dc")
-                    .arg(format!("{}/mock_input_dev.img.gz", test_data_dir))
+                    .arg(format!("{test_data_dir}/mock_input_dev.img.gz"))
                     .stdout(Stdio::from(input_file))
                     .stderr(Stdio::null())
                     .status()
@@ -63,11 +63,11 @@ impl IntegrationTester {
         // Create mock output dev if none was supplied
         let mock_output_dev = match env::var("USBSAS_MOCK_OUTPUT_DEV") {
             Ok(output) => {
-                println!("Using {} as output dev", output);
+                println!("Using {output} as output dev");
                 output
             }
             Err(_) => {
-                let output = format!("{}/mock_output_dev.img", working_dir);
+                let output = format!("{working_dir}/mock_output_dev.img");
                 Command::new("dd")
                     .arg("if=/dev/zero")
                     .arg(format!("of={}", &output))
@@ -84,10 +84,10 @@ impl IntegrationTester {
         };
 
         // Copy export bundle in working_dir
-        let _ = fs::create_dir(format!("{}/Tartempion", working_dir));
+        let _ = fs::create_dir(format!("{working_dir}/Tartempion"));
         Command::new("cp")
-            .arg(format!("{}/bundle_test.tar.gz", test_data_dir))
-            .arg(format!("{}/Tartempion/123456.tar.gz", working_dir))
+            .arg(format!("{test_data_dir}/bundle_test.tar.gz"))
+            .arg(format!("{working_dir}/Tartempion/123456.tar.gz"))
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
@@ -96,7 +96,7 @@ impl IntegrationTester {
         // Start usbsas server
         let usbsas_server = Command::cargo_bin("usbsas-server")
             .expect("Couldn't run usbsas server")
-            .args(["-c", &format!("{}/config_test.toml", test_data_dir)])
+            .args(["-c", &format!("{test_data_dir}/config_test.toml")])
             .spawn()
             .expect("Couldn't run usbsas server");
 
@@ -146,12 +146,12 @@ impl IntegrationTester {
             .stderr(Stdio::null())
             .status()
             .expect("Couldn't reset mock output dev");
-        match self.client.get(&format!("{}{}", self.api, "reset")).send() {
+        match self.client.get(format!("{}{}", self.api, "reset")).send() {
             Ok(resp) => {
                 assert!(resp.status().is_success());
             }
             Err(err) => {
-                panic!("Couldn't reset: {}", err);
+                panic!("Couldn't reset: {err}");
             }
         }
     }
@@ -295,7 +295,7 @@ impl IntegrationTester {
         // Start copy
         let resp = self
             .client
-            .post(&format!("{}{}", self.api, "copy"))
+            .post(format!("{}{}", self.api, "copy"))
             .json(&post_payload)
             .send()?;
 
@@ -464,11 +464,11 @@ impl Drop for IntegrationTester {
     fn drop(&mut self) {
         // Send SIGTERM instead of SIGKILL so the signal is forwarded to sons
         while let Err(err) = signal::kill(Pid::from_raw(self.usbsas_server.id() as i32), SIGTERM) {
-            println!("Couldn't sigterm usbsas server: {}", err);
+            println!("Couldn't sigterm usbsas server: {err}");
             sleep(Duration::from_secs(1));
         }
         if let Err(e) = self.analyzer_server.kill() {
-            println!("Couldn't kill analyzer server: {}", e);
+            println!("Couldn't kill analyzer server: {e}");
         }
         sleep(Duration::from_secs(1));
         // Remove working dir

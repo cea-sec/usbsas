@@ -108,7 +108,7 @@ impl RunningState {
                         Err(err) => {
                             error!("download error: {}", err);
                             comm.error(proto::downloader::ResponseError {
-                                err: format!("{}", err),
+                                err: format!("{err}"),
                             })?;
                         }
                     };
@@ -118,7 +118,7 @@ impl RunningState {
                         if let Err(err) = self.download(comm, size) {
                             error!("download error: {}", err);
                             comm.error(proto::downloader::ResponseError {
-                                err: format!("{}", err),
+                                err: format!("{err}"),
                             })?;
                         };
                         return Ok(State::WaitEnd(WaitEndState {}));
@@ -251,7 +251,7 @@ impl Downloader {
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::downloader::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

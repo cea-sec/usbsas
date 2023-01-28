@@ -272,7 +272,7 @@ impl InitState {
             if let Err(err) = res {
                 error!("{}", err);
                 comm.error(proto::usbsas::ResponseError {
-                    err: format!("{}", err),
+                    err: format!("{err}"),
                 })?;
             }
         }
@@ -364,7 +364,7 @@ impl DevOpenedState {
             if let Err(err) = res {
                 error!("{}", err);
                 comm.error(proto::usbsas::ResponseError {
-                    err: format!("{}", err),
+                    err: format!("{err}"),
                 })?;
             }
         }
@@ -445,7 +445,7 @@ impl PartitionOpenedState {
             if let Err(err) = res {
                 error!("{}", err);
                 comm.error(proto::usbsas::ResponseError {
-                    err: format!("{}", err),
+                    err: format!("{err}"),
                 })?;
             }
         }
@@ -1085,7 +1085,7 @@ impl WriteFilesState {
             }
             Err(err) => {
                 comm.error(proto::usbsas::ResponseError {
-                    err: format!("err writing fs: {}", err),
+                    err: format!("err writing fs: {err}"),
                 })?;
                 error!("USB TRANSFER FAILED for user {}", self.id);
             }
@@ -1139,7 +1139,7 @@ impl WriteFilesState {
                             .retain(|x| res.clean.contains(&x.trim_start_matches('/').to_string()));
                         res.dirty
                             .iter()
-                            .for_each(|p| self.dirty.push(format!("/{}", p)));
+                            .for_each(|p| self.dirty.push(format!("/{p}")));
                         comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
                         return Ok(());
                     }
@@ -1197,7 +1197,7 @@ impl WriteFilesState {
                 }) {
                 Ok(rep) => rep,
                 Err(err) => {
-                    return Err(Error::Error(format!("{}", err)));
+                    return Err(Error::Error(format!("{err}")));
                 }
             };
             children
@@ -1519,7 +1519,7 @@ impl TransferDoneState {
                     Err(err) => {
                         error!("post copy cmd error: {}", err);
                         comm.error(proto::usbsas::ResponseError {
-                            err: format!("{}", err),
+                            err: format!("{err}"),
                         })?;
                     }
                 }
@@ -1920,7 +1920,7 @@ impl Usbsas {
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::usbsas::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

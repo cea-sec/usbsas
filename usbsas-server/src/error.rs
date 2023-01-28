@@ -37,8 +37,7 @@ impl ResponseError for ServiceError {
 impl From<base64::DecodeError> for ServiceError {
     fn from(error: base64::DecodeError) -> ServiceError {
         ServiceError::Error(format!(
-            "Input data error: unable to decode base64: {:?}",
-            error
+            "Input data error: unable to decode base64: {error:?}"
         ))
     }
 }

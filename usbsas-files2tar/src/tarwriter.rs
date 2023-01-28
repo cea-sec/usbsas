@@ -78,7 +78,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
             Ok(uname) => uname.nodename,
             _ => "Unknown".to_string(),
         };
-        name = format!("USBSAS-{}", name);
+        name = format!("USBSAS-{name}");
         let infos = json!({
             "time": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs_f64(),
             "name": name,

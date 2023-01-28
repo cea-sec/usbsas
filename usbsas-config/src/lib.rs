@@ -74,7 +74,7 @@ pub fn conf_parse(conf_str: &str) -> io::Result<Config> {
     toml::from_str(conf_str).map_err(|err| {
         io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("Couldn't parse config: {}", err),
+            format!("Couldn't parse config: {err}"),
         )
     })
 }

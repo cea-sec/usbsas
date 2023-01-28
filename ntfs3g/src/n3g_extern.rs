@@ -25,7 +25,7 @@ pub extern "C" fn ntfs_dev_lseek(dev: *mut n3g_c::ntfs_device, pos: i64, whence:
     match seek_ret {
         Ok(new_pos) => i64::try_from(new_pos).unwrap_or(-1),
         Err(err) => {
-            eprintln!("ntfs seek error: {}", err);
+            eprintln!("ntfs seek error: {err}");
             -1
         }
     }
@@ -46,7 +46,7 @@ pub extern "C" fn ntfs_dev_read(
     std::mem::forget(inner);
 
     if let Err(err) = read_ret {
-        eprintln!("ntfs read error: {}", err);
+        eprintln!("ntfs read error: {err}");
         return -1;
     };
 
@@ -78,7 +78,7 @@ pub extern "C" fn ntfs_dev_write(
     std::mem::forget(inner);
 
     if let Err(err) = write_ret {
-        eprintln!("ntfs write error: {}", err);
+        eprintln!("ntfs write error: {err}");
         return -1;
     }
 

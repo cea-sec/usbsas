@@ -47,7 +47,7 @@ pub fn get_libusb_opened_fds(busnum: u32, devnum: u32) -> Result<LibusbFds> {
         let fd = fd?;
         match fd.target {
             FDTarget::Path(path) => {
-                if PathBuf::from(format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum)) == path {
+                if PathBuf::from(format!("/dev/bus/usb/{busnum:03}/{devnum:03}")) == path {
                     dev_fd = Some(fd.fd as RawFd);
                 }
             }

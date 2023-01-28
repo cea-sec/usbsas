@@ -71,7 +71,7 @@ pub(crate) fn get_server_infos() -> ServerInfos {
 
                 let mac_str = match mac_address::mac_address_by_name(&netif.name) {
                     Ok(mac) => match mac {
-                        Some(mac) => format!("{}", mac),
+                        Some(mac) => format!("{mac}"),
                         None => String::default(),
                     },
                     Err(_) => String::default(),

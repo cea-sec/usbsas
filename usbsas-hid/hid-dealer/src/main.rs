@@ -19,7 +19,7 @@ struct Device {}
 
 fn run_son(busnum: u8, devnum: u8) -> Result<Child, std::io::Error> {
     let mut filtered_env: HashMap<String, String> = std::env::vars()
-        .filter(|&(ref k, _)| {
+        .filter(|(k, _)| {
             k == "TERM"
                 || k == "LANG"
                 || k == "HOME"
@@ -30,8 +30,8 @@ fn run_son(busnum: u8, devnum: u8) -> Result<Child, std::io::Error> {
         })
         .collect();
 
-    filtered_env.insert("BUSNUM".to_owned(), format!("{}", busnum));
-    filtered_env.insert("DEVNUM".to_owned(), format!("{}", devnum));
+    filtered_env.insert("BUSNUM".to_owned(), format!("{busnum}"));
+    filtered_env.insert("DEVNUM".to_owned(), format!("{devnum}"));
 
     Command::new("/usr/libexec/hid-user")
         .env_clear()

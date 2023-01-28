@@ -88,7 +88,7 @@ impl MockUsbDev {
                 Ok(_) => continue,
                 Err(err) => {
                     self.comm.error(proto::usbdev::ResponseError {
-                        err: format!("{}", err),
+                        err: format!("{err}"),
                     })?;
                 }
             }

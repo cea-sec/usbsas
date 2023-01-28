@@ -567,7 +567,7 @@ impl AppState {
         self.comm
             .lock()?
             .opendev(in_dev)
-            .map_err(|err| ServiceError::Error(format!("couldn't open input device: {}", err)))?;
+            .map_err(|err| ServiceError::Error(format!("couldn't open input device: {err}")))?;
         *self.out_dev.lock()? = out_dev;
 
         Ok(())
@@ -606,10 +606,7 @@ impl AppState {
             .openpartition(proto::usbsas::RequestOpenPartition { index })
         {
             error!("Error opening partition: {}", err);
-            return Err(ServiceError::Error(format!(
-                "Cannot open partition: {}",
-                err
-            )));
+            return Err(ServiceError::Error(format!("Cannot open partition: {err}")));
         };
         Ok(())
     }

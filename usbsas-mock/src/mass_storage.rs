@@ -22,16 +22,18 @@ impl<T> MockMassStorage<T> {
     fn new(_: T, busnum: u32, devnum: u32) -> Result<Self, io::Error> {
         let fakedev =
             match (busnum, devnum) {
-                (1, 1) => OpenOptions::new().read(true).write(true).open(
-                    env::var("USBSAS_MOCK_IN_DEV").map_err(|err| {
-                        io::Error::new(ErrorKind::InvalidInput, format!("{}", err))
-                    })?,
-                )?,
-                (1, 2) => OpenOptions::new().read(false).write(true).open(
-                    env::var("USBSAS_MOCK_OUT_DEV").map_err(|err| {
-                        io::Error::new(ErrorKind::InvalidInput, format!("{}", err))
-                    })?,
-                )?,
+                (1, 1) => OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(env::var("USBSAS_MOCK_IN_DEV").map_err(|err| {
+                        io::Error::new(ErrorKind::InvalidInput, format!("{err}"))
+                    })?)?,
+                (1, 2) => OpenOptions::new()
+                    .read(false)
+                    .write(true)
+                    .open(env::var("USBSAS_MOCK_OUT_DEV").map_err(|err| {
+                        io::Error::new(ErrorKind::InvalidInput, format!("{err}"))
+                    })?)?,
                 _ => {
                     return Err(io::Error::new(
                         ErrorKind::InvalidInput,

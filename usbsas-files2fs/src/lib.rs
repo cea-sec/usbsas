@@ -138,7 +138,7 @@ impl WaitFsInfosState {
                 Ok(fs) => State::WaitNewFile(WaitNewFileState { fs }),
                 Err(err) => {
                     comm.error(proto::writefs::ResponseError {
-                        err: format!("Error mkfs: {}", err),
+                        err: format!("Error mkfs: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }
@@ -293,7 +293,7 @@ impl WaitNewFileState {
                     Err(err) => {
                         warn!("{}", err);
                         comm.error(proto::writefs::ResponseError {
-                            err: format!("{}", err),
+                            err: format!("{err}"),
                         })?;
                     }
                 }
@@ -315,7 +315,7 @@ impl WritingFileState {
         if let Err(err) = self.write_file(comm) {
             error!("Error writing file: {}", err);
             comm.error(proto::writefs::ResponseError {
-                err: format!("{}", err),
+                err: format!("{err}"),
             })?;
             if let Error::State = err {
                 return Ok(State::WaitEnd(WaitEndState {}));
@@ -473,7 +473,7 @@ impl Files2Fs {
                 Err(err) => {
                     error!("state run error: {}", err);
                     comm.error(proto::writefs::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }
