@@ -21,7 +21,7 @@ impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
         let file_info = self
             .fs
             .get_attr(path)
-            .map_err(|err| Error::FSError(format!("Couldn't get attr for {}: {}", path, err)))?;
+            .map_err(|err| Error::FSError(format!("Couldn't get attr for {path}: {err}")))?;
         if file_info.is_dir() {
             Ok((FileType::Directory, file_info.size, file_info.timestamp))
         } else {
@@ -34,7 +34,7 @@ impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
         Ok(self
             .fs
             .read_dir(path)
-            .map_err(|err| Error::FSError(format!("Couldn't read dir {}: {}", path, err)))?
+            .map_err(|err| Error::FSError(format!("Couldn't read dir {path}: {err}")))?
             .iter()
             .map(|x| FileInfo {
                 path: format!("{}/{}", path.trim_end_matches('/'), x.name),
@@ -100,7 +100,7 @@ impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
     fn newfile(&mut self, path: &str, _timestamp: i64) -> Result<Box<dyn WriteSeek + '_>> {
         log::trace!("new file {}", path);
         Ok(Box::new(self.fs.new_file(path).map_err(|err| {
-            Error::FSError(format!("Couldn't create file {}: {}", path, err))
+            Error::FSError(format!("Couldn't create file {path}: {err}"))
         })?))
     }
 
@@ -108,7 +108,7 @@ impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
         log::trace!("new dir: {}", path);
         self.fs
             .new_dir(path)
-            .map_err(|err| Error::FSError(format!("Couldn't create dir {}: {}", path, err)))?;
+            .map_err(|err| Error::FSError(format!("Couldn't create dir {path}: {err}")))?;
         self.settimestamp(path, timestamp)?;
         Ok(())
     }
@@ -117,7 +117,7 @@ impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
         log::trace!("rm file {}", path);
         self.fs
             .remove_file(path)
-            .map_err(|err| Error::FSError(format!("Couldn't rm file {}: {}", path, err)))?;
+            .map_err(|err| Error::FSError(format!("Couldn't rm file {path}: {err}")))?;
         Ok(())
     }
 
@@ -125,7 +125,7 @@ impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
         log::trace!("set timestamp");
         self.fs
             .set_timestamp(path, timestamp)
-            .map_err(|err| Error::FSError(format!("Couldn't rm file {}: {}", path, err)))?;
+            .map_err(|err| Error::FSError(format!("Couldn't rm file {path}: {err}")))?;
         Ok(())
     }
 

@@ -13,7 +13,7 @@ fn main() {
         + "/";
 
     let bin_path = env::var("USBSAS_BIN_PATH").unwrap_or_else(|_| out_dir.clone());
-    println!("cargo:rustc-env=USBSAS_BIN_PATH={}", bin_path);
+    println!("cargo:rustc-env=USBSAS_BIN_PATH={bin_path}");
     println!("cargo:rerun-if-env-changed=USBSAS_BIN_PATH");
 
     println!("cargo:rerun-if-env-changed=USBSAS_CONFIG");
@@ -24,6 +24,6 @@ fn main() {
         .output()
         .expect("can't get git hash");
     let git_hash = String::from_utf8(output.stdout).expect("can't parse git output");
-    println!("cargo:rustc-env=GIT_HASH={}", git_hash);
+    println!("cargo:rustc-env=GIT_HASH={git_hash}");
     println!("cargo:rerun-if-env-changed=GIT_HASH");
 }

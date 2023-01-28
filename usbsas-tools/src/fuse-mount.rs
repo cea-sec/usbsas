@@ -106,8 +106,7 @@ impl UsbsasFS {
             .openpartition(proto::files::RequestOpenPartition { index: partnum })
         {
             return Err(Error::Partition(format!(
-                "Couldn't open part number {} ({})",
-                partnum, err
+                "Couldn't open part number {partnum} ({err})"
             )));
         }
         Ok(Self {

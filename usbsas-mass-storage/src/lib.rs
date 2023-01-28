@@ -50,7 +50,7 @@ impl<T: UsbContext> MassStorage<T> {
             Err(e) => {
                 return Err(io::Error::new(
                     ErrorKind::Other,
-                    format!("Cannot init mass storage: {}", e),
+                    format!("Cannot init mass storage: {e}"),
                 ));
             }
         };
@@ -132,7 +132,7 @@ impl<T: UsbContext> MassStorage<T> {
     ) -> Result<Vec<u8>, io::Error> {
         self.scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
             .read_sectors(offset, count, block_size)
     }
 
@@ -145,7 +145,7 @@ impl<T: UsbContext> MassStorage<T> {
         let ret = self
             .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
             .scsi_write_10(buffer, offset, count)?;
         // Read last sector of what we've just written and verify it's ok.
         // XXX TODO FIXME Apparently, some devices requires reads between writes
@@ -155,7 +155,7 @@ impl<T: UsbContext> MassStorage<T> {
         let mut buf_check = vec![0; self.block_size as usize];
         self.scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
             .scsi_read_10(&mut buf_check, offset + count - 1, 1)?;
         if buf_check != buffer[(buffer.len() - buf_check.len())..] {
             return Err(io::Error::new(
@@ -187,7 +187,7 @@ impl<T: UsbContext> Read for MassStorage<T> {
         let data = self
             .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
             .read_sectors(offset, sectors, self.block_size as usize)?;
 
         self.pos += buf.len() as u64;
@@ -239,7 +239,7 @@ impl<T: UsbContext> ReadAt for MassStorage<T> {
         let data = self
             .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {}", err)))?
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
             .read_sectors(offset, sectors, self.block_size as usize)?;
 
         for (i, c) in data.iter().enumerate() {
@@ -296,7 +296,7 @@ impl MassStorageComm {
     ) -> Result<std::sync::RwLockWriteGuard<'_, Comm<proto::scsi::Request>>, io::Error> {
         self.comm
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {}", err)))
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {err}")))
     }
 
     pub fn read_sectors(&self, offset: u64, count: u64) -> Result<Vec<u8>, io::Error> {
@@ -307,7 +307,7 @@ impl MassStorageComm {
                 .cache
                 .write()
                 .map_err(|err| {
-                    io::Error::new(ErrorKind::Other, format!("cache lock error: {}", err))
+                    io::Error::new(ErrorKind::Other, format!("cache lock error: {err}"))
                 })?
                 .get(&(offset, count))
             {
@@ -317,13 +317,13 @@ impl MassStorageComm {
         let rep = self
             .comm
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {}", err)))?
+            .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {err}")))?
             .readsectors(proto::scsi::RequestReadSectors { offset, count })?;
         if count <= MAX_SECTORS_COUNT_CACHE {
             self.cache
                 .write()
                 .map_err(|err| {
-                    io::Error::new(ErrorKind::Other, format!("cache lock error: {}", err))
+                    io::Error::new(ErrorKind::Other, format!("cache lock error: {err}"))
                 })?
                 .put((offset, count), rep.data.clone());
         }

@@ -33,10 +33,11 @@ impl<T: Read + Write + Seek> FSWrite<T> for NTFS3G<T> {
 
     fn newfile(&mut self, path: &str, timestamp: i64) -> Result<Box<dyn WriteSeek + '_>> {
         log::trace!("new file {}", path);
-        let file: Box<dyn WriteSeek> =
-            Box::new(self.volume.new_file(path, timestamp).map_err(|err| {
-                Error::FSError(format!("Couldn't create file {}: {}", path, err))
-            })?);
+        let file: Box<dyn WriteSeek> = Box::new(
+            self.volume
+                .new_file(path, timestamp)
+                .map_err(|err| Error::FSError(format!("Couldn't create file {path}: {err}")))?,
+        );
         Ok(file)
     }
 
@@ -44,14 +45,14 @@ impl<T: Read + Write + Seek> FSWrite<T> for NTFS3G<T> {
         log::trace!("new dir {}", path);
         self.volume
             .new_dir(path, timestamp)
-            .map_err(|err| Error::FSError(format!("Couldn't create dir {}: {}", path, err)))
+            .map_err(|err| Error::FSError(format!("Couldn't create dir {path}: {err}")))
     }
 
     fn removefile(&mut self, path: &str) -> Result<()> {
         log::trace!("remove file {}", path);
         self.volume
             .remove_file(path)
-            .map_err(|err| Error::FSError(format!("Couldn't remove file {}: {}", path, err)))
+            .map_err(|err| Error::FSError(format!("Couldn't remove file {path}: {err}")))
     }
 
     fn settimestamp(&mut self, _path: &str, _timestamp: i64) -> Result<()> {
@@ -90,7 +91,7 @@ fn ntfs_file_from_path<'a, T: Read + Seek>(
             // Already opened root dir if path starts with a '/'
             continue;
         }
-        let absolute_cur_path_new = format!("{}/{}", absolute_cur_path, cur_path);
+        let absolute_cur_path_new = format!("{absolute_cur_path}/{cur_path}");
         if let Some(file_record_number) = file_cache.get(&absolute_cur_path_new) {
             // We already walked this parent dir or cached the file
             absolute_cur_path = absolute_cur_path_new;
@@ -108,12 +109,12 @@ fn ntfs_file_from_path<'a, T: Read + Seek>(
                 found = true;
             }
             file_cache.insert(
-                format!("{}/{}", absolute_cur_path, name_string),
+                format!("{absolute_cur_path}/{name_string}"),
                 entry.file_record_number(),
             );
         }
         if !found {
-            return Err(Error::FSError(format!("didn't find file '{}'", path)));
+            return Err(Error::FSError(format!("didn't find file '{path}'")));
         } else {
             absolute_cur_path = absolute_cur_path_new;
         }
@@ -122,14 +123,11 @@ fn ntfs_file_from_path<'a, T: Read + Seek>(
     if let Some(file_record_number) = file_cache.get(path) {
         Ok(fs.file(reader, *file_record_number)?)
     } else {
-        Err(Error::FSError(format!("didn't find file '{}'", path)))
+        Err(Error::FSError(format!("didn't find file '{path}'")))
     }
 }
 
-fn ntfs_name_from_file<'a, T: Read + Seek>(
-    file: &'a ntfs::NtfsFile,
-    reader: &mut T,
-) -> Result<String> {
+fn ntfs_name_from_file<T: Read + Seek>(file: &ntfs::NtfsFile, reader: &mut T) -> Result<String> {
     // Try to get the Posix name (it may not be the first registered) or
     // fallback to whatever there is.
     let name = if let Some(name) = file.name(
@@ -233,7 +231,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
             ntfs_entries.insert(
                 ntfs_file.file_record_number(),
                 FileInfo {
-                    path: format!("{}/{}", path, name_string),
+                    path: format!("{path}/{name_string}"),
                     size: ntfs_file_size(&ntfs_file, &mut self.reader)?,
                     ftype: if ntfs_file.is_directory() {
                         FileType::Directory.into()
@@ -262,8 +260,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
             Some(data_item) => data_item?,
             None => {
                 return Err(Error::FSError(format!(
-                    "No ntfs data stream for file {}",
-                    path
+                    "No ntfs data stream for file {path}"
                 )))
             }
         };

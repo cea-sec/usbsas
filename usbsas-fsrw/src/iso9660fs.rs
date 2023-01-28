@@ -67,7 +67,7 @@ impl<T: Read + Seek> FSRead<T> for Iso9660<T> {
         for entry in dir.contents() {
             let name_str = entry?.identifier().to_string();
             if !(name_str == "." || name_str == "..") {
-                let full_name = format!("{}/{}", path, name_str);
+                let full_name = format!("{path}/{name_str}");
                 let (ftype, size, timestamp) = self.get_attr(&full_name)?;
                 entries.push(FileInfo {
                     path: full_name,

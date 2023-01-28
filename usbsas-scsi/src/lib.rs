@@ -102,7 +102,7 @@ impl<T: UsbContext> ScsiUsb<T> {
                 if tried == ACK_TRYCOUNT {
                     return Err(io::Error::new(
                         ErrorKind::Other,
-                        format!("Usb ack error: {} ({} times)", err, tried),
+                        format!("Usb ack error: {err} ({tried} times)"),
                     ));
                 } else {
                     log::warn!("usb ack timed out, retrying");
@@ -112,7 +112,7 @@ impl<T: UsbContext> ScsiUsb<T> {
             } else {
                 return Err(io::Error::new(
                     ErrorKind::Other,
-                    format!("Usb ack error: {}", err),
+                    format!("Usb ack error: {err}"),
                 ));
             }
         }
@@ -144,7 +144,7 @@ impl<T: UsbContext> ScsiUsb<T> {
                 Err(err) => {
                     return Err(io::Error::new(
                         ErrorKind::Other,
-                        format!("Usb read_bulk error: {}", err),
+                        format!("Usb read_bulk error: {err}"),
                     ));
                 }
             };
@@ -177,7 +177,7 @@ impl<T: UsbContext> ScsiUsb<T> {
                 Err(err) => {
                     return Err(io::Error::new(
                         ErrorKind::Other,
-                        format!("Usb write_bulk error: {}", err),
+                        format!("Usb write_bulk error: {err}"),
                     ));
                 }
             };

@@ -30,7 +30,7 @@ pub enum Error {
 }
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Error {
-        Error::Error(format!("{}", err))
+        Error::Error(format!("{err}"))
     }
 }
 pub(crate) type Result<T> = std::result::Result<T, Error>;

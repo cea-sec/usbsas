@@ -161,7 +161,7 @@ pub async fn start_server(
     let app_data = web::Data::new(AppState::new(config_path).map_err(|err| {
         io::Error::new(
             ErrorKind::Other,
-            format!("couldn't init server data: {}", err),
+            format!("couldn't init server data: {err}"),
         )
     })?);
     #[cfg(feature = "log-json")]
@@ -198,7 +198,7 @@ pub async fn start_server(
             ))
             .service(index)
     })
-    .bind(format!("{}:{}", bind_addr, bind_port))?
+    .bind(format!("{bind_addr}:{bind_port}"))?
     .run()
     .await
 }

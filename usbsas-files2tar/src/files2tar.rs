@@ -84,7 +84,7 @@ impl WaitNewFileState {
                     Err(err) => {
                         error!("Couldn't add file \"{}\": {}", &req.path, err);
                         comm.error(proto::writetar::ResponseError {
-                            err: format!("{}", err),
+                            err: format!("{err}"),
                         })?;
                         Ok(State::WaitNewFile(self))
                     }
@@ -126,14 +126,14 @@ impl WritingFileState {
                         ));
                     }
                     if let Err(err) = self.archive.writefile(&req.data) {
-                        return Err(Error::Error(format!("{}", err)));
+                        return Err(Error::Error(format!("{err}")));
                     } else {
                         comm.writefile(proto::writetar::ResponseWriteFile {})?;
                     }
                 }
                 Msg::EndFile(_) => {
                     if let Err(err) = self.archive.endfile(self.len_written) {
-                        return Err(Error::Error(format!("{}", err)));
+                        return Err(Error::Error(format!("{err}")));
                     };
                     comm.endfile(proto::writetar::ResponseEndFile {})?;
                     return Ok(State::WaitNewFile(WaitNewFileState {
@@ -194,7 +194,7 @@ impl Files2Tar {
                 Err(err) => {
                     error!("state run error: {}", err);
                     comm.error(proto::writetar::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

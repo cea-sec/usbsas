@@ -110,7 +110,7 @@ impl<T: UsbContext> InitState<T> {
             Err(err) => {
                 error!("Init mass storage error: {}, waiting end", err);
                 comm.error(proto::scsi::ResponseError {
-                    err: format!("{}", err),
+                    err: format!("{err}"),
                 })?;
                 return Ok(State::WaitEnd(WaitEndState {}));
             }
@@ -142,7 +142,7 @@ impl<T: UsbContext> DevOpenedState<T> {
                     Err(err) => {
                         error!("{}", err);
                         comm.error(proto::scsi::ResponseError {
-                            err: format!("{}", err),
+                            err: format!("{err}"),
                         })?;
                     }
                 },
@@ -156,7 +156,7 @@ impl<T: UsbContext> DevOpenedState<T> {
                         Err(err) => {
                             error!("{}", err);
                             comm.error(proto::scsi::ResponseError {
-                                err: format!("{}", err),
+                                err: format!("{err}"),
                             })?;
                         }
                     }
@@ -372,7 +372,7 @@ impl<T: UsbContext> PartitionsListedState<T> {
                         Err(err) => {
                             error!("{}", err);
                             comm.error(proto::scsi::ResponseError {
-                                err: format!("{}", err),
+                                err: format!("{err}"),
                             })?;
                         }
                     }
@@ -430,7 +430,7 @@ impl<T: UsbContext> Dev2Scsi<T> {
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
                     comm.error(proto::scsi::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

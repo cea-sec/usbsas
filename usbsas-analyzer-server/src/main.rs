@@ -76,7 +76,7 @@ impl AppState {
             let file_type = file.file_type().unwrap();
             let filename = file.path().into_os_string().into_string().unwrap();
             let relative_filename = filename
-                .strip_prefix(&format!("{}/", base_path))
+                .strip_prefix(&format!("{base_path}/"))
                 .unwrap()
                 .to_string();
             if file_type.is_symlink() {
@@ -220,7 +220,7 @@ async fn upload_bundle(
 
 fn find_bundle(filename: &str) -> Result<(String, u64), actix_web::Error> {
     for ext in ["tar", "tar.gz", "gz"] {
-        let bundle_path = format!("{}.{}", filename, ext);
+        let bundle_path = format!("{filename}.{ext}");
         if let Ok(metadata) = fs::metadata(&bundle_path) {
             return Ok((bundle_path, metadata.len()));
         }

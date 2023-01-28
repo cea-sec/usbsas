@@ -177,7 +177,7 @@ impl MainLoopState {
                 Err(err) => {
                     error!("{}", err);
                     comm.error(proto::files::ResponseError {
-                        err: format!("{}", err),
+                        err: format!("{err}"),
                     })?;
                 }
             }
@@ -188,7 +188,7 @@ impl MainLoopState {
         let path = path.trim_start_matches('/').trim_end_matches('/');
         self.metadata
             .get(path)
-            .ok_or_else(|| Error::Error(format!("didn't find {} in metadata", path)))
+            .ok_or_else(|| Error::Error(format!("didn't find {path} in metadata")))
     }
 
     fn getattr(&mut self, comm: &mut Comm<proto::files::Request>, path: &str) -> Result<()> {
@@ -290,7 +290,7 @@ impl Tar2Files {
                 Err(err) => {
                     error!("state run error: {}", err);
                     comm.error(proto::files::ResponseError {
-                        err: format!("run error: {}", err),
+                        err: format!("run error: {err}"),
                     })?;
                     State::WaitEnd(WaitEndState {})
                 }

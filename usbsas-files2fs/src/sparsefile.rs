@@ -36,7 +36,7 @@ impl<T: Read + Write + Seek> Read for SparseFile<T> {
 impl<T: Read + Write + Seek> Write for SparseFile<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         /* Get file position */
-        let offset = self.file.seek(io::SeekFrom::Current(0))?;
+        let offset = self.file.stream_position()?;
 
         match self.file.write(buf)? {
             0 => Ok(0),

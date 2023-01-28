@@ -76,11 +76,10 @@ impl FsWriter {
     fn write_fs(&mut self) -> Result<()> {
         // check fs size doesn't exceed dev size
         let fs_size = self.fs.seek(SeekFrom::End(0))?;
-        self.fs.seek(SeekFrom::Start(0))?;
+        self.fs.rewind()?;
         if fs_size % SECTOR_SIZE != 0 {
             return Err(Error::Error(format!(
-                "fs size ({}) % sector size ({}) != 0",
-                fs_size, SECTOR_SIZE
+                "fs size ({fs_size}) % sector size ({SECTOR_SIZE}) != 0"
             )));
         }
         let dev_size = self
@@ -90,8 +89,7 @@ impl FsWriter {
             .size;
         if fs_size > dev_size {
             return Err(Error::Error(format!(
-                "filesystem size ({}) > device size ({}), aborting",
-                fs_size, dev_size
+                "filesystem size ({fs_size}) > device size ({dev_size}), aborting"
             )));
         }
 
@@ -119,7 +117,7 @@ impl FsWriter {
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
                 .template("[{wide_bar}] {bytes}/{total_bytes} ({eta})")
-                .map_err(|err| Error::Error(format!("progress bar err: {}", err)))?
+                .map_err(|err| Error::Error(format!("progress bar err: {err}")))?
                 .progress_chars("#>-"),
         );
 

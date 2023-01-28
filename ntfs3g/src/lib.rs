@@ -225,7 +225,7 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
         let ni = self.inode_from_path(path)?;
         let path_u16 = str2ntfsunicode(&filename)?;
         let path_c = CString::new(filename)
-            .map_err(|err| Error::new(ErrorKind::Other, format!("ntfs cstring error ({})", err)))?;
+            .map_err(|err| Error::new(ErrorKind::Other, format!("ntfs cstring error ({err})")))?;
 
         if unsafe {
             n3g_c::ntfs_delete(
