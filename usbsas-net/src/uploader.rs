@@ -73,6 +73,17 @@ struct WaitEndState {}
 
 impl InitState {
     fn run(self, _comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
+        usbsas_sandbox::landlock(
+            Some(&[
+                &self.tarpath,
+                "/etc",
+                "/lib",
+                "/usr/lib/",
+                "/var/lib/usbsas",
+            ]),
+            None,
+        )?;
+
         let file = File::open(self.tarpath)?;
 
         Ok(State::Running(RunningState { file: Some(file) }))

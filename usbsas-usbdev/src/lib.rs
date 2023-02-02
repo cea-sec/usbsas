@@ -337,7 +337,25 @@ struct WaitEndState {}
 impl InitState {
     fn run(self, comm: &mut Comm<proto::usbdev::Request>) -> Result<State> {
         trace!("init state");
+
+        usbsas_sandbox::landlock(
+            Some(&[
+                &self.config_path,
+                "/proc/self/fd",
+                "/sys/bus",
+                "/sys/class",
+                "/sys/devices",
+                "/run/udev/data",
+            ]),
+            Some(&["/dev/bus/usb"]),
+        )?;
+
         let config = conf_parse(&conf_read(&self.config_path)?)?;
+
+        if !rusb::has_hotplug() {
+            error!("libusb doesn't support hotplug");
+            std::process::exit(1);
+        }
 
         let context = rusb::Context::new()?;
         let current_devices = Arc::new(Mutex::new(CurrentDevices::new(config.usb_port_accesses)));
@@ -432,10 +450,6 @@ pub struct UsbDev {
 
 impl UsbDev {
     pub fn new(comm: Comm<proto::usbdev::Request>, config_path: String) -> Result<Self> {
-        if !rusb::has_hotplug() {
-            error!("libusb doesn't support hotplug");
-            std::process::exit(1);
-        }
         Ok(UsbDev {
             comm,
             state: State::Init(InitState { config_path }),
