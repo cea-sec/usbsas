@@ -8,7 +8,7 @@ license = "GPL-3.0"
 cc = "1.0"
 
 [dependencies]
-landlock = { git = "https://github.com/landlock-lsm/rust-landlock", rev = "99628b1b984ca7981f4edb6f6a6e8f6866f8f310"}
+landlock = "0.2"
 libc = "0.2"
 log = "0.4"
 procfs = { version = "0.14", default-features = false }
