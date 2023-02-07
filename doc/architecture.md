@@ -13,8 +13,8 @@ a remote server. During the operation, files can be analyzed by a remote
 antivirus server. The diagram above should be read from left to right.
 
 Processes communicate with each other via `protobuf` serialized data (see
-[Communication](#communication)). Every process is tightly sandboxed with
-`seccomp` (see [Sandboxing](#sandboxing)).
+[Communication](#communication)). Processes are tightly sandboxed with `seccomp`
+and possibly `landlock` (see [Sandboxing](#sandboxing)).
 
 ## Communication
 
@@ -28,9 +28,10 @@ Messages can be found in `usbsas-proto/proto`.
 ## Sandboxing
 
 Each process has its own `seccomp` rules (apart from the ones doing net stuff
-(for now): `analyzer`, `uploader` and `cmdexec`). During their initialization
-phase, processes open the files they will need later then transition into their
-secure state. No messages are parsed before this transition.
+(for now): `analyzer`, `uploader`, `downloader` and `cmdexec`). During their
+initialization phase, processes open the files they will need later then
+transition into their secure state. No messages are parsed before this
+transition.
 
 Allowed syscalls for all processes:
 - `read()` on the first communication pipe
@@ -47,6 +48,10 @@ Allowed syscalls for all processes:
 - `rt_sigreturn()`
 
 Other syscalls can be allowed, depending on the tasks of the process, see below.
+
+If a process can't be sandboxed enough with `seccomp` (if files that will be
+opened can't be known in advance for example), filesystem accesses are
+restricted to the bare minimum with `landlock`.
 
 ## Processes
 
@@ -74,8 +79,14 @@ their information.
 
 Requests: `Devices`
 
-syscalls: `openat()`; `read()`; `write()`; `close()`; `recvmsg()`;
-`recvfrom()`;`poll()`; `clock_nanosleep()`; some `ioctl()`
+syscalls: `setsockopt()`, `bind()`, `getsockname()`, `recvfrom()`, `recvmsg()`
+on udev socket; `epoll_ctl`, `epoll_wait` on a polling file descriptor;
+`mprotect()` without the PROT_EXEC flag; `faccessat2()`; `readlinkat()`;
+`openat()`; `read()`; `getdents64()`; `fstatfs()`; `newfstatat()`;
+`close()`;`clock_nanosleep()`; `getrandom()`
+
+Landlock allowed paths (read only): configuration file path, `/sys/bus`,
+`/sys/class`, `/sys/devices`, `/run/udev`.
 
 ### dev2scsi
 
@@ -163,7 +174,8 @@ file.
 Requests: `Analyze`
 
 syscalls: analyzer doesn't run in a seccomp sandbox (for now ? many are needed
-because of network and authentication).
+because of network and kerberos authentication) but its filesystem accesses are
+restricted with landlock.
 
 ### analyzer-server
 
@@ -223,7 +235,22 @@ file.
 
 Requests: `Upload`
 
-syscall: uploader doesn't run in a seccomp sandbox
+uploader doesn't run in a seccomp sandbox but its filesystem accesses
+are restricted with landlock.
+
+### downloader
+
+This process can download a tar containing files from the remote server and
+write them on the destination USB device.
+
+It supports Kerberos mutual authentication if compiled with the `authkrb`
+feature (enabled by default) and a service name is present in the configuration
+file.
+
+Requests: `Download`, `ArchiveInfos`
+
+downloader doesn't run in a seccomp sandbox but its filesystem accesses are
+restricted with landlock.
 
 ### cmd-exec
 
