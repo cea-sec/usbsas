@@ -1,15 +1,15 @@
 //! usbdev is a process from usbsas responsible for detecting plugged /
 //! unplugged USB devices.
 //!
-//! It uses libusb's hot-plug handler.
+//! It uses udev monitoring system.
 
 use log::{debug, error, info, trace};
-use rusb::constants::LIBUSB_CLASS_MASS_STORAGE;
-use rusb::UsbContext;
+use mio::{Events, Interest, Poll, Token};
 use std::{
+    collections::HashMap,
+    os::unix::io::AsRawFd,
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
 };
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
@@ -26,12 +26,14 @@ pub enum Error {
     #[cfg(feature = "mock")]
     #[error("mock: {0}")]
     Mock(#[from] usbsas_mock::usbdev::Error),
-    #[error("rusb error: {0}")]
-    Rusb(#[from] rusb::Error),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Poison error")]
     Poison,
+    #[error("ParseInt error {0}")]
+    ParseInt(#[from] std::num::ParseIntError),
+    #[error("None value")]
+    NoneValue,
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -52,61 +54,77 @@ protoresponse!(
     end = End[ResponseEnd]
 );
 
-struct HotPlugHandler {
+/// Thread for getting plugged devices at startup and handling udev events
+fn handle_udev_events(
     current_devices: Arc<Mutex<CurrentDevices>>,
-}
-
-impl<T: rusb::UsbContext> rusb::Hotplug<T> for HotPlugHandler {
-    fn device_arrived(&mut self, device: rusb::Device<T>) {
-        debug!("hello there {:#?}", device);
-        match self.current_devices.lock() {
-            Ok(mut cur_dev_guard) => {
-                if let Err(err) = cur_dev_guard.add_dev(device) {
-                    error!("Couldn't add dev: {}", err);
-                }
-            }
-            Err(err) => {
-                error!("Couldn't get lock {}", err);
-            }
-        }
-    }
-
-    fn device_left(&mut self, device: rusb::Device<T>) {
-        debug!("see you {:#?}", device);
-        match self.current_devices.lock() {
-            Ok(mut cur_dev_guard) => cur_dev_guard.rm_dev(device),
-            Err(err) => {
-                error!("Couldn't get lock {}", err);
-            }
-        }
-    }
-}
-
-/// Handle libusb hotplug events
-fn handle_events_loop(
-    context: rusb::Context,
-    current_devices: Arc<Mutex<CurrentDevices>>,
+    config_path: &str,
 ) -> Result<()> {
-    usbsas_sandbox::usbdev::thread_seccomp(usbsas_sandbox::get_libusb_opened_fds(0, 0)?)?;
-    loop {
-        trace!("waiting libusb event");
-        if let Err(err) = context.handle_events(None) {
-            error!("Couldn't handle libusb events: {}", err);
-            continue;
-        }
-        trace!("handled libusb event");
+    let config = conf_read(config_path)?;
 
-        match current_devices.lock() {
-            Ok(ref mut cur_dev_guard) => {
-                if cur_dev_guard.need_update {
-                    cur_dev_guard.update_desc_last(&context);
+    let monitor = udev::MonitorBuilder::new()?.match_subsystem_devtype("usb", "usb_device")?;
+    let mut poll = Poll::new()?;
+
+    usbsas_sandbox::usbdev::seccomp_thread(monitor.socket_raw_fd(), poll.as_raw_fd())?;
+
+    let config = conf_parse(&config)?;
+
+    let mut socket = monitor.listen()?;
+    let mut events = Events::with_capacity(1024);
+
+    poll.registry().register(
+        &mut socket,
+        Token(0),
+        Interest::READABLE | Interest::WRITABLE,
+    )?;
+
+    // Scan devices once and add the already plugged ones in our list
+    let mut enumerator = udev::Enumerator::new()?;
+    enumerator.match_subsystem("usb")?;
+
+    let mut cur_dev = current_devices.lock()?;
+    cur_dev.usb_port_accesses = config.usb_port_accesses;
+
+    for dev in enumerator.scan_devices()? {
+        // Only add mass storage devices
+        if let Some(value) = dev.property_value("ID_USB_INTERFACES") {
+            if value.to_string_lossy().contains(":080650:") {
+                if let Err(err) = cur_dev.add_device(&dev) {
+                    log::error!("Couldn't add dev {:?} ({})", dev, err);
                 }
             }
-            Err(err) => {
-                error!("Couldn't get devices lock {}", err);
-                continue;
+        }
+    }
+    drop(cur_dev);
+
+    // Handle udev events
+    loop {
+        poll.poll(&mut events, None)?;
+
+        for event in &events {
+            if event.token() == Token(0) && event.is_writable() {
+                for ev in socket.iter() {
+                    match ev.event_type() {
+                        udev::EventType::Add => {
+                            if let Some(value) = ev.property_value("ID_USB_INTERFACES") {
+                                if value.to_string_lossy().contains(":080650:") {
+                                    if let Err(err) =
+                                        current_devices.lock()?.add_device(&ev.device())
+                                    {
+                                        log::error!("Couldn't add dev {:?} ({})", ev.device(), err);
+                                    }
+                                }
+                            }
+                        }
+                        udev::EventType::Remove => {
+                            if let Err(err) = current_devices.lock()?.rm_device(&ev.device()) {
+                                log::error!("Couldn't rm dev {:?} ({})", ev.device(), err);
+                            }
+                        }
+                        _ => (),
+                    }
+                }
             }
-        };
+        }
     }
 }
 
@@ -121,186 +139,106 @@ fn cmp_vec(vec1: &[u32], vec2: &[u8]) -> bool {
 }
 
 pub struct CurrentDevices {
-    devices: Vec<UsbDevice>,
-    need_update: bool,
+    devices: HashMap<String, UsbDevice>,
     usb_port_accesses: Option<UsbPortAccesses>,
 }
 
 impl CurrentDevices {
     fn new(usb_port_accesses: Option<UsbPortAccesses>) -> Self {
         CurrentDevices {
-            devices: Vec::new(),
-            need_update: false,
+            devices: HashMap::new(),
             usb_port_accesses,
         }
     }
 
-    /// Function called when a device is plugged. It will save its information
-    fn add_dev<T: rusb::UsbContext>(&mut self, device: rusb::Device<T>) -> Result<bool> {
-        let ports: Vec<u32> = match device.port_numbers() {
-            Ok(ports) => ports.iter().map(|&val| val as u32).collect(),
-            Err(err) => {
-                error!("couldn't get device port numbers: {}", err);
-                return Err(err.into());
+    fn add_device(&mut self, device: &udev::Device) -> Result<()> {
+        // Check if device is connected to an allowed port
+        let (is_src, is_dst) = if let Some(ports) = &self.usb_port_accesses {
+            let mut dev_port = Vec::new();
+            for port in device
+                .attribute_value("devpath")
+                .ok_or(Error::NoneValue)?
+                .to_string_lossy()
+                .to_string()
+                .split('.')
+            {
+                dev_port.push(port.parse::<u32>()?)
             }
-        };
-
-        let (is_src, is_dst) = if let Some(usb_port_accesses) = &self.usb_port_accesses {
-            if cmp_vec(&ports, &usb_port_accesses.ports_src) {
+            if cmp_vec(&dev_port, &ports.ports_src) {
                 (true, false)
-            } else if cmp_vec(&ports, &usb_port_accesses.ports_dst) {
+            } else if cmp_vec(&dev_port, &ports.ports_dst) {
                 (false, true)
             } else {
-                debug!("Device plugged in unhandled port {:?}", ports);
-                return Ok(false);
+                debug!("Device plugged in unauthorized port {:?}", dev_port);
+                return Ok(());
             }
         } else {
             (true, true)
         };
 
-        let descriptor = match device.device_descriptor() {
-            Ok(des) => des,
-            Err(err) => {
-                error!("couldn't get device descriptor: {}", err);
-                return Err(err.into());
-            }
+        let dev = UsbDevice {
+            busnum: device
+                .attribute_value("busnum")
+                .ok_or(Error::NoneValue)?
+                .to_string_lossy()
+                .parse::<u32>()?,
+            devnum: device
+                .attribute_value("devnum")
+                .ok_or(Error::NoneValue)?
+                .to_string_lossy()
+                .parse::<u32>()?,
+            vendorid: u32::from_str_radix(
+                &device
+                    .attribute_value("idVendor")
+                    .ok_or(Error::NoneValue)?
+                    .to_string_lossy(),
+                16,
+            )?,
+            productid: u32::from_str_radix(
+                &device
+                    .attribute_value("idProduct")
+                    .ok_or(Error::NoneValue)?
+                    .to_string_lossy(),
+                16,
+            )?,
+            manufacturer: device
+                .attribute_value("manufacturer")
+                .ok_or(Error::NoneValue)?
+                .to_string_lossy()
+                .to_string(),
+            description: device
+                .attribute_value("product")
+                .ok_or(Error::NoneValue)?
+                .to_string_lossy()
+                .to_string(),
+            serial: device
+                .attribute_value("serial")
+                .ok_or(Error::NoneValue)?
+                .to_string_lossy()
+                .to_string(),
+            is_src,
+            is_dst,
         };
 
-        for n in 0..descriptor.num_configurations() {
-            let config_desc = match device.config_descriptor(n) {
-                Ok(cfd) => cfd,
-                Err(err) => {
-                    error!("couldn't get config descriptor: {}", err);
-                    return Err(err.into());
-                }
-            };
-            for interface in config_desc.interfaces() {
-                for interface_desc in interface.descriptors() {
-                    if interface_desc.class_code() == LIBUSB_CLASS_MASS_STORAGE {
-                        self.devices.push(UsbDevice {
-                            busnum: device.bus_number() as u32,
-                            devnum: device.address() as u32,
-                            vendorid: descriptor.vendor_id() as u32,
-                            productid: descriptor.product_id() as u32,
-                            manufacturer: "unknown".into(),
-                            description: "unknown".into(),
-                            serial: "unknown".into(),
-                            is_src,
-                            is_dst,
-                        });
-                        self.need_update = true;
-                        return Ok(true);
-                    }
-                }
-            }
-        }
+        info!(
+            "Device plugged {}-{} ({} {})",
+            dev.busnum, dev.devnum, dev.manufacturer, dev.description
+        );
 
-        Ok(false)
+        self.devices
+            .insert(device.syspath().to_string_lossy().to_string(), dev);
+
+        Ok(())
     }
 
-    /// Remove device from current list
-    fn rm_dev<T: rusb::UsbContext>(&mut self, device: rusb::Device<T>) {
-        if let Some(index) = self.devices.iter().position(|x| {
-            (x.busnum, x.devnum) == (device.bus_number() as u32, device.address() as u32)
-        }) {
-            self.devices.remove(index);
+    fn rm_device(&mut self, device: &udev::Device) -> Result<()> {
+        if let Some(dev) = self
+            .devices
+            .remove(&device.syspath().to_string_lossy().to_string())
+        {
+            debug!("see you {}-{}", dev.busnum, dev.devnum);
         }
-    }
-
-    /// Get more information on last plugged device like its description and
-    /// manufacturer etc.
-    fn update_desc_last(&mut self, context: &rusb::Context) {
-        let last_device = match self.devices.last_mut() {
-            Some(dev) => dev,
-            None => return,
-        };
-
-        let devices = match context.devices() {
-            Ok(devs) => devs,
-            Err(err) => {
-                error!("Couldn't get devices: {}", err);
-                return;
-            }
-        };
-
-        for device in devices.iter() {
-            if device.bus_number() == last_device.busnum as u8
-                && device.address() == last_device.devnum as u8
-            {
-                match device.open() {
-                    Ok(mut handle) => {
-                        if let Err(err) = handle.reset() {
-                            error!("Couldn't reset device: {}", err);
-                            return;
-                        };
-                        let timeout = Duration::from_secs(1);
-                        let languages = match handle.read_languages(timeout) {
-                            Ok(lang) => lang,
-                            Err(err) => {
-                                error!("Couldn't read languages: {}", err);
-                                return;
-                            }
-                        };
-
-                        let device_descriptor = match handle.device().device_descriptor() {
-                            Ok(dd) => dd,
-                            Err(err) => {
-                                error!("couldn't get device descriptor: {}", err);
-                                return;
-                            }
-                        };
-                        let (manufacturer, description, serial) = if !languages.is_empty() {
-                            (
-                                handle
-                                    .read_manufacturer_string(
-                                        languages[0],
-                                        &device_descriptor,
-                                        timeout,
-                                    )
-                                    .unwrap_or_else(|_| "Unknown manufacturer".to_string()),
-                                handle
-                                    .read_product_string(languages[0], &device_descriptor, timeout)
-                                    .unwrap_or_else(|_| "Unknown description".to_string()),
-                                handle
-                                    .read_serial_number_string(
-                                        languages[0],
-                                        &device_descriptor,
-                                        timeout,
-                                    )
-                                    .unwrap_or_else(|_| "Unknown serial".to_string()),
-                            )
-                        } else {
-                            return;
-                        };
-                        info!(
-                            "Device plugged: {} - {} - {}",
-                            manufacturer, description, serial
-                        );
-                        last_device.manufacturer = manufacturer;
-                        last_device.description = description;
-                        last_device.serial = serial;
-                        self.need_update = false;
-                    }
-                    Err(err) => {
-                        error!("Can't open dev: {}", err);
-                    }
-                }
-            }
-        }
-    }
-
-    fn add_dev_with_desc<T: rusb::UsbContext>(
-        &mut self,
-        device: rusb::Device<T>,
-        context: &rusb::Context,
-    ) {
-        match self.add_dev(device) {
-            Ok(true) => self.update_desc_last(context),
-            Ok(false) => (),
-            Err(err) => {
-                error!("Couldn't add dev: {}", err);
-            }
-        }
+        Ok(())
     }
 }
 
@@ -327,9 +265,7 @@ struct InitState {
 }
 
 struct RunningState {
-    context: rusb::Context,
     current_devices: Arc<Mutex<CurrentDevices>>,
-    registration: rusb::Registration<rusb::Context>,
 }
 
 struct WaitEndState {}
@@ -341,54 +277,22 @@ impl InitState {
         usbsas_sandbox::landlock(
             Some(&[
                 &self.config_path,
-                "/proc/self/fd",
                 "/sys/bus",
                 "/sys/class",
                 "/sys/devices",
-                "/run/udev/data",
+                "/run/udev",
             ]),
-            Some(&["/dev/bus/usb"]),
+            None,
         )?;
 
-        let config = conf_parse(&conf_read(&self.config_path)?)?;
-
-        if !rusb::has_hotplug() {
-            error!("libusb doesn't support hotplug");
-            std::process::exit(1);
-        }
-
-        let context = rusb::Context::new()?;
-        let current_devices = Arc::new(Mutex::new(CurrentDevices::new(config.usb_port_accesses)));
-
-        // Poll devices
-        for device in context.devices()?.iter() {
-            current_devices.lock()?.add_dev_with_desc(device, &context);
-        }
-
-        let registration = rusb::HotplugBuilder::new()
-            // .class(LIBUSB_CLASS_MASS_STORAGE) // doesn't seem to work
-            .register(
-                &context,
-                Box::new(HotPlugHandler {
-                    current_devices: current_devices.clone(),
-                }),
-            )?;
-
-        let context_clone = context.clone();
+        let current_devices = Arc::new(Mutex::new(CurrentDevices::new(None)));
         let cur_dev_clone = current_devices.clone();
-        thread::spawn(|| handle_events_loop(context_clone, cur_dev_clone));
 
-        usbsas_sandbox::usbdev::seccomp(
-            comm.input_fd(),
-            comm.output_fd(),
-            usbsas_sandbox::get_libusb_opened_fds(0, 0)?,
-        )?;
+        thread::spawn(move || handle_udev_events(cur_dev_clone, &self.config_path));
 
-        Ok(State::Running(RunningState {
-            context,
-            current_devices,
-            registration,
-        }))
+        usbsas_sandbox::usbdev::seccomp(comm.input_fd(), comm.output_fd())?;
+
+        Ok(State::Running(RunningState { current_devices }))
     }
 }
 
@@ -398,11 +302,16 @@ impl RunningState {
         loop {
             let req: proto::usbdev::Request = comm.recv()?;
             let res = match req.msg.ok_or(Error::BadRequest)? {
-                Msg::Devices(_) => comm.devices(proto::usbdev::ResponseDevices {
-                    devices: self.current_devices.lock()?.devices.clone(),
-                }),
+                Msg::Devices(_) => {
+                    let mut devices = Vec::new();
+                    self.current_devices
+                        .lock()?
+                        .devices
+                        .values()
+                        .for_each(|dev| devices.push(dev.clone()));
+                    comm.devices(proto::usbdev::ResponseDevices { devices })
+                }
                 Msg::End(_) => {
-                    self.context.unregister_callback(self.registration);
                     comm.end(proto::usbdev::ResponseEnd {})?;
                     break;
                 }

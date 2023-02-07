@@ -1603,6 +1603,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "libudev-sys"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c8469b4a23b962c1396b9b451dda50ef5b283e8dd309d69033475fa9b334324"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "libusb1-sys"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2870,6 +2880,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
+name = "udev"
+version = "0.7.0"
+source = "git+https://github.com/losynix/udev-rs?branch=socket_fd_from_monitor#26955cd1ec3297eb6f4f77d3482280fd5f0487a4"
+dependencies = [
+ "io-lifetimes",
+ "libc",
+ "libudev-sys",
+ "mio",
+ "pkg-config",
+]
+
+[[package]]
 name = "uname"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3288,8 +3310,9 @@ version = "0.1.1"
 dependencies = [
  "env_logger 0.10.0",
  "log",
- "rusb",
+ "mio",
  "thiserror",
+ "udev",
  "usbsas-comm",
  "usbsas-config",
  "usbsas-mock",
