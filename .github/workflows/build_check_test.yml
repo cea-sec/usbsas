@@ -34,6 +34,7 @@ jobs:
         libx11-dev \
         libxtst-dev \
         libdbus-1-dev \
+        libudev-dev \
         libseccomp-dev
     # Build
     - name: Build
@@ -71,6 +72,7 @@ jobs:
         libx11-dev \
         libxtst-dev \
         libdbus-1-dev \
+        libudev-dev \
         libseccomp-dev \
         clamav-freshclam; \
         systemctl is-active --quiet clamav-freshclam && \
@@ -136,6 +138,7 @@ jobs:
           libx11-dev \
           libxtst-dev \
           libdbus-1-dev \
+          libudev-dev \
           libseccomp-dev
       - uses: actions-rs/cargo@v1
         with:
