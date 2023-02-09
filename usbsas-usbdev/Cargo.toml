@@ -7,13 +7,14 @@ license = "GPL-3.0"
 [dependencies]
 env_logger = "0.10"
 log = "0.4"
-rusb = "0.9"
+mio = { version = "0.8", features = ["os-ext"] }
 thiserror = "1.0"
+udev = { git = "https://github.com/losynix/udev-rs", branch = "socket_fd_from_monitor", features = ["mio"] }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
-usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-proto = { path = "../usbsas-proto" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
 
 [features]
