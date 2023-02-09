@@ -1215,7 +1215,7 @@ function device_choice() {
         if (state == "WAIT_REMOVAL" || state == "WAIT_REMOVAL_RESTART") {
           check_device_removal();
         } else if (state == "WAIT_WIPE_KEY" || state == 'WAIT_IMAGE_KEY') {
-          confirm_key();
+          render_tool_device_choice();
         } else {
           render_device_choice();
         }
@@ -1299,17 +1299,54 @@ function tool_device_choice(action) {
   device_choice();
 }
 
-function confirm_key() {
-  for (let device of devices.availables) {
-    if (device.is_src) {
+function render_tool_device_choice() {
+  document.querySelector("#tools-devices").innerHTML = "";
+
+  let usb_devices = devices.availables.filter(dev => dev.dev_type == "Usb");
+
+  if (!usb_devices.some((dev) => Devices.compare(dev, devices.device_in))) {
+    devices.device_in = undefined;
+  }
+
+  for (let device of usb_devices) {
+    let a = document.createElement("a");
+    a.classList.add("list-group-item");
+    a.classList.add("list-group-item-action");
+    a.href = "#";
+    a.onclick = function() {
       devices.device_in = device;
-      document.querySelector("#key-manuf").innerText = devices.device_in.dev.Usb.manufacturer
-        + " " + devices.device_in.dev.Usb.description;
-      document.querySelector("#key-serial").innerText = devices.device_in.dev.Usb.serial;
-      document.querySelector("#usb-arrow").style.visibility = "hidden";
-      document.querySelector("#confirm-button").removeAttribute("disabled");
+      a.classList.add("active");
+      render_tool_device_choice();
+    }
+
+    let p = document.createElement("p");
+    p.classList.add("list-group-item-text");
+    let h4 = document.createElement("h4");
+    h4.classList.add("list-group-item-heading");
+    h4.innerText = device.dev.Usb.description;
+    p.innerText = device.dev.Usb.manufacturer + "/" + device.dev.Usb.serial;
+
+    a.appendChild(h4);
+    a.appendChild(p);
+    document.querySelector("#tools-devices").appendChild(a);
+
+    if (devices.device_in == undefined) {
+      devices.device_in = device;
+    }
+
+    if (Devices.compare(device, devices.device_in)) {
+      a.classList.add("active");
     }
   }
+
+  if (devices.device_in != undefined) {
+    document.querySelector("#usb-arrow").style.visibility = "hidden";
+    document.querySelector("#confirm-button").removeAttribute("disabled");
+  } else {
+    document.querySelector("#usb-arrow").style.visibility = "visible";
+    document.querySelector("#confirm-button").setAttribute("disabled", "disabled");
+  }
+
 }
 
 function do_tool() {
