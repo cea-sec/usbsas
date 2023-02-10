@@ -11,7 +11,7 @@ use usbsas_proto as proto;
 #[cfg(not(feature = "mock"))]
 use {
     log::{debug, error, trace},
-    rusb::{Direction, TransferType, UsbContext},
+    rusb::{Direction, GlobalContext, TransferType, UsbContext},
     std::time::Duration,
     usbsas_scsi::ScsiUsb,
 };
@@ -45,8 +45,8 @@ enum LibusbClassCode {
 
 // Mass storage struct used by dev2scsi
 #[cfg(not(feature = "mock"))]
-pub struct MassStorage<T: UsbContext> {
-    scsiusb: RwLock<ScsiUsb<T>>,
+pub struct MassStorage {
+    scsiusb: RwLock<ScsiUsb<GlobalContext>>,
     pub max_lba: u32,
     pub block_size: u32,
     pub dev_size: u64,
@@ -54,8 +54,8 @@ pub struct MassStorage<T: UsbContext> {
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> MassStorage<T> {
-    fn new(scsiusb: ScsiUsb<T>) -> Result<Self> {
+impl MassStorage {
+    fn new(scsiusb: ScsiUsb<GlobalContext>) -> Result<Self> {
         let mut scsiusb = scsiusb;
         let (max_lba, block_size, dev_size) = scsiusb.init_mass_storage()?;
         // TODO: support more sector size
@@ -69,9 +69,13 @@ impl<T: UsbContext> MassStorage<T> {
         })
     }
 
-    pub fn from_busnum_devnum(libusb_ctx: T, busnum: u32, devnum: u32) -> Result<Self> {
-        trace!("find_and_init_dev");
-        let libusb_devlist = libusb_ctx.devices()?;
+    pub fn from_busnum_devnum(busnum: u32, devnum: u32) -> Result<Self> {
+        trace!("find_and_init_dev {} {}", busnum, devnum);
+
+        assert!(rusb::supports_detach_kernel_driver());
+
+        let context = rusb::GlobalContext::default();
+        let libusb_devlist = context.devices()?;
 
         for device in libusb_devlist.iter() {
             if device.bus_number() != busnum as u8 || device.address() != devnum as u8 {
@@ -100,7 +104,7 @@ impl<T: UsbContext> MassStorage<T> {
                         if let [Some(ep0), Some(ep1)] = endpoints {
                             handle.set_auto_detach_kernel_driver(true)?;
                             handle.claim_interface(interface.number())?;
-                            let scsiusb: ScsiUsb<T> = ScsiUsb::new(
+                            let scsiusb = ScsiUsb::new(
                                 handle,
                                 interface.number(),
                                 desc.setting_number(),
@@ -152,7 +156,7 @@ impl<T: UsbContext> MassStorage<T> {
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> Read for MassStorage<T> {
+impl Read for MassStorage {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.pos % (self.block_size as u64) != 0 {
             return Err(io::Error::new(
@@ -183,7 +187,7 @@ impl<T: UsbContext> Read for MassStorage<T> {
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> Seek for MassStorage<T> {
+impl Seek for MassStorage {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         match pos {
             SeekFrom::Start(pos) => {
@@ -198,7 +202,7 @@ impl<T: UsbContext> Seek for MassStorage<T> {
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> ReadAt for MassStorage<T> {
+impl ReadAt for MassStorage {
     fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
         self.read_exact_at(pos, buf)?;
         Ok(buf.len())

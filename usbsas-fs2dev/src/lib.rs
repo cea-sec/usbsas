@@ -4,8 +4,6 @@
 use bitvec::prelude::*;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{debug, error, trace};
-#[cfg(not(feature = "mock"))]
-use rusb::UsbContext;
 use std::{
     fs::File,
     io::{prelude::*, SeekFrom},
@@ -13,7 +11,7 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 #[cfg(feature = "mock")]
-use usbsas_mock::mass_storage::{MockMassStorage as MassStorage, MockUsbContext as UsbContext};
+use usbsas_mock::mass_storage::MockMassStorage as MassStorage;
 use usbsas_proto as proto;
 use usbsas_utils::SECTOR_SIZE;
 #[cfg(not(feature = "mock"))]
@@ -29,8 +27,6 @@ pub enum Error {
     #[error("{0}")]
     Error(String),
     #[error("rusb error: {0}")]
-    Rusb(#[from] rusb::Error),
-    #[error("mass storage: {0}")]
     MassStorage(#[from] usbsas_mass_storage::Error),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
@@ -59,17 +55,17 @@ protoresponse!(
 const MAX_WRITE_SECTORS: usize = 240;
 const BUFFER_MAX_WRITE_SIZE: u64 = MAX_WRITE_SECTORS as u64 * SECTOR_SIZE;
 
-enum State<T: UsbContext> {
-    Init(InitState<T>),
-    DevOpened(DevOpenedState<T>),
-    BitVecLoaded(BitVecLoadedState<T>),
-    Copying(CopyingState<T>),
-    Wiping(WipingState<T>),
+enum State {
+    Init(InitState),
+    DevOpened(DevOpenedState),
+    BitVecLoaded(BitVecLoadedState),
+    Copying(CopyingState),
+    Wiping(WipingState),
     WaitEnd(WaitEndState),
     End,
 }
 
-impl<T: UsbContext> State<T> {
+impl State {
     fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
@@ -83,31 +79,30 @@ impl<T: UsbContext> State<T> {
     }
 }
 
-struct InitState<T: UsbContext> {
+struct InitState {
     fs_fname: String,
-    context: T,
 }
 
-struct DevOpenedState<T: UsbContext> {
+struct DevOpenedState {
     fs: File,
-    mass_storage: MassStorage<T>,
+    mass_storage: MassStorage,
 }
 
-struct BitVecLoadedState<T: UsbContext> {
-    fs: File,
-    fs_bv: BitVecIterOnes,
-    mass_storage: MassStorage<T>,
-}
-
-struct CopyingState<T: UsbContext> {
+struct BitVecLoadedState {
     fs: File,
     fs_bv: BitVecIterOnes,
-    mass_storage: MassStorage<T>,
+    mass_storage: MassStorage,
 }
 
-struct WipingState<T: UsbContext> {
+struct CopyingState {
     fs: File,
-    mass_storage: MassStorage<T>,
+    fs_bv: BitVecIterOnes,
+    mass_storage: MassStorage,
+}
+
+struct WipingState {
+    fs: File,
+    mass_storage: MassStorage,
 }
 
 struct WaitEndState;
@@ -146,8 +141,8 @@ impl Iterator for BitVecIterOnes {
     }
 }
 
-impl<T: UsbContext> InitState<T> {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State<T>> {
+impl InitState {
+    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
         let busnum = comm.read_u32::<LittleEndian>()?;
         let devnum = comm.read_u32::<LittleEndian>()?;
         debug!("unlocked with busnum={} devnum={}", busnum, devnum);
@@ -163,7 +158,7 @@ impl<T: UsbContext> InitState<T> {
             Ok(State::WaitEnd(WaitEndState))
         } else {
             let fs = File::open(self.fs_fname)?;
-            let mass_storage = MassStorage::from_busnum_devnum(self.context, busnum, devnum)?;
+            let mass_storage = MassStorage::from_busnum_devnum(busnum, devnum)?;
             #[cfg(not(feature = "mock"))]
             usbsas_sandbox::fs2dev::seccomp(
                 comm.input_fd(),
@@ -176,8 +171,8 @@ impl<T: UsbContext> InitState<T> {
     }
 }
 
-impl<T: UsbContext> CopyingState<T> {
-    fn run(mut self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State<T>> {
+impl CopyingState {
+    fn run(mut self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
         trace!("copying state");
         comm.startcopy(proto::fs2dev::ResponseStartCopy {})?;
 
@@ -229,8 +224,8 @@ impl<T: UsbContext> CopyingState<T> {
     }
 }
 
-impl<T: UsbContext> WipingState<T> {
-    fn run(mut self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State<T>> {
+impl WipingState {
+    fn run(mut self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
         trace!("wiping state");
         comm.wipe(proto::fs2dev::ResponseWipe {})?;
         let mut buffer = vec![0u8; BUFFER_MAX_WRITE_SIZE as usize];
@@ -275,8 +270,8 @@ impl<T: UsbContext> WipingState<T> {
     }
 }
 
-impl<T: UsbContext> DevOpenedState<T> {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State<T>> {
+impl DevOpenedState {
+    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
         trace!("dev opened state");
         use proto::fs2dev;
         use proto::fs2dev::request::Msg;
@@ -313,7 +308,7 @@ impl<T: UsbContext> DevOpenedState<T> {
         comm: &mut Comm<proto::fs2dev::Request>,
         chunk: &mut Vec<u8>,
         last: bool,
-    ) -> Result<State<T>> {
+    ) -> Result<State> {
         use proto::fs2dev::{self, request::Msg};
         let mut fs_bv_buf = Vec::new();
         fs_bv_buf.append(chunk);
@@ -348,8 +343,8 @@ impl<T: UsbContext> DevOpenedState<T> {
     }
 }
 
-impl<T: UsbContext> BitVecLoadedState<T> {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State<T>> {
+impl BitVecLoadedState {
+    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
         trace!("bitvec loaded state");
         use proto::fs2dev::{self, request::Msg};
         let req: fs2dev::Request = comm.recv()?;
@@ -375,7 +370,7 @@ impl<T: UsbContext> BitVecLoadedState<T> {
 }
 
 impl WaitEndState {
-    fn run<T: UsbContext>(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State<T>> {
+    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
         use proto::fs2dev;
         use proto::fs2dev::request::Msg;
 
@@ -396,17 +391,14 @@ impl WaitEndState {
     }
 }
 
-pub struct Fs2Dev<T: UsbContext> {
+pub struct Fs2Dev {
     comm: Comm<proto::fs2dev::Request>,
-    state: State<T>,
+    state: State,
 }
 
-impl<T: UsbContext> Fs2Dev<T> {
-    pub fn new(comm: Comm<proto::fs2dev::Request>, fs_fname: String, context: T) -> Result<Self> {
-        #[cfg(not(feature = "mock"))]
-        assert!(rusb::supports_detach_kernel_driver());
-
-        let state = State::Init(InitState { fs_fname, context });
+impl Fs2Dev {
+    pub fn new(comm: Comm<proto::fs2dev::Request>, fs_fname: String) -> Result<Self> {
+        let state = State::Init(InitState { fs_fname });
         Ok(Fs2Dev { comm, state })
     }
 
