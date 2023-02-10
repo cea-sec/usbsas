@@ -14,6 +14,6 @@ log = "0.4"
 thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
-usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-proto = { path = "../usbsas-proto" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }

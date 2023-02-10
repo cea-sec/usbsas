@@ -28,6 +28,8 @@ pub enum Error {
     Partition(String),
     #[error("fsrw: {0}")]
     Fsrw(#[from] usbsas_fsrw::Error),
+    #[error("mass storage: {0}")]
+    MassStorage(#[from] usbsas_mass_storage::Error),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]

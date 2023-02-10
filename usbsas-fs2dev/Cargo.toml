@@ -14,8 +14,8 @@ thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
-usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-proto = { path = "../usbsas-proto" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
 
 [features]

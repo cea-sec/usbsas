@@ -5,6 +5,7 @@ use std::{
     io::{self, ErrorKind, Read, Seek, SeekFrom},
     sync::{Arc, RwLock},
 };
+use thiserror::Error;
 use usbsas_comm::{protorequest, Comm};
 use usbsas_proto as proto;
 #[cfg(not(feature = "mock"))]
@@ -14,6 +15,17 @@ use {
     std::time::Duration,
     usbsas_scsi::ScsiUsb,
 };
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("io error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("rusb error: {0}")]
+    Rusb(#[from] rusb::Error),
+    #[error("{0}")]
+    Error(String),
+}
+pub type Result<T> = std::result::Result<T, Error>;
 
 protorequest!(
     CommScsi,
@@ -43,17 +55,9 @@ pub struct MassStorage<T: UsbContext> {
 
 #[cfg(not(feature = "mock"))]
 impl<T: UsbContext> MassStorage<T> {
-    fn new(scsiusb: ScsiUsb<T>) -> Result<Self, io::Error> {
+    fn new(scsiusb: ScsiUsb<T>) -> Result<Self> {
         let mut scsiusb = scsiusb;
-        let (max_lba, block_size, dev_size) = match scsiusb.init_mass_storage() {
-            Ok(result) => result,
-            Err(e) => {
-                return Err(io::Error::new(
-                    ErrorKind::Other,
-                    format!("Cannot init mass storage: {e}"),
-                ));
-            }
-        };
+        let (max_lba, block_size, dev_size) = scsiusb.init_mass_storage()?;
         // TODO: support more sector size
         assert!(vec![0x200, 0x800, 0x1000].contains(&block_size));
         Ok(MassStorage {
@@ -65,11 +69,7 @@ impl<T: UsbContext> MassStorage<T> {
         })
     }
 
-    pub fn from_busnum_devnum(
-        libusb_ctx: T,
-        busnum: u32,
-        devnum: u32,
-    ) -> Result<Self, rusb::Error> {
+    pub fn from_busnum_devnum(libusb_ctx: T, busnum: u32, devnum: u32) -> Result<Self> {
         trace!("find_and_init_dev");
         let libusb_devlist = libusb_ctx.devices()?;
 
@@ -108,40 +108,27 @@ impl<T: UsbContext> MassStorage<T> {
                                 ep1,
                                 Duration::from_secs(5),
                             );
-                            return MassStorage::new(scsiusb).map_err(|err| {
-                                error!("MassStorage init err: {}", err);
-                                rusb::Error::NotFound
-                            });
+                            return MassStorage::new(scsiusb);
                         }
                     }
                 }
             }
         }
-        error!(
-            "Couldn't find device with busnum: {} / devnum: {}",
+        Err(Error::Error(format!(
+            "couldn't find device {}-{}",
             busnum, devnum
-        );
-        Err(rusb::Error::NotFound)
+        )))
     }
 
-    pub fn read_sectors(
-        &mut self,
-        offset: u64,
-        count: u64,
-        block_size: usize,
-    ) -> Result<Vec<u8>, io::Error> {
-        self.scsiusb
+    pub fn read_sectors(&mut self, offset: u64, count: u64, block_size: usize) -> Result<Vec<u8>> {
+        Ok(self
+            .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
-            .read_sectors(offset, count, block_size)
+            .map_err(|err| Error::Error(format!("write lock error: {}", err)))?
+            .read_sectors(offset, count, block_size)?)
     }
 
-    pub fn scsi_write_10(
-        &mut self,
-        buffer: &mut [u8],
-        offset: u64,
-        count: u64,
-    ) -> Result<u8, io::Error> {
+    pub fn scsi_write_10(&mut self, buffer: &mut [u8], offset: u64, count: u64) -> Result<u8> {
         let ret = self
             .scsiusb
             .write()
@@ -158,10 +145,7 @@ impl<T: UsbContext> MassStorage<T> {
             .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
             .scsi_read_10(&mut buf_check, offset + count - 1, 1)?;
         if buf_check != buffer[(buffer.len() - buf_check.len())..] {
-            return Err(io::Error::new(
-                ErrorKind::InvalidData,
-                "Couldn't verify write(10)",
-            ));
+            return Err(Error::Error("write check failed".into()));
         }
         Ok(ret)
     }
@@ -291,15 +275,13 @@ impl MassStorageComm {
         }
     }
 
-    pub fn comm(
-        &self,
-    ) -> Result<std::sync::RwLockWriteGuard<'_, Comm<proto::scsi::Request>>, io::Error> {
+    pub fn comm(&self) -> Result<std::sync::RwLockWriteGuard<'_, Comm<proto::scsi::Request>>> {
         self.comm
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {err}")))
+            .map_err(|err| Error::Error(format!("comm lock error: {err}")))
     }
 
-    pub fn read_sectors(&self, offset: u64, count: u64) -> Result<Vec<u8>, io::Error> {
+    pub fn read_sectors(&self, offset: u64, count: u64) -> io::Result<Vec<u8>> {
         // Don't cache data if we're reading a lot of sectors,
         // it's probably a file (only read once) and not FS stuff
         if count <= MAX_SECTORS_COUNT_CACHE {

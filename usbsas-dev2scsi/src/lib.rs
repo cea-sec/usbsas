@@ -28,6 +28,9 @@ pub enum Error {
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("partition error: {0}")]
     Partition(String),
+    #[cfg(not(feature = "mock"))]
+    #[error("mass storage: {0}")]
+    MassStorage(#[from] usbsas_mass_storage::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]

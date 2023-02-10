@@ -17,9 +17,9 @@ thiserror = "1.0"
 time = { version = "0.3", optional = true }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config", optional = true }
-usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils", optional = true }
 users = { version = "0.11", optional = true }
 

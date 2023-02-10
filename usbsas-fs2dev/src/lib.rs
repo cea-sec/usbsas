@@ -30,6 +30,8 @@ pub enum Error {
     Error(String),
     #[error("rusb error: {0}")]
     Rusb(#[from] rusb::Error),
+    #[error("mass storage: {0}")]
+    MassStorage(#[from] usbsas_mass_storage::Error),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("Bad Request")]

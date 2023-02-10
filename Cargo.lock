@@ -1054,7 +1054,7 @@ dependencies = [
 [[package]]
 name = "fscommon"
 version = "0.1.1"
-source = "git+https://github.com/rafalh/rust-fscommon?rev=248292ca9dd3a90d2dc345564f38858ef455526f#248292ca9dd3a90d2dc345564f38858ef455526f"
+source = "git+https://github.com/rafalh/rust-fscommon?rev=89706258032efff88689f6083510ed34b845fe46#89706258032efff88689f6083510ed34b845fe46"
 dependencies = [
  "log",
 ]
@@ -3133,6 +3133,7 @@ dependencies = [
  "lru",
  "positioned-io2",
  "rusb",
+ "thiserror",
  "usbsas-comm",
  "usbsas-proto",
  "usbsas-scsi",
