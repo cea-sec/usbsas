@@ -7,26 +7,36 @@ use log::{debug, error, trace, warn};
 use std::{convert::TryFrom, io::prelude::*, str};
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
-#[cfg(not(feature = "mock"))]
-use usbsas_mass_storage::{self, MassStorage};
-#[cfg(feature = "mock")]
-use usbsas_mock::mass_storage::MockMassStorage as MassStorage;
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
+#[cfg(not(feature = "mock"))]
+use {
+    std::os::unix::io::AsRawFd,
+    usbsas_mass_storage::{self, MassStorage},
+};
+#[cfg(feature = "mock")]
+use {
+    std::{env, fs::OpenOptions},
+    usbsas_mock::mass_storage::MockMassStorage as MassStorage,
+};
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
+    #[error("{0}")]
+    Error(String),
     #[error("int error: {0}")]
     Tryfromint(#[from] std::num::TryFromIntError),
-    #[error("rusb error: {0}")]
+    #[error("sandbox error: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("partition error: {0}")]
     Partition(String),
     #[cfg(not(feature = "mock"))]
     #[error("mass storage: {0}")]
     MassStorage(#[from] usbsas_mass_storage::Error),
+    #[error("var error: {0}")]
+    VarError(#[from] std::env::VarError),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -90,19 +100,42 @@ impl InitState {
 
         debug!("unlocked, busnum: {} devnum: {}", busnum, devnum);
 
-        // If the process is unlock with 0-0, usbsas is resetting, go directly
-        // to the EndState
+        // If the process is unlocked with 0-0, usbsas is resetting, go directly to the EndState
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
-            usbsas_sandbox::dev2scsi::seccomp(
-                comm.input_fd(),
-                comm.output_fd(),
-                usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
-            )?;
+            usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), None)?;
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
-        let usb_mass_storage = match MassStorage::from_busnum_devnum(busnum, devnum) {
+        #[cfg(not(feature = "mock"))]
+        let (device_file, device_fd) = {
+            let device_path = format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum);
+            match std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(device_path)
+            {
+                Ok(file) => {
+                    let file_fd = file.as_raw_fd();
+                    (file, file_fd)
+                }
+                Err(err) => {
+                    error!("Error opening device file: {}", err);
+                    comm.error(proto::scsi::ResponseError {
+                        err: format!("{err}"),
+                    })?;
+                    return Ok(State::WaitEnd(WaitEndState {}));
+                }
+            }
+        };
+
+        #[cfg(feature = "mock")]
+        let device_file = OpenOptions::new()
+            .read(true)
+            .write(false)
+            .open(env::var("USBSAS_MOCK_IN_DEV")?)?;
+
+        let usb_mass_storage = match MassStorage::from_opened_file(device_file) {
             Ok(ums) => ums,
             Err(err) => {
                 error!("Init mass storage error: {}, waiting end", err);
@@ -114,11 +147,7 @@ impl InitState {
         };
 
         #[cfg(not(feature = "mock"))]
-        usbsas_sandbox::dev2scsi::seccomp(
-            comm.input_fd(),
-            comm.output_fd(),
-            usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
-        )?;
+        usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), Some(device_fd))?;
 
         comm.opendev(proto::scsi::ResponseOpenDevice {
             block_size: u64::from(usb_mass_storage.block_size),

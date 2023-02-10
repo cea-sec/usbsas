@@ -7,4 +7,4 @@ license = "GPL-3.0"
 [dependencies]
 byteorder = "1.4"
 log = "0.4"
-rusb = "0.9"
+rusb = { git = "https://github.com/losynix/rusb", branch = "disable_device_discovery" }

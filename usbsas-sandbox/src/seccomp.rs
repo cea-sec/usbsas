@@ -1,6 +1,7 @@
 //! Seccomp helpers for usbsas processes.
 
 use crate::Result;
+use procfs::process::{FDTarget, Process};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Context, Syscall};
 
@@ -103,88 +104,86 @@ pub(crate) fn new_context_with_common_rules(
     Ok(ctx)
 }
 
-pub(crate) fn apply_libusb_rules(ctx: &mut Context, libusb_fds: crate::LibusbFds) -> Result<()> {
-    if let Some(device_fd) = libusb_fds.device {
-        // Allow close on device fd
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::close,
-            &[Comparator::new(0, Cmp::Eq, device_fd as u64, None)],
-        )?;
+pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<()> {
+    // Allow close on device fd
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::close,
+        &[Comparator::new(0, Cmp::Eq, device_fd as u64, None)],
+    )?;
 
-        // Allow some ioctls on device fd
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::ioctl,
-            &[
-                Comparator::new(0, Cmp::Eq, device_fd as u64, None),
-                Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_submiturb() }, None),
-            ],
-        )?;
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::ioctl,
-            &[
-                Comparator::new(0, Cmp::Eq, device_fd as u64, None),
-                Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_reapurbndelay() }, None),
-            ],
-        )?;
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::ioctl,
-            &[
-                Comparator::new(0, Cmp::Eq, device_fd as u64, None),
-                Comparator::new(
-                    1,
-                    Cmp::Eq,
-                    unsafe { crate::usbdevfs_releaseinterface() },
-                    None,
-                ),
-            ],
-        )?;
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::ioctl,
-            &[
-                Comparator::new(0, Cmp::Eq, device_fd as u64, None),
-                Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_ioctl() }, None),
-            ],
-        )?;
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::ioctl,
-            &[
-                Comparator::new(0, Cmp::Eq, device_fd as u64, None),
-                Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_discardurb() }, None),
-            ],
-        )?;
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::ioctl,
-            &[
-                Comparator::new(0, Cmp::Eq, device_fd as u64, None),
-                Comparator::new(
-                    1,
-                    Cmp::Eq,
-                    unsafe { crate::usbdevfs_get_capabilities() },
-                    None,
-                ),
-            ],
-        )?;
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::ioctl,
-            &[
-                Comparator::new(0, Cmp::Eq, device_fd as u64, None),
-                Comparator::new(
-                    1,
-                    Cmp::Eq,
-                    unsafe { crate::usbdevfs_disconnect_claim() },
-                    None,
-                ),
-            ],
-        )?;
-    }
+    // Allow some ioctls on device fd
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_submiturb() }, None),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_reapurbndelay() }, None),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                1,
+                Cmp::Eq,
+                unsafe { crate::usbdevfs_releaseinterface() },
+                None,
+            ),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_ioctl() }, None),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_discardurb() }, None),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                1,
+                Cmp::Eq,
+                unsafe { crate::usbdevfs_get_capabilities() },
+                None,
+            ),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                1,
+                Cmp::Eq,
+                unsafe { crate::usbdevfs_disconnect_claim() },
+                None,
+            ),
+        ],
+    )?;
 
     // XXX poll() takes as first arg an array of struct pollfd, can we use comparators for this ?
     #[cfg(not(target_arch = "aarch64"))]
@@ -192,8 +191,22 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, libusb_fds: crate::LibusbFds
     #[cfg(target_arch = "aarch64")]
     ctx.allow_syscall(Syscall::ppoll)?;
 
+    let mut event_fds = vec![];
+    let mut timer_fds = vec![];
+
+    for fd in Process::myself()?.fd()? {
+        let fd = fd?;
+        if let FDTarget::AnonInode(inode_type) = fd.target {
+            match inode_type.as_str() {
+                "[timerfd]" => timer_fds.push(fd.fd as RawFd),
+                "[eventfd]" => event_fds.push(fd.fd as RawFd),
+                _ => (),
+            }
+        };
+    }
+
     // Allow read, write & close on eventfds
-    for eventfd in libusb_fds.events {
+    for eventfd in event_fds {
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::read,
@@ -212,7 +225,7 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, libusb_fds: crate::LibusbFds
     }
 
     // Allow timerfd_settime and close on timerfds
-    for timerfd in libusb_fds.timers {
+    for timerfd in timer_fds {
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::timerfd_settime,

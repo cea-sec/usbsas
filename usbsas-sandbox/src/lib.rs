@@ -18,8 +18,6 @@ pub(crate) mod seccomp;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus,
 };
-use procfs::process::{FDTarget, Process};
-use std::{os::unix::io::RawFd, path::PathBuf};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -36,42 +34,6 @@ pub enum Error {
 type Result<T> = std::result::Result<T, Error>;
 
 const LLABI: landlock::ABI = landlock::ABI::V1;
-
-pub struct LibusbFds {
-    pub device: Option<RawFd>,
-    pub timers: Vec<RawFd>,
-    pub events: Vec<RawFd>,
-}
-
-// XXX Get those fds from rusb when possible
-#[cfg(not(feature = "mock"))]
-pub fn get_libusb_opened_fds(busnum: u32, devnum: u32) -> Result<LibusbFds> {
-    let mut dev_fd = None;
-    let mut event_fds = vec![];
-    let mut timer_fds = vec![];
-
-    for fd in Process::myself()?.fd()? {
-        let fd = fd?;
-        match fd.target {
-            FDTarget::Path(path) => {
-                if PathBuf::from(format!("/dev/bus/usb/{busnum:03}/{devnum:03}")) == path {
-                    dev_fd = Some(fd.fd as RawFd);
-                }
-            }
-            FDTarget::AnonInode(inode_type) => match inode_type.as_str() {
-                "[timerfd]" => timer_fds.push(fd.fd as RawFd),
-                "[eventfd]" => event_fds.push(fd.fd as RawFd),
-                _ => (),
-            },
-            _ => (),
-        }
-    }
-    Ok(LibusbFds {
-        device: dev_fd,
-        timers: timer_fds,
-        events: event_fds,
-    })
-}
 
 /* XXX: Functions returning constants we need and can't (yet) get from bindgen
  * because it cannot develop macro.

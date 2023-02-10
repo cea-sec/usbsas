@@ -9,5 +9,5 @@ license = "GPL-3.0"
 bitfield = "0.14"
 env_logger = "0.10"
 log = "0.4"
-rusb = "0.9"
+rusb = { git = "https://github.com/losynix/rusb", branch = "disable_device_discovery" }
 x11 = "2.21"

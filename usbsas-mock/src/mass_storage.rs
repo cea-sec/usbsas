@@ -1,7 +1,6 @@
 use positioned_io2::ReadAt;
 use std::{
-    env,
-    fs::{File, OpenOptions},
+    fs::File,
     io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
 };
 
@@ -13,39 +12,14 @@ pub struct MockMassStorage {
 }
 
 impl MockMassStorage {
-    fn new(busnum: u32, devnum: u32) -> Result<Self, io::Error> {
-        let fakedev =
-            match (busnum, devnum) {
-                (1, 1) => OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(env::var("USBSAS_MOCK_IN_DEV").map_err(|err| {
-                        io::Error::new(ErrorKind::InvalidInput, format!("{err}"))
-                    })?)?,
-                (1, 2) => OpenOptions::new()
-                    .read(false)
-                    .write(true)
-                    .open(env::var("USBSAS_MOCK_OUT_DEV").map_err(|err| {
-                        io::Error::new(ErrorKind::InvalidInput, format!("{err}"))
-                    })?)?,
-                _ => {
-                    return Err(io::Error::new(
-                        ErrorKind::InvalidInput,
-                        "Unsupported fake device",
-                    ))
-                }
-            };
-        let dev_size = fakedev.metadata()?.len();
+    pub fn from_opened_file(file: File) -> Result<Self, io::Error> {
+        let dev_size = file.metadata()?.len();
         Ok(MockMassStorage {
-            fakedev,
+            fakedev: file,
             block_size: 512,
             dev_size,
             pos: 0,
         })
-    }
-
-    pub fn from_busnum_devnum(busnum: u32, devnum: u32) -> Result<Self, io::Error> {
-        MockMassStorage::new(busnum, devnum)
     }
 
     pub fn read_sectors(

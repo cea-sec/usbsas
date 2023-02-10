@@ -10,9 +10,8 @@ use usbsas_comm::{protorequest, Comm};
 use usbsas_proto as proto;
 #[cfg(not(feature = "mock"))]
 use {
-    log::{debug, error, trace},
     rusb::{Direction, GlobalContext, TransferType, UsbContext},
-    std::time::Duration,
+    std::{fs::File, os::unix::io::AsRawFd, time::Duration},
     usbsas_scsi::ScsiUsb,
 };
 
@@ -51,11 +50,12 @@ pub struct MassStorage {
     pub block_size: u32,
     pub dev_size: u64,
     pub pos: u64,
+    _inner: Option<File>,
 }
 
 #[cfg(not(feature = "mock"))]
 impl MassStorage {
-    fn new(scsiusb: ScsiUsb<GlobalContext>) -> Result<Self> {
+    fn new(scsiusb: ScsiUsb<GlobalContext>, file: Option<File>) -> Result<Self> {
         let mut scsiusb = scsiusb;
         let (max_lba, block_size, dev_size) = scsiusb.init_mass_storage()?;
         // TODO: support more sector size
@@ -66,62 +66,51 @@ impl MassStorage {
             block_size,
             dev_size,
             pos: 0,
+            _inner: file,
         })
     }
 
-    pub fn from_busnum_devnum(busnum: u32, devnum: u32) -> Result<Self> {
-        trace!("find_and_init_dev {} {}", busnum, devnum);
-
+    pub fn from_opened_file(file: File) -> Result<Self> {
+        rusb::disable_device_discovery()?;
         assert!(rusb::supports_detach_kernel_driver());
 
         let context = rusb::GlobalContext::default();
-        let libusb_devlist = context.devices()?;
-
-        for device in libusb_devlist.iter() {
-            if device.bus_number() != busnum as u8 || device.address() != devnum as u8 {
-                continue;
-            }
-            debug!("Found matching {{bus,dev}}num device");
-            let mut handle = device.open()?;
-            let mut endpoints: [Option<u8>; 2] = [None; 2];
-            for interface in device.active_config_descriptor()?.interfaces() {
-                for desc in interface.descriptors() {
-                    if desc.class_code() == LibusbClassCode::MassStorage as u8
-                        && (desc.sub_class_code() == 0x01 || desc.sub_class_code() == 0x06)
-                        && desc.protocol_code() == 0x50
-                    {
-                        for endp in desc.endpoint_descriptors() {
-                            if endp.transfer_type() == TransferType::Bulk {
-                                if endp.direction() == Direction::In {
-                                    endpoints[0] = Some(endp.address());
-                                }
-                                if endp.direction() == Direction::Out {
-                                    endpoints[1] = Some(endp.address());
-                                }
+        let mut handle = unsafe { context.open_device_with_fd(file.as_raw_fd())? };
+        let mut endpoints: [Option<u8>; 2] = [None; 2];
+        for interface in handle.device().active_config_descriptor()?.interfaces() {
+            for desc in interface.descriptors() {
+                if desc.class_code() == LibusbClassCode::MassStorage as u8
+                    && (desc.sub_class_code() == 0x01 || desc.sub_class_code() == 0x06)
+                    && desc.protocol_code() == 0x50
+                {
+                    for endp in desc.endpoint_descriptors() {
+                        if endp.transfer_type() == TransferType::Bulk {
+                            if endp.direction() == Direction::In {
+                                endpoints[0] = Some(endp.address());
+                            }
+                            if endp.direction() == Direction::Out {
+                                endpoints[1] = Some(endp.address());
                             }
                         }
+                    }
 
-                        if let [Some(ep0), Some(ep1)] = endpoints {
-                            handle.set_auto_detach_kernel_driver(true)?;
-                            handle.claim_interface(interface.number())?;
-                            let scsiusb = ScsiUsb::new(
-                                handle,
-                                interface.number(),
-                                desc.setting_number(),
-                                ep0,
-                                ep1,
-                                Duration::from_secs(5),
-                            );
-                            return MassStorage::new(scsiusb);
-                        }
+                    if let [Some(ep0), Some(ep1)] = endpoints {
+                        handle.set_auto_detach_kernel_driver(true)?;
+                        handle.claim_interface(interface.number())?;
+                        let scsiusb = ScsiUsb::new(
+                            handle,
+                            interface.number(),
+                            desc.setting_number(),
+                            ep0,
+                            ep1,
+                            Duration::from_secs(5),
+                        );
+                        return MassStorage::new(scsiusb, Some(file));
                     }
                 }
             }
         }
-        Err(Error::Error(format!(
-            "couldn't find device {}-{}",
-            busnum, devnum
-        )))
+        Err(Error::Error("Couldn't init libusb with opened file".into()))
     }
 
     pub fn read_sectors(&mut self, offset: u64, count: u64, block_size: usize) -> Result<Vec<u8>> {

@@ -9,6 +9,7 @@ use std::{
     collections::HashMap,
     env,
     io::{Error, ErrorKind},
+    os::unix::io::AsRawFd,
     ptr::null_mut,
     time::Duration,
 };
@@ -29,6 +30,7 @@ pub struct UsbDevice {
     pub interface: u8,
     pub ep_in: u8,
     pub ep_in_size: u16,
+    _dev_file: std::fs::File,
 }
 
 impl UsbDevice {
@@ -37,12 +39,14 @@ impl UsbDevice {
         interface: u8,
         ep_in: u8,
         ep_in_size: u16,
+        dev_file: std::fs::File,
     ) -> UsbDevice {
         UsbDevice {
             handle,
             interface,
             ep_in,
             ep_in_size,
+            _dev_file: dev_file,
         }
     }
 }
@@ -58,47 +62,50 @@ bitfield::bitfield! {
 }
 
 fn open_device(busnum: u8, devnum: u8) -> Result<UsbDevice, rusb::Error> {
+    rusb::disable_device_discovery()?;
     let libusb_ctx = Context::new()?;
-    log::trace!("find_and_init_dev");
-    let libusb_devlist = libusb_ctx.devices()?;
 
-    for device in libusb_devlist.iter() {
-        if device.bus_number() != busnum || device.address() != devnum {
-            continue;
-        }
-        let mut handle = match device.open() {
-            Err(_) => {
-                continue;
-            }
-            Ok(handle) => handle,
-        };
-        for interface in device.active_config_descriptor()?.interfaces() {
-            for desc in interface.descriptors() {
-                if desc.class_code() == LibusbClassCode::Hid as u8
-                /*
-                && (desc.sub_class_code() == 0x01)
-                && desc.protocol_code() == 0x2 // Mouse*/
-                {
-                    for endp in desc.endpoint_descriptors() {
-                        if endp.transfer_type() == TransferType::Interrupt
-                            && endp.direction() == Direction::In
-                        {
-                            handle.set_auto_detach_kernel_driver(true)?;
-                            handle.claim_interface(interface.number())?;
-                            log::debug!(
-                                "Found interface: {} endpoint {:x}",
-                                interface.number(),
-                                endp.address()
-                            );
+    log::trace!("init dev {} {}", busnum, devnum);
 
-                            let result = UsbDevice::new(
-                                handle,
-                                interface.number(),
-                                endp.address(),
-                                endp.max_packet_size(),
-                            );
-                            return Ok(result);
-                        }
+    let device_path = format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum);
+    let dev_file = match std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(device_path)
+    {
+        Ok(file) => file,
+        Err(_) => return Err(rusb::Error::NotFound),
+    };
+
+    let mut handle = unsafe { libusb_ctx.open_device_with_fd(dev_file.as_raw_fd())? };
+
+    for interface in handle.device().active_config_descriptor()?.interfaces() {
+        for desc in interface.descriptors() {
+            if desc.class_code() == LibusbClassCode::Hid as u8
+            /*
+            && (desc.sub_class_code() == 0x01)
+            && desc.protocol_code() == 0x2 // Mouse*/
+            {
+                for endp in desc.endpoint_descriptors() {
+                    if endp.transfer_type() == TransferType::Interrupt
+                        && endp.direction() == Direction::In
+                    {
+                        handle.set_auto_detach_kernel_driver(true)?;
+                        handle.claim_interface(interface.number())?;
+                        log::debug!(
+                            "Found interface: {} endpoint {:x}",
+                            interface.number(),
+                            endp.address()
+                        );
+
+                        let result = UsbDevice::new(
+                            handle,
+                            interface.number(),
+                            endp.address(),
+                            endp.max_packet_size(),
+                            dev_file,
+                        );
+                        return Ok(result);
                     }
                 }
             }
