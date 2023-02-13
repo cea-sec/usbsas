@@ -227,7 +227,9 @@ descriptor
 ### uploader
 
 This process uploads the tar containing files from the input device on a remote
-server.
+server. It is done with a HTTP POST request to the URL specified in the
+configuration file, to which is added the identification string (e.g.
+`http///127.0.0.1/api/uploadbundle/{ID}`)
 
 It supports Kerberos mutual authentication if compiled with the `authkrb`
 feature (enabled by default) and a service name is present in the configuration
