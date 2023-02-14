@@ -13,6 +13,6 @@ tar = "0.4"
 thiserror = "1.0"
 uname = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
-usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-proto = { path = "../usbsas-proto" }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }

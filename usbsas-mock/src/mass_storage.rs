@@ -1,58 +1,25 @@
 use positioned_io2::ReadAt;
 use std::{
-    env,
-    fs::{File, OpenOptions},
+    fs::File,
     io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
-    marker::PhantomData,
 };
 
-pub trait MockUsbContext {}
-pub struct MockContext {}
-impl MockUsbContext for MockContext {}
-
-pub struct MockMassStorage<T> {
+pub struct MockMassStorage {
     fakedev: File,
     pub block_size: u32,
     pub dev_size: u64,
     pub pos: u64,
-    ctx: PhantomData<T>,
 }
 
-impl<T> MockMassStorage<T> {
-    fn new(_: T, busnum: u32, devnum: u32) -> Result<Self, io::Error> {
-        let fakedev =
-            match (busnum, devnum) {
-                (1, 1) => OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(env::var("USBSAS_MOCK_IN_DEV").map_err(|err| {
-                        io::Error::new(ErrorKind::InvalidInput, format!("{err}"))
-                    })?)?,
-                (1, 2) => OpenOptions::new()
-                    .read(false)
-                    .write(true)
-                    .open(env::var("USBSAS_MOCK_OUT_DEV").map_err(|err| {
-                        io::Error::new(ErrorKind::InvalidInput, format!("{err}"))
-                    })?)?,
-                _ => {
-                    return Err(io::Error::new(
-                        ErrorKind::InvalidInput,
-                        "Unsupported fake device",
-                    ))
-                }
-            };
-        let dev_size = fakedev.metadata()?.len();
+impl MockMassStorage {
+    pub fn from_opened_file(file: File) -> Result<Self, io::Error> {
+        let dev_size = file.metadata()?.len();
         Ok(MockMassStorage {
-            fakedev,
+            fakedev: file,
             block_size: 512,
             dev_size,
             pos: 0,
-            ctx: PhantomData,
         })
-    }
-
-    pub fn from_busnum_devnum(libusb_ctx: T, busnum: u32, devnum: u32) -> Result<Self, io::Error> {
-        MockMassStorage::new(libusb_ctx, busnum, devnum)
     }
 
     pub fn read_sectors(
@@ -81,7 +48,7 @@ impl<T> MockMassStorage<T> {
     }
 }
 
-impl<T> Read for MockMassStorage<T> {
+impl Read for MockMassStorage {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.pos % (self.block_size as u64) != 0 {
             return Err(io::Error::new(
@@ -107,7 +74,7 @@ impl<T> Read for MockMassStorage<T> {
     }
 }
 
-impl<T> Seek for MockMassStorage<T> {
+impl Seek for MockMassStorage {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         match pos {
             SeekFrom::Start(pos) => {
@@ -119,7 +86,7 @@ impl<T> Seek for MockMassStorage<T> {
     }
 }
 
-impl<T> ReadAt for MockMassStorage<T> {
+impl ReadAt for MockMassStorage {
     fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
         if self.pos % (self.block_size as u64) != 0 {
             return Err(io::Error::new(

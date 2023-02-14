@@ -6,7 +6,7 @@ pub fn seccomp(
     fd_read: RawFd,
     fd_write: RawFd,
     out_fs_fd: Option<RawFd>,
-    libusb_fds: crate::LibusbFds,
+    device_fd: Option<RawFd>,
 ) -> Result<()> {
     let mut fds_read = vec![fd_read];
     if let Some(fd) = out_fs_fd {
@@ -26,7 +26,9 @@ pub fn seccomp(
         )?;
     }
 
-    seccomp::apply_libusb_rules(&mut ctx, libusb_fds)?;
+    if let Some(fd) = device_fd {
+        seccomp::apply_libusb_rules(&mut ctx, fd)?;
+    }
 
     ctx.load()?;
 

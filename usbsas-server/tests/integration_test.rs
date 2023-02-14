@@ -19,7 +19,7 @@ use {
 struct IntegrationTester {
     api: String,
     client: Client,
-    mock_input_dev: String,
+    _mock_input_dev: String,
     mock_output_dev: String,
     working_dir: String,
     usbsas_server: Child,
@@ -126,7 +126,7 @@ impl IntegrationTester {
         IntegrationTester {
             api: "http://localhost:8080/".into(),
             client,
-            mock_input_dev,
+            _mock_input_dev: mock_input_dev,
             mock_output_dev,
             working_dir,
             usbsas_server,
@@ -370,9 +370,9 @@ impl IntegrationTester {
             .json()?;
 
         // Find input dev (first USB)
-        let input_dev = devices
+        let device = devices
             .iter()
-            .find(|dev| dev.dev_type == appstate::DevType::Usb)
+            .find(|dev| dev.dev_type == appstate::DevType::Usb && dev.is_dst)
             .unwrap();
 
         // Wipe dev
@@ -382,7 +382,7 @@ impl IntegrationTester {
                 "{}{}/{}/{}/{}",
                 self.api,
                 "wipe",
-                input_dev.id,
+                device.id,
                 fsfmt,
                 if quick { "true" } else { "false" }
             ))
@@ -396,7 +396,7 @@ impl IntegrationTester {
             let status: StatusJson = serde_json::from_str(line).unwrap();
             if status.status == *"wipe_end" {
                 let sha1sum_cmd = Command::new("sha1sum")
-                    .args(&[self.mock_input_dev.clone()])
+                    .args(&[self.mock_output_dev.clone()])
                     .output()
                     .expect("failed to execute sha1sum");
                 let sha1sum = String::from_utf8(sha1sum_cmd.stdout).unwrap();
@@ -585,7 +585,7 @@ fn integration_test() {
 
     // Test quick wipe & mkfs fat32
     tester
-        .wipe("fat32", true, "b127d51b0988cf50dca2fc403d646cc94cd3f23d")
+        .wipe("fat32", true, "76fec4a87ce5a5e0157afc91fd603b272402629f")
         .expect("wipe failed");
     tester.reset();
 

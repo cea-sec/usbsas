@@ -5,15 +5,26 @@ use std::{
     io::{self, ErrorKind, Read, Seek, SeekFrom},
     sync::{Arc, RwLock},
 };
+use thiserror::Error;
 use usbsas_comm::{protorequest, Comm};
 use usbsas_proto as proto;
 #[cfg(not(feature = "mock"))]
 use {
-    log::{debug, error, trace},
-    rusb::{Direction, TransferType, UsbContext},
-    std::time::Duration,
+    rusb::{Direction, GlobalContext, TransferType, UsbContext},
+    std::{fs::File, os::unix::io::AsRawFd, time::Duration},
     usbsas_scsi::ScsiUsb,
 };
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("io error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("rusb error: {0}")]
+    Rusb(#[from] rusb::Error),
+    #[error("{0}")]
+    Error(String),
+}
+pub type Result<T> = std::result::Result<T, Error>;
 
 protorequest!(
     CommScsi,
@@ -33,27 +44,20 @@ enum LibusbClassCode {
 
 // Mass storage struct used by dev2scsi
 #[cfg(not(feature = "mock"))]
-pub struct MassStorage<T: UsbContext> {
-    scsiusb: RwLock<ScsiUsb<T>>,
+pub struct MassStorage {
+    scsiusb: RwLock<ScsiUsb<GlobalContext>>,
     pub max_lba: u32,
     pub block_size: u32,
     pub dev_size: u64,
     pub pos: u64,
+    _inner: Option<File>,
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> MassStorage<T> {
-    fn new(scsiusb: ScsiUsb<T>) -> Result<Self, io::Error> {
+impl MassStorage {
+    fn new(scsiusb: ScsiUsb<GlobalContext>, file: Option<File>) -> Result<Self> {
         let mut scsiusb = scsiusb;
-        let (max_lba, block_size, dev_size) = match scsiusb.init_mass_storage() {
-            Ok(result) => result,
-            Err(e) => {
-                return Err(io::Error::new(
-                    ErrorKind::Other,
-                    format!("Cannot init mass storage: {e}"),
-                ));
-            }
-        };
+        let (max_lba, block_size, dev_size) = scsiusb.init_mass_storage()?;
         // TODO: support more sector size
         assert!(vec![0x200, 0x800, 0x1000].contains(&block_size));
         Ok(MassStorage {
@@ -62,86 +66,62 @@ impl<T: UsbContext> MassStorage<T> {
             block_size,
             dev_size,
             pos: 0,
+            _inner: file,
         })
     }
 
-    pub fn from_busnum_devnum(
-        libusb_ctx: T,
-        busnum: u32,
-        devnum: u32,
-    ) -> Result<Self, rusb::Error> {
-        trace!("find_and_init_dev");
-        let libusb_devlist = libusb_ctx.devices()?;
+    pub fn from_opened_file(file: File) -> Result<Self> {
+        rusb::disable_device_discovery()?;
+        assert!(rusb::supports_detach_kernel_driver());
 
-        for device in libusb_devlist.iter() {
-            if device.bus_number() != busnum as u8 || device.address() != devnum as u8 {
-                continue;
-            }
-            debug!("Found matching {{bus,dev}}num device");
-            let mut handle = device.open()?;
-            let mut endpoints: [Option<u8>; 2] = [None; 2];
-            for interface in device.active_config_descriptor()?.interfaces() {
-                for desc in interface.descriptors() {
-                    if desc.class_code() == LibusbClassCode::MassStorage as u8
-                        && (desc.sub_class_code() == 0x01 || desc.sub_class_code() == 0x06)
-                        && desc.protocol_code() == 0x50
-                    {
-                        for endp in desc.endpoint_descriptors() {
-                            if endp.transfer_type() == TransferType::Bulk {
-                                if endp.direction() == Direction::In {
-                                    endpoints[0] = Some(endp.address());
-                                }
-                                if endp.direction() == Direction::Out {
-                                    endpoints[1] = Some(endp.address());
-                                }
+        let context = rusb::GlobalContext::default();
+        let mut handle = unsafe { context.open_device_with_fd(file.as_raw_fd())? };
+        let mut endpoints: [Option<u8>; 2] = [None; 2];
+        for interface in handle.device().active_config_descriptor()?.interfaces() {
+            for desc in interface.descriptors() {
+                if desc.class_code() == LibusbClassCode::MassStorage as u8
+                    && (desc.sub_class_code() == 0x01 || desc.sub_class_code() == 0x06)
+                    && desc.protocol_code() == 0x50
+                {
+                    for endp in desc.endpoint_descriptors() {
+                        if endp.transfer_type() == TransferType::Bulk {
+                            if endp.direction() == Direction::In {
+                                endpoints[0] = Some(endp.address());
+                            }
+                            if endp.direction() == Direction::Out {
+                                endpoints[1] = Some(endp.address());
                             }
                         }
+                    }
 
-                        if let [Some(ep0), Some(ep1)] = endpoints {
-                            handle.set_auto_detach_kernel_driver(true)?;
-                            handle.claim_interface(interface.number())?;
-                            let scsiusb: ScsiUsb<T> = ScsiUsb::new(
-                                handle,
-                                interface.number(),
-                                desc.setting_number(),
-                                ep0,
-                                ep1,
-                                Duration::from_secs(5),
-                            );
-                            return MassStorage::new(scsiusb).map_err(|err| {
-                                error!("MassStorage init err: {}", err);
-                                rusb::Error::NotFound
-                            });
-                        }
+                    if let [Some(ep0), Some(ep1)] = endpoints {
+                        handle.set_auto_detach_kernel_driver(true)?;
+                        handle.claim_interface(interface.number())?;
+                        let scsiusb = ScsiUsb::new(
+                            handle,
+                            interface.number(),
+                            desc.setting_number(),
+                            ep0,
+                            ep1,
+                            Duration::from_secs(5),
+                        );
+                        return MassStorage::new(scsiusb, Some(file));
                     }
                 }
             }
         }
-        error!(
-            "Couldn't find device with busnum: {} / devnum: {}",
-            busnum, devnum
-        );
-        Err(rusb::Error::NotFound)
+        Err(Error::Error("Couldn't init libusb with opened file".into()))
     }
 
-    pub fn read_sectors(
-        &mut self,
-        offset: u64,
-        count: u64,
-        block_size: usize,
-    ) -> Result<Vec<u8>, io::Error> {
-        self.scsiusb
+    pub fn read_sectors(&mut self, offset: u64, count: u64, block_size: usize) -> Result<Vec<u8>> {
+        Ok(self
+            .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
-            .read_sectors(offset, count, block_size)
+            .map_err(|err| Error::Error(format!("write lock error: {}", err)))?
+            .read_sectors(offset, count, block_size)?)
     }
 
-    pub fn scsi_write_10(
-        &mut self,
-        buffer: &mut [u8],
-        offset: u64,
-        count: u64,
-    ) -> Result<u8, io::Error> {
+    pub fn scsi_write_10(&mut self, buffer: &mut [u8], offset: u64, count: u64) -> Result<u8> {
         let ret = self
             .scsiusb
             .write()
@@ -158,17 +138,14 @@ impl<T: UsbContext> MassStorage<T> {
             .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
             .scsi_read_10(&mut buf_check, offset + count - 1, 1)?;
         if buf_check != buffer[(buffer.len() - buf_check.len())..] {
-            return Err(io::Error::new(
-                ErrorKind::InvalidData,
-                "Couldn't verify write(10)",
-            ));
+            return Err(Error::Error("write check failed".into()));
         }
         Ok(ret)
     }
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> Read for MassStorage<T> {
+impl Read for MassStorage {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.pos % (self.block_size as u64) != 0 {
             return Err(io::Error::new(
@@ -199,7 +176,7 @@ impl<T: UsbContext> Read for MassStorage<T> {
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> Seek for MassStorage<T> {
+impl Seek for MassStorage {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         match pos {
             SeekFrom::Start(pos) => {
@@ -214,7 +191,7 @@ impl<T: UsbContext> Seek for MassStorage<T> {
 }
 
 #[cfg(not(feature = "mock"))]
-impl<T: UsbContext> ReadAt for MassStorage<T> {
+impl ReadAt for MassStorage {
     fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
         self.read_exact_at(pos, buf)?;
         Ok(buf.len())
@@ -291,15 +268,13 @@ impl MassStorageComm {
         }
     }
 
-    pub fn comm(
-        &self,
-    ) -> Result<std::sync::RwLockWriteGuard<'_, Comm<proto::scsi::Request>>, io::Error> {
+    pub fn comm(&self) -> Result<std::sync::RwLockWriteGuard<'_, Comm<proto::scsi::Request>>> {
         self.comm
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {err}")))
+            .map_err(|err| Error::Error(format!("comm lock error: {err}")))
     }
 
-    pub fn read_sectors(&self, offset: u64, count: u64) -> Result<Vec<u8>, io::Error> {
+    pub fn read_sectors(&self, offset: u64, count: u64) -> io::Result<Vec<u8>> {
         // Don't cache data if we're reading a lot of sectors,
         // it's probably a file (only read once) and not FS stuff
         if count <= MAX_SECTORS_COUNT_CACHE {

@@ -4,30 +4,39 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
-#[cfg(not(feature = "mock"))]
-use rusb::UsbContext;
 use std::{convert::TryFrom, io::prelude::*, str};
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
-#[cfg(not(feature = "mock"))]
-use usbsas_mass_storage::{self, MassStorage};
-#[cfg(feature = "mock")]
-use usbsas_mock::mass_storage::{MockMassStorage as MassStorage, MockUsbContext as UsbContext};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
+#[cfg(not(feature = "mock"))]
+use {
+    std::os::unix::io::AsRawFd,
+    usbsas_mass_storage::{self, MassStorage},
+};
+#[cfg(feature = "mock")]
+use {
+    std::{env, fs::OpenOptions},
+    usbsas_mock::mass_storage::MockMassStorage as MassStorage,
+};
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
+    #[error("{0}")]
+    Error(String),
     #[error("int error: {0}")]
     Tryfromint(#[from] std::num::TryFromIntError),
-    #[error("rusb error: {0}")]
-    Rusb(#[from] rusb::Error),
-    #[error("sandbox: {0}")]
+    #[error("sandbox error: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("partition error: {0}")]
     Partition(String),
+    #[cfg(not(feature = "mock"))]
+    #[error("mass storage: {0}")]
+    MassStorage(#[from] usbsas_mass_storage::Error),
+    #[error("var error: {0}")]
+    VarError(#[from] std::env::VarError),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -49,15 +58,15 @@ protoresponse!(
 const MAX_LEN_PART_HEADER: u64 = 0x464;
 const MAX_LEN_ISO_HEADER: u64 = 0x8806;
 
-enum State<T: UsbContext> {
-    Init(InitState<T>),
-    DevOpened(DevOpenedState<T>),
-    PartitionsListed(PartitionsListedState<T>),
+enum State {
+    Init(InitState),
+    DevOpened(DevOpenedState),
+    PartitionsListed(PartitionsListedState),
     WaitEnd(WaitEndState),
     End,
 }
 
-impl<T: UsbContext> State<T> {
+impl State {
     fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
@@ -69,22 +78,20 @@ impl<T: UsbContext> State<T> {
     }
 }
 
-struct InitState<T: UsbContext> {
-    context: T,
+struct InitState {}
+
+struct DevOpenedState {
+    usb_mass_storage: MassStorage,
 }
 
-struct DevOpenedState<T: UsbContext> {
-    usb_mass_storage: MassStorage<T>,
-}
-
-struct PartitionsListedState<T: UsbContext> {
-    usb_mass_storage: MassStorage<T>,
+struct PartitionsListedState {
+    usb_mass_storage: MassStorage,
 }
 
 struct WaitEndState {}
 
-impl<T: UsbContext> InitState<T> {
-    fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<State<T>> {
+impl InitState {
+    fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
         let mut buf = vec![0u8; 8];
         comm.read_exact(&mut buf)?;
 
@@ -93,19 +100,42 @@ impl<T: UsbContext> InitState<T> {
 
         debug!("unlocked, busnum: {} devnum: {}", busnum, devnum);
 
-        // If the process is unlock with 0-0, usbsas is resetting, go directly
-        // to the EndState
+        // If the process is unlocked with 0-0, usbsas is resetting, go directly to the EndState
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
-            usbsas_sandbox::dev2scsi::seccomp(
-                comm.input_fd(),
-                comm.output_fd(),
-                usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
-            )?;
+            usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), None)?;
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
-        let usb_mass_storage = match MassStorage::from_busnum_devnum(self.context, busnum, devnum) {
+        #[cfg(not(feature = "mock"))]
+        let (device_file, device_fd) = {
+            let device_path = format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum);
+            match std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(device_path)
+            {
+                Ok(file) => {
+                    let file_fd = file.as_raw_fd();
+                    (file, file_fd)
+                }
+                Err(err) => {
+                    error!("Error opening device file: {}", err);
+                    comm.error(proto::scsi::ResponseError {
+                        err: format!("{err}"),
+                    })?;
+                    return Ok(State::WaitEnd(WaitEndState {}));
+                }
+            }
+        };
+
+        #[cfg(feature = "mock")]
+        let device_file = OpenOptions::new()
+            .read(true)
+            .write(false)
+            .open(env::var("USBSAS_MOCK_IN_DEV")?)?;
+
+        let usb_mass_storage = match MassStorage::from_opened_file(device_file) {
             Ok(ums) => ums,
             Err(err) => {
                 error!("Init mass storage error: {}, waiting end", err);
@@ -117,11 +147,7 @@ impl<T: UsbContext> InitState<T> {
         };
 
         #[cfg(not(feature = "mock"))]
-        usbsas_sandbox::dev2scsi::seccomp(
-            comm.input_fd(),
-            comm.output_fd(),
-            usbsas_sandbox::get_libusb_opened_fds(busnum, devnum)?,
-        )?;
+        usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), Some(device_fd))?;
 
         comm.opendev(proto::scsi::ResponseOpenDevice {
             block_size: u64::from(usb_mass_storage.block_size),
@@ -132,8 +158,8 @@ impl<T: UsbContext> InitState<T> {
     }
 }
 
-impl<T: UsbContext> DevOpenedState<T> {
-    fn run(mut self, comm: &mut Comm<proto::scsi::Request>) -> Result<State<T>> {
+impl DevOpenedState {
+    fn run(mut self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
         loop {
             let req: proto::scsi::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
@@ -357,8 +383,8 @@ impl<T: UsbContext> DevOpenedState<T> {
     }
 }
 
-impl<T: UsbContext> PartitionsListedState<T> {
-    fn run(mut self, comm: &mut Comm<proto::scsi::Request>) -> Result<State<T>> {
+impl PartitionsListedState {
+    fn run(mut self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
         loop {
             let req: proto::scsi::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
@@ -392,7 +418,7 @@ impl<T: UsbContext> PartitionsListedState<T> {
 }
 
 impl WaitEndState {
-    fn run<T: UsbContext>(self, comm: &mut Comm<proto::scsi::Request>) -> Result<State<T>> {
+    fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
         trace!("wait end state");
         let req: proto::scsi::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
@@ -410,14 +436,14 @@ impl WaitEndState {
     }
 }
 
-pub struct Dev2Scsi<T: UsbContext> {
+pub struct Dev2Scsi {
     comm: Comm<proto::scsi::Request>,
-    state: State<T>,
+    state: State,
 }
 
-impl<T: UsbContext> Dev2Scsi<T> {
-    pub fn new(comm: Comm<proto::scsi::Request>, context: T) -> Result<Self> {
-        let state = State::Init(InitState { context });
+impl Dev2Scsi {
+    pub fn new(comm: Comm<proto::scsi::Request>) -> Result<Self> {
+        let state = State::Init(InitState {});
         Ok(Dev2Scsi { comm, state })
     }
 

@@ -8,14 +8,7 @@ fn main() -> usbsas_fs2dev::Result<()> {
     let fs_path = matches.get_one::<String>("fs_path").unwrap().to_owned();
 
     log::info!("start ({}): {}", std::process::id(), fs_path);
-    usbsas_fs2dev::Fs2Dev::new(
-        usbsas_comm::Comm::from_env()?,
-        fs_path,
-        #[cfg(not(feature = "mock"))]
-        rusb::Context::new()?,
-        #[cfg(feature = "mock")]
-        usbsas_mock::mass_storage::MockContext {},
-    )?
-    .main_loop()
-    .map(|_| log::debug!("exit"))
+    usbsas_fs2dev::Fs2Dev::new(usbsas_comm::Comm::from_env()?, fs_path)?
+        .main_loop()
+        .map(|_| log::debug!("exit"))
 }
