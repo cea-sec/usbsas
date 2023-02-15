@@ -34,7 +34,7 @@ $ export USBSAS_BIN_PATH="/usr/libexec"
 
 ### usbsas-core
 ```shell
-$ sudo apt install -y --no-install-recommends libssl-dev libkrb5-dev libseccomp-dev libusb-1.0-0-dev protobuf-compiler
+$ sudo apt install -y --no-install-recommends libssl-dev libkrb5-dev libseccomp-dev libudev-dev libusb-1.0-0-dev protobuf-compiler
 $ cargo build --release
 $ cargo-deb --manifest-path=usbsas-usbsas/Cargo.toml --no-build
 ```

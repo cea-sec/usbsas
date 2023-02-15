@@ -15,7 +15,7 @@ Debian specific instructions.
 Most dependencies are managed by `cargo` but before building usbsas, the
 following packages must also be installed (the names may change depending on the
 Linux distribution): `rust`, `cargo`, `pkgconf`, `clang`, `cmake`, `protobuf`,
-`libseccomp`, `libusb`, `libkrb5 `.
+`libseccomp`, `libusb`, `libudev`, `libkrb5 `.
 
 Optional dependencies to build the analyzer-server, the tools and the HID
 manager: `libclamav`, `libdbus`, `libxtst`, `libx11`, `libfuse`
