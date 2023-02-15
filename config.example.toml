@@ -57,7 +57,7 @@ longdescr = "Save out tar in /usbsas_data/"
 command_bin = "/bin/cp"
 command_args = [
     "%SOURCE_FILE%",
-    "/usbsas_data/",
+    "/usbsas_data/"
 ]
 
 
@@ -75,7 +75,7 @@ url = "http://127.0.0.1:8042/api/scanbundle"
 #description = "Archive transfer"
 #command_bin = "/bin/cp"
 #command_args = [
-#	"%SOURCE_FILE%"
+#	"%SOURCE_FILE%",
 #	"/usbsas_archive/"
 #]
 
