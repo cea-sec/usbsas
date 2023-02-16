@@ -10,4 +10,5 @@ bitfield = "0.14"
 env_logger = "0.10"
 log = "0.4"
 rusb = { git = "https://github.com/losynix/rusb", branch = "disable_device_discovery", features = ["vendored"] }
+usbsas-sandbox = { path = "../../usbsas-sandbox" }
 x11 = "2.21"

@@ -6,6 +6,7 @@ pub mod files2tar;
 pub mod filter;
 pub mod fs2dev;
 pub mod fswriter;
+pub mod hiduser;
 pub mod identificator;
 pub mod imager;
 pub mod scsi2files;
