@@ -12,7 +12,6 @@ use usbsas_comm::{protorequest, Comm};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
-use usbsas_proto::common::Device;
 use usbsas_utils::READ_FILE_MAX_SIZE;
 
 #[derive(Error, Debug)]
@@ -31,13 +30,6 @@ enum Error {
     Process(#[from] usbsas_process::Error),
 }
 type Result<T> = std::result::Result<T, Error>;
-
-protorequest!(
-    CommUsbdev,
-    usbdev,
-    devices = Devices[RequestDevices, ResponseDevices],
-    end = End[RequestEnd, ResponseEnd]
-);
 
 protorequest!(
     CommScsi,
@@ -62,28 +54,19 @@ protorequest!(
     end = End[RequestEnd, ResponseEnd]
 );
 
-struct BusDevNum {
+struct Imager {
+    dev2scsi: UsbsasChild<proto::scsi::Request>,
+    writer: Box<dyn Write>,
     busnum: u32,
     devnum: u32,
 }
 
-struct Imager {
-    usbdev: Option<UsbsasChild<proto::usbdev::Request>>,
-    dev2scsi: UsbsasChild<proto::scsi::Request>,
-    writer: Box<dyn Write>,
-    busdevnum: Option<BusDevNum>,
-}
-
 impl Imager {
-    fn new(
-        config_path: &str,
-        out_file: Option<fs::File>,
-        busdevnum: Option<BusDevNum>,
-    ) -> Result<Self> {
+    fn new(out_file: Option<fs::File>, busnum: u32, devnum: u32) -> Result<Self> {
         let mut pipes_read = vec![];
         let mut pipes_write = vec![];
 
-        log::debug!("Starting usbsas children");
+        log::debug!("spawn dev2scsi ");
         let dev2scsi = UsbsasChildSpawner::new("usbsas-dev2scsi")
             .wait_on_startup()
             .spawn::<proto::scsi::Request>()?;
@@ -98,107 +81,19 @@ impl Imager {
             Box::new(io::stdout())
         };
 
-        // If busnum and devnum were not specified we need usbdev to select the device
-        let usbdev = if busdevnum.is_none() {
-            let usbdev = UsbsasChildSpawner::new("usbsas-usbdev")
-                .arg(config_path)
-                .spawn::<proto::usbdev::Request>()?;
-            pipes_read.push(usbdev.comm.input_fd());
-            pipes_write.push(usbdev.comm.output_fd());
-            Some(usbdev)
-        } else {
-            None
-        };
-
         usbsas_sandbox::imager::seccomp(pipes_read, pipes_write)?;
 
         Ok(Imager {
-            usbdev,
             dev2scsi,
             writer,
-            busdevnum,
+            busnum,
+            devnum,
         })
     }
 
-    fn list_devices(&mut self) -> Result<Vec<Device>> {
-        log::debug!("Listing usb devices (mass storage)");
-        let mut usbdev = self.usbdev.take().expect("shouldn't happen");
-        let devices = usbdev
-            .comm
-            .devices(proto::usbdev::RequestDevices {})?
-            .devices;
-        // Don't need you anymore
-        usbdev.comm.end(proto::usbdev::RequestEnd {}).ok();
-        Ok(devices)
-    }
-
-    fn select_device(&mut self) -> Result<()> {
-        let devices = self.list_devices()?;
-        if devices.is_empty() {
-            log::error!("No device found");
-            return Err(Error::Error("No device found".to_string()));
-        }
-        let index = if devices.len() == 1 {
-            0
-        } else {
-            eprintln!("Multiple devices found, which one should be imaged ?");
-            for (index, dev) in devices.iter().enumerate() {
-                eprintln!(
-                    "{}: {} - {} (Serial: {}, VID/PID: {}/{})",
-                    index + 1,
-                    dev.manufacturer,
-                    dev.description,
-                    dev.serial,
-                    dev.vendorid,
-                    dev.productid
-                );
-            }
-            loop {
-                eprint!("[1-{}]: ", devices.len());
-                io::stdout().flush().expect("couldn't flush stdout");
-                let mut input = String::new();
-                match io::stdin().read_line(&mut input) {
-                    Ok(_) => {
-                        match input.trim().parse::<usize>() {
-                            Ok(n) => {
-                                if n > 0 && n <= devices.len() {
-                                    break n - 1;
-                                } else {
-                                    log::error!("Index out of range");
-                                }
-                            }
-                            Err(err) => {
-                                log::error!("Couldn't parse input: {}", err);
-                            }
-                        };
-                    }
-                    Err(err) => {
-                        log::error!("Couldn't read input: {}", err);
-                    }
-                }
-            }
-        };
-
-        log::info!(
-            "Cloning device \'{} - {} (Serial: {}, VID/PID: {}/{})\'",
-            devices[index].manufacturer,
-            devices[index].description,
-            devices[index].serial,
-            devices[index].vendorid,
-            devices[index].productid
-        );
-
-        self.busdevnum = Some(BusDevNum {
-            busnum: devices[index].busnum,
-            devnum: devices[index].devnum,
-        });
-        Ok(())
-    }
-
     fn image_device(&mut self) -> Result<()> {
-        let BusDevNum { busnum, devnum } = self.busdevnum.take().expect("shouldn't happen");
         // Unlock dev2scsi
-        let buf = (u64::from(devnum)) << 32 | u64::from(busnum);
+        let buf = (u64::from(self.devnum)) << 32 | u64::from(self.busnum);
         self.dev2scsi.comm.write_all(&buf.to_le_bytes())?;
         self.dev2scsi.locked = false;
 
@@ -259,13 +154,7 @@ impl Imager {
 impl Drop for Imager {
     // Properly end children
     fn drop(&mut self) {
-        log::debug!("End usbsas children");
-        if let Some(mut usbdev) = self.usbdev.take() {
-            usbdev
-                .comm
-                .end(proto::usbdev::RequestEnd {})
-                .expect("Couldn't end usbdev");
-        }
+        log::debug!("End children");
         if self.dev2scsi.locked {
             self.dev2scsi
                 .comm
@@ -285,6 +174,26 @@ fn main() -> Result<()> {
         .about("Clone a usb device (Mass Storage) with usbsas")
         .version("1.0")
         .arg(
+            Arg::new("busnum")
+                .value_name("BUSNUM")
+                .requires("devnum")
+                .value_parser(clap::value_parser!(u32))
+                .help("Bus number of the output device")
+                .index(1)
+                .num_args(1)
+                .required(true),
+        )
+        .arg(
+            Arg::new("devnum")
+                .value_name("DEVNUM")
+                .requires("busnum")
+                .value_parser(clap::value_parser!(u32))
+                .help("Device number of the output device")
+                .index(2)
+                .num_args(1)
+                .required(true),
+        )
+        .arg(
             clap::Arg::new("config")
                 .short('c')
                 .long("config")
@@ -300,26 +209,6 @@ fn main() -> Result<()> {
                 .value_name("FILE")
                 .help("Path of the output file")
                 .conflicts_with("stdout")
-                .num_args(1),
-        )
-        .arg(
-            Arg::new("busnum")
-                .short('b')
-                .long("busnum")
-                .requires("devnum")
-                .value_name("BUSNUM")
-                .value_parser(clap::value_parser!(u32))
-                .help("Bus number of the device to clone")
-                .num_args(1),
-        )
-        .arg(
-            Arg::new("devnum")
-                .short('d')
-                .long("devnum")
-                .requires("busnum")
-                .value_name("DEVNUM")
-                .value_parser(clap::value_parser!(u32))
-                .help("Device number of the device to clone")
                 .num_args(1),
         )
         .arg(
@@ -356,27 +245,19 @@ fn main() -> Result<()> {
         Some(out_file)
     };
 
-    let busdevnum = match (
+    let (busnum, devnum) = match (
         matches.get_one::<u32>("busnum"),
         matches.get_one::<u32>("devnum"),
     ) {
-        (Some(busnum), Some(devnum)) => Some(BusDevNum {
-            busnum: busnum.to_owned(),
-            devnum: devnum.to_owned(),
-        }),
-        (None, Some(_)) | (Some(_), None) => {
+        (Some(busnum), Some(devnum)) => (busnum.to_owned(), devnum.to_owned()),
+        _ => {
             return Err(Error::Error(
                 "Must specify both busnum and devnum".to_string(),
             ));
         }
-        (None, None) => None,
     };
 
-    let mut imager = Imager::new(config_path, writer, busdevnum)?;
-
-    if imager.busdevnum.is_none() {
-        imager.select_device()?;
-    }
+    let mut imager = Imager::new(writer, busnum, devnum)?;
 
     imager.image_device()?;
 

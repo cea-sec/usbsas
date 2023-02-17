@@ -1376,6 +1376,8 @@ function do_wipe_key() {
   let reset_timeout = 1000;
   let time_start = new Date().getTime();
   let time_now = 0;
+  let pad = 1;
+  let slice = 90;
   let update_display = function (data) {
     // console.log(JSON.stringify(data, null, 2));
     switch (data.status) {
@@ -1396,19 +1398,17 @@ function do_wipe_key() {
             wipe_time_value.innerText = minutes;
           }
           wipe_time.removeAttribute("hidden");
-          percent = 1 + (90 * data.current_size) / data.total_size;
+          percent = pad + (slice * data.current_size) / data.total_size;
           percent = percent.toFixed(2);
           progress.style.width = percent + "%";
           progress.innerText = percent + "%";
+          if (data.current_size == data.total_size) {
+            pad = 91;
+            slice = 8;
+          }
         }
         break;
       case "format_status":
-        if (data.current_size != 0 && data.total_size != 0) {
-          percent = 91 + (8 * data.current_size) / data.total_size;
-          percent = percent.toFixed(2);
-          progress.style.width = percent + "%";
-          progress.innerText = percent + "%";
-        }
         break;
       case "wipe_end":
         updateElementLang(wipe_message, "formatend");
