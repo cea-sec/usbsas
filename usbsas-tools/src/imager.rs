@@ -101,7 +101,7 @@ impl Imager {
         // If busnum and devnum were not specified we need usbdev to select the device
         let usbdev = if busdevnum.is_none() {
             let usbdev = UsbsasChildSpawner::new("usbsas-usbdev")
-                .arg(config_path)
+                .args(&["-c", config_path])
                 .spawn::<proto::usbdev::Request>()?;
             pipes_read.push(usbdev.comm.input_fd());
             pipes_write.push(usbdev.comm.output_fd());
