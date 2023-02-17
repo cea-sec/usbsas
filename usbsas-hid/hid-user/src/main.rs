@@ -30,7 +30,7 @@ pub struct UsbDevice {
     pub interface: u8,
     pub ep_in: u8,
     pub ep_in_size: u16,
-    _dev_file: std::fs::File,
+    dev_file: std::fs::File,
 }
 
 impl UsbDevice {
@@ -46,7 +46,7 @@ impl UsbDevice {
             interface,
             ep_in,
             ep_in_size,
-            _dev_file: dev_file,
+            dev_file,
         }
     }
 }
@@ -1480,6 +1480,15 @@ fn main() -> Result<(), Error> {
 
     let screen = get_screen_display()?;
     log::debug!("Screen: {}x{}", screen.width, screen.height);
+
+    // ConnectionNumber returns the socket fd (see libx11's Xlib.h)
+    let socket_fd = unsafe { x11::xlib::XConnectionNumber(screen.display) };
+    usbsas_sandbox::hiduser::seccomp(device.dev_file.as_raw_fd(), socket_fd).map_err(|err| {
+        Error::new(
+            ErrorKind::Other,
+            format!("Error applying seccomp filter: {}", err),
+        )
+    })?;
 
     let mut context = DisplayContext::new(screen);
     context.updt_cursor();

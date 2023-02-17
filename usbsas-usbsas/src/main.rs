@@ -1414,6 +1414,10 @@ impl WipeState {
                 }
                 Msg::CopyStatusDone(_) => {
                     comm.wipe(proto::usbsas::ResponseWipe {})?;
+                    info!(
+                        "WIPE DONE (bus/devnum: {}/{} - quick: {})",
+                        self.busnum, self.devnum, self.quick
+                    );
                     break;
                 }
                 _ => {
@@ -1425,11 +1429,6 @@ impl WipeState {
                 }
             }
         }
-
-        info!(
-            "WIPE DONE (bus/devnum: {}/{} - quick: {})",
-            self.busnum, self.devnum, self.quick
-        );
         Ok(State::WaitEnd(WaitEndState {}))
     }
 }
