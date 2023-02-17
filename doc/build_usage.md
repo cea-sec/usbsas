@@ -149,6 +149,8 @@ analyzer-server with multiple antiviruses should be preferred.
 ### Other applications
 
 #### Fuse
+
+Standalone tool to mount a USB Mass Storage device with fuse.
 After building `usbsas-tools`:
 ```shell
 $ ./target/release/usbsas-fuse-mount --help
@@ -168,6 +170,44 @@ OPTIONS:
     -n, --part-num <PARTNUM>    Partition number to mount [default: 1]
     -V, --version               Print version information
 ```
+
+#### Imager
+
+Standalone tool to make an image of a USB Mass Storage device (like `dd`).
+```
+$ ./target/release/usbsas-imager  --help
+
+Usage: usbsas-imager [OPTIONS] <BUSNUM> <DEVNUM>
+
+Arguments:
+  <BUSNUM>  Bus number of the output device
+  <DEVNUM>  Device number of the output device
+
+Options:
+  -c, --config <config>  Path of the configuration file [default: /etc/usbsas/config.toml]
+  -o, --output <FILE>    Path of the output file
+  -O, --stdout           Output to stdout
+  -h, --help             Print help
+  -V, --version          Print version
+```
+
+#### Filesystem writer
+Standalone tool to write a filesystem on a USB Mass Storage device (like `dd)`.
+```
+$ ./target/release/usbsas-fswriter --help
+
+Usage: usbsas-fswriter <FILE> <BUSNUM> <DEVNUM>
+
+Arguments:
+  <FILE>    Path of the input filesystem
+  <BUSNUM>  Bus number of the output device
+  <DEVNUM>  Device number of the output device
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
 
 #### Python
 
