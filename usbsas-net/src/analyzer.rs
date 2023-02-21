@@ -13,7 +13,6 @@ use usbsas_comm::{protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::analyzer::request::Msg;
-use usbsas_utils::TAR_DATA_DIR;
 
 protoresponse!(
     CommAnalyzer,
@@ -212,18 +211,7 @@ impl RunningState {
             let res: JsonRes = resp.json()?;
             trace!("res: {:#?}", &res);
             match res.status.as_str() {
-                "scanned" => {
-                    let result = res.files.unwrap_or_default();
-                    // Filter paths not in TAR_DATA_DIR
-                    return Ok(HashMap::from_iter(result.iter().filter_map(
-                        |(path, status)| {
-                            path.strip_prefix(
-                                &(TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/"),
-                            )
-                            .map(|stripped_path| (stripped_path.to_owned(), status.to_owned()))
-                        },
-                    )));
-                }
+                "scanned" => return Ok(res.files.unwrap_or_default()),
                 "uploaded" | "processing" => sleep(Duration::from_secs(1)),
                 _ => return Err(Error::Remote),
             }

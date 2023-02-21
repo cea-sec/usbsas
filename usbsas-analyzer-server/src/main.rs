@@ -53,7 +53,21 @@ impl AppState {
             return Ok(());
         }
 
-        self.analyze_recursive(tmpdir.path(), tmpdir.path().to_str().unwrap(), &bundle_id)?;
+        // If we received a bundle (with "/data" and "/config.json" at the root), only analyze the
+        // data directory.
+        let base_path = if tmpdir.path().join("data").as_path().is_dir()
+            && tmpdir.path().join("config.json").as_path().is_file()
+        {
+            tmpdir.path().join("data")
+        } else {
+            tmpdir.path().to_path_buf()
+        };
+
+        self.analyze_recursive(
+            base_path.as_path(),
+            base_path.as_path().to_str().unwrap(),
+            &bundle_id,
+        )?;
 
         self.current_scans
             .lock()
