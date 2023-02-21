@@ -21,6 +21,8 @@ const SCSI_INQUIRY: u8 = 0x12;
 const SCSI_REQUEST_SENSE: u8 = 0x3;
 const SCSI_MAX_READ_SECTORS: u64 = 0x800;
 const ACK_TRYCOUNT: u8 = 3;
+const SCSI_DEV_TYPE_DIRECT_ACCESS_BLOCK_DEVICE: u8 = 0x0;
+const SCSI_DEV_TYPE_CD_DVD: u8 = 0x5;
 
 //#[derive(Debug, Default)]
 pub struct ScsiUsb<T: UsbContext> {
@@ -350,10 +352,11 @@ impl<T: UsbContext> ScsiUsb<T> {
             self.lun = Some(lun);
             let mut buffer: [u8; 36] = [0; 36];
             self.scsi_inquiry(&mut buffer)?;
-            let lun_type = buffer[0] & 0x1f;
-            debug!("Lun {} of type {}", lun, lun_type);
-            if lun_type == 0 {
-                // Device is Direct access decice
+            let device_type = buffer[0] & 0x1f;
+            debug!("Lun {} of type {}", lun, device_type);
+            if device_type == SCSI_DEV_TYPE_DIRECT_ACCESS_BLOCK_DEVICE
+                || device_type == SCSI_DEV_TYPE_CD_DVD
+            {
                 lun_dad.push(lun);
             }
         }
@@ -404,7 +407,8 @@ impl<T: UsbContext> ScsiUsb<T> {
                                             /* 2.4.1.6 Additional Sense and Additional Sense Qualifier codes */
                                             match buffer[12] {
                                                 0x4 => {
-                                                    /* Logical Unit Not Ready, Cause Not Reportable*/
+                                                    debug!("Logical Unit Not Ready, Cause Not Reportable");
+                                                    /* Logical Unit Not Ready, Cause Not Reportable */
 
                                                     /* Wait 200ms */
                                                     let ten_millis =

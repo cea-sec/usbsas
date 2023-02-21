@@ -36,10 +36,10 @@ protorequest!(
 );
 
 pub const MAX_SECTORS_COUNT_CACHE: u64 = 8;
-
-#[cfg(not(feature = "mock"))]
-enum LibusbClassCode {
-    MassStorage = 0x08,
+const MSC_SUBCLASS_RBC: u8 = 0x1; // Reduced Block Commands
+const MSC_SUBCLASS_MMC5: u8 = 0x2; // Multi-Media Commands (CD/DVD)
+const MSC_SUBCLASS_SCSI_TR: u8 = 0x6; // SCSI transparent command set
+const MSC_PROTOCOL_CLASS_BULK_ONLY: u8 = 0x50;
 }
 
 // Mass storage struct used by dev2scsi
@@ -79,9 +79,11 @@ impl MassStorage {
         let mut endpoints: [Option<u8>; 2] = [None; 2];
         for interface in handle.device().active_config_descriptor()?.interfaces() {
             for desc in interface.descriptors() {
-                if desc.class_code() == LibusbClassCode::MassStorage as u8
-                    && (desc.sub_class_code() == 0x01 || desc.sub_class_code() == 0x06)
-                    && desc.protocol_code() == 0x50
+                if desc.class_code() == rusb::constants::LIBUSB_CLASS_MASS_STORAGE
+                    && (desc.sub_class_code() == MSC_SUBCLASS_RBC
+                        || desc.sub_class_code() == MSC_SUBCLASS_MMC5
+                        || desc.sub_class_code() == MSC_SUBCLASS_SCSI_TR)
+                    && desc.protocol_code() == MSC_PROTOCOL_CLASS_BULK_ONLY
                 {
                     for endp in desc.endpoint_descriptors() {
                         if endp.transfer_type() == TransferType::Bulk {
