@@ -16,9 +16,6 @@ usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
 
-[features]
-mock = ["usbsas-mock"]
-
 # cargo-deb
 [package.metadata.deb]
 name = "usbsas-core"
