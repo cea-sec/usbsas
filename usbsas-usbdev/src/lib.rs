@@ -87,7 +87,9 @@ fn handle_udev_events(
     for dev in enumerator.scan_devices()? {
         // Only add mass storage devices
         if let Some(value) = dev.property_value("ID_USB_INTERFACES") {
-            if value.to_string_lossy().contains(":080650:") {
+            if value.to_string_lossy().contains(":080650:")
+                || value.to_string_lossy().contains(":080250:")
+            {
                 if let Err(err) = cur_dev.add_device(&dev) {
                     log::error!("Couldn't add dev {:?} ({})", dev, err);
                 }
@@ -106,7 +108,9 @@ fn handle_udev_events(
                     match ev.event_type() {
                         udev::EventType::Add => {
                             if let Some(value) = ev.property_value("ID_USB_INTERFACES") {
-                                if value.to_string_lossy().contains(":080650:") {
+                                if value.to_string_lossy().contains(":080650:")
+                                    || value.to_string_lossy().contains(":080250:")
+                                {
                                     if let Err(err) =
                                         current_devices.lock()?.add_device(&ev.device())
                                     {
@@ -153,7 +157,7 @@ impl CurrentDevices {
 
     fn add_device(&mut self, device: &udev::Device) -> Result<()> {
         // Check if device is connected to an allowed port
-        let (is_src, is_dst) = if let Some(ports) = &self.usb_port_accesses {
+        let (is_src, mut is_dst) = if let Some(ports) = &self.usb_port_accesses {
             let mut dev_port = Vec::new();
             for port in device
                 .attribute_value("devpath")
@@ -175,6 +179,16 @@ impl CurrentDevices {
         } else {
             (true, true)
         };
+
+        // Never destination if optical disk reader
+        if device
+            .property_value("ID_USB_INTERFACES")
+            .ok_or(Error::NoneValue)?
+            .to_string_lossy()
+            .contains(":080250:")
+        {
+            is_dst = false;
+        }
 
         let dev = UsbDevice {
             busnum: device

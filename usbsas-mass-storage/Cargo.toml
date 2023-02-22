@@ -13,6 +13,3 @@ thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-scsi = { path = "../usbsas-scsi" }
-
-[features]
-mock = []

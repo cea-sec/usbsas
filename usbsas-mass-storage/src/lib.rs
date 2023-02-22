@@ -1,19 +1,18 @@
 //! Mass storage structs used by usbsas processes.
 
 use positioned_io2::ReadAt;
+use rusb::{Direction, GlobalContext, TransferType, UsbContext};
 use std::{
+    fs::File,
     io::{self, ErrorKind, Read, Seek, SeekFrom},
+    os::unix::io::AsRawFd,
     sync::{Arc, RwLock},
+    time::Duration,
 };
 use thiserror::Error;
 use usbsas_comm::{protorequest, Comm};
 use usbsas_proto as proto;
-#[cfg(not(feature = "mock"))]
-use {
-    rusb::{Direction, GlobalContext, TransferType, UsbContext},
-    std::{fs::File, os::unix::io::AsRawFd, time::Duration},
-    usbsas_scsi::ScsiUsb,
-};
+use usbsas_scsi::ScsiUsb;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -36,14 +35,12 @@ protorequest!(
 );
 
 pub const MAX_SECTORS_COUNT_CACHE: u64 = 8;
-
-#[cfg(not(feature = "mock"))]
-enum LibusbClassCode {
-    MassStorage = 0x08,
-}
+const MSC_SUBCLASS_RBC: u8 = 0x1; // Reduced Block Commands
+const MSC_SUBCLASS_MMC5: u8 = 0x2; // Multi-Media Commands (CD/DVD)
+const MSC_SUBCLASS_SCSI_TR: u8 = 0x6; // SCSI transparent command set
+const MSC_PROTOCOL_CLASS_BULK_ONLY: u8 = 0x50;
 
 // Mass storage struct used by dev2scsi
-#[cfg(not(feature = "mock"))]
 pub struct MassStorage {
     scsiusb: RwLock<ScsiUsb<GlobalContext>>,
     pub max_lba: u32,
@@ -53,7 +50,6 @@ pub struct MassStorage {
     _inner: Option<File>,
 }
 
-#[cfg(not(feature = "mock"))]
 impl MassStorage {
     fn new(scsiusb: ScsiUsb<GlobalContext>, file: Option<File>) -> Result<Self> {
         let mut scsiusb = scsiusb;
@@ -79,9 +75,11 @@ impl MassStorage {
         let mut endpoints: [Option<u8>; 2] = [None; 2];
         for interface in handle.device().active_config_descriptor()?.interfaces() {
             for desc in interface.descriptors() {
-                if desc.class_code() == LibusbClassCode::MassStorage as u8
-                    && (desc.sub_class_code() == 0x01 || desc.sub_class_code() == 0x06)
-                    && desc.protocol_code() == 0x50
+                if desc.class_code() == rusb::constants::LIBUSB_CLASS_MASS_STORAGE
+                    && (desc.sub_class_code() == MSC_SUBCLASS_RBC
+                        || desc.sub_class_code() == MSC_SUBCLASS_MMC5
+                        || desc.sub_class_code() == MSC_SUBCLASS_SCSI_TR)
+                    && desc.protocol_code() == MSC_PROTOCOL_CLASS_BULK_ONLY
                 {
                     for endp in desc.endpoint_descriptors() {
                         if endp.transfer_type() == TransferType::Bulk {
@@ -144,7 +142,6 @@ impl MassStorage {
     }
 }
 
-#[cfg(not(feature = "mock"))]
 impl Read for MassStorage {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.pos % (self.block_size as u64) != 0 {
@@ -175,7 +172,6 @@ impl Read for MassStorage {
     }
 }
 
-#[cfg(not(feature = "mock"))]
 impl Seek for MassStorage {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         match pos {
@@ -190,7 +186,6 @@ impl Seek for MassStorage {
     }
 }
 
-#[cfg(not(feature = "mock"))]
 impl ReadAt for MassStorage {
     fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
         self.read_exact_at(pos, buf)?;
