@@ -48,6 +48,8 @@ pub enum Error {
     Error(String),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
+    #[error("json error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("No conf")]

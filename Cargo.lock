@@ -3154,6 +3154,7 @@ dependencies = [
  "log",
  "reqwest",
  "serde",
+ "serde_json",
  "thiserror",
  "usbsas-comm",
  "usbsas-config",
@@ -3280,6 +3281,7 @@ dependencies = [
  "indicatif",
  "libc",
  "log",
+ "serde_json",
  "tempfile",
  "thiserror",
  "time",
@@ -3315,6 +3317,7 @@ version = "0.1.4"
 dependencies = [
  "clap 4.1.6",
  "log",
+ "serde_json",
  "thiserror",
  "usbsas-comm",
  "usbsas-mass-storage",

@@ -208,7 +208,18 @@ async fn scan_result(
             json!({
                 "id": bundle_id,
                 "status": entry.status,
-                "files": entry.files
+                "files": entry.files,
+                "antivirus": {
+                    "name": "ClamAV",
+                    "version": clamav_rs::version(),
+                    "database_version": data.clamav_engine
+                        .lock().unwrap().database_version().unwrap(),
+                    "database_timestamp": data.clamav_engine
+                        .lock().unwrap().database_timestamp().unwrap()
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap().as_secs_f64()
+                }
+
             })
         } else {
             json!({

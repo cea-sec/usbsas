@@ -18,6 +18,8 @@ enum Error {
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
+    #[error("serde_json: {0}")]
+    SerdeJson(#[from] serde_json::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("upload error: {0}")]
@@ -157,9 +159,8 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         match rep.msg.ok_or(Error::BadRequest)? {
             Msg::Analyze(res) => {
                 log::info!(
-                    "Analyzer status: clean: {:#?}, dirty: {:#?}",
-                    &res.clean,
-                    &res.dirty
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::from_str(&res.report)?)?
                 );
                 break;
             }

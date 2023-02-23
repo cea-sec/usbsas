@@ -84,11 +84,13 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
             "name": name,
             "id": req.id,
             "file_names": self.files,
-            "vendorid": req.vendorid,
-            "productid": req.productid,
-            "manufacturer": req.manufacturer,
-            "serial": req.serial,
-            "description": req.description
+            "usb_src": {
+                "vendorid": req.vendorid,
+                "productid": req.productid,
+                "manufacturer": req.manufacturer,
+                "serial": req.serial,
+                "description": req.description
+            }
         })
         .to_string();
         let mut header = tar::Header::new_ustar();

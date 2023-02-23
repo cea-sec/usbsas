@@ -122,9 +122,6 @@ impl LoadMetadataState {
         for entry in archive.entries()? {
             let entry = entry?;
             let path_name = entry.path()?.to_path_buf().to_string_lossy().to_string();
-            if path_name == "config.json" {
-                continue;
-            }
             let ftype = match entry.header().entry_type() {
                 tar::EntryType::Directory => FileType::Directory,
                 tar::EntryType::Regular => FileType::Regular,
@@ -133,6 +130,16 @@ impl LoadMetadataState {
             if let Some(name) = path_name.strip_prefix(&data_dir) {
                 metadata.insert(
                     name.trim_end_matches('/').to_owned(),
+                    Attrs {
+                        ftype,
+                        size: entry.header().size()?,
+                        timestamp: i64::try_from(entry.header().mtime()?)?,
+                        offset: entry.raw_file_position(),
+                    },
+                );
+            } else if path_name == "config.json" {
+                metadata.insert(
+                    path_name,
                     Attrs {
                         ftype,
                         size: entry.header().size()?,
