@@ -127,7 +127,7 @@ impl HttpClient {
                             format!(
                                 "Negotiate {}",
                                 &b64eng::general_purpose::STANDARD_NO_PAD
-                                    .encode(client_token.as_ref())
+                                    .encode::<&[u8]>(client_token.as_ref())
                             )
                             .parse()?,
                         );

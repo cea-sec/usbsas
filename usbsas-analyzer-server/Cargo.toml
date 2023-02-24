@@ -19,6 +19,9 @@ tar = "0.4"
 tempfile = "3.4"
 uuid = { version = "1.3", features = ["v4"] }
 
+[features]
+integration-tests = []
+
 # cargo-deb
 [package.metadata.deb]
 maintainer = "usbsas"

@@ -74,13 +74,25 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
     }
 
     fn finish(mut self: Box<Self>, req: usbsas_proto::writetar::RequestClose) -> Result<()> {
-        let mut name = match uname::Info::new() {
-            Ok(uname) => uname.nodename,
-            _ => "Unknown".to_string(),
+        #[cfg(not(feature = "integration-tests"))]
+        let (name, time) = {
+            let name = match uname::Info::new() {
+                Ok(uname) => format!("usbsas-{}", uname.nodename),
+                _ => "Unknown".to_string(),
+            };
+            (
+                name,
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_secs_f64(),
+            )
         };
-        name = format!("USBSAS-{name}");
+        // Fixed values to keep a deterministic filesystem hash
+        #[cfg(feature = "integration-tests")]
+        let (name, time) = ("usbsas", 946767600);
+
         let infos = json!({
-            "time": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs_f64(),
+            "time": time,
             "name": name,
             "id": req.id,
             "file_names": self.files,
@@ -93,6 +105,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
             }
         })
         .to_string();
+
         let mut header = tar::Header::new_ustar();
         header.set_size(infos.as_bytes().len() as u64);
         header.set_entry_type(tar::EntryType::Regular);

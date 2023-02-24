@@ -199,18 +199,9 @@ async fn scan_result(
             || current_scans[&bundle_id].status == "error"
         {
             let entry = current_scans.remove(&bundle_id).unwrap();
-            fs::remove_file(format!(
-                "{}/{}.tar",
-                data.working_dir.lock().unwrap(),
-                bundle_id
-            ))
-            .unwrap();
-            json!({
-                "id": bundle_id,
-                "status": entry.status,
-                "files": entry.files,
-                "antivirus": {
-                    "name": "ClamAV",
+            #[cfg(not(feature = "integration-tests"))]
+            let av_infos = json!({
+                "ClamAV": {
                     "version": clamav_rs::version(),
                     "database_version": data.clamav_engine
                         .lock().unwrap().database_version().unwrap(),
@@ -219,6 +210,29 @@ async fn scan_result(
                         .duration_since(std::time::SystemTime::UNIX_EPOCH)
                         .unwrap().as_secs_f64()
                 }
+            });
+            // Fixed timestamp to keep a determistic filesystem hash
+            #[cfg(feature = "integration-tests")]
+            let av_infos = json!({
+                "ClamAV": {
+                    "version": "946767600",
+                    "database_version": "946767600",
+                    "database_timestamp": "946767600",
+                }
+            });
+            fs::remove_file(format!(
+                "{}/{}.tar",
+                data.working_dir.lock().unwrap(),
+                bundle_id
+            ))
+            .unwrap();
+            #[cfg(feature = "integration-tests")]
+            let bundle_id = "0";
+            json!({
+                "id": bundle_id,
+                "status": entry.status,
+                "files": entry.files,
+                "antivirus": [av_infos]
 
             })
         } else {

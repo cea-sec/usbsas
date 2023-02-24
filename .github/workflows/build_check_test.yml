@@ -83,7 +83,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: --release --all --verbose --features mock
+        args: --release --all --verbose --features mock,integration-tests
     # Run the integration tests
     - name: Integration tests with mock feature
       uses: actions-rs/cargo@v1

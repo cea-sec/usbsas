@@ -921,6 +921,9 @@ impl DownloadTarState {
         let mut todo = VecDeque::from([String::from("")]);
         let mut all_entries = HashSet::new();
         while let Some(entry) = todo.pop_front() {
+            if entry == "config.json" {
+                continue;
+            }
             let mut parts = entry.trim_start_matches('/').split('/');
             // Remove last (file basename)
             let _ = parts.next_back();
@@ -1280,7 +1283,7 @@ impl WriteFilesState {
             "errors": self.errors,
         });
 
-        let report_data = serde_json::to_vec(&final_report)?;
+        let report_data = serde_json::to_vec_pretty(&final_report)?;
         let report_name = format!("/usbsas-report-{}.json", config_json["time"]);
 
         children
