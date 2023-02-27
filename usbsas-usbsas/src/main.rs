@@ -430,6 +430,7 @@ impl PartitionOpenedState {
                                 id,
                                 selected: req.selected,
                                 destination: req.destination.ok_or(Error::BadRequest)?,
+                                write_report: req.write_report,
                             }));
                         } else {
                             error!("empty id");
@@ -496,6 +497,7 @@ struct CopyFilesState {
     device: UsbDevice,
     id: String,
     selected: Vec<String>,
+    write_report: bool,
 }
 
 impl CopyFilesState {
@@ -568,6 +570,7 @@ impl CopyFilesState {
                     id: self.id,
                     usb,
                     analyze: true,
+                    write_report: self.write_report,
                 }))
             }
             Destination::Net(_) | Destination::Cmd(_) => {
@@ -852,6 +855,7 @@ impl DownloadTarState {
                 id: self.id,
                 usb,
                 analyze: false,
+                write_report: false,
             })),
             Destination::Net(_) | Destination::Cmd(_) => {
                 children.tar2files.comm.write_all(&[0_u8])?;
@@ -997,6 +1001,7 @@ struct WriteFilesState {
     id: String,
     usb: proto::usbsas::DestUsb,
     analyze: bool,
+    write_report: bool,
 }
 
 impl WriteFilesState {
@@ -1006,7 +1011,7 @@ impl WriteFilesState {
         children: &mut Children,
     ) -> Result<State> {
         let analyze_report = if self.analyze {
-            Some(self.analyze_files(comm, children)?)
+            self.analyze_files(comm, children)?
         } else {
             None
         };
@@ -1132,7 +1137,7 @@ impl WriteFilesState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-    ) -> Result<serde_json::Value> {
+    ) -> Result<Option<serde_json::Value>> {
         trace!("analyzing files");
         use proto::analyzer::response::Msg;
         if let Some(ref mut analyzer) = children.analyzer {
@@ -1165,7 +1170,11 @@ impl WriteFilesState {
                             }
                         });
                         comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
-                        return Ok(report_json);
+                        if self.write_report {
+                            return Ok(Some(report_json));
+                        } else {
+                            return Ok(None);
+                        }
                     }
                     Msg::UploadStatus(status) => {
                         comm.analyzestatus(proto::usbsas::ResponseAnalyzeStatus {
