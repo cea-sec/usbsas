@@ -12,7 +12,7 @@ fuse_mt = { version = "0.6", optional = true }
 indicatif = { version = "0.17", optional = true }
 libc = { version = "0.2", optional = true }
 log = "0.4"
-tempfile = { version = "3.3", optional = true }
+tempfile = { version = "3.4", optional = true }
 thiserror = "1.0"
 time = { version = "0.3", optional = true }
 usbsas-comm = { path = "../usbsas-comm" }
