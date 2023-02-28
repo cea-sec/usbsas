@@ -216,12 +216,13 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
             if ntfs_entries.contains_key(&ntfs_file.file_record_number()) {
                 continue;
             }
+
+            let name_string = ntfs_name_from_file(&ntfs_file, &mut self.reader)?;
             // Filter MFT metafiles (https://en.wikipedia.org/wiki/NTFS#Metafiles)
-            if ntfs_file.file_record_number() < 27 {
+            if ntfs_file.file_record_number() < 27 && name_string.starts_with('$') {
                 continue;
             }
 
-            let name_string = ntfs_name_from_file(&ntfs_file, &mut self.reader)?;
             if name_string == "." || name_string == ".." {
                 continue;
             }
