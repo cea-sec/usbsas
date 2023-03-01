@@ -21,8 +21,7 @@ message Request {
 /* Response */
 
 message ResponseAnalyze {
-  repeated string clean = 1;
-  repeated string dirty = 2;
+  string report = 1;
 }
 
 message ResponseUploadStatus {

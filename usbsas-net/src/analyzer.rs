@@ -13,7 +13,6 @@ use usbsas_comm::{protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::analyzer::request::Msg;
-use usbsas_utils::TAR_DATA_DIR;
 
 protoresponse!(
     CommAnalyzer,
@@ -164,20 +163,10 @@ impl RunningState {
             }
         }
 
-        let scanned_files = self.poll_result()?;
+        let report = self.poll_result()?;
 
-        let mut clean = Vec::new();
-        let mut dirty = Vec::new();
-
-        for (file, status) in scanned_files.iter() {
-            match status.as_str() {
-                "CLEAN" => clean.push(file.to_string()),
-                _ => dirty.push(file.to_string()),
-            }
-        }
-
-        trace!("rep analyzer: clean: {:?}, dirty: {:?}", &clean, &dirty);
-        comm.analyze(proto::analyzer::ResponseAnalyze { clean, dirty })?;
+        trace!("analyzer report: {}", &report);
+        comm.analyze(proto::analyzer::ResponseAnalyze { report })?;
         Ok(())
     }
 
@@ -200,7 +189,7 @@ impl RunningState {
         Ok(resp.json()?)
     }
 
-    fn poll_result(&mut self) -> Result<HashMap<String, String>> {
+    fn poll_result(&mut self) -> Result<String> {
         trace!("poll result");
         // XXX TODO timeout
         loop {
@@ -209,21 +198,11 @@ impl RunningState {
             if !resp.status().is_success() {
                 return Err(Error::Remote);
             }
-            let res: JsonRes = resp.json()?;
-            trace!("res: {:#?}", &res);
-            match res.status.as_str() {
-                "scanned" => {
-                    let result = res.files.unwrap_or_default();
-                    // Filter paths not in TAR_DATA_DIR
-                    return Ok(HashMap::from_iter(result.iter().filter_map(
-                        |(path, status)| {
-                            path.strip_prefix(
-                                &(TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/"),
-                            )
-                            .map(|stripped_path| (stripped_path.to_owned(), status.to_owned()))
-                        },
-                    )));
-                }
+            let raw_report = resp.text()?;
+            let report: JsonRes = serde_json::from_str(&raw_report)?;
+            trace!("res: {:#?}", &report);
+            match report.status.as_str() {
+                "scanned" => return Ok(raw_report),
                 "uploaded" | "processing" => sleep(Duration::from_secs(1)),
                 _ => return Err(Error::Remote),
             }

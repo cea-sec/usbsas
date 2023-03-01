@@ -53,7 +53,21 @@ impl AppState {
             return Ok(());
         }
 
-        self.analyze_recursive(tmpdir.path(), tmpdir.path().to_str().unwrap(), &bundle_id)?;
+        // If we received a bundle (with "/data" and "/config.json" at the root), only analyze the
+        // data directory.
+        let base_path = if tmpdir.path().join("data").as_path().is_dir()
+            && tmpdir.path().join("config.json").as_path().is_file()
+        {
+            tmpdir.path().join("data")
+        } else {
+            tmpdir.path().to_path_buf()
+        };
+
+        self.analyze_recursive(
+            base_path.as_path(),
+            base_path.as_path().to_str().unwrap(),
+            &bundle_id,
+        )?;
 
         self.current_scans
             .lock()
@@ -185,16 +199,41 @@ async fn scan_result(
             || current_scans[&bundle_id].status == "error"
         {
             let entry = current_scans.remove(&bundle_id).unwrap();
+            #[cfg(not(feature = "integration-tests"))]
+            let av_infos = json!({
+                "ClamAV": {
+                    "version": clamav_rs::version(),
+                    "database_version": data.clamav_engine
+                        .lock().unwrap().database_version().unwrap(),
+                    "database_timestamp": data.clamav_engine
+                        .lock().unwrap().database_timestamp().unwrap()
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap().as_secs_f64()
+                }
+            });
+            // Fixed timestamp to keep a determistic filesystem hash
+            #[cfg(feature = "integration-tests")]
+            let av_infos = json!({
+                "ClamAV": {
+                    "version": "946767600",
+                    "database_version": "946767600",
+                    "database_timestamp": "946767600",
+                }
+            });
             fs::remove_file(format!(
                 "{}/{}.tar",
                 data.working_dir.lock().unwrap(),
                 bundle_id
             ))
             .unwrap();
+            #[cfg(feature = "integration-tests")]
+            let bundle_id = "0";
             json!({
                 "id": bundle_id,
                 "status": entry.status,
-                "files": entry.files
+                "files": entry.files,
+                "antivirus": [av_infos]
+
             })
         } else {
             json!({

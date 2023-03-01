@@ -44,6 +44,7 @@ pub struct PathFilter {
 pub struct Analyzer {
     pub url: String,
     pub krb_service_name: Option<String>,
+    pub write_report: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

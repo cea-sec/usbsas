@@ -16,3 +16,6 @@ usbsas-comm = { path = "../usbsas-comm" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
+
+[features]
+integration-tests = []

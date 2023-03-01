@@ -74,6 +74,7 @@ message RequestCopyStart {
     SrcNet src_net = 6;
   };
   repeated string selected = 4;
+  bool write_report = 7;
 };
 
 message RequestWipe {

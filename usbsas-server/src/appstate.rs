@@ -725,12 +725,23 @@ impl AppState {
         progress += 1.0;
         resp_stream.report_progress("copy_usb_filter", progress)?;
 
+        let write_report = if let Some(analyzer_conf) = &self.config.lock()?.analyzer {
+            if let Some(report_config) = analyzer_conf.write_report {
+                report_config
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         comm.send(proto::usbsas::Request {
             msg: Some(proto::usbsas::request::Msg::CopyStart(
                 proto::usbsas::RequestCopyStart {
                     destination: Some(destination),
                     selected,
                     source,
+                    write_report,
                 },
             )),
         })?;

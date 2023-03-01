@@ -42,6 +42,8 @@ enum Error {
     Process(#[from] usbsas_process::Error),
     #[error("Not enough space on destination device")]
     NotEnoughSpace,
+    #[error("serde_json: {0}")]
+    JsonError(#[from] serde_json::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -428,6 +430,7 @@ impl PartitionOpenedState {
                                 id,
                                 selected: req.selected,
                                 destination: req.destination.ok_or(Error::BadRequest)?,
+                                write_report: req.write_report,
                             }));
                         } else {
                             error!("empty id");
@@ -494,6 +497,7 @@ struct CopyFilesState {
     device: UsbDevice,
     id: String,
     selected: Vec<String>,
+    write_report: bool,
 }
 
 impl CopyFilesState {
@@ -566,6 +570,7 @@ impl CopyFilesState {
                     id: self.id,
                     usb,
                     analyze: true,
+                    write_report: self.write_report,
                 }))
             }
             Destination::Net(_) | Destination::Cmd(_) => {
@@ -850,6 +855,7 @@ impl DownloadTarState {
                 id: self.id,
                 usb,
                 analyze: false,
+                write_report: false,
             })),
             Destination::Net(_) | Destination::Cmd(_) => {
                 children.tar2files.comm.write_all(&[0_u8])?;
@@ -919,6 +925,9 @@ impl DownloadTarState {
         let mut todo = VecDeque::from([String::from("")]);
         let mut all_entries = HashSet::new();
         while let Some(entry) = todo.pop_front() {
+            if entry == "config.json" {
+                continue;
+            }
             let mut parts = entry.trim_start_matches('/').split('/');
             // Remove last (file basename)
             let _ = parts.next_back();
@@ -992,6 +1001,7 @@ struct WriteFilesState {
     id: String,
     usb: proto::usbsas::DestUsb,
     analyze: bool,
+    write_report: bool,
 }
 
 impl WriteFilesState {
@@ -1000,9 +1010,11 @@ impl WriteFilesState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        if self.analyze {
-            self.analyze_files(comm, children)?;
-        }
+        let analyze_report = if self.analyze {
+            self.analyze_files(comm, children)?
+        } else {
+            None
+        };
 
         // Abort if no files survived antivirus
         if self.files.is_empty() {
@@ -1067,6 +1079,16 @@ impl WriteFilesState {
             }
         }
 
+        if let Some(report) = analyze_report {
+            if let Err(err) = self.write_report_file(children, report) {
+                error!("Couldn't write report on destination fs");
+                comm.error(proto::usbsas::ResponseError {
+                    err: format!("err writing report on dest fs: {err}"),
+                })?;
+                return Ok(State::WaitEnd(WaitEndState {}));
+            }
+        }
+
         children
             .files2fs
             .comm
@@ -1115,7 +1137,7 @@ impl WriteFilesState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-    ) -> Result<()> {
+    ) -> Result<Option<serde_json::Value>> {
         trace!("analyzing files");
         use proto::analyzer::response::Msg;
         if let Some(ref mut analyzer) = children.analyzer {
@@ -1131,17 +1153,28 @@ impl WriteFilesState {
                 let rep: proto::analyzer::Response = analyzer.comm.recv()?;
                 match rep.msg.ok_or(Error::BadRequest)? {
                     Msg::Analyze(res) => {
-                        debug!(
-                            "Analyzer status: clean: {:#?}, dirty: {:#?}",
-                            &res.clean, &res.dirty
-                        );
-                        self.files
-                            .retain(|x| res.clean.contains(&x.trim_start_matches('/').to_string()));
-                        res.dirty
-                            .iter()
-                            .for_each(|p| self.dirty.push(format!("/{p}")));
+                        let report_json: serde_json::Value = serde_json::from_str(&res.report)?;
+
+                        let files_status = report_json["files"].as_object().ok_or(Error::Error(
+                            "Couldn't get files from analyzer report".into(),
+                        ))?;
+
+                        self.files.retain(|x| {
+                            files_status.get(x.trim_start_matches('/'))
+                                == Some(&serde_json::Value::String("CLEAN".to_string()))
+                        });
+
+                        files_status.iter().for_each(|(file, status)| {
+                            if status == "DIRTY" {
+                                self.dirty.push(format!("/{}", file))
+                            }
+                        });
                         comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
-                        return Ok(());
+                        if self.write_report {
+                            return Ok(Some(report_json));
+                        } else {
+                            return Ok(None);
+                        }
                     }
                     Msg::UploadStatus(status) => {
                         comm.analyzestatus(proto::usbsas::ResponseAnalyzeStatus {
@@ -1157,8 +1190,10 @@ impl WriteFilesState {
                     _ => return Err(Error::Analyze("Unexpected response".into())),
                 }
             }
-        };
-        Ok(())
+        }
+        Err(Error::Analyze(
+            "Analyze requested but no analyzer process spawned".into(),
+        ))
     }
 
     fn write_file(
@@ -1220,6 +1255,67 @@ impl WriteFilesState {
             .endfile(proto::writefs::RequestEndFile {
                 path: path.to_string(),
             })?;
+        Ok(())
+    }
+
+    fn write_report_file(&self, children: &mut Children, report: serde_json::Value) -> Result<()> {
+        log::debug!("writing report");
+        // Read config.json from temp archive
+        let config_size = children
+            .tar2files
+            .comm
+            .getattr(proto::files::RequestGetAttr {
+                path: "config.json".into(),
+            })?
+            .size;
+        let config_data = children
+            .tar2files
+            .comm
+            .readfile(proto::files::RequestReadFile {
+                path: "config.json".into(),
+                offset: 0,
+                size: config_size,
+            })?
+            .data;
+
+        let config_json: serde_json::Value = serde_json::from_str(
+            std::str::from_utf8(&config_data).map_err(|err| Error::Error(format!("{}", err)))?,
+        )?;
+
+        let final_report = serde_json::json!({
+            "name": config_json["name"],
+            "id": config_json["id"],
+            "time": config_json["time"],
+            "usb_src": config_json["usb_src"],
+            "analyzer_report": report,
+            "filtered_files": self.filtered,
+            "errors": self.errors,
+        });
+
+        let report_data = serde_json::to_vec_pretty(&final_report)?;
+        let report_name = format!("/usbsas-report-{}.json", config_json["time"]);
+
+        children
+            .files2fs
+            .comm
+            .newfile(proto::writefs::RequestNewFile {
+                path: report_name.clone(),
+                size: report_data.len() as u64,
+                ftype: FileType::Regular.into(),
+                timestamp: config_json["time"].as_f64().unwrap_or(0.0) as i64,
+            })?;
+        children
+            .files2fs
+            .comm
+            .writefile(proto::writefs::RequestWriteFile {
+                path: report_name.clone(),
+                offset: 0,
+                data: report_data,
+            })?;
+        children
+            .files2fs
+            .comm
+            .endfile(proto::writefs::RequestEndFile { path: report_name })?;
         Ok(())
     }
 

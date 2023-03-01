@@ -48,6 +48,8 @@ pub enum Error {
     Error(String),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
+    #[error("json error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("No conf")]
@@ -125,7 +127,7 @@ impl HttpClient {
                             format!(
                                 "Negotiate {}",
                                 &b64eng::general_purpose::STANDARD_NO_PAD
-                                    .encode(client_token.as_ref())
+                                    .encode::<&[u8]>(client_token.as_ref())
                             )
                             .parse()?,
                         );

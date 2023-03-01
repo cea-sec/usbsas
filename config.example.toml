@@ -63,9 +63,11 @@ command_args = [
 
 # Remote analyzer server. (Optional)
 # Like for network destination below, kerberos authentication can be enabled.
+# An analyzer report can optionally be written on the destination device.
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 #krb_service_name = "HTTP@your.domain"
+#write_report = true
 
 
 # Command to execute after a transfer. (Optional)
