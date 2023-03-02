@@ -313,7 +313,7 @@ function set_usbsas_infos(infos) {
 
 function get_usbsas_infos() {
   try {
-    parse_json_and_call("usbsas_infos", set_usbsas_infos);
+    parse_json_and_call("status", set_usbsas_infos);
   } catch (error) {
     console.error(error);
   }
