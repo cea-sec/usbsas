@@ -1,4 +1,6 @@
-use crate::appstate::{AppState, CopyIn, DeviceDesc, ReadDirQuery, ResponseStream, UsbsasInfos};
+use crate::appstate::{
+    AppState, CopyIn, Desc, DeviceDesc, ReadDirQuery, ResponseStream, UsbsasInfos,
+};
 use crate::error::ServiceError;
 use crate::srv_infos::get_server_infos;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
@@ -16,8 +18,8 @@ async fn id(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     Ok(HttpResponse::Ok().json(id))
 }
 
-#[get("/usbsas_infos")]
-async fn usbsas_infos(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
+#[get("/status")]
+async fn status(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     let node_name = match uname::Info::new() {
         Ok(infos) => infos.nodename,
         _ => "Unknown".to_string(),
@@ -30,6 +32,7 @@ async fn usbsas_infos(data: web::Data<AppState>) -> Result<impl Responder, Servi
         name: node_name,
         message: config.message.unwrap_or_else(|| "".into()),
         version: usbsas_utils::USBSAS_VERSION.into(),
+        status: data.status.read()?.to_string(),
     }))
 }
 
@@ -42,6 +45,14 @@ async fn server_infos() -> Result<impl Responder, ServiceError> {
 async fn devices(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     let devices = data.list_all_devices()?;
     let devices: Vec<DeviceDesc> = devices.iter().map(DeviceDesc::from).collect();
+
+    // Set busy state if a usb device is plugged
+    if devices.iter().any(|dev| matches!(dev.dev, Desc::Usb(_))) {
+        *data.status.write()? = "busy".into();
+    } else {
+        *data.status.write()? = "idle".into();
+    };
+
     Ok(HttpResponse::Ok().json(devices))
 }
 
@@ -50,6 +61,7 @@ async fn device_select(
     params: web::Path<(String, String)>,
     data: web::Data<AppState>,
 ) -> Result<impl Responder, ServiceError> {
+    *data.status.write()? = "busy".into();
     let (fingerprint_dirty, fingerprint_out) = params.into_inner();
     data.device_select(fingerprint_dirty, fingerprint_out)?;
     Ok(HttpResponse::Ok())
@@ -112,6 +124,7 @@ async fn wipe(
     params: web::Path<(String, String, bool)>,
     data: web::Data<AppState>,
 ) -> Result<impl Responder, ServiceError> {
+    *data.status.write()? = "busy".into();
     let (fingerprint, fsfmt, quick) = params.into_inner();
     let device = data.dev_from_fingerprint(fingerprint)?;
     let resp_stream = ResponseStream::new();
@@ -127,6 +140,7 @@ async fn imagedisk(
     params: web::Path<String>,
     data: web::Data<AppState>,
 ) -> Result<impl Responder, ServiceError> {
+    *data.status.write()? = "busy".into();
     let fingerprint = params.into_inner();
     let device = data.dev_from_fingerprint(fingerprint)?;
     let resp_stream = ResponseStream::new();
@@ -140,6 +154,7 @@ async fn imagedisk(
 #[get("/reset")]
 async fn reset(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     info!("** Resetting server **");
+    *data.status.write()? = "idle".into();
     data.reset()?;
     Ok(HttpResponse::Ok())
 }
@@ -181,7 +196,7 @@ pub async fn start_server(
                     .log_target("http"),
             )
             .service(id)
-            .service(usbsas_infos)
+            .service(status)
             .service(server_infos)
             .service(devices)
             .service(device_select)

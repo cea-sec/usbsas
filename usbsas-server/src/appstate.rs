@@ -13,7 +13,7 @@ use std::{
     pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, RwLock,
     },
 };
 use usbsas_comm::{protorequest, Comm};
@@ -84,6 +84,7 @@ pub(crate) struct UsbsasInfos {
     pub(crate) name: String,
     pub(crate) message: String,
     pub(crate) version: String,
+    pub(crate) status: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -146,7 +147,7 @@ pub enum Desc {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DeviceDesc {
-    dev: Desc,
+    pub dev: Desc,
     pub id: String,
     pub is_src: bool,
     pub is_dst: bool,
@@ -342,6 +343,7 @@ pub(crate) struct AppState {
     out_dev: Mutex<Option<CopyDestination>>,
     hmac: Mutex<Hmac<Sha256>>,
     tmpfiles: Mutex<TmpFiles>,
+    pub status: Arc<RwLock<String>>,
     #[cfg(feature = "log-json")]
     pub session_id: Arc<std::sync::RwLock<String>>,
 }
@@ -375,8 +377,9 @@ impl AppState {
             hmac: Mutex::new(Hmac::new_from_slice(
                 &rand::thread_rng().gen::<[u8; 0x10]>(),
             )?),
+            status: Arc::new(RwLock::new(String::from("idle"))),
             #[cfg(feature = "log-json")]
-            session_id: Arc::new(std::sync::RwLock::new(session_id)),
+            session_id: Arc::new(RwLock::new(session_id)),
         })
     }
 
