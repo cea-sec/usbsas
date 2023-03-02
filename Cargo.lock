@@ -3328,6 +3328,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "time",
+ "toml",
 ]
 
 [[package]]

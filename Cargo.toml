@@ -60,3 +60,6 @@ default-members = [
 [profile.release]
 overflow-checks = true
 strip = true
+
+[workspace.metadata]
+version = '0.1.4'
