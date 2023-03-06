@@ -6,7 +6,7 @@ license = "GPL-3.0"
 
 [dependencies]
 log = "0.4"
-lru = "0.9"
+lru = "0.10"
 positioned-io2 = "0.3"
 rusb = { git = "https://github.com/losynix/rusb", branch = "disable_device_discovery", features = ["vendored"] }
 thiserror = "1.0"
