@@ -12,6 +12,11 @@ use std::{
 };
 use usbsas_config::{conf_parse, conf_read};
 
+const USBSAS_WEBFILES_DIR: &str = match option_env!("USBSAS_WEBFILES_DIR") {
+    Some(val) => val,
+    None => "client/web",
+};
+
 #[get("/id")]
 async fn id(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     let id = data.id()?;
@@ -163,7 +168,7 @@ async fn reset(data: web::Data<AppState>) -> Result<impl Responder, ServiceError
 async fn index() -> Result<impl Responder, ServiceError> {
     Ok(actix_files::NamedFile::open(format!(
         "{}/index.html",
-        env!("USBSAS_WEBFILES_DIR")
+        USBSAS_WEBFILES_DIR
     ))?)
 }
 
@@ -209,7 +214,7 @@ pub async fn start_server(
             .service(reset)
             .service(actix_files::Files::new(
                 "/static/",
-                format!("{}/static/", env!("USBSAS_WEBFILES_DIR")),
+                format!("{}/static/", USBSAS_WEBFILES_DIR),
             ))
             .service(index)
     })
