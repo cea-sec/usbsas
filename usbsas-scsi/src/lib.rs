@@ -363,22 +363,23 @@ impl<T: UsbContext> ScsiUsb<T> {
 
         debug!("Direct access devices luns: {:?}", lun_dad);
 
-        /* For each lun, test if ready or not present  */
+        /* For each lun, test if ready or not present, stop at first lun ready  */
 
         let mut is_ok = false;
-        for lun in lun_dad.iter() {
+        'outer: for lun in lun_dad.iter() {
             debug!("Test lun {}", lun);
             self.lun = Some(*lun);
             let mut buffer: [u8; 36] = [0; 36];
             self.scsi_inquiry(&mut buffer)?;
             for _ in 0..100 {
-                debug!("Test unit ready...");
+                debug!("Testing unit ready...");
                 let mut buffer: [u8; 0] = [0; 0];
                 match self.scsi_test_unit_ready(&mut buffer) {
                     Ok(0) => {
                         /* Everything is ok */
                         is_ok = true;
-                        break;
+                        log::debug!("Test unit ready");
+                        break 'outer;
                     }
                     Ok(ret) => {
                         debug!("Test unit response {}", ret);
