@@ -126,7 +126,7 @@ impl HttpClient {
                             reqwest::header::AUTHORIZATION,
                             format!(
                                 "Negotiate {}",
-                                &b64eng::general_purpose::STANDARD_NO_PAD
+                                &b64eng::general_purpose::STANDARD
                                     .encode::<&[u8]>(client_token.as_ref())
                             )
                             .parse()?,
@@ -142,7 +142,7 @@ impl HttpClient {
                         let authenticate_h =
                             resp.headers().get("www-authenticate").ok_or(Error::Nego)?;
                         server_token = Some(
-                            b64eng::general_purpose::STANDARD_NO_PAD
+                            b64eng::general_purpose::STANDARD
                                 .decode(&authenticate_h.to_str()?[10..])?,
                         );
                         resp_ret = Some(resp);
