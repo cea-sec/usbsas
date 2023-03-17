@@ -20,7 +20,7 @@ use usbsas_proto::{
     common::*,
     usbsas::{request::Msg, request_copy_start::Destination, request_copy_start::Source},
 };
-use usbsas_utils::{self, clap::UsbsasClap, READ_FILE_MAX_SIZE};
+use usbsas_utils::{self, clap::UsbsasClap, READ_FILE_MAX_SIZE, TAR_DATA_DIR};
 
 #[derive(Error, Debug)]
 enum Error {
@@ -1154,21 +1154,55 @@ impl WriteFilesState {
                 match rep.msg.ok_or(Error::BadRequest)? {
                     Msg::Analyze(res) => {
                         let report_json: serde_json::Value = serde_json::from_str(&res.report)?;
-
+                        log::trace!("analyzer report: {:?}", report_json);
                         let files_status = report_json["files"].as_object().ok_or(Error::Error(
                             "Couldn't get files from analyzer report".into(),
                         ))?;
 
-                        self.files.retain(|x| {
-                            files_status.get(x.trim_start_matches('/'))
-                                == Some(&serde_json::Value::String("CLEAN".to_string()))
-                        });
+                        match &report_json["version"].as_u64() {
+                            Some(2) => self.files.retain(|x| {
+                                if let Some(status) = files_status.get(x.trim_start_matches('/')) {
+                                    match status["status"].as_str() {
+                                        Some("CLEAN") => true,
+                                        Some("DIRTY") => {
+                                            self.dirty.push(x.to_string());
+                                            false
+                                        }
+                                        _ => {
+                                            self.errors.push(x.to_string());
+                                            false
+                                        }
+                                    }
+                                } else {
+                                    false
+                                }
+                            }),
+                            _ => self.files.retain(|x| {
+                                if let Some(status) = files_status
+                                    .get(&format!("{TAR_DATA_DIR}/{}", x.trim_start_matches('/')))
+                                {
+                                    match status.as_str() {
+                                        Some("CLEAN") => true,
+                                        Some("DIRTY") => {
+                                            self.dirty.push(format!(
+                                                "/{}",
+                                                x.strip_prefix(TAR_DATA_DIR)
+                                                    .unwrap()
+                                                    .trim_start_matches('/')
+                                            ));
+                                            false
+                                        }
+                                        _ => {
+                                            self.errors.push(x.to_string());
+                                            false
+                                        }
+                                    }
+                                } else {
+                                    false
+                                }
+                            }),
+                        }
 
-                        files_status.iter().for_each(|(file, status)| {
-                            if status == "DIRTY" {
-                                self.dirty.push(format!("/{}", file))
-                            }
-                        });
                         comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
                         if self.write_report {
                             return Ok(Some(report_json));
@@ -1191,9 +1225,7 @@ impl WriteFilesState {
                 }
             }
         }
-        Err(Error::Analyze(
-            "Analyze requested but no analyzer process spawned".into(),
-        ))
+        Ok(None)
     }
 
     fn write_file(

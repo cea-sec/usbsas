@@ -510,7 +510,7 @@ fn integration_test() {
         &error_path,
         &filtered_path,
         &ok_path,
-        "dcefc36d03c80c1e62e7baedbeff349d778a6370",
+        "83383efd7a406292bd881363d01c1f78f27c1a91",
         "exfat",
     );
     tester.reset();
@@ -524,7 +524,7 @@ fn integration_test() {
         &error_path,
         &filtered_path,
         &ok_path,
-        "aef45e891628a91540116f04fad526f86f78ca15",
+        "9c053e25307e8be4415333e2e0084dea7bfadbf6",
         "fat32",
     );
     tester.reset();
@@ -538,7 +538,7 @@ fn integration_test() {
         &error_path,
         &filtered_path,
         &ok_path,
-        "bb0daa602bae204e2e0266d5a663fd8f67a0db4a",
+        "621e9a9f32e32ed75da5475639be8da18567b604",
         "ntfs",
     );
     tester.reset();

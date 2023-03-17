@@ -27,7 +27,7 @@ protoresponse!(
 struct JsonRes {
     status: String,
     id: String,
-    files: Option<HashMap<String, String>>,
+    files: Option<HashMap<String, serde_json::Value>>,
 }
 
 struct FileReaderProgress {

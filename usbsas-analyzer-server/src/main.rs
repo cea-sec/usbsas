@@ -228,12 +228,17 @@ async fn scan_result(
             .unwrap();
             #[cfg(feature = "integration-tests")]
             let bundle_id = "0";
+            let files_status: HashMap<String, serde_json::Value> = entry
+                .files
+                .iter()
+                .map(|(key, val)| (key.clone(), json!({ "status": val })))
+                .collect();
             json!({
                 "id": bundle_id,
                 "status": entry.status,
-                "files": entry.files,
-                "antivirus": [av_infos]
-
+                "version": 2,
+                "files": files_status,
+                "antivirus": av_infos
             })
         } else {
             json!({
