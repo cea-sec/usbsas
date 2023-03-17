@@ -160,7 +160,9 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
             Msg::Analyze(res) => {
                 log::info!(
                     "{}",
-                    serde_json::to_string_pretty(&serde_json::from_str(&res.report)?)?
+                    serde_json::to_string_pretty(&serde_json::from_str::<serde_json::Value>(
+                        &res.report
+                    )?)?
                 );
                 break;
             }
