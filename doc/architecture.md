@@ -160,12 +160,31 @@ and the JSON response should include sanity status for all files, for example:
   "status": "scanned",
   "id": "f092fb9a883b439eaf5c6e75bcdc646e",
   "files": {
-    "SCSI Commands Reference Manual.pdf": "CLEAN",
-    "directories/a/man_rustc.txt": "CLEAN",
-    "eicar.com": "DIRTY",
+    "SCSI Commands Reference Manual.pdf": {
+      "status": "CLEAN",
+      "sha256": "XXX"
+    },
+    "directories/a/man_rustc.txt": {
+      "status": "CLEAN",
+      "sha256": "XXX"
+    },
+    "eicar.com": {
+      "status": "DIRTY",
+      "sha256": "XXX"
+    }
+  },
+  "antivirus": {
+    "ClamAV": {
+        "version": "XXX",
+        "database_version": "XXX",
+        "database_timestamp": "XXX"
+    }
   }
 }
 ```
+
+This report can be written on the destination device (if enabled in the
+configuration file).
 
 It supports Kerberos mutual authentication if compiled with the `authkrb`
 feature (enabled by default) and a service name is present in the configuration
