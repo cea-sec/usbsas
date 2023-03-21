@@ -1184,12 +1184,7 @@ impl WriteFilesState {
                                     match status.as_str() {
                                         Some("CLEAN") => true,
                                         Some("DIRTY") => {
-                                            self.dirty.push(format!(
-                                                "/{}",
-                                                x.strip_prefix(TAR_DATA_DIR)
-                                                    .unwrap()
-                                                    .trim_start_matches('/')
-                                            ));
+                                            self.dirty.push(x.to_string());
                                             false
                                         }
                                         _ => {
