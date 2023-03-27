@@ -1285,6 +1285,7 @@ function do_id_and_copy() {
 }
 
 function tool_device_choice(action) {
+  devices = new Devices();
   if (action == 'wipe') {
     set_state("WAIT_WIPE_KEY");
     document.querySelector("#copy-options").classList.remove('d-none');
@@ -1433,7 +1434,7 @@ function do_wipe_key() {
         wipe_icon.classList.remove("spinner-border-sm");
         wipe_icon.classList.add("fa-times");
         throw_error(langDocument["formaterr"]);
-        document.querySelector("#cancel-button").innerText = "Retour";
+        document.querySelector("#cancel-button").innerText = langDocument["return"];
         break;
       default:
         console.error("Unknown status message: ", json);
