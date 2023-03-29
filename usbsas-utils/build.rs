@@ -1,4 +1,4 @@
-use std::{env, process::Command};
+use std::env;
 
 fn main() {
     // Get the absolute path of the target directory
@@ -18,12 +18,14 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=USBSAS_CONFIG");
 
-    // Set version for env!() macro
-    let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .expect("can't get git hash");
-    let git_hash = String::from_utf8(output.stdout).expect("can't parse git output");
-    println!("cargo:rustc-env=GIT_HASH={git_hash}");
-    println!("cargo:rerun-if-env-changed=GIT_HASH");
+    let wp_manifest_path = format!("{}/../Cargo.toml", env::var("CARGO_MANIFEST_DIR").unwrap());
+    let usbsas_version =
+        toml::from_str::<toml::Table>(&std::fs::read_to_string(&wp_manifest_path).unwrap())
+            .unwrap()["workspace"]["metadata"]["version"]
+            .as_str()
+            .unwrap()
+            .to_string();
+    println!("cargo:rustc-env=USBSAS_VERSION={usbsas_version}");
+    println!("cargo:rerun-if-env-changed=USBSAS_VERSION");
+    println!("cargo:rerun-if-env-changed={wp_manifest_path}");
 }
