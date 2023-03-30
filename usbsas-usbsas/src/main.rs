@@ -303,7 +303,7 @@ impl InitState {
         children: &mut Children,
         dev_req: Device,
     ) -> Result<UsbDevice> {
-        trace!("req opendevice");
+        info!("Opening device {}", dev_req);
         let device = children
             .scsi2files
             .comm
@@ -507,7 +507,10 @@ impl CopyFilesState {
         children: &mut Children,
     ) -> Result<State> {
         trace!("req copy");
-        info!("Usbsas transfer for user: {}", self.id);
+        info!(
+            "Starting transfer from {} to {:?} for user: {}",
+            self.device, self.destination, self.id
+        );
 
         let mut errors = vec![];
         let mut all_directories = vec![];
@@ -810,7 +813,7 @@ impl DownloadTarState {
         children: &mut Children,
     ) -> Result<State> {
         trace!("req download tar");
-        info!("Usbsas export for user: {}", self.id);
+        info!("starting export for user: {}", self.id);
 
         let mut errors = vec![];
         let mut all_directories = vec![];
@@ -1103,13 +1106,13 @@ impl WriteFilesState {
                     filtered_path: self.filtered,
                     dirty_path: self.dirty,
                 })?;
-                info!("USB TRANSFER DONE for user {}", self.id);
+                info!("transfer done");
             }
             Err(err) => {
                 comm.error(proto::usbsas::ResponseError {
                     err: format!("err writing fs: {err}"),
                 })?;
-                error!("USB TRANSFER FAILED for user {}", self.id);
+                error!("transfer failed: {}", err);
             }
         }
 
@@ -1410,7 +1413,7 @@ impl UploadOrCmdState {
             dirty_path: Vec::new(),
         })?;
 
-        info!("NET TRANSFER DONE for user {}", self.id);
+        info!("net transfer done");
         Ok(State::TransferDone(TransferDoneState {}))
     }
 
@@ -1473,7 +1476,10 @@ impl WipeState {
         children: &mut Children,
     ) -> Result<State> {
         use proto::fs2dev::response::Msg;
-        trace!("req wipe");
+        info!(
+            "starting wipe {}-{} quick: {} ",
+            self.busnum, self.devnum, self.quick
+        );
 
         // Unlock fs2dev
         children
@@ -1537,10 +1543,6 @@ impl WipeState {
                 }
                 Msg::CopyStatusDone(_) => {
                     comm.wipe(proto::usbsas::ResponseWipe {})?;
-                    info!(
-                        "WIPE DONE (bus/devnum: {}/{} - quick: {})",
-                        self.busnum, self.devnum, self.quick
-                    );
                     break;
                 }
                 _ => {
@@ -1552,6 +1554,7 @@ impl WipeState {
                 }
             }
         }
+        info!("wipe done");
         Ok(State::WaitEnd(WaitEndState {}))
     }
 }
@@ -1566,7 +1569,7 @@ impl ImgDiskState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        trace!("Image disk");
+        info!("starting image disk: {}", self.device);
         self.image_disk(comm, children)?;
         comm.imgdisk(proto::usbsas::ResponseImgDisk {})?;
         Ok(State::WaitEnd(WaitEndState {}))
@@ -1608,7 +1611,7 @@ impl ImgDiskState {
                 total_size: self.device.dev_size,
             })?;
         }
-        info!("DISK IMAGE DONE");
+        info!("image disk done");
         Ok(())
     }
 }
@@ -1628,7 +1631,7 @@ impl TransferDoneState {
                 return Ok(State::End);
             }
             Msg::PostCopyCmd(req) => {
-                trace!("post copy cmd");
+                info!("starting post copy cmd");
                 match children
                     .cmdexec
                     .comm
@@ -1636,6 +1639,7 @@ impl TransferDoneState {
                         outfiletype: req.outfiletype,
                     }) {
                     Ok(_) => {
+                        info!("post copy cmd done");
                         comm.postcopycmd(proto::usbsas::ResponsePostCopyCmd {})?;
                     }
                     Err(err) => {
@@ -2070,7 +2074,7 @@ fn main() -> Result<()> {
     let tar_path = matches.get_one::<String>("tar_path").unwrap();
     let fs_path = matches.get_one::<String>("fs_path").unwrap();
 
-    info!("start ({}): {} {}", std::process::id(), tar_path, fs_path);
+    info!("init ({}): {} {}", std::process::id(), tar_path, fs_path);
     Usbsas::new(
         Comm::from_env()?,
         config,
