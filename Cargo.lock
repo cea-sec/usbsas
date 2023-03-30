@@ -408,29 +408,6 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.59.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bd2a9a458e8f4304c52c43ebb0cfbd520289f8379a52e329a38afda99bf8eb8"
-dependencies = [
- "bitflags 1.3.2",
- "cexpr 0.6.0",
- "clang-sys",
- "clap 2.34.0",
- "env_logger 0.9.3",
- "lazy_static",
- "lazycell",
- "log",
- "peeking_take_while",
- "proc-macro2",
- "quote",
- "regex",
- "rustc-hash",
- "shlex 1.1.0",
- "which 4.4.0",
-]
-
-[[package]]
-name = "bindgen"
 version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4243e6031260db77ede97ad86c27e501d646a27ab57b59a574f725d98ab1fb4"
@@ -661,9 +638,9 @@ dependencies = [
 
 [[package]]
 name = "clang-sys"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77ed9a53e5d4d9c573ae844bfac6872b159cb1d1585a83b29e7a64b7eef7332a"
+checksum = "c688fc74432808e3eb684cae8830a86be1d66a2bd58e1f248ed0960a590baf6f"
 dependencies = [
  "glob",
  "libc",
@@ -687,18 +664,18 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.2.0"
+version = "4.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6efb5f0a41b5ef5b50c5da28c07609c20091df0c1fc33d418fa2a7e693c2b624"
+checksum = "046ae530c528f252094e4a77886ee1374437744b2bff1497aa898bbddbbb29b3"
 dependencies = [
  "clap_builder",
 ]
 
 [[package]]
 name = "clap_builder"
-version = "4.2.0"
+version = "4.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "671fcaa5debda4b9a84aa7fde49c907c8986c0e6ab927e04217c9cb74e7c8bc9"
+checksum = "223163f58c9a40c3b0a43e1c4b50a9ce09f007ea2cb1ec258a687945b4b7929f"
 dependencies = [
  "anstream",
  "anstyle",
@@ -709,9 +686,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f0807fb6f644c83f3e4ec014fec9858c1c8b26a7db8eb5f0bde5817df9c1df7"
+checksum = "8a2dd5a6fe8c6e3502f568a6353e5273bbb15193ad9a89e457b9970798efbea1"
 
 [[package]]
 name = "concolor-override"
@@ -956,19 +933,6 @@ name = "env_logger"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
-dependencies = [
- "atty",
- "humantime",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
-name = "env_logger"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
 dependencies = [
  "atty",
  "humantime",
@@ -1537,13 +1501,13 @@ checksum = "12b6ee2129af8d4fb011108c73d99a1b83a85977f23b82460c0ae2e25bb4b57f"
 
 [[package]]
 name = "is-terminal"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8687c819457e979cc940d09cb16e42a1bf70aa6b60a549de6d3a62a0ee90c69e"
+checksum = "256017f749ab3117e93acb91063009e1f1bb56d03965b14c2c8df4eb02c524d8"
 dependencies = [
  "hermit-abi 0.3.1",
  "io-lifetimes",
- "rustix 0.36.11",
+ "rustix 0.37.5",
  "windows-sys 0.45.0",
 ]
 
@@ -1636,10 +1600,11 @@ dependencies = [
 
 [[package]]
 name = "libgssapi"
-version = "0.6.3"
-source = "git+https://github.com/losynix/libgssapi#995fb85ce34c1c53a5bb993880b1679c7e80b2ff"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dcfb7f77cbefc242a46ea667491c4f1129712f563cd368623d3f1b261a90e5f"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.0.2",
  "bytes",
  "lazy_static",
  "libgssapi-sys",
@@ -1647,10 +1612,11 @@ dependencies = [
 
 [[package]]
 name = "libgssapi-sys"
-version = "0.2.4"
-source = "git+https://github.com/losynix/libgssapi#995fb85ce34c1c53a5bb993880b1679c7e80b2ff"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efdcdd31923aa6280d41ff2636fd93a18cc60fe25983b24887d1a8d24478cbfb"
 dependencies = [
- "bindgen 0.59.2",
+ "bindgen 0.64.0",
 ]
 
 [[package]]
@@ -3038,7 +3004,7 @@ dependencies = [
  "actix-files",
  "actix-web",
  "clamav-rs",
- "clap 4.2.0",
+ "clap 4.2.1",
  "env_logger 0.10.0",
  "futures",
  "log",
@@ -3313,7 +3279,7 @@ dependencies = [
  "actix-web",
  "assert_cmd",
  "base64",
- "clap 4.2.0",
+ "clap 4.2.1",
  "err-derive",
  "futures",
  "hmac",
@@ -3358,7 +3324,7 @@ name = "usbsas-tools"
 version = "0.1.3"
 dependencies = [
  "bitvec",
- "clap 4.2.0",
+ "clap 4.2.1",
  "env_logger 0.10.0",
  "fuse_mt",
  "indicatif",
@@ -3398,7 +3364,7 @@ dependencies = [
 name = "usbsas-usbsas"
 version = "0.1.4"
 dependencies = [
- "clap 4.2.0",
+ "clap 4.2.1",
  "log",
  "serde_json",
  "thiserror",
@@ -3415,7 +3381,7 @@ dependencies = [
 name = "usbsas-utils"
 version = "0.1.1"
 dependencies = [
- "clap 4.2.0",
+ "clap 4.2.1",
  "env_logger 0.10.0",
  "log",
  "serde_json",
