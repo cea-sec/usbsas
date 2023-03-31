@@ -36,5 +36,5 @@ pub(crate) trait ArchiveWriter {
     fn newfile(&mut self, path: &str, ftype: FileType, size: u64, timestamp: i64) -> Result<()>;
     fn writefile(&mut self, data: &[u8]) -> Result<()>;
     fn endfile(&mut self, len_written: usize) -> Result<()>;
-    fn finish(self: Box<Self>, infos: usbsas_proto::writetar::RequestClose) -> Result<()>;
+    fn finish(self: Box<Self>, infos: &[u8]) -> Result<()>;
 }

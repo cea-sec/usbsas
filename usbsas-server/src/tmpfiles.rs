@@ -36,7 +36,7 @@ impl TmpFiles {
         Ok((out_tar, out_fs))
     }
 
-    fn delete_files(&self) {
+    fn delete_if_empty(&self) {
         // XXX TODO add a config to always remove or not ?
         if let Ok(metadata) = fs::metadata(&self.out_fs) {
             if metadata.len() == 0 {
@@ -52,7 +52,7 @@ impl TmpFiles {
     }
 
     pub(crate) fn reset(&mut self) -> Result<(), ServiceError> {
-        self.delete_files();
+        self.delete_if_empty();
         let (new_out_tar, new_out_fs) = TmpFiles::create_files(&self.out_directory)?;
         self.out_tar = new_out_tar;
         self.out_fs = new_out_fs;
@@ -62,6 +62,6 @@ impl TmpFiles {
 
 impl Drop for TmpFiles {
     fn drop(&mut self) {
-        self.delete_files()
+        self.delete_if_empty()
     }
 }

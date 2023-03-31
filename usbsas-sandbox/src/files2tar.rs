@@ -13,7 +13,6 @@ pub fn seccomp(fd_read: RawFd, fd_write: RawFd, out_tar_fd: RawFd) -> Result<()>
         Syscall::_llseek,
         &[Comparator::new(0, Cmp::Eq, out_tar_fd as u64, None)],
     )?;
-    ctx.allow_syscall(Syscall::uname)?;
     ctx.load()?;
 
     Ok(())

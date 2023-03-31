@@ -17,6 +17,7 @@ import signal
 import struct
 import sys
 import time
+import json
 
 from comm import CommUsbsas
 from proto.usbsas import proto3_pb2 as proto_usbsas
@@ -98,10 +99,11 @@ def copy_usb(comm, files, device):
         rep = comm.recv_resp()
         ok_or_exit(comm, rep, "error during copy")
         if isinstance(rep, proto_usbsas.ResponseCopyDone):
-            print("Transfer done, report:")
-            print(rep)
-            return
+            break
         print(rep)
+    print("Transfer done")
+    rep = comm.report()
+    print(json.dumps(json.loads(rep.report), indent=2))
 
 def copy_net(comm, files, url):
     rep = comm.copy_files_net(selected=files, url=url)
@@ -111,10 +113,11 @@ def copy_net(comm, files, url):
         rep = comm.recv_resp()
         ok_or_exit(comm, rep, "error during copy")
         if isinstance(rep, proto_usbsas.ResponseCopyDone):
-            print("Transfer done, report:")
-            print(rep)
-            return
+            break
         print(rep)
+    print("Transfer done")
+    rep = comm.report()
+    print(json.dumps(json.loads(rep.report), indent=2))
 
 def confirm_copy(devices):
     print('Copy all files from \n\"{}\"\nto\n\"{}\"\n? [Y/n]'.format(

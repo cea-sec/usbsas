@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
+    io::Write,
+    path,
     pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -35,6 +37,7 @@ protorequest!(
     getattr = GetAttr[RequestGetAttr, ResponseGetAttr],
     wipe = Wipe[RequestWipe, ResponseWipe],
     imgdisk = ImgDisk[RequestImgDisk, ResponseImgDisk],
+    report = Report[RequestReport, ResponseReport],
     end = End[RequestEnd, ResponseEnd]
 );
 
@@ -344,7 +347,6 @@ pub(crate) struct AppState {
     hmac: Mutex<Hmac<Sha256>>,
     tmpfiles: Mutex<TmpFiles>,
     pub status: Arc<RwLock<String>>,
-    #[cfg(feature = "log-json")]
     pub session_id: Arc<std::sync::RwLock<String>>,
 }
 
@@ -354,19 +356,27 @@ impl AppState {
 
         let tmpfiles = TmpFiles::new(config.out_directory.clone())?;
 
-        #[cfg(feature = "log-json")]
+        // Create reports directory if it doesn't exists
+        if let Some(report_config) = &config.report {
+            if let Some(reports_dir) = &report_config.write_local {
+                if let Err(err) = fs::create_dir(reports_dir) {
+                    match err.kind() {
+                        std::io::ErrorKind::AlreadyExists => (),
+                        _ => return Err(err.into()),
+                    }
+                }
+            };
+        };
+
+        #[cfg(feature = "integration-tests")]
+        let session_id = "0".to_string();
+        #[cfg(not(feature = "integration-tests"))]
         let session_id = uuid::Uuid::new_v4().simple().to_string();
 
         debug!("Out tar file name: {:?}", tmpfiles.out_tar);
         debug!("Out fs file name: {:?}", tmpfiles.out_fs);
 
-        let comm = AppState::start_usbsas(
-            &config,
-            &config_path,
-            &tmpfiles,
-            #[cfg(feature = "log-json")]
-            &session_id,
-        )?;
+        let comm = AppState::start_usbsas(&config, &config_path, &tmpfiles, &session_id)?;
 
         Ok(AppState {
             config: Mutex::new(config),
@@ -378,7 +388,6 @@ impl AppState {
                 &rand::thread_rng().gen::<[u8; 0x10]>(),
             )?),
             status: Arc::new(RwLock::new(String::from("idle"))),
-            #[cfg(feature = "log-json")]
             session_id: Arc::new(RwLock::new(session_id)),
         })
     }
@@ -387,7 +396,7 @@ impl AppState {
         config: &Config,
         config_path: &str,
         tmpfiles: &TmpFiles,
-        #[cfg(feature = "log-json")] sessionid: &str,
+        session_id: &str,
     ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
         debug!("starting usbsas");
 
@@ -400,8 +409,7 @@ impl AppState {
             usbsas_cmd = usbsas_cmd.arg("--analyze");
         }
 
-        #[cfg(feature = "log-json")]
-        std::env::set_var("USBSAS_SESSION_ID", sessionid);
+        std::env::set_var("USBSAS_SESSION_ID", session_id);
 
         let usbsas_child = usbsas_cmd.spawn::<proto::usbsas::Request>()?;
 
@@ -415,21 +423,19 @@ impl AppState {
 
         self.tmpfiles.lock()?.reset()?;
 
-        #[cfg(feature = "log-json")]
+        #[cfg(not(feature = "integration-tests"))]
         let new_session_id = uuid::Uuid::new_v4().simple().to_string();
+        #[cfg(feature = "integration-tests")]
+        let new_session_id = "0".to_string();
 
         let new_comm = AppState::start_usbsas(
             &*self.config.lock()?,
             &self.config_path.lock()?,
             &*self.tmpfiles.lock()?,
-            #[cfg(feature = "log-json")]
             &new_session_id,
         )?;
 
-        #[cfg(feature = "log-json")]
-        {
-            *self.session_id.write()? = new_session_id;
-        }
+        *self.session_id.write()? = new_session_id;
 
         *comm = new_comm;
 
@@ -728,12 +734,8 @@ impl AppState {
         progress += 1.0;
         resp_stream.report_progress("copy_usb_filter", progress)?;
 
-        let write_report = if let Some(analyzer_conf) = &self.config.lock()?.analyzer {
-            if let Some(report_config) = analyzer_conf.write_report {
-                report_config
-            } else {
-                false
-            }
+        let write_report = if let Some(report_conf) = &self.config.lock()?.report {
+            report_conf.write_dest
         } else {
             false
         };
@@ -920,6 +922,27 @@ impl AppState {
             }
         };
 
+        if let Some(report_conf) = &self.config.lock()?.report {
+            if let Some(report_dir) = &report_conf.write_local {
+                // save report on local disk
+                let transfer_report = comm.report(proto::usbsas::RequestReport {})?.report;
+                let datetime = time::OffsetDateTime::now_utc();
+                let report_file_name = format!(
+                    "usbsas_transfer_{:04}{:02}{:02}{:02}{:02}{:02}_{}.json",
+                    datetime.year(),
+                    datetime.month() as u8,
+                    datetime.day(),
+                    datetime.hour(),
+                    datetime.minute(),
+                    datetime.second(),
+                    self.session_id.read()?,
+                );
+                let mut report_file =
+                    fs::File::create(path::Path::new(&report_dir).join(report_file_name))?;
+                report_file.write_all(&transfer_report)?;
+            }
+        }
+
         // post copy cmd
         if let Some(usbsas_config::PostCopy { .. }) = self.config.lock()?.post_copy {
             let outfiletype = match out_dev.as_ref().ok_or(ServiceError::InternalServerError)? {
@@ -1036,10 +1059,10 @@ impl AppState {
                     fs::rename(
                         self.tmpfiles.lock()?.out_fs.clone(),
                         format!(
-                            "{}/imgdisk_{}{}{}{}{}{}_{}_{}_{}.bin",
+                            "{}/imgdisk_{:04}{:02}{:02}{:02}{:02}{:02}_{}_{}_{}.bin",
                             self.config.lock()?.out_directory,
                             datetime.year(),
-                            datetime.month(),
+                            datetime.month() as u8,
                             datetime.day(),
                             datetime.hour(),
                             datetime.minute(),

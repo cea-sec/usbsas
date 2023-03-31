@@ -25,7 +25,6 @@ pub mod common {
             )
         }
     }
-
 }
 
 pub mod downloader {

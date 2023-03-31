@@ -8,7 +8,7 @@ license = "GPL-3.0"
 anyhow = "1.0"
 ext4 = { git = "https://github.com/FauxFaux/ext4-rs", rev = "292c80fdf99533d6ac700a588497cd9f52631614" }
 ff = { path = "../ff" }
-iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "usbsas" }
+iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
 libc = "0.2"
 log = "0.4"
 ntfs = "0.3"

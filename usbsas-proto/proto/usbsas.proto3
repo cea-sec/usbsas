@@ -88,6 +88,9 @@ message RequestImgDisk {
   common.Device device = 1;
 };
 
+message RequestReport {
+};
+
 message Request {
   oneof msg {
     RequestEnd End = 1;
@@ -102,9 +105,9 @@ message Request {
     RequestWipe Wipe = 10;
     RequestPostCopyCmd PostCopyCmd = 11;
     RequestImgDisk ImgDisk = 12;
+    RequestReport Report = 13;
   }
 };
-
 
 
 /* Responses */
@@ -196,6 +199,10 @@ message ResponseImgDisk {
 message ResponsePostCopyCmd {
 };
 
+message ResponseReport {
+  bytes report = 1;
+};
+
 message Response {
   oneof msg {
     ResponseEnd End = 1;
@@ -220,5 +227,6 @@ message Response {
     ResponseImgDisk ImgDisk = 20;
     ResponseCopyDone CopyDone = 21;
     ResponseNothingToCopy NothingToCopy = 22;
+    ResponseReport Report = 23;
   }
 };
