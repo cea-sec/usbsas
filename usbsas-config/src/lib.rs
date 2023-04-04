@@ -44,7 +44,6 @@ pub struct PathFilter {
 pub struct Analyzer {
     pub url: String,
     pub krb_service_name: Option<String>,
-    pub write_report: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,8 +53,15 @@ pub struct UsbPortAccesses {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct Report {
+    pub write_dest: bool,
+    pub write_local: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub out_directory: String,
+    pub report: Option<Report>,
     pub message: Option<String>,
     pub command: Option<Command>,
     pub networks: Option<Vec<Network>>,

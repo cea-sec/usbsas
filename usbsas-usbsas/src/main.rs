@@ -4,6 +4,7 @@
 //! requests from the final application.
 
 use log::{debug, error, info, trace, warn};
+use serde_json::json;
 #[cfg(feature = "log-json")]
 use std::sync::{Arc, RwLock};
 use std::{
@@ -75,6 +76,7 @@ protoresponse!(
     nothingtocopy = NothingToCopy[ResponseNothingToCopy],
     wipe = Wipe[ResponseWipe],
     imgdisk = ImgDisk[ResponseImgDisk],
+    report = Report[ResponseReport],
     postcopycmd = PostCopyCmd[ResponsePostCopyCmd]
 );
 
@@ -303,7 +305,7 @@ impl InitState {
         children: &mut Children,
         dev_req: Device,
     ) -> Result<UsbDevice> {
-        trace!("req opendevice");
+        info!("Opening device {}", dev_req);
         let device = children
             .scsi2files
             .comm
@@ -507,8 +509,12 @@ impl CopyFilesState {
         children: &mut Children,
     ) -> Result<State> {
         trace!("req copy");
-        info!("Usbsas transfer for user: {}", self.id);
+        info!(
+            "Starting transfer from {} to {:?} for user: {}",
+            self.device, self.destination, self.id
+        );
 
+        let mut report = init_report()?;
         let mut errors = vec![];
         let mut all_directories = vec![];
         let mut all_files = vec![];
@@ -549,12 +555,24 @@ impl CopyFilesState {
 
         comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
 
+        report["file_names"] = all_files_filtered.clone().into();
+        report["filtered_files"] = filtered.clone().into();
+        report["user"] = serde_json::Value::String(self.id.clone());
+        report["source"] = json!({
+            "vendorid": self.device.vendorid,
+            "productid": self.device.productid,
+            "manufacturer": self.device.manufacturer,
+            "serial": self.device.serial,
+            "description": self.device.description
+        });
+
         self.tar_src_files(
             comm,
             children,
             &all_entries_filtered,
             &mut errors,
             max_file_size,
+            &report,
         )?;
 
         match self.destination {
@@ -571,6 +589,7 @@ impl CopyFilesState {
                     usb,
                     analyze: true,
                     write_report: self.write_report,
+                    report,
                 }))
             }
             Destination::Net(_) | Destination::Cmd(_) => {
@@ -581,6 +600,7 @@ impl CopyFilesState {
                     filtered,
                     id: self.id,
                     destination: self.destination,
+                    report,
                 }))
             }
         }
@@ -693,12 +713,13 @@ impl CopyFilesState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-        selected: &[String],
+        entries_filtered: &[String],
         errors: &mut Vec<String>,
         max_file_size: Option<u64>,
+        report: &serde_json::Value,
     ) -> Result<()> {
         trace!("tar src files");
-        for path in selected {
+        for path in entries_filtered {
             if let Err(err) = self.file_to_tar(comm, children, path, max_file_size) {
                 error!("Couldn't copy file {}: {}", &path, err);
                 errors.push(path.clone());
@@ -708,12 +729,7 @@ impl CopyFilesState {
             .files2tar
             .comm
             .close(proto::writetar::RequestClose {
-                id: self.id.clone(),
-                vendorid: self.device.vendorid,
-                productid: self.device.productid,
-                manufacturer: self.device.manufacturer.clone(),
-                serial: self.device.serial.clone(),
-                description: self.device.description.clone(),
+                infos: serde_json::to_vec(&report)?,
             })?;
         comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
         Ok(())
@@ -810,7 +826,7 @@ impl DownloadTarState {
         children: &mut Children,
     ) -> Result<State> {
         trace!("req download tar");
-        info!("Usbsas export for user: {}", self.id);
+        info!("starting export for user: {}", self.id);
 
         let mut errors = vec![];
         let mut all_directories = vec![];
@@ -845,6 +861,10 @@ impl DownloadTarState {
             max_file_size,
         )?;
 
+        let mut report = init_report()?;
+        report["source"] = "network".into();
+        report["file_names"] = all_files.clone().into();
+
         match self.destination {
             Destination::Usb(usb) => Ok(State::WriteFiles(WriteFilesState {
                 directories: all_directories,
@@ -856,6 +876,7 @@ impl DownloadTarState {
                 usb,
                 analyze: false,
                 write_report: false,
+                report,
             })),
             Destination::Net(_) | Destination::Cmd(_) => {
                 children.tar2files.comm.write_all(&[0_u8])?;
@@ -865,6 +886,7 @@ impl DownloadTarState {
                     filtered: Vec::new(),
                     id: self.id,
                     destination: self.destination,
+                    report,
                 }))
             }
         }
@@ -1002,6 +1024,7 @@ struct WriteFilesState {
     usb: proto::usbsas::DestUsb,
     analyze: bool,
     write_report: bool,
+    report: serde_json::Value,
 }
 
 impl WriteFilesState {
@@ -1079,8 +1102,14 @@ impl WriteFilesState {
             }
         }
 
+        self.report["error_files"] = self.errors.clone().into();
+
         if let Some(report) = analyze_report {
-            if let Err(err) = self.write_report_file(children, report) {
+            self.report["analyzer_report"] = report;
+        }
+
+        if self.write_report {
+            if let Err(err) = self.write_report_file(children) {
                 error!("Couldn't write report on destination fs");
                 comm.error(proto::usbsas::ResponseError {
                     err: format!("err writing report on dest fs: {err}"),
@@ -1103,17 +1132,19 @@ impl WriteFilesState {
                     filtered_path: self.filtered,
                     dirty_path: self.dirty,
                 })?;
-                info!("USB TRANSFER DONE for user {}", self.id);
+                info!("transfer done");
             }
             Err(err) => {
                 comm.error(proto::usbsas::ResponseError {
                     err: format!("err writing fs: {err}"),
                 })?;
-                error!("USB TRANSFER FAILED for user {}", self.id);
+                error!("transfer failed: {}", err);
             }
         }
 
-        Ok(State::TransferDone(TransferDoneState {}))
+        Ok(State::TransferDone(TransferDoneState {
+            report: self.report,
+        }))
     }
 
     fn init_fs(&mut self, children: &mut Children) -> Result<()> {
@@ -1285,42 +1316,11 @@ impl WriteFilesState {
         Ok(())
     }
 
-    fn write_report_file(&self, children: &mut Children, report: serde_json::Value) -> Result<()> {
+    fn write_report_file(&mut self, children: &mut Children) -> Result<()> {
         log::debug!("writing report");
-        // Read config.json from temp archive
-        let config_size = children
-            .tar2files
-            .comm
-            .getattr(proto::files::RequestGetAttr {
-                path: "config.json".into(),
-            })?
-            .size;
-        let config_data = children
-            .tar2files
-            .comm
-            .readfile(proto::files::RequestReadFile {
-                path: "config.json".into(),
-                offset: 0,
-                size: config_size,
-            })?
-            .data;
 
-        let config_json: serde_json::Value = serde_json::from_str(
-            std::str::from_utf8(&config_data).map_err(|err| Error::Error(format!("{}", err)))?,
-        )?;
-
-        let final_report = serde_json::json!({
-            "name": config_json["name"],
-            "id": config_json["id"],
-            "time": config_json["time"],
-            "usb_src": config_json["usb_src"],
-            "analyzer_report": report,
-            "filtered_files": self.filtered,
-            "errors": self.errors,
-        });
-
-        let report_data = serde_json::to_vec_pretty(&final_report)?;
-        let report_name = format!("/usbsas-report-{}.json", config_json["time"]);
+        let report_data = serde_json::to_vec_pretty(&self.report)?;
+        let report_name = format!("/usbsas-report-{}.json", self.report["timestamp"]);
 
         children
             .files2fs
@@ -1329,7 +1329,7 @@ impl WriteFilesState {
                 path: report_name.clone(),
                 size: report_data.len() as u64,
                 ftype: FileType::Regular.into(),
-                timestamp: config_json["time"].as_f64().unwrap_or(0.0) as i64,
+                timestamp: self.report["timestamp"].as_f64().unwrap_or(0.0) as i64,
             })?;
         children
             .files2fs
@@ -1382,6 +1382,7 @@ struct UploadOrCmdState {
     errors: Vec<String>,
     filtered: Vec<String>,
     id: String,
+    report: serde_json::Value,
 }
 
 impl UploadOrCmdState {
@@ -1390,11 +1391,13 @@ impl UploadOrCmdState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
+        self.report["error_files"] = self.errors.clone().into();
         match &self.destination {
             Destination::Usb(_) => unreachable!("already handled"),
             Destination::Net(dest_net) => self.upload_files(comm, children, dest_net.clone())?,
             Destination::Cmd(_) => {
-                trace!("exec cmd");
+                debug!("exec cmd");
+                self.report["destination"] = "cmd".into();
                 children.cmdexec.comm.exec(proto::cmdexec::RequestExec {})?;
             }
         }
@@ -1410,8 +1413,10 @@ impl UploadOrCmdState {
             dirty_path: Vec::new(),
         })?;
 
-        info!("NET TRANSFER DONE for user {}", self.id);
-        Ok(State::TransferDone(TransferDoneState {}))
+        info!("net transfer done");
+        Ok(State::TransferDone(TransferDoneState {
+            report: self.report,
+        }))
     }
 
     fn upload_files(
@@ -1454,7 +1459,7 @@ impl UploadOrCmdState {
                 }
             }
         }
-
+        self.report["destination"] = "network".into();
         Ok(())
     }
 }
@@ -1473,7 +1478,10 @@ impl WipeState {
         children: &mut Children,
     ) -> Result<State> {
         use proto::fs2dev::response::Msg;
-        trace!("req wipe");
+        info!(
+            "starting wipe {}-{} quick: {} ",
+            self.busnum, self.devnum, self.quick
+        );
 
         // Unlock fs2dev
         children
@@ -1537,10 +1545,6 @@ impl WipeState {
                 }
                 Msg::CopyStatusDone(_) => {
                     comm.wipe(proto::usbsas::ResponseWipe {})?;
-                    info!(
-                        "WIPE DONE (bus/devnum: {}/{} - quick: {})",
-                        self.busnum, self.devnum, self.quick
-                    );
                     break;
                 }
                 _ => {
@@ -1552,6 +1556,7 @@ impl WipeState {
                 }
             }
         }
+        info!("wipe done");
         Ok(State::WaitEnd(WaitEndState {}))
     }
 }
@@ -1566,7 +1571,7 @@ impl ImgDiskState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        trace!("Image disk");
+        info!("starting image disk: {}", self.device);
         self.image_disk(comm, children)?;
         comm.imgdisk(proto::usbsas::ResponseImgDisk {})?;
         Ok(State::WaitEnd(WaitEndState {}))
@@ -1608,12 +1613,14 @@ impl ImgDiskState {
                 total_size: self.device.dev_size,
             })?;
         }
-        info!("DISK IMAGE DONE");
+        info!("image disk done");
         Ok(())
     }
 }
 
-struct TransferDoneState {}
+struct TransferDoneState {
+    report: serde_json::Value,
+}
 
 impl TransferDoneState {
     fn run(
@@ -1623,12 +1630,17 @@ impl TransferDoneState {
     ) -> Result<State> {
         let req: proto::usbsas::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
+            Msg::Report(_) => {
+                comm.report(proto::usbsas::ResponseReport {
+                    report: serde_json::to_vec(&self.report)?,
+                })?;
+            }
             Msg::End(_) => {
                 children.end_wait_all(comm)?;
                 return Ok(State::End);
             }
             Msg::PostCopyCmd(req) => {
-                trace!("post copy cmd");
+                info!("starting post copy cmd");
                 match children
                     .cmdexec
                     .comm
@@ -1636,6 +1648,7 @@ impl TransferDoneState {
                         outfiletype: req.outfiletype,
                     }) {
                     Ok(_) => {
+                        info!("post copy cmd done");
                         comm.postcopycmd(proto::usbsas::ResponsePostCopyCmd {})?;
                     }
                     Err(err) => {
@@ -1683,6 +1696,33 @@ impl WaitEndState {
         }
         Ok(State::End)
     }
+}
+
+fn init_report() -> Result<serde_json::Value> {
+    #[cfg(not(feature = "integration-tests"))]
+    let (hostname, time) = {
+        let name = match uname::Info::new() {
+            Ok(name) => name.nodename,
+            _ => "unknown-usbsas".to_string(),
+        };
+        (name, time::OffsetDateTime::now_utc())
+    };
+    // Fixed values to keep a deterministic filesystem hash
+    #[cfg(feature = "integration-tests")]
+    let (hostname, time) = (
+        "unknown-usbsas",
+        time::macros::datetime!(2020-01-01 0:00 UTC),
+    );
+
+    let report = json!({
+        "timestamp": time.unix_timestamp(),
+        "datetime": format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+            time.year(), time.month() as u8, time.day(),
+            time.hour(),time.minute(),time.second()),
+        "hostname": hostname,
+        "transfer_id": std::env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string()),
+    });
+    Ok(report)
 }
 
 struct Children {
@@ -2070,7 +2110,7 @@ fn main() -> Result<()> {
     let tar_path = matches.get_one::<String>("tar_path").unwrap();
     let fs_path = matches.get_one::<String>("fs_path").unwrap();
 
-    info!("start ({}): {} {}", std::process::id(), tar_path, fs_path);
+    info!("init ({}): {} {}", std::process::id(), tar_path, fs_path);
     Usbsas::new(
         Comm::from_env()?,
         config,

@@ -15,6 +15,16 @@ pub mod cmdexec {
 
 pub mod common {
     include!(concat!(env!("OUT_DIR"), "/common.rs"));
+
+    impl std::fmt::Display for Device {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(
+                f,
+                "{} - {} - {} ({}-{})",
+                self.manufacturer, self.description, self.serial, self.vendorid, self.productid
+            )
+        }
+    }
 }
 
 pub mod downloader {

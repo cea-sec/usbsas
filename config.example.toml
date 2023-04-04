@@ -67,7 +67,6 @@ command_args = [
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 #krb_service_name = "HTTP@your.domain"
-#write_report = true
 
 
 # Command to execute after a transfer. (Optional)
@@ -93,6 +92,11 @@ url = "http://127.0.0.1:8042/api/scanbundle"
 #ports_src = [9, 3]
 #ports_dst = [6]
 
+# A transfer report can be written on the destination device. (Optional)
+# It can also be written on the local disk. (Optional)
+[report]
+write_dest = true
+#write_local = "/var/lib/usbsas/reports"
 
 # Message to show on web page if using web client/server. (Optional)
 # Message can be in HTML.

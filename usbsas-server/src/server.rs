@@ -197,7 +197,8 @@ pub async fn start_server(
                     .exclude("/id")
                     .exclude("/devices")
                     .exclude("/status")
-                    .exclude("/static")
+                    .exclude("/favicon.ico")
+                    .exclude_regex("/static/*")
                     .log_target("http"),
             )
             .service(id)

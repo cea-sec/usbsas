@@ -26,13 +26,7 @@ message RequestEndFile {
 
 
 message RequestClose {
-  string id = 1;
-  uint32 vendorid = 2;
-  uint32 productid = 3;
-  string manufacturer = 4;
-  string serial = 5;
-  string description = 6;
-
+  bytes infos = 1;
 };
 
 

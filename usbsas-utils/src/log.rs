@@ -9,7 +9,7 @@ use {
 
 #[cfg(feature = "log-json")]
 pub fn init_server_logger(session_id: Arc<RwLock<String>>) {
-    let mut builder = Builder::from_env(Env::default().filter_or("RUST_LOG", "info"));
+    let mut builder = Builder::from_env(Env::default().filter_or("RUST_LOG", "info,http=error"));
     builder.format(move |buf, record| {
         write!(buf, "{{")?;
         write!(
@@ -57,5 +57,5 @@ pub fn init_logger() {
 
 #[cfg(not(feature = "log-json"))]
 pub fn init_logger() {
-    env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
+    env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info,http=error"));
 }

@@ -1,6 +1,5 @@
 use crate::ArchiveWriter;
 use crate::{Error, Result};
-use serde_json::json;
 use std::{io::Write, path::Path, time::SystemTime};
 use usbsas_proto::common::FileType;
 use usbsas_utils::{TAR_BLOCK_SIZE, TAR_DATA_DIR};
@@ -73,41 +72,9 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
         Ok(())
     }
 
-    fn finish(mut self: Box<Self>, req: usbsas_proto::writetar::RequestClose) -> Result<()> {
-        #[cfg(not(feature = "integration-tests"))]
-        let (name, time) = {
-            let name = match uname::Info::new() {
-                Ok(uname) => format!("usbsas-{}", uname.nodename),
-                _ => "Unknown".to_string(),
-            };
-            (
-                name,
-                SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)?
-                    .as_secs_f64(),
-            )
-        };
-        // Fixed values to keep a deterministic filesystem hash
-        #[cfg(feature = "integration-tests")]
-        let (name, time) = ("usbsas", 946767600);
-
-        let infos = json!({
-            "time": time,
-            "name": name,
-            "id": req.id,
-            "file_names": self.files,
-            "usb_src": {
-                "vendorid": req.vendorid,
-                "productid": req.productid,
-                "manufacturer": req.manufacturer,
-                "serial": req.serial,
-                "description": req.description
-            }
-        })
-        .to_string();
-
+    fn finish(mut self: Box<Self>, infos: &[u8]) -> Result<()> {
         let mut header = tar::Header::new_ustar();
-        header.set_size(infos.as_bytes().len() as u64);
+        header.set_size(infos.len() as u64);
         header.set_entry_type(tar::EntryType::Regular);
         header.set_mode(0o644);
         header.set_path("config.json")?;
@@ -117,7 +84,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
                 .as_secs_f64() as u64,
         );
         header.set_cksum();
-        self.builder.append(&header, infos.as_bytes())?;
+        self.builder.append(&header, infos)?;
 
         // Make sure everything is flushed and closed
         let mut inner = self.builder.into_inner()?;

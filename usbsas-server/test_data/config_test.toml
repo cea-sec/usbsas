@@ -13,7 +13,9 @@ url = "http://127.0.0.1:8042/api/downloadbundle"
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 referer = "http://127.0.0.1"
-write_report = true
+
+[report]
+write_dest = true
 
 [[filters]]
 contain = ["__macosx"]

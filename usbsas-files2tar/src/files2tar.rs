@@ -91,7 +91,7 @@ impl WaitNewFileState {
                 }
             }
             Msg::Close(req) => {
-                self.archive.finish(req)?;
+                self.archive.finish(&req.infos)?;
                 comm.close(proto::writetar::ResponseClose {})?;
                 Ok(State::WaitEnd(WaitEndState {}))
             }

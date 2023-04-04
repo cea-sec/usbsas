@@ -9,6 +9,8 @@ clap = "4.2"
 log = "0.4"
 serde_json = "1.0"
 thiserror = "1.0"
+time = "0.3"
+uname = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
@@ -16,6 +18,9 @@ usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
+
+[features]
+integration-tests = []
 
 # cargo-deb
 [package.metadata.deb]

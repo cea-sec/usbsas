@@ -89,7 +89,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --release --verbose -p usbsas-server
+        args: --release --verbose -p usbsas-server --features integration-tests
 
   # cargo fmt
   fmt:

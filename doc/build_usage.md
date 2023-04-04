@@ -72,8 +72,8 @@ A `mock` feature is available to test the usbsas without real USB devices.
 
 Run the integration tests:
 ```shell
-$ cargo build --all --features mock
-$ cargo test -p usbsas-server
+$ cargo build --all --features mock,integration-tests
+$ cargo test -p usbsas-server --features integration-tests
 ```
 
 ## Usage

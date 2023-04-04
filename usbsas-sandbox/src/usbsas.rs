@@ -7,6 +7,7 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
 
     ctx.allow_syscall(Syscall::wait4)?;
     ctx.allow_syscall(Syscall::getrandom)?;
+    ctx.allow_syscall(Syscall::uname)?;
 
     ctx.load()?;
 
