@@ -2919,7 +2919,7 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 [[package]]
 name = "udev"
 version = "0.7.0"
-source = "git+https://github.com/losynix/udev-rs?branch=socket_fd_from_monitor#26955cd1ec3297eb6f4f77d3482280fd5f0487a4"
+source = "git+https://github.com/losynix/udev-rs?branch=socket_fd_from_monitor#68c1fe3e550580d90f7dbd78d777a5c6412bf009"
 dependencies = [
  "io-lifetimes",
  "libc",
