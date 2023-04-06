@@ -64,7 +64,7 @@ fn handle_udev_events(
     let monitor = udev::MonitorBuilder::new()?.match_subsystem_devtype("usb", "usb_device")?;
     let mut poll = Poll::new()?;
 
-    usbsas_sandbox::usbdev::seccomp_thread(monitor.socket_raw_fd(), poll.as_raw_fd())?;
+    usbsas_sandbox::usbdev::seccomp_thread(monitor.as_raw_fd(), poll.as_raw_fd())?;
 
     let config = conf_parse(&config)?;
 
