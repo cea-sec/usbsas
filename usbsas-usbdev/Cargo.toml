@@ -9,7 +9,7 @@ env_logger = "0.10"
 log = "0.4"
 mio = { version = "0.8", features = ["os-ext"] }
 thiserror = "1.0"
-udev = { git = "https://github.com/losynix/udev-rs", branch = "socket_fd_from_monitor", features = ["mio"] }
+udev = { git = "https://github.com/Smithay/udev-rs", rev = "ae6f8faf0418fe3ba7d80a4aa239e247b4f3e75e", features = ["mio"] }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
