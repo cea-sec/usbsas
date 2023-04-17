@@ -7,6 +7,7 @@ use log::{debug, error, info, trace};
 use mio::{Events, Interest, Poll, Token};
 use std::{
     collections::HashMap,
+    ffi::OsStr,
     os::unix::io::AsRawFd,
     sync::{Arc, Mutex},
     thread,
@@ -204,30 +205,30 @@ impl CurrentDevices {
             vendorid: u32::from_str_radix(
                 &device
                     .attribute_value("idVendor")
-                    .ok_or(Error::NoneValue)?
+                    .unwrap_or(OsStr::new("0"))
                     .to_string_lossy(),
                 16,
             )?,
             productid: u32::from_str_radix(
                 &device
                     .attribute_value("idProduct")
-                    .ok_or(Error::NoneValue)?
+                    .unwrap_or(OsStr::new("0"))
                     .to_string_lossy(),
                 16,
             )?,
             manufacturer: device
                 .attribute_value("manufacturer")
-                .ok_or(Error::NoneValue)?
+                .unwrap_or(OsStr::new("unknown"))
                 .to_string_lossy()
                 .to_string(),
             description: device
                 .attribute_value("product")
-                .ok_or(Error::NoneValue)?
+                .unwrap_or(OsStr::new("unknown"))
                 .to_string_lossy()
                 .to_string(),
             serial: device
                 .attribute_value("serial")
-                .ok_or(Error::NoneValue)?
+                .unwrap_or(OsStr::new("unknown"))
                 .to_string_lossy()
                 .to_string(),
             is_src,
