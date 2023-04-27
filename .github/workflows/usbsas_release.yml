@@ -1,0 +1,140 @@
+name: usbsas release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  GITHUB_REF: "${{ github.ref }}"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install dependencies
+        run: |
+          sudo apt update && \
+          sudo apt install -y --no-install-recommends \
+          pkgconf \
+          clang \
+          make \
+          cmake \
+          curl \
+          git \
+          protobuf-compiler \
+          libfuse3-dev \
+          libssl-dev \
+          libkrb5-dev \
+          libclamav-dev \
+          libx11-dev \
+          libxtst-dev \
+          libdbus-1-dev \
+          libudev-dev \
+          libseccomp-dev\
+          dpkg-deb \
+          live-build
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+      - name: Build deb packages and live ISO
+        run: make -C client/live-iso
+      - name: Upload deb packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: usbsas-deb-packages
+          path: ./target/debian/usbsas-*.deb
+      - name: Upload live ISO
+        uses: actions/upload-artifact@v3
+        with:
+          name: usbsas-live-iso
+          path: ./client/live-iso/usbsas-*.iso
+  release:
+    name: Github release draft
+    needs: [build-all]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "${GITHUB_REF##*/}"
+          release_name: "${GITHUB_REF##*/}"
+          draft: true
+      - name: Download usbsas deb packages
+        uses: actions/download-artifact@v3
+        with:
+          name: usbsas-deb-packages
+      - name: Download usbsas live ISO
+        uses: actions/download-artifact@v3
+        with:
+          name: usbsas-live-iso
+      - name: Get artifacts names
+        id: artifacts_names
+        run: |
+          echo "U_PKG_ASRV=$(ls usbsas-analyzer-server*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_SRV=$(ls usbsas-server*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_CORE=$(ls usbsas-core*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_KIOSK=$(ls usbsas-kiosk*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_HID=$(ls usbsas-hid*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_ISO=$(ls usbsas-*.hybrid.iso)" >> "$GITHUB_OUTPUT"
+      - name: Upload usbsas-analyzer-server package to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.artifacts_names.outputs.U_PKG_ASRV }}
+          asset_content_type: application/octet-stream
+          asset_name: ${{ steps.artifacts_names.outputs.U_PKG_ASRV }}
+      - name: Upload usbsas-server package to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.artifacts_names.outputs.U_PKG_SRV }}
+          asset_content_type: application/octet-stream
+          asset_name: ${{ steps.artifacts_names.outputs.U_PKG_SRV }}
+      - name: Upload analyzer-core package to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.artifacts_names.outputs.U_PKG_CORE }}
+          asset_content_type: application/octet-stream
+          asset_name: ${{ steps.artifacts_names.outputs.U_PKG_CORE }}
+      - name: Upload usbsas-kiosk package to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.artifacts_names.outputs.U_PKG_KIOSK }}
+          asset_content_type: application/octet-stream
+          asset_name: ${{ steps.artifacts_names.outputs.U_PKG_KIOSK }}
+      - name: Upload usbsas-hid package to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.artifacts_names.outputs.U_PKG_HID }}
+          asset_content_type: application/octet-stream
+          asset_name: ${{ steps.artifacts_names.outputs.U_PKG_HID }}
+      - name: Upload usbsas live iso to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.artifacts_names.outputs.U_ISO }}
+          asset_content_type: application/octet-stream
+          asset_name: ${{ steps.artifacts_names.outputs.U_ISO }}
