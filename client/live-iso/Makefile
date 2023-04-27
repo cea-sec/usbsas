@@ -1,4 +1,4 @@
-ISO_VER=0.1.4
+ISO_VER=$(shell grep '^version' ../../Cargo.toml | cut -d'"' -f2)
 
 DST_PKG_DIR=config/includes.chroot
 SRC_PKG_DIR=../../target/debian
