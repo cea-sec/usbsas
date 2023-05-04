@@ -1,0 +1,71 @@
+name: usbsas release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build packages and live ISO
+        run: |
+          cd debian && \
+          docker build -t usbsas-builder:debian -f Dockerfile . && \
+          docker run -t -u $(id -u):$(id -g) -v $(pwd)/../:/SRC  \
+            --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
+            make -C debian pkgs && \
+          docker run -t --privileged -v $(pwd)/../:/SRC  \
+            --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
+            make SU= -C debian
+      - name: Upload deb packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: usbsas-deb-packages
+          path: ./target/debian/usbsas-*.deb
+      - name: Upload live ISO
+        uses: actions/upload-artifact@v3
+        with:
+          name: usbsas-live-iso
+          path: ./client/live-iso/usbsas-*.iso
+  release:
+    name: Github release draft
+    needs: [build-all]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download usbsas deb packages
+        uses: actions/download-artifact@v3
+        with:
+          name: usbsas-deb-packages
+      - name: Download usbsas live ISO
+        uses: actions/download-artifact@v3
+        with:
+          name: usbsas-live-iso
+      - name: Get artifacts names
+        id: artifacts_names
+        run: |
+          echo "U_PKG_ASRV=$(ls usbsas-analyzer-server*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_SRV=$(ls usbsas-server*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_CORE=$(ls usbsas-core*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_KIOSK=$(ls usbsas-kiosk*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_HID=$(ls usbsas-hid*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_ISO=$(ls usbsas-*.hybrid.iso)" >> "$GITHUB_OUTPUT"
+      - name: Create draft release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: |
+            ${{ steps.artifacts_names.outputs.U_PKG_ASRV }}
+            ${{ steps.artifacts_names.outputs.U_PKG_SRV }}
+            ${{ steps.artifacts_names.outputs.U_PKG_CORE }}
+            ${{ steps.artifacts_names.outputs.U_PKG_KIOSK }}
+            ${{ steps.artifacts_names.outputs.U_PKG_HID }}
+            ${{ steps.artifacts_names.outputs.U_ISO }}

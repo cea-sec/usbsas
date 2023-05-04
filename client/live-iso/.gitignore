@@ -1,0 +1,13 @@
+.build
+cache
+chroot*
+config/binary
+config/bootstrap
+config/common
+config/hooks/live/0010*
+config/hooks/live/0050*
+config/hooks/normal
+config/includes.chroot/usbsas-*.deb
+config/source
+
+
