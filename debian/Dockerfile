@@ -1,4 +1,4 @@
-FROM rust:slim-bullseye
+FROM rust:slim-bookworm
 
 RUN set -eux; \
     apt-get update && \
@@ -20,7 +20,12 @@ RUN set -eux; \
     libudev-dev \
     libseccomp-dev \
     live-build \
-    dpkg-dev && \
-    cargo install cargo-deb
+    dpkg-dev \
+    clamav-freshclam && \
+    cargo install cargo-deb && \
+    cargo install cargo-audit && \
+    rustup component add rustfmt && \
+    rustup component add clippy; \
+    freshclam
 
 WORKDIR /SRC
