@@ -125,13 +125,10 @@ body[data-state="DOCUMENTATION"] #documentation {
 }
 
 #usb-arrow {
+  width: 30%;
   position: absolute;
   bottom: 6vh;
   left: 4vw;
-}
-
-body[data-state="WAIT_DESTINATION"] #usb-arrow {
-  top: 78%;
 }
 
 #usb-arrow i {
@@ -140,7 +137,6 @@ body[data-state="WAIT_DESTINATION"] #usb-arrow {
 }
 
 #usb-arrow p {
-  width: 50%;
   font-size: 2rem;
   text-align: center;
   margin-top: -10px;
@@ -164,6 +160,8 @@ body[data-state="WAIT_DESTINATION"] #usb-arrow p strong {
 
 .button-bar {
   margin-top: 1rem;
+  margin-bottom: 5%;
+  margin-right: 5%;
 }
 
 .list-group-item-text, #key-serial {
