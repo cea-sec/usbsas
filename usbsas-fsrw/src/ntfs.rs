@@ -154,11 +154,7 @@ fn ntfs_name_from_file<T: Read + Seek>(file: &ntfs::NtfsFile, reader: &mut T) ->
         return Err(Error::FSError("Didn't find file name".to_string()));
     };
 
-    if let Some(name_string) = name?.name().to_string_checked() {
-        Ok(name_string)
-    } else {
-        Err(Error::FSError("Didn't find file name".to_string()))
-    }
+    Ok(name?.name().to_string_lossy())
 }
 
 fn ntfs_file_size<T: Read + Seek>(ntfs_file: &ntfs::NtfsFile, reader: &mut T) -> Result<u64> {

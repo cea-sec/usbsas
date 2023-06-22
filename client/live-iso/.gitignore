@@ -9,5 +9,9 @@ config/hooks/live/0050*
 config/hooks/normal
 config/includes.chroot/usbsas-*.deb
 config/source
-
-
+binary*
+*.contents
+*.files
+*.iso
+*.zsync
+*.packages

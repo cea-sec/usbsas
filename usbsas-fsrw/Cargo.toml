@@ -11,7 +11,7 @@ ff = { path = "../ff" }
 iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
 libc = "0.2"
 log = "0.4"
-ntfs = "0.3"
+ntfs = "0.4"
 ntfs3g = { path = "../ntfs3g" }
 positioned-io2 = "0.3"
 thiserror = "1.0"
