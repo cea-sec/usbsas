@@ -13,6 +13,10 @@ if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
     echo "reloading udev rules"
     udevadm control --reload-rules
 
+    echo "creating /usbsas_data"
+    mkdir -p /usbsas_data
+    chown usbsas /usbsas_data
+
 fi
 
 #DEBHELPER#
