@@ -1039,13 +1039,13 @@ impl WriteFilesState {
             None
         };
 
-        // Abort if no files survived antivirus
-        if self.files.is_empty() {
+        // Abort if no files survived antivirus and no report requested
+        if self.files.is_empty() && !self.write_report {
             comm.nothingtocopy(proto::usbsas::ResponseNothingToCopy {
                 rejected_filter: self.filtered,
                 rejected_dirty: self.dirty,
             })?;
-            warn!("Aborting copy, no files survived antivirus");
+            warn!("Aborting copy, no files survived filter and antivirus");
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
