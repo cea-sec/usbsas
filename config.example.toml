@@ -83,14 +83,15 @@ url = "http://127.0.0.1:8042/api/scanbundle"
 
 # USB ports allowed. (Optional)
 # Enforce USB topology for source and destination USB devices.
-# [1] means: device should be plugged into the physical port 1.
-# [1, 2] means: a USB hub is plugged into the physical port 1 and the device
-#               should be plugged into the physical port 2 of the hub. There can
-#               be more than 1 hub (e.g. [2, 3, 1, 2]).
+# [4, 3] means: device should be plugged into Port 3 of Bus 4.
+# [3, 2, 5] means: There is a USB hub in the Port 2 of Bus 3 and the device
+#                  should be plugged into the Port 5 of the hub.
+# There can be more than 1 hub (e.g. [2, 3, 1, 2]).
 # To check your topology: $ lsusb -t
+# Multiple ports can be allowed.
 #[usb_port_accesses]
-#ports_src = [9, 3]
-#ports_dst = [6]
+#ports_src = [ [6, 2, 3, 1], [2, 3] ]
+#ports_dst = [ [4, 3] ]
 
 # A transfer report can be written on the destination device. (Optional)
 # It can also be written on the local disk. (Optional)

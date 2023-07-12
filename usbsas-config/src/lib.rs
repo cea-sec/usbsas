@@ -48,8 +48,8 @@ pub struct Analyzer {
 
 #[derive(Debug, Deserialize)]
 pub struct UsbPortAccesses {
-    pub ports_src: Vec<u8>,
-    pub ports_dst: Vec<u8>,
+    pub ports_src: Vec<Vec<u8>>,
+    pub ports_dst: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize)]

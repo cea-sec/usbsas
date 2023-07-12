@@ -84,6 +84,9 @@ fn handle_udev_events(
 
     let mut cur_dev = current_devices.lock()?;
     cur_dev.usb_port_accesses = config.usb_port_accesses;
+    if let Some(usb_ports) = &cur_dev.usb_port_accesses {
+        log::debug!("usb_port_accesses: {:?}", usb_ports);
+    };
 
     for dev in enumerator.scan_devices()? {
         // Only add mass storage devices
@@ -115,7 +118,11 @@ fn handle_udev_events(
                                     if let Err(err) =
                                         current_devices.lock()?.add_device(&ev.device())
                                     {
-                                        log::error!("Couldn't add dev {:?} ({})", ev.device(), err);
+                                        log::error!(
+                                            "Couldn't add dev {:#?} ({})",
+                                            ev.device(),
+                                            err
+                                        );
                                     }
                                 }
                             }
@@ -133,16 +140,6 @@ fn handle_udev_events(
     }
 }
 
-/// Compare vectors (usb ports)
-fn cmp_vec(vec1: &[u32], vec2: &[u8]) -> bool {
-    if vec1.len() != vec2.len() {
-        return false;
-    }
-    vec1.iter()
-        .zip(vec2.iter())
-        .all(|(&elt1, &elt2)| elt1 == elt2 as u32)
-}
-
 pub struct CurrentDevices {
     devices: HashMap<String, UsbDevice>,
     usb_port_accesses: Option<UsbPortAccesses>,
@@ -157,26 +154,30 @@ impl CurrentDevices {
     }
 
     fn add_device(&mut self, device: &udev::Device) -> Result<()> {
-        // Check if device is connected to an allowed port
+        let busnum = device
+            .attribute_value("busnum")
+            .ok_or(Error::NoneValue)?
+            .to_string_lossy()
+            .parse::<u8>()?;
+
+        let mut dev_path = Vec::new();
+        dev_path.push(busnum);
+        for port in device
+            .attribute_value("devpath")
+            .ok_or(Error::NoneValue)?
+            .to_string_lossy()
+            .to_string()
+            .split('.')
+        {
+            dev_path.push(port.parse::<u8>()?)
+        }
+
+        // Check if device is connected to an allowed port if policy configured
         let (is_src, mut is_dst) = if let Some(ports) = &self.usb_port_accesses {
-            let mut dev_port = Vec::new();
-            for port in device
-                .attribute_value("devpath")
-                .ok_or(Error::NoneValue)?
-                .to_string_lossy()
-                .to_string()
-                .split('.')
-            {
-                dev_port.push(port.parse::<u32>()?)
-            }
-            if cmp_vec(&dev_port, &ports.ports_src) {
-                (true, false)
-            } else if cmp_vec(&dev_port, &ports.ports_dst) {
-                (false, true)
-            } else {
-                debug!("Device plugged in unauthorized port {:?}", dev_port);
-                return Ok(());
-            }
+            (
+                ports.ports_src.contains(&dev_path),
+                ports.ports_dst.contains(&dev_path),
+            )
         } else {
             (true, true)
         };
@@ -191,12 +192,16 @@ impl CurrentDevices {
             is_dst = false;
         }
 
+        if !is_src && !is_dst {
+            log::warn!(
+                "Ignoring device plugged in unauthorized port {:?}",
+                dev_path.as_slice()
+            );
+            return Ok(());
+        }
+
         let dev = UsbDevice {
-            busnum: device
-                .attribute_value("busnum")
-                .ok_or(Error::NoneValue)?
-                .to_string_lossy()
-                .parse::<u32>()?,
+            busnum: busnum.into(),
             devnum: device
                 .attribute_value("devnum")
                 .ok_or(Error::NoneValue)?
@@ -236,8 +241,15 @@ impl CurrentDevices {
         };
 
         info!(
-            "Device plugged {}-{} ({} {})",
-            dev.busnum, dev.devnum, dev.manufacturer, dev.description
+            "Device plugged {}-{} ({} - {} - {}) {:?}, src: {}, dst: {}]",
+            dev.busnum,
+            dev.devnum,
+            dev.manufacturer,
+            dev.description,
+            dev.serial,
+            dev_path.as_slice(),
+            dev.is_src,
+            dev.is_dst
         );
 
         self.devices
