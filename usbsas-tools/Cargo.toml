@@ -3,6 +3,7 @@ name = "usbsas-tools"
 version = "0.1.4"
 edition = "2021"
 license = "GPL-3.0"
+description = "usbsas tools"
 
 [dependencies]
 bitvec = { version = "1.0", optional = true }
