@@ -376,7 +376,7 @@ impl AppState {
         debug!("Out tar file name: {:?}", outfiles.out_tar);
         debug!("Out fs file name: {:?}", outfiles.out_fs);
 
-        let comm = AppState::start_usbsas(&config, &config_path, &outfiles, &session_id)?;
+        let comm = AppState::start_usbsas(&config_path, &outfiles, &session_id)?;
 
         Ok(AppState {
             config: Mutex::new(config),
@@ -393,21 +393,16 @@ impl AppState {
     }
 
     fn start_usbsas(
-        config: &Config,
         config_path: &str,
         outfiles: &OutFiles,
         session_id: &str,
     ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
         debug!("starting usbsas");
 
-        let mut usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas")
+        let usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas")
             .arg(&outfiles.out_tar)
             .arg(&outfiles.out_fs)
             .args(&["-c", config_path]);
-
-        if config.analyzer.is_some() {
-            usbsas_cmd = usbsas_cmd.arg("--analyze");
-        }
 
         std::env::set_var("USBSAS_SESSION_ID", session_id);
 
@@ -429,7 +424,6 @@ impl AppState {
         self.outfiles.lock()?.reset(&new_session_id)?;
 
         let new_comm = AppState::start_usbsas(
-            &*self.config.lock()?,
             &self.config_path.lock()?,
             &*self.outfiles.lock()?,
             &new_session_id,

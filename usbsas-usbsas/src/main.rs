@@ -1161,87 +1161,84 @@ impl WriteFsState {
     ) -> Result<Option<serde_json::Value>> {
         trace!("analyzing files");
         use proto::analyzer::response::Msg;
-        if let Some(ref mut analyzer) = children.analyzer {
-            analyzer.comm.send(proto::analyzer::Request {
-                msg: Some(proto::analyzer::request::Msg::Analyze(
-                    proto::analyzer::RequestAnalyze {
-                        id: self.id.to_string(),
-                    },
-                )),
-            })?;
+        children.analyzer.comm.send(proto::analyzer::Request {
+            msg: Some(proto::analyzer::request::Msg::Analyze(
+                proto::analyzer::RequestAnalyze {
+                    id: self.id.to_string(),
+                },
+            )),
+        })?;
 
-            loop {
-                let rep: proto::analyzer::Response = analyzer.comm.recv()?;
-                match rep.msg.ok_or(Error::BadRequest)? {
-                    Msg::Analyze(res) => {
-                        let report_json: serde_json::Value = serde_json::from_str(&res.report)?;
-                        log::trace!("analyzer report: {:?}", report_json);
-                        let files_status = report_json["files"].as_object().ok_or(Error::Error(
-                            "Couldn't get files from analyzer report".into(),
-                        ))?;
+        loop {
+            let rep: proto::analyzer::Response = children.analyzer.comm.recv()?;
+            match rep.msg.ok_or(Error::BadRequest)? {
+                Msg::Analyze(res) => {
+                    let report_json: serde_json::Value = serde_json::from_str(&res.report)?;
+                    log::trace!("analyzer report: {:?}", report_json);
+                    let files_status = report_json["files"].as_object().ok_or(Error::Error(
+                        "Couldn't get files from analyzer report".into(),
+                    ))?;
 
-                        match &report_json["version"].as_u64() {
-                            Some(2) => self.files.retain(|x| {
-                                if let Some(status) = files_status.get(x.trim_start_matches('/')) {
-                                    match status["status"].as_str() {
-                                        Some("CLEAN") => true,
-                                        Some("DIRTY") => {
-                                            self.dirty.push(x.to_string());
-                                            false
-                                        }
-                                        _ => {
-                                            self.errors.push(x.to_string());
-                                            false
-                                        }
+                    match &report_json["version"].as_u64() {
+                        Some(2) => self.files.retain(|x| {
+                            if let Some(status) = files_status.get(x.trim_start_matches('/')) {
+                                match status["status"].as_str() {
+                                    Some("CLEAN") => true,
+                                    Some("DIRTY") => {
+                                        self.dirty.push(x.to_string());
+                                        false
                                     }
-                                } else {
-                                    false
-                                }
-                            }),
-                            _ => self.files.retain(|x| {
-                                if let Some(status) = files_status
-                                    .get(&format!("{TAR_DATA_DIR}/{}", x.trim_start_matches('/')))
-                                {
-                                    match status.as_str() {
-                                        Some("CLEAN") => true,
-                                        Some("DIRTY") => {
-                                            self.dirty.push(x.to_string());
-                                            false
-                                        }
-                                        _ => {
-                                            self.errors.push(x.to_string());
-                                            false
-                                        }
+                                    _ => {
+                                        self.errors.push(x.to_string());
+                                        false
                                     }
-                                } else {
-                                    false
                                 }
-                            }),
-                        }
+                            } else {
+                                false
+                            }
+                        }),
+                        _ => self.files.retain(|x| {
+                            if let Some(status) = files_status
+                                .get(&format!("{TAR_DATA_DIR}/{}", x.trim_start_matches('/')))
+                            {
+                                match status.as_str() {
+                                    Some("CLEAN") => true,
+                                    Some("DIRTY") => {
+                                        self.dirty.push(x.to_string());
+                                        false
+                                    }
+                                    _ => {
+                                        self.errors.push(x.to_string());
+                                        false
+                                    }
+                                }
+                            } else {
+                                false
+                            }
+                        }),
+                    }
 
-                        comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
-                        if self.write_report {
-                            return Ok(Some(report_json));
-                        } else {
-                            return Ok(None);
-                        }
+                    comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
+                    if self.write_report {
+                        return Ok(Some(report_json));
+                    } else {
+                        return Ok(None);
                     }
-                    Msg::UploadStatus(status) => {
-                        comm.analyzestatus(proto::usbsas::ResponseAnalyzeStatus {
-                            current_size: status.current_size,
-                            total_size: status.total_size,
-                        })?;
-                        continue;
-                    }
-                    Msg::Error(err) => {
-                        error!("{}", err.err);
-                        return Err(Error::Analyze(err.err));
-                    }
-                    _ => return Err(Error::Analyze("Unexpected response".into())),
                 }
+                Msg::UploadStatus(status) => {
+                    comm.analyzestatus(proto::usbsas::ResponseAnalyzeStatus {
+                        current_size: status.current_size,
+                        total_size: status.total_size,
+                    })?;
+                    continue;
+                }
+                Msg::Error(err) => {
+                    error!("{}", err.err);
+                    return Err(Error::Analyze(err.err));
+                }
+                _ => return Err(Error::Analyze("Unexpected response".into())),
             }
         }
-        Ok(None)
     }
 
     fn write_file(
@@ -1714,7 +1711,7 @@ fn init_report() -> Result<serde_json::Value> {
 }
 
 struct Children {
-    analyzer: Option<UsbsasChild<proto::analyzer::Request>>,
+    analyzer: UsbsasChild<proto::analyzer::Request>,
     identificator: UsbsasChild<proto::identificator::Request>,
     cmdexec: UsbsasChild<proto::cmdexec::Request>,
     downloader: UsbsasChild<proto::downloader::Request>,
@@ -1813,10 +1810,8 @@ impl Children {
 
     fn end_all(&mut self) -> Result<()> {
         trace!("req end");
-        if let Some(ref mut analyzer) = self.analyzer {
-            if let Err(err) = analyzer.comm.end(proto::analyzer::RequestEnd {}) {
-                error!("Couldn't end analyzer: {}", err);
-            };
+        if let Err(err) = self.analyzer.comm.end(proto::analyzer::RequestEnd {}) {
+            error!("Couldn't end analyzer: {}", err);
         };
         if let Err(err) = self
             .identificator
@@ -1866,11 +1861,9 @@ impl Children {
 
     fn wait_all(&mut self) -> Result<()> {
         debug!("waiting children");
-        if let Some(ref mut analyzer) = self.analyzer {
-            trace!("waiting analyzer");
-            if let Err(err) = analyzer.wait() {
-                error!("Waiting analyzer failed: {}", err);
-            };
+        trace!("waiting analyzer");
+        if let Err(err) = self.analyzer.wait() {
+            error!("Waiting analyzer failed: {}", err);
         };
         trace!("waiting identificator");
         if let Err(err) = self.identificator.wait() {
@@ -1940,7 +1933,6 @@ impl Usbsas {
         config_path: &str,
         out_tar: &str,
         out_fs: &str,
-        analyze: bool,
     ) -> Result<Self> {
         trace!("init");
         let mut pipes_read = vec![];
@@ -2018,18 +2010,12 @@ impl Usbsas {
         pipes_read.push(uploader.comm.input_fd());
         pipes_write.push(uploader.comm.output_fd());
 
-        let analyzer = if analyze {
-            let analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
-                .arg(out_tar)
-                .args(&["-c", config_path])
-                .spawn::<proto::analyzer::Request>()?;
-            pipes_read.push(analyzer.comm.input_fd());
-            pipes_write.push(analyzer.comm.output_fd());
-
-            Some(analyzer)
-        } else {
-            None
-        };
+        let analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
+            .arg(out_tar)
+            .args(&["-c", config_path])
+            .spawn::<proto::analyzer::Request>()?;
+        pipes_read.push(analyzer.comm.input_fd());
+        pipes_write.push(analyzer.comm.output_fd());
 
         trace!("enter seccomp");
         usbsas_sandbox::usbsas::seccomp(pipes_read, pipes_write)?;
@@ -2081,26 +2067,13 @@ fn main() -> Result<()> {
         .add_config_arg()
         .add_tar_path_arg()
         .add_fs_path_arg()
-        .arg(
-            clap::Arg::new("analyze")
-                .short('a')
-                .long("analyze")
-                .help("Analyze files with antivirus server")
-                .action(clap::ArgAction::SetTrue),
-        )
         .get_matches();
     let config = matches.get_one::<String>("config").unwrap();
     let tar_path = matches.get_one::<String>("tar_path").unwrap();
     let fs_path = matches.get_one::<String>("fs_path").unwrap();
 
     info!("init ({}): {} {}", std::process::id(), tar_path, fs_path);
-    Usbsas::new(
-        Comm::from_env()?,
-        config,
-        tar_path,
-        fs_path,
-        matches.get_flag("analyze"),
-    )?
-    .main_loop()
-    .map(|_| log::debug!("exit"))
+    Usbsas::new(Comm::from_env()?, config, tar_path, fs_path)?
+        .main_loop()
+        .map(|_| log::debug!("exit"))
 }
