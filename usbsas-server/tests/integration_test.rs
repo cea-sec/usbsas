@@ -334,13 +334,25 @@ impl IntegrationTester {
             }
             let status: StatusJson = serde_json::from_str(line).expect("quiche");
             if status.status == *"final_report" {
-                let report: appstate::ReportCopy = serde_json::from_str(line).expect("plop");
-                assert_eq!(report.dirty_path, dirty_path, "dirty path mismatch");
-                assert_eq!(report.error_path, error_path, "error_path mismatch");
-                assert_eq!(
-                    report.filtered_path, filtered_path,
-                    "filtered_path mismatch"
-                );
+                let response: appstate::ReportCopy = serde_json::from_str(line).expect("plop");
+                assert!(response.report["file_names"].as_array().is_some());
+                if let Some(resp_filtered) = response.report["filtered_files"].as_array() {
+                    assert_eq!(resp_filtered, filtered_path, "filtered_path mismatch");
+                }
+
+                if let Some(resp_error) = response.report["error_files"].as_array() {
+                    assert_eq!(resp_error, error_path, "error_path mismatch");
+                }
+
+                if let Some(analyzed_files) = response.report["analyzer_report"].as_object() {
+                    let mut resp_dirty: Vec<String> = Vec::new();
+                    for (file, status) in analyzed_files["files"].as_object().unwrap() {
+                        if status["status"] == "DIRTY" {
+                            resp_dirty.push(format!("/{}", file));
+                        }
+                    }
+                    assert_eq!(resp_dirty, dirty_path, "dirty path mismatch");
+                }
             }
         }
 

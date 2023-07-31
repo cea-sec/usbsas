@@ -75,7 +75,6 @@ protoresponse!(
     nothingtocopy = NothingToCopy[ResponseNothingToCopy],
     wipe = Wipe[ResponseWipe],
     imgdisk = ImgDisk[ResponseImgDisk],
-    report = Report[ResponseReport],
     postcopycmd = PostCopyCmd[ResponsePostCopyCmd]
 );
 
@@ -529,15 +528,26 @@ impl CopyFilesState {
         let all_files_filtered = self.filter_files(children, all_files, &mut filtered)?;
         let all_directories_filtered =
             self.filter_files(children, all_directories, &mut filtered)?;
+
         let mut all_entries_filtered = vec![];
         all_entries_filtered.append(&mut all_directories_filtered.clone());
         all_entries_filtered.append(&mut all_files_filtered.clone());
 
-        // Abort if no files passed name filtering
-        if all_entries_filtered.is_empty() {
+        report["file_names"] = all_files_filtered.clone().into();
+        report["filtered_files"] = filtered.clone().into();
+        report["user"] = serde_json::Value::String(self.id.clone());
+        report["source"] = json!({
+            "vendorid": self.device.vendorid,
+            "productid": self.device.productid,
+            "manufacturer": self.device.manufacturer,
+            "serial": self.device.serial,
+            "description": self.device.description
+        });
+
+        // Abort if no files passed name filtering and no report requested
+        if all_entries_filtered.is_empty() && !self.write_report {
             comm.nothingtocopy(proto::usbsas::ResponseNothingToCopy {
-                rejected_filter: filtered,
-                rejected_dirty: vec![],
+                report: serde_json::to_vec(&report)?,
             })?;
             warn!("Aborting copy, no files survived filter");
             return Ok(State::WaitEnd(WaitEndState {}));
@@ -550,17 +560,6 @@ impl CopyFilesState {
         };
 
         comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
-
-        report["file_names"] = all_files_filtered.clone().into();
-        report["filtered_files"] = filtered.clone().into();
-        report["user"] = serde_json::Value::String(self.id.clone());
-        report["source"] = json!({
-            "vendorid": self.device.vendorid,
-            "productid": self.device.productid,
-            "manufacturer": self.device.manufacturer,
-            "serial": self.device.serial,
-            "description": self.device.description
-        });
 
         self.tar_src_files(
             comm,
@@ -576,10 +575,8 @@ impl CopyFilesState {
                 children.tar2files.unlock_with(&[1_u8])?;
                 Ok(State::WriteFs(WriteFsState {
                     directories: all_directories_filtered,
-                    dirty: Vec::new(),
                     errors,
                     files: all_files_filtered,
-                    filtered,
                     id: self.id,
                     usb,
                     analyze: true,
@@ -591,7 +588,6 @@ impl CopyFilesState {
                 children.tar2files.unlock_with(&[0_u8])?;
                 Ok(State::UploadOrCmd(UploadOrCmdState {
                     errors,
-                    filtered,
                     id: self.id,
                     destination: self.destination,
                     report,
@@ -859,10 +855,8 @@ impl DownloadTarState {
         match self.destination {
             Destination::Usb(usb) => Ok(State::WriteFs(WriteFsState {
                 directories: all_directories,
-                dirty: Vec::new(),
                 errors,
                 files: all_files,
-                filtered: Vec::new(),
                 id: self.id,
                 usb,
                 analyze: false,
@@ -873,7 +867,6 @@ impl DownloadTarState {
                 children.tar2files.unlock_with(&[0_u8])?;
                 Ok(State::UploadOrCmd(UploadOrCmdState {
                     errors,
-                    filtered: Vec::new(),
                     id: self.id,
                     destination: self.destination,
                     report,
@@ -1006,10 +999,8 @@ impl DownloadTarState {
 
 struct WriteFsState {
     directories: Vec<String>,
-    dirty: Vec<String>,
     errors: Vec<String>,
     files: Vec<String>,
-    filtered: Vec<String>,
     id: String,
     usb: proto::usbsas::DestUsb,
     analyze: bool,
@@ -1023,8 +1014,9 @@ impl WriteFsState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
+        let mut dirty: Vec<String> = Vec::new();
         let analyze_report = if self.analyze {
-            self.analyze_files(comm, children)?
+            Some(self.analyze_files(comm, children, &mut dirty)?)
         } else {
             None
         };
@@ -1032,8 +1024,7 @@ impl WriteFsState {
         // Abort if no files survived antivirus and no report requested
         if self.files.is_empty() && !self.write_report {
             comm.nothingtocopy(proto::usbsas::ResponseNothingToCopy {
-                rejected_filter: self.filtered,
-                rejected_dirty: self.dirty,
+                report: serde_json::to_vec(&self.report)?,
             })?;
             warn!("Aborting copy, no files survived filter and antivirus");
             return Ok(State::WaitEnd(WaitEndState {}));
@@ -1118,9 +1109,7 @@ impl WriteFsState {
         match self.write_fs(comm, children) {
             Ok(()) => {
                 comm.copydone(proto::usbsas::ResponseCopyDone {
-                    error_path: self.errors,
-                    filtered_path: self.filtered,
-                    dirty_path: self.dirty,
+                    report: serde_json::to_vec(&self.report)?,
                 })?;
                 info!("transfer done");
             }
@@ -1132,9 +1121,7 @@ impl WriteFsState {
             }
         }
 
-        Ok(State::TransferDone(TransferDoneState {
-            report: self.report,
-        }))
+        Ok(State::TransferDone(TransferDoneState {}))
     }
 
     fn init_fs(&mut self, children: &mut Children) -> Result<()> {
@@ -1158,7 +1145,8 @@ impl WriteFsState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-    ) -> Result<Option<serde_json::Value>> {
+        dirty: &mut Vec<String>,
+    ) -> Result<serde_json::Value> {
         trace!("analyzing files");
         use proto::analyzer::response::Msg;
         children.analyzer.comm.send(proto::analyzer::Request {
@@ -1185,7 +1173,7 @@ impl WriteFsState {
                                 match status["status"].as_str() {
                                     Some("CLEAN") => true,
                                     Some("DIRTY") => {
-                                        self.dirty.push(x.to_string());
+                                        dirty.push(x.to_string());
                                         false
                                     }
                                     _ => {
@@ -1204,7 +1192,7 @@ impl WriteFsState {
                                 match status.as_str() {
                                     Some("CLEAN") => true,
                                     Some("DIRTY") => {
-                                        self.dirty.push(x.to_string());
+                                        dirty.push(x.to_string());
                                         false
                                     }
                                     _ => {
@@ -1219,11 +1207,7 @@ impl WriteFsState {
                     }
 
                     comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
-                    if self.write_report {
-                        return Ok(Some(report_json));
-                    } else {
-                        return Ok(None);
-                    }
+                    return Ok(report_json);
                 }
                 Msg::UploadStatus(status) => {
                     comm.analyzestatus(proto::usbsas::ResponseAnalyzeStatus {
@@ -1367,7 +1351,6 @@ impl WriteFsState {
 struct UploadOrCmdState {
     destination: Destination,
     errors: Vec<String>,
-    filtered: Vec<String>,
     id: String,
     report: serde_json::Value,
 }
@@ -1394,15 +1377,11 @@ impl UploadOrCmdState {
 
         comm.finalcopystatusdone(proto::usbsas::ResponseFinalCopyStatusDone {})?;
         comm.copydone(proto::usbsas::ResponseCopyDone {
-            error_path: self.errors,
-            filtered_path: self.filtered,
-            dirty_path: Vec::new(),
+            report: serde_json::to_vec(&self.report)?,
         })?;
 
         info!("net transfer done");
-        Ok(State::TransferDone(TransferDoneState {
-            report: self.report,
-        }))
+        Ok(State::TransferDone(TransferDoneState {}))
     }
 
     fn upload_files(
@@ -1602,9 +1581,7 @@ impl ImgDiskState {
     }
 }
 
-struct TransferDoneState {
-    report: serde_json::Value,
-}
+struct TransferDoneState {}
 
 impl TransferDoneState {
     fn run(
@@ -1614,11 +1591,6 @@ impl TransferDoneState {
     ) -> Result<State> {
         let req: proto::usbsas::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
-            Msg::Report(_) => {
-                comm.report(proto::usbsas::ResponseReport {
-                    report: serde_json::to_vec(&self.report)?,
-                })?;
-            }
             Msg::End(_) => {
                 children.end_wait_all(comm)?;
                 return Ok(State::End);

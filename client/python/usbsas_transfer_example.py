@@ -23,9 +23,8 @@ from comm import CommUsbsas
 from proto.usbsas import proto3_pb2 as proto_usbsas
 
 usbsas_bin = "/usr/libexec/usbsas-usbsas"
+config_path = "../../config.example.toml"
 date = datetime.datetime.now()
-out_tar = "/tmp/usbsas_tmp_%s.tar" % str(date).replace(' ', '_')
-out_fs = "/tmp/usbsas_tmp_%s.fs" % str(date).replace(' ', '_')
 pid_usbsas = -1
 
 if not os.path.exists(usbsas_bin):
@@ -41,8 +40,6 @@ def start_usbsas():
     (parent_to_child_r, parent_to_child_w) = os.pipe()
     os.set_inheritable(child_to_parent_w, True)
     os.set_inheritable(parent_to_child_r, True)
-    with open(out_tar, mode='w'): pass
-    with open(out_fs, mode='w'): pass
     pid_usbsas = os.fork()
     if pid_usbsas < 0:
         print("fork error")
@@ -54,7 +51,7 @@ def start_usbsas():
         os.environ["INPUT_PIPE_FD"] = str(parent_to_child_r)
         os.environ["OUTPUT_PIPE_FD"] = str(child_to_parent_w)
         os.environ["RUST_LOG"] = "error"
-        os.execv(usbsas_bin, [usbsas_bin, out_tar, out_fs, "--analyze"])
+        os.execv(usbsas_bin, [usbsas_bin, "-c", config_path])
         sys.exit(0)
     os.close(parent_to_child_r)
     os.close(child_to_parent_w)
@@ -99,11 +96,10 @@ def copy_usb(comm, files, device):
         rep = comm.recv_resp()
         ok_or_exit(comm, rep, "error during copy")
         if isinstance(rep, proto_usbsas.ResponseCopyDone):
-            break
+            print("Transfer done")
+            print(json.dumps(json.loads(rep.report), indent=2))
+            return
         print(rep)
-    print("Transfer done")
-    rep = comm.report()
-    print(json.dumps(json.loads(rep.report), indent=2))
 
 def copy_net(comm, files, url):
     rep = comm.copy_files_net(selected=files, url=url)
@@ -113,11 +109,10 @@ def copy_net(comm, files, url):
         rep = comm.recv_resp()
         ok_or_exit(comm, rep, "error during copy")
         if isinstance(rep, proto_usbsas.ResponseCopyDone):
-            break
+            print("Transfer done")
+            print(json.dumps(json.loads(rep.report), indent=2))
+            return
         print(rep)
-    print("Transfer done")
-    rep = comm.report()
-    print(json.dumps(json.loads(rep.report), indent=2))
 
 def confirm_copy(devices):
     print('Copy all files from \n\"{}\"\nto\n\"{}\"\n? [Y/n]'.format(
@@ -140,8 +135,6 @@ def end(comm):
     comm.end()
     os.kill(pid_usbsas, signal.SIGTERM)
     os.waitpid(pid_usbsas, 0)
-    os.remove(out_tar)
-    os.remove(out_fs)
     sys.exit(0)
 
 def main():

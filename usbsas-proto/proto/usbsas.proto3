@@ -88,9 +88,6 @@ message RequestImgDisk {
   common.Device device = 1;
 };
 
-message RequestReport {
-};
-
 message Request {
   oneof msg {
     RequestEnd End = 1;
@@ -105,7 +102,6 @@ message Request {
     RequestWipe Wipe = 10;
     RequestPostCopyCmd PostCopyCmd = 11;
     RequestImgDisk ImgDisk = 12;
-    RequestReport Report = 13;
   }
 };
 
@@ -153,9 +149,7 @@ message ResponseCopyStart {
 };
 
 message ResponseCopyDone {
-  repeated string error_path = 1;
-  repeated string filtered_path = 2;
-  repeated string dirty_path = 3;
+  bytes report = 1;
 };
 
 message ResponseCopyStatus {
@@ -186,8 +180,7 @@ message ResponseNotEnoughSpace {
 };
 
 message ResponseNothingToCopy {
-  repeated string rejected_filter = 1;
-  repeated string rejected_dirty = 2;
+  bytes report = 1;
 };
 
 message ResponseWipe {
@@ -197,10 +190,6 @@ message ResponseImgDisk {
 };
 
 message ResponsePostCopyCmd {
-};
-
-message ResponseReport {
-  bytes report = 1;
 };
 
 message Response {
@@ -227,6 +216,5 @@ message Response {
     ResponseImgDisk ImgDisk = 20;
     ResponseCopyDone CopyDone = 21;
     ResponseNothingToCopy NothingToCopy = 22;
-    ResponseReport Report = 23;
   }
 };

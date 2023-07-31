@@ -73,8 +73,8 @@ class CommUsbsas(Comm):
         "OpenPartition": proto_usbsas.RequestOpenPartition,
         "Partitions": proto_usbsas.RequestPartitions,
         "ReadDir": proto_usbsas.RequestReadDir,
-        "Report": proto_usbsas.RequestReport,
         "Wipe": proto_usbsas.RequestWipe,
+        "PostCopyCmd": proto_usbsas.RequestPostCopyCmd,
     }
     resp_types = {
         "AnalyzeDone": proto_usbsas.ResponseAnalyzeDone,
@@ -97,7 +97,6 @@ class CommUsbsas(Comm):
         "Partitions": proto_usbsas.ResponsePartitions,
         "PostCopyCmd": proto_usbsas.ResponsePostCopyCmd,
         "ReadDir": proto_usbsas.ResponseReadDir,
-        "Report": proto_usbsas.ResponseReport,
         "Wipe": proto_usbsas.ResponseWipe,
     }
     response_cls = proto_usbsas.Response
@@ -167,6 +166,3 @@ class CommUsbsas(Comm):
             ))
         return self.recv_resp()
 
-    def report(self):
-        self.send_req(proto_usbsas.RequestReport())
-        return self.recv_resp()

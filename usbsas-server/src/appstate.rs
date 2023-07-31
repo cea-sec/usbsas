@@ -37,7 +37,6 @@ protorequest!(
     getattr = GetAttr[RequestGetAttr, ResponseGetAttr],
     wipe = Wipe[RequestWipe, ResponseWipe],
     imgdisk = ImgDisk[RequestImgDisk, ResponseImgDisk],
-    report = Report[RequestReport, ResponseReport],
     end = End[RequestEnd, ResponseEnd]
 );
 
@@ -292,9 +291,7 @@ struct ReportDeviceSize<'a> {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ReportCopy<'a> {
     status: &'a str,
-    pub error_path: Vec<String>,
-    pub filtered_path: Vec<String>,
-    pub dirty_path: Vec<String>,
+    pub report: serde_json::Value,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -775,9 +772,7 @@ impl AppState {
                 Msg::NothingToCopy(msg) => {
                     resp_stream.add_message(ReportCopy {
                         status: "nothing_to_copy",
-                        filtered_path: msg.rejected_filter,
-                        dirty_path: msg.rejected_dirty,
-                        error_path: vec![],
+                        report: serde_json::from_slice(&msg.report)?,
                     })?;
                     resp_stream.done()?;
                     return Ok(());
@@ -844,9 +839,7 @@ impl AppState {
                         Msg::NothingToCopy(msg) => {
                             resp_stream.add_message(ReportCopy {
                                 status: "nothing_to_copy",
-                                filtered_path: msg.rejected_filter,
-                                dirty_path: msg.rejected_dirty,
-                                error_path: vec![],
+                                report: serde_json::from_slice(&msg.report)?,
                             })?;
                             resp_stream.done()?;
                             return Ok(());
@@ -893,15 +886,10 @@ impl AppState {
                     // wait for response copy to break
                     continue;
                 }
-                Msg::CopyDone(info) => {
+                Msg::CopyDone(msg) => {
                     progress = current_progress + 30.0;
                     resp_stream.report_progress("terminate", progress)?;
-                    break ReportCopy {
-                        status: "final_report",
-                        error_path: info.error_path,
-                        filtered_path: info.filtered_path,
-                        dirty_path: info.dirty_path,
-                    };
+                    break msg.report;
                 }
                 Msg::Error(err) => {
                     error!("{}", err.err);
@@ -919,7 +907,6 @@ impl AppState {
         if let Some(report_conf) = &self.config.lock()?.report {
             if let Some(report_dir) = &report_conf.write_local {
                 // save report on local disk
-                let transfer_report = comm.report(proto::usbsas::RequestReport {})?.report;
                 let datetime = time::OffsetDateTime::now_utc();
                 let report_file_name = format!(
                     "usbsas_transfer_{:04}{:02}{:02}{:02}{:02}{:02}_{}.json",
@@ -933,7 +920,7 @@ impl AppState {
                 );
                 let mut report_file =
                     fs::File::create(path::Path::new(&report_dir).join(report_file_name))?;
-                report_file.write_all(&transfer_report)?;
+                report_file.write_all(&final_report)?;
             }
         }
 
@@ -948,7 +935,10 @@ impl AppState {
             })?;
         };
 
-        resp_stream.add_message(final_report)?;
+        resp_stream.add_message(ReportCopy {
+            status: "final_report",
+            report: serde_json::from_slice(&final_report)?,
+        })?;
         resp_stream.done()?;
         Ok(())
     }
