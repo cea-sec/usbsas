@@ -22,7 +22,7 @@ use usbsas_comm::{protorequest, Comm};
 use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
-use usbsas_proto::common::OutFileType;
+use usbsas_proto::common::{OutFileType, OutFsType};
 
 protorequest!(
     CommUsbsas,
@@ -61,7 +61,7 @@ pub(crate) struct TargetDevice {
     is_dst: bool,
 }
 
-enum CopyDestination {
+enum Destination {
     Usb {
         busnum: u32,
         devnum: u32,
@@ -73,7 +73,7 @@ enum CopyDestination {
     Cmd,
 }
 
-enum CopySource {
+enum Source {
     Usb {
         opendev: proto::usbsas::RequestOpenDevice,
     },
@@ -119,7 +119,7 @@ pub struct ReadDir {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct USBDeviceDesc {
+pub struct USBDesc {
     vendorid: u32,
     productid: u32,
     manufacturer: String,
@@ -143,7 +143,7 @@ pub struct CmdDesc {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum Desc {
-    Usb(USBDeviceDesc),
+    Usb(USBDesc),
     Net(NetDesc),
     Cmd(CmdDesc),
 }
@@ -189,7 +189,7 @@ impl From<&TargetDevice> for DeviceDesc {
                 }
             }
             Device::Usb(ref usb) => {
-                let net_json = USBDeviceDesc {
+                let net_json = USBDesc {
                     vendorid: usb.vendorid,
                     productid: usb.productid,
                     manufacturer: usb.manufacturer.to_owned(),
@@ -343,7 +343,7 @@ pub(crate) struct AppState {
     config: Mutex<Config>,
     pub config_path: Mutex<String>,
     comm: Mutex<Comm<proto::usbsas::Request>>,
-    out_dev: Mutex<Option<CopyDestination>>,
+    dest: Mutex<Option<Destination>>,
     hmac: Mutex<Hmac<Sha256>>,
     tmpfiles: Mutex<TmpFiles>,
     pub status: Arc<RwLock<String>>,
@@ -383,7 +383,7 @@ impl AppState {
             config_path: Mutex::new(config_path),
             tmpfiles: Mutex::new(tmpfiles),
             comm: Mutex::new(comm),
-            out_dev: Mutex::new(None),
+            dest: Mutex::new(None),
             hmac: Mutex::new(Hmac::new_from_slice(
                 &rand::thread_rng().gen::<[u8; 0x10]>(),
             )?),
@@ -522,51 +522,51 @@ impl AppState {
         let devices = self.list_all_devices()?;
 
         let mut in_dev = None;
-        let mut out_dev = None;
+        let mut dest = None;
         for dev in devices {
             let fingerprint = dev.device.fingerprint();
             if fingerprint_in == fingerprint {
                 debug!("in_dev set");
                 match &dev.device {
                     Device::Usb(ref usb) => {
-                        in_dev = Some(CopySource::Usb {
+                        in_dev = Some(Source::Usb {
                             opendev: proto::usbsas::RequestOpenDevice {
                                 device: Some(usb.to_owned()),
                             },
                         });
                     }
                     Device::Net(_) => {
-                        in_dev = Some(CopySource::Net);
+                        in_dev = Some(Source::Net);
                     }
                     Device::Cmd(_) => in_dev = None,
                 }
             }
             if fingerprint_out == fingerprint {
-                debug!("out_dev set");
+                debug!("dest set");
                 match &dev.device {
                     Device::Usb(ref usb) => {
-                        out_dev = Some(CopyDestination::Usb {
+                        dest = Some(Destination::Usb {
                             busnum: usb.busnum,
                             devnum: usb.devnum,
                         });
                     }
                     Device::Net(ref net) => {
-                        out_dev = Some(CopyDestination::Net {
+                        dest = Some(Destination::Net {
                             url: net.url.clone(),
                             krb_service_name: net.krb_service_name.clone(),
                         })
                     }
-                    Device::Cmd(_) => out_dev = Some(CopyDestination::Cmd),
+                    Device::Cmd(_) => dest = Some(Destination::Cmd),
                 }
             }
         }
 
-        let in_dev = match (in_dev, &out_dev) {
-            (Some(CopySource::Net), Some(_)) => {
-                *self.out_dev.lock()? = out_dev;
+        let in_dev = match (in_dev, &dest) {
+            (Some(Source::Net), Some(_)) => {
+                *self.dest.lock()? = dest;
                 return Ok(());
             }
-            (Some(CopySource::Usb { opendev }), Some(_)) => opendev,
+            (Some(Source::Usb { opendev }), Some(_)) => opendev,
             (_, _) => {
                 error!("Cannot find in or out dev");
                 return Err(ServiceError::Error("Cannot find in or out dev".to_string()));
@@ -577,7 +577,7 @@ impl AppState {
             .lock()?
             .opendev(in_dev)
             .map_err(|err| ServiceError::Error(format!("couldn't open input device: {err}")))?;
-        *self.out_dev.lock()? = out_dev;
+        *self.dest.lock()? = dest;
 
         Ok(())
     }
@@ -697,14 +697,14 @@ impl AppState {
         let mut comm = self.comm.lock()?;
         resp_stream.report_progress("copy_start", progress)?;
 
-        let out_dev = self.out_dev.lock()?;
-        let destination = match out_dev.as_ref().ok_or(ServiceError::InternalServerError)? {
-            CopyDestination::Usb { busnum, devnum } => {
+        let dest = self.dest.lock()?;
+        let destination = match dest.as_ref().ok_or(ServiceError::InternalServerError)? {
+            Destination::Usb { busnum, devnum } => {
                 debug!("do copy usb {} {} ({})", busnum, devnum, fsfmt);
                 let fstype = match fsfmt.as_str() {
-                    "ntfs" => proto::common::OutFsType::Ntfs,
-                    "exfat" => proto::common::OutFsType::Exfat,
-                    "fat32" => proto::common::OutFsType::Fat,
+                    "ntfs" => OutFsType::Ntfs,
+                    "exfat" => OutFsType::Exfat,
+                    "fat32" => OutFsType::Fat,
                     _ => return Err(ServiceError::InternalServerError),
                 };
                 proto::usbsas::request_copy_start::Destination::Usb(proto::usbsas::DestUsb {
@@ -713,7 +713,7 @@ impl AppState {
                     fstype: fstype.into(),
                 })
             }
-            CopyDestination::Net {
+            Destination::Net {
                 url,
                 krb_service_name,
             } => {
@@ -723,7 +723,7 @@ impl AppState {
                     krb_service_name: krb_service_name.clone().unwrap_or_else(|| String::from("")),
                 })
             }
-            CopyDestination::Cmd { .. } => {
+            Destination::Cmd { .. } => {
                 debug!("do copy cmd");
                 proto::usbsas::request_copy_start::Destination::Cmd(proto::usbsas::DestCmd {})
             }
@@ -803,7 +803,7 @@ impl AppState {
         progress = current_progress + 30.0;
 
         if self.config.lock()?.analyzer.is_some() && !src_is_net {
-            if let Some(CopyDestination::Usb { .. }) = *out_dev {
+            if let Some(Destination::Usb { .. }) = *dest {
                 resp_stream.report_progress("analyzing", progress)?;
                 current_progress = progress;
                 loop {
@@ -833,8 +833,8 @@ impl AppState {
         size_read = 0;
         current_progress = progress;
 
-        match out_dev.as_ref().ok_or(ServiceError::InternalServerError)? {
-            CopyDestination::Usb { .. } => {
+        match dest.as_ref().ok_or(ServiceError::InternalServerError)? {
+            Destination::Usb { .. } => {
                 resp_stream.report_progress("copy_fromtar_tofs", progress)?;
                 // create fs
                 loop {
@@ -871,11 +871,11 @@ impl AppState {
                 progress = current_progress + 30.0;
                 resp_stream.report_progress("copy_fs2dev_start", progress)?
             }
-            CopyDestination::Net { .. } => {
+            Destination::Net { .. } => {
                 progress = current_progress + 30.0;
                 resp_stream.report_progress("copy_upload_start", progress)?
             }
-            CopyDestination::Cmd { .. } => {
+            Destination::Cmd { .. } => {
                 progress = current_progress + 30.0;
                 resp_stream.report_progress("copy_cmd_start", progress)?
             }
@@ -945,9 +945,9 @@ impl AppState {
 
         // post copy cmd
         if let Some(usbsas_config::PostCopy { .. }) = self.config.lock()?.post_copy {
-            let outfiletype = match out_dev.as_ref().ok_or(ServiceError::InternalServerError)? {
-                CopyDestination::Usb { .. } => OutFileType::Fs,
-                CopyDestination::Net { .. } | CopyDestination::Cmd { .. } => OutFileType::Tar,
+            let outfiletype = match dest.as_ref().ok_or(ServiceError::InternalServerError)? {
+                Destination::Usb { .. } => OutFileType::Fs,
+                Destination::Net { .. } | Destination::Cmd { .. } => OutFileType::Tar,
             };
             comm.postcopycmd(proto::usbsas::RequestPostCopyCmd {
                 outfiletype: outfiletype.into(),
@@ -972,9 +972,9 @@ impl AppState {
         resp_stream.report_progress("wipe_start", 0.0)?;
 
         let fstype = match fsfmt.as_str() {
-            "ntfs" => proto::common::OutFsType::Ntfs,
-            "exfat" => proto::common::OutFsType::Exfat,
-            "fat32" => proto::common::OutFsType::Fat,
+            "ntfs" => OutFsType::Ntfs,
+            "exfat" => OutFsType::Exfat,
+            "fat32" => OutFsType::Fat,
             _ => return Err(ServiceError::InternalServerError),
         };
 
