@@ -1,5 +1,4 @@
 use crate::error::{AuthentError, ServiceError};
-use crate::outfiles::OutFiles;
 use actix_web::web;
 use base64::{engine as b64eng, Engine as _};
 use futures::task::{Context, Poll, Waker};
@@ -11,7 +10,7 @@ use sha2::{Digest, Sha256};
 use std::{
     fs,
     io::Write,
-    path,
+    path::{self, Path},
     pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -342,7 +341,6 @@ pub(crate) struct AppState {
     comm: Mutex<Comm<proto::usbsas::Request>>,
     dest: Mutex<Option<Destination>>,
     hmac: Mutex<Hmac<Sha256>>,
-    outfiles: Mutex<OutFiles>,
     pub status: Arc<RwLock<String>>,
     pub session_id: Arc<std::sync::RwLock<String>>,
 }
@@ -356,8 +354,6 @@ impl AppState {
         #[cfg(not(feature = "integration-tests"))]
         let session_id = uuid::Uuid::new_v4().simple().to_string();
 
-        let outfiles = OutFiles::new(config.out_directory.clone(), &session_id)?;
-
         // Create reports directory if it doesn't exists
         if let Some(report_config) = &config.report {
             if let Some(reports_dir) = &report_config.write_local {
@@ -370,15 +366,11 @@ impl AppState {
             };
         };
 
-        debug!("Out tar file name: {:?}", outfiles.out_tar);
-        debug!("Out fs file name: {:?}", outfiles.out_fs);
-
-        let comm = AppState::start_usbsas(&config_path, &outfiles, &session_id)?;
+        let comm = AppState::start_usbsas(&config_path, &session_id)?;
 
         Ok(AppState {
             config: Mutex::new(config),
             config_path: Mutex::new(config_path),
-            outfiles: Mutex::new(outfiles),
             comm: Mutex::new(comm),
             dest: Mutex::new(None),
             hmac: Mutex::new(Hmac::new_from_slice(
@@ -391,15 +383,11 @@ impl AppState {
 
     fn start_usbsas(
         config_path: &str,
-        outfiles: &OutFiles,
         session_id: &str,
     ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
         debug!("starting usbsas");
 
-        let usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas")
-            .arg(&outfiles.out_tar)
-            .arg(&outfiles.out_fs)
-            .args(&["-c", config_path]);
+        let usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas").args(&["-c", config_path]);
 
         std::env::set_var("USBSAS_SESSION_ID", session_id);
 
@@ -417,14 +405,32 @@ impl AppState {
         let new_session_id = uuid::Uuid::new_v4().simple().to_string();
         #[cfg(feature = "integration-tests")]
         let new_session_id = "0".to_string();
+        std::env::set_var("USBSAS_SESSION_ID", &new_session_id);
 
-        self.outfiles.lock()?.reset(&new_session_id)?;
+        // Delete out files if empty
+        let tar_path = format!(
+            "{}/usbsas_{}.tar",
+            self.config.lock()?.out_directory.trim_end_matches('/'),
+            self.session_id.read()?
+        );
+        let fs_path = format!(
+            "{}/usbsas_{}.img",
+            self.config.lock()?.out_directory.trim_end_matches('/'),
+            self.session_id.read()?
+        );
+        if let Ok(metadata) = fs::metadata(&fs_path) {
+            if metadata.len() == 0 {
+                let _ = fs::remove_file(Path::new(&fs_path)).ok();
+            }
+        };
+        if let Ok(metadata) = fs::metadata(&tar_path) {
+            // 1536 == tar with only a data entry (512b) + 1024b zeroes
+            if metadata.len() == 1536 {
+                let _ = fs::remove_file(Path::new(&tar_path)).ok();
+            }
+        };
 
-        let new_comm = AppState::start_usbsas(
-            &self.config_path.lock()?,
-            &*self.outfiles.lock()?,
-            &new_session_id,
-        )?;
+        let new_comm = AppState::start_usbsas(&self.config_path.lock()?, &new_session_id)?;
 
         *self.session_id.write()? = new_session_id;
 
@@ -1034,7 +1040,11 @@ impl AppState {
                     // Keep out fs
                     let datetime = time::OffsetDateTime::now_utc();
                     fs::rename(
-                        self.outfiles.lock()?.out_fs.clone(),
+                        format!(
+                            "{}/usbsas_{}.img",
+                            self.config.lock()?.out_directory.trim_end_matches('/'),
+                            self.session_id.read()?
+                        ),
                         format!(
                             "{}/imgdisk_{:04}{:02}{:02}{:02}{:02}{:02}_{}_{}_{}.bin",
                             self.config.lock()?.out_directory,

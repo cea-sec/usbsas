@@ -10,6 +10,8 @@ use std::sync::{Arc, RwLock};
 use std::{
     collections::{HashSet, VecDeque},
     convert::TryFrom,
+    env,
+    fs::File,
 };
 use thiserror::Error;
 use usbsas_comm::{protorequest, protoresponse, Comm};
@@ -1690,7 +1692,7 @@ fn init_report() -> Result<serde_json::Value> {
             time.year(), time.month() as u8, time.day(),
             time.hour(),time.minute(),time.second()),
         "hostname": hostname,
-        "transfer_id": std::env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string()),
+        "transfer_id": env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string()),
     });
     Ok(report)
 }
@@ -1917,8 +1919,7 @@ impl Usbsas {
         comm: Comm<proto::usbsas::Request>,
         config: Config,
         config_path: &str,
-        out_tar: &str,
-        out_fs: &str,
+        out_files: OutFiles,
     ) -> Result<Self> {
         trace!("init");
         let mut pipes_read = vec![];
@@ -1933,15 +1934,15 @@ impl Usbsas {
         pipes_write.push(identificator.comm.output_fd());
 
         let cmdexec = UsbsasChildSpawner::new("usbsas-cmdexec")
-            .arg(out_tar)
-            .arg(out_fs)
+            .arg(&out_files.tar_path)
+            .arg(&out_files.fs_path)
             .args(&["-c", config_path])
             .spawn::<proto::cmdexec::Request>()?;
         pipes_read.push(cmdexec.comm.input_fd());
         pipes_write.push(cmdexec.comm.output_fd());
 
         let downloader = UsbsasChildSpawner::new("usbsas-downloader")
-            .arg(out_tar)
+            .arg(&out_files.tar_path)
             .args(&["-c", config_path])
             .spawn::<proto::downloader::Request>()?;
         pipes_read.push(downloader.comm.input_fd());
@@ -1959,13 +1960,13 @@ impl Usbsas {
         pipes_write.push(scsi2files.comm.output_fd());
 
         let files2tar = UsbsasChildSpawner::new("usbsas-files2tar")
-            .arg(out_tar)
+            .arg(&out_files.tar_path)
             .spawn::<proto::writetar::Request>()?;
         pipes_read.push(files2tar.comm.input_fd());
         pipes_write.push(files2tar.comm.output_fd());
 
         let files2fs = UsbsasChildSpawner::new("usbsas-files2fs")
-            .arg(out_fs)
+            .arg(&out_files.fs_path)
             .spawn::<proto::writefs::Request>()?;
         pipes_read.push(files2fs.comm.input_fd());
         pipes_write.push(files2fs.comm.output_fd());
@@ -1977,27 +1978,27 @@ impl Usbsas {
         pipes_write.push(filter.comm.output_fd());
 
         let fs2dev = UsbsasChildSpawner::new("usbsas-fs2dev")
-            .arg(out_fs)
+            .arg(&out_files.fs_path)
             .wait_on_startup()
             .spawn::<proto::fs2dev::Request>()?;
         pipes_read.push(fs2dev.comm.input_fd());
         pipes_write.push(fs2dev.comm.output_fd());
 
         let tar2files = UsbsasChildSpawner::new("usbsas-tar2files")
-            .arg(out_tar)
+            .arg(&out_files.tar_path)
             .wait_on_startup()
             .spawn::<proto::files::Request>()?;
         pipes_read.push(tar2files.comm.input_fd());
         pipes_write.push(tar2files.comm.output_fd());
 
         let uploader = UsbsasChildSpawner::new("usbsas-uploader")
-            .arg(out_tar)
+            .arg(&out_files.tar_path)
             .spawn::<proto::uploader::Request>()?;
         pipes_read.push(uploader.comm.input_fd());
         pipes_write.push(uploader.comm.output_fd());
 
         let analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
-            .arg(out_tar)
+            .arg(&out_files.tar_path)
             .args(&["-c", config_path])
             .spawn::<proto::analyzer::Request>()?;
         pipes_read.push(analyzer.comm.input_fd());
@@ -2052,16 +2053,26 @@ struct Config {
     write_report_dest: bool,
 }
 
+struct OutFiles {
+    pub tar_path: String,
+    pub fs_path: String,
+}
+
 fn main() -> Result<()> {
+    let session_id = match env::var("USBSAS_SESSION_ID") {
+        Ok(id) => id.to_string(),
+        Err(_) => {
+            let id = uuid::Uuid::new_v4().simple().to_string();
+            env::set_var("USBSAS_SESSION_ID", &id);
+            id
+        }
+    };
     usbsas_utils::log::init_logger();
+
     let matches = usbsas_utils::clap::new_usbsas_cmd("usbsas-usbsas")
         .add_config_arg()
-        .add_tar_path_arg()
-        .add_fs_path_arg()
         .get_matches();
     let config_path = matches.get_one::<String>("config").unwrap();
-    let tar_path = matches.get_one::<String>("tar_path").unwrap();
-    let fs_path = matches.get_one::<String>("fs_path").unwrap();
 
     let config = conf_parse(&conf_read(config_path)?)?;
 
@@ -2069,17 +2080,37 @@ fn main() -> Result<()> {
         analyze: false,
         write_report_dest: false,
     };
-
     if config.analyzer.is_some() {
         conf.analyze = true;
     }
-
     if let Some(report_conf) = &config.report {
         conf.write_report_dest = report_conf.write_dest;
     };
 
-    info!("init ({}): {} {}", std::process::id(), tar_path, fs_path);
-    Usbsas::new(Comm::from_env()?, conf, config_path, tar_path, fs_path)?
+    let out_files = OutFiles {
+        tar_path: format!(
+            "{}/usbsas_{}.tar",
+            &config.out_directory.trim_end_matches('/'),
+            session_id,
+        ),
+        fs_path: format!(
+            "{}/usbsas_{}.img",
+            &config.out_directory.trim_end_matches('/'),
+            session_id,
+        ),
+    };
+
+    info!(
+        "init ({}): {} {}",
+        std::process::id(),
+        &out_files.tar_path,
+        &out_files.fs_path
+    );
+
+    let _ = File::create(&out_files.tar_path)?;
+    let _ = File::create(&out_files.fs_path)?;
+
+    Usbsas::new(Comm::from_env()?, conf, config_path, out_files)?
         .main_loop()
         .map(|_| log::debug!("exit"))
 }

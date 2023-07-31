@@ -4,6 +4,5 @@
 
 pub mod appstate;
 pub(crate) mod error;
-pub(crate) mod outfiles;
 pub mod server;
 pub(crate) mod srv_infos;

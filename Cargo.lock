@@ -3469,6 +3469,7 @@ dependencies = [
  "usbsas-proto",
  "usbsas-sandbox",
  "usbsas-utils",
+ "uuid",
 ]
 
 [[package]]
