@@ -145,7 +145,10 @@ impl AppState {
         &self,
         mut body: web::Payload,
     ) -> Result<(String, String), actix_web::Error> {
+        #[cfg(not(feature = "integration-tests"))]
         let bundle_id = uuid::Uuid::new_v4().simple().to_string();
+        #[cfg(feature = "integration-tests")]
+        let bundle_id = "bundle_test".into();
         let out_file_name = format!("{}/{}.tar", self.working_dir.lock().unwrap(), bundle_id);
         let mut out_file = fs::File::create(out_file_name.clone()).unwrap();
 

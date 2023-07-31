@@ -9,6 +9,7 @@ use {
     std::{
         collections::HashMap,
         env, fs, io,
+        path::Path,
         process::{Child, Command, Stdio},
         thread::sleep,
         time::Duration,
@@ -353,6 +354,8 @@ impl IntegrationTester {
                 sha1sum.split_whitespace().next().unwrap().to_string(),
                 expected_sha1sum
             );
+        } else if let appstate::DevType::Net = output_type {
+            assert!(Path::new(&format!("{}/bundle_test.tar", self.working_dir)).exists());
         }
     }
 
