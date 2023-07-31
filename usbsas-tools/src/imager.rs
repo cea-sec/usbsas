@@ -94,8 +94,7 @@ impl Imager {
     fn image_device(&mut self) -> Result<()> {
         // Unlock dev2scsi
         let buf = (u64::from(self.devnum)) << 32 | u64::from(self.busnum);
-        self.dev2scsi.comm.write_all(&buf.to_le_bytes())?;
-        self.dev2scsi.locked = false;
+        self.dev2scsi.unlock_with(&buf.to_le_bytes())?;
 
         let rep: proto::scsi::Response = self.dev2scsi.comm.recv()?;
         let (dev_size, block_size) =

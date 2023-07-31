@@ -10,7 +10,6 @@ use std::sync::{Arc, RwLock};
 use std::{
     collections::{HashSet, VecDeque},
     convert::TryFrom,
-    io::Write,
 };
 use thiserror::Error;
 use usbsas_comm::{protorequest, protoresponse, Comm};
@@ -550,9 +549,6 @@ impl CopyFilesState {
             Err(err) => return Err(err),
         };
 
-        children.files2tar.comm.write_all(&[0_u8])?;
-        children.files2tar.locked = false;
-
         comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
 
         report["file_names"] = all_files_filtered.clone().into();
@@ -577,8 +573,7 @@ impl CopyFilesState {
 
         match self.destination {
             Destination::Usb(usb) => {
-                children.tar2files.comm.write_all(&[1_u8])?;
-                children.tar2files.locked = false;
+                children.tar2files.unlock_with(&[1_u8])?;
                 Ok(State::WriteFiles(WriteFilesState {
                     directories: all_directories_filtered,
                     dirty: Vec::new(),
@@ -593,8 +588,7 @@ impl CopyFilesState {
                 }))
             }
             Destination::Net(_) | Destination::Cmd(_) => {
-                children.tar2files.comm.write_all(&[0_u8])?;
-                children.tar2files.locked = false;
+                children.tar2files.unlock_with(&[0_u8])?;
                 Ok(State::UploadOrCmd(UploadOrCmdState {
                     errors,
                     filtered,
@@ -847,12 +841,9 @@ impl DownloadTarState {
             Err(err) => return Err(err),
         };
 
-        children.files2tar.comm.write_all(&[1_u8])?;
-        children.files2tar.locked = false;
         comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
         self.download_tar(comm, children, &remote_path)?;
-        children.tar2files.comm.write_all(&[1_u8])?;
-        children.tar2files.locked = false;
+        children.tar2files.unlock_with(&[1_u8])?;
         self.tar_to_files_list(
             children,
             &mut errors,
@@ -879,8 +870,7 @@ impl DownloadTarState {
                 report,
             })),
             Destination::Net(_) | Destination::Cmd(_) => {
-                children.tar2files.comm.write_all(&[0_u8])?;
-                children.tar2files.locked = false;
+                children.tar2files.unlock_with(&[0_u8])?;
                 Ok(State::UploadOrCmd(UploadOrCmdState {
                     errors,
                     filtered: Vec::new(),
@@ -1403,8 +1393,7 @@ impl UploadOrCmdState {
         }
 
         // Unlock fs2dev so it can exit
-        children.fs2dev.comm.write_all(&(0_u64).to_ne_bytes())?;
-        children.fs2dev.locked = false;
+        children.fs2dev.unlock_with(&(0_u64).to_ne_bytes())?;
 
         comm.finalcopystatusdone(proto::usbsas::ResponseFinalCopyStatusDone {})?;
         comm.copydone(proto::usbsas::ResponseCopyDone {
@@ -1486,9 +1475,7 @@ impl WipeState {
         // Unlock fs2dev
         children
             .fs2dev
-            .comm
-            .write_all(&((self.devnum << 32) | self.busnum).to_ne_bytes())?;
-        children.fs2dev.locked = false;
+            .unlock_with(&((self.devnum << 32) | self.busnum).to_ne_bytes())?;
 
         if !self.quick {
             trace!("secure wipe");
@@ -1796,10 +1783,9 @@ impl Children {
         match destination {
             Destination::Usb(ref usb) => {
                 // Unlock fs2dev to get dev_size
-                self.fs2dev.comm.write_all(
+                self.fs2dev.unlock_with(
                     &(((u64::from(usb.devnum)) << 32) | (u64::from(usb.busnum))).to_ne_bytes(),
                 )?;
-                self.fs2dev.locked = false;
                 let dev_size = self
                     .fs2dev
                     .comm
@@ -1848,9 +1834,6 @@ impl Children {
         if let Err(err) = self.files2fs.comm.end(proto::writefs::RequestEnd {}) {
             error!("Couldn't end files2fs: {}", err);
         };
-        if self.files2tar.locked {
-            self.files2tar.comm.write_all(&[1_u8]).ok();
-        }
         if let Err(err) = self.files2tar.comm.end(proto::writetar::RequestEnd {}) {
             error!("Couldn't end files2tar: {}", err);
         };
@@ -1858,7 +1841,7 @@ impl Children {
             error!("Couldn't end filter: {}", err);
         };
         if self.fs2dev.locked {
-            self.fs2dev.comm.write_all(&(0_u64).to_ne_bytes()).ok();
+            self.fs2dev.unlock_with(&(0_u64).to_ne_bytes()).ok();
         }
         if let Err(err) = self.fs2dev.comm.end(proto::fs2dev::RequestEnd {}) {
             error!("Couldn't end fs2dev: {}", err);
@@ -1867,7 +1850,7 @@ impl Children {
             error!("Couldn't end scsi2files: {}", err);
         };
         if self.tar2files.locked {
-            self.tar2files.comm.write_all(&[0_u8]).ok();
+            self.tar2files.unlock_with(&[0_u8]).ok();
         }
         if let Err(err) = self.tar2files.comm.end(proto::files::RequestEnd {}) {
             error!("Couldn't end tar2files: {}", err);
@@ -1999,7 +1982,6 @@ impl Usbsas {
 
         let files2tar = UsbsasChildSpawner::new("usbsas-files2tar")
             .arg(out_tar)
-            .wait_on_startup()
             .spawn::<proto::writetar::Request>()?;
         pipes_read.push(files2tar.comm.input_fd());
         pipes_write.push(files2tar.comm.output_fd());

@@ -58,10 +58,7 @@ impl FsWriter {
         )?;
 
         // unlock fs2dev with busnum / devnum
-        fs2dev
-            .comm
-            .write_all(&(((u64::from(devnum)) << 32) | (u64::from(busnum))).to_ne_bytes())?;
-        fs2dev.locked = false;
+        fs2dev.unlock_with(&(((u64::from(devnum)) << 32) | (u64::from(busnum))).to_ne_bytes())?;
 
         log::info!(
             "Writing fs '{}' on device BUS {} DEV {}",

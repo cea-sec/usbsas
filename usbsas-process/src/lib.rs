@@ -5,7 +5,11 @@ use nix::{
     fcntl::{FcntlArg, FdFlag},
     unistd,
 };
-use std::{io, os::unix::io::RawFd, path, process};
+use std::{
+    io::{self, Write},
+    os::unix::io::RawFd,
+    path, process,
+};
 use thiserror::Error;
 use usbsas_comm::Comm;
 use usbsas_utils::{INPUT_PIPE_FD_VAR, OUTPUT_PIPE_FD_VAR, USBSAS_BIN_PATH};
@@ -120,6 +124,15 @@ pub struct UsbsasChild<R> {
 impl<R> UsbsasChild<R> {
     pub fn wait(&mut self) -> Result<std::process::ExitStatus> {
         Ok(self.child.wait()?)
+    }
+
+    pub fn unlock_with(&mut self, buf: &[u8]) -> Result<()> {
+        if !self.locked {
+            return Err(Error::Error("not locked".into()));
+        }
+        self.comm.write_all(buf)?;
+        self.locked = false;
+        Ok(())
     }
 }
 

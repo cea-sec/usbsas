@@ -3179,7 +3179,6 @@ dependencies = [
 name = "usbsas-files2tar"
 version = "0.1.2"
 dependencies = [
- "byteorder",
  "env_logger 0.10.0",
  "log",
  "tar",

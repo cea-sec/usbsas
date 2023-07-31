@@ -1,7 +1,7 @@
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{self, Write},
 };
 use usbsas_comm::{protoresponse, Comm};
@@ -91,7 +91,10 @@ impl InitState {
             Some(&[&self.tarpath]),
         )?;
 
-        let file = File::create(&self.tarpath)?;
+        let file = OpenOptions::new()
+            .write(true)
+            .read(false)
+            .open(&self.tarpath)?;
         let config_str = conf_read(&self.config_path)?;
         let config = conf_parse(&config_str)?;
         let net_conf = config.source_network.ok_or(Error::NoConf)?;
