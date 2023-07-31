@@ -3462,6 +3462,7 @@ dependencies = [
  "time",
  "uname",
  "usbsas-comm",
+ "usbsas-config",
  "usbsas-mass-storage",
  "usbsas-mock",
  "usbsas-process",
