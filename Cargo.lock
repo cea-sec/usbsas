@@ -3101,7 +3101,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-analyzer-server"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -3119,7 +3119,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-cmdexec"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "byteorder",
  "env_logger 0.10.0",
@@ -3142,7 +3142,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-config"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "log",
  "serde",
@@ -3185,7 +3185,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-files2tar"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "env_logger 0.10.0",
  "log",
@@ -3295,7 +3295,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-net"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "base64",
  "byteorder",
@@ -3315,7 +3315,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-process"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
  "log",
@@ -3327,7 +3327,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-proto"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "prost",
  "prost-build",
@@ -3374,7 +3374,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-server"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -3421,7 +3421,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-tools"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "bitvec",
  "clap 4.3.19",
@@ -3462,7 +3462,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-usbsas"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "clap 4.3.19",
  "log",
