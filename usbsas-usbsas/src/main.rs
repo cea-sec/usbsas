@@ -183,7 +183,7 @@ enum State {
     PartitionOpened(PartitionOpenedState),
     CopyFiles(CopyFilesState),
     DownloadTar(DownloadTarState),
-    WriteFiles(WriteFilesState),
+    WriteFs(WriteFsState),
     UploadOrCmd(UploadOrCmdState),
     TransferDone(TransferDoneState),
     Wipe(WipeState),
@@ -200,7 +200,7 @@ impl State {
             State::PartitionOpened(s) => s.run(comm, children),
             State::CopyFiles(s) => s.run(comm, children),
             State::DownloadTar(s) => s.run(comm, children),
-            State::WriteFiles(s) => s.run(comm, children),
+            State::WriteFs(s) => s.run(comm, children),
             State::UploadOrCmd(s) => s.run(comm, children),
             State::TransferDone(s) => s.run(comm, children),
             State::Wipe(s) => s.run(comm, children),
@@ -574,7 +574,7 @@ impl CopyFilesState {
         match self.destination {
             Destination::Usb(usb) => {
                 children.tar2files.unlock_with(&[1_u8])?;
-                Ok(State::WriteFiles(WriteFilesState {
+                Ok(State::WriteFs(WriteFsState {
                     directories: all_directories_filtered,
                     dirty: Vec::new(),
                     errors,
@@ -857,7 +857,7 @@ impl DownloadTarState {
         report["file_names"] = all_files.clone().into();
 
         match self.destination {
-            Destination::Usb(usb) => Ok(State::WriteFiles(WriteFilesState {
+            Destination::Usb(usb) => Ok(State::WriteFs(WriteFsState {
                 directories: all_directories,
                 dirty: Vec::new(),
                 errors,
@@ -1004,7 +1004,7 @@ impl DownloadTarState {
     }
 }
 
-struct WriteFilesState {
+struct WriteFsState {
     directories: Vec<String>,
     dirty: Vec<String>,
     errors: Vec<String>,
@@ -1017,7 +1017,7 @@ struct WriteFilesState {
     report: serde_json::Value,
 }
 
-impl WriteFilesState {
+impl WriteFsState {
     fn run(
         mut self,
         comm: &mut Comm<proto::usbsas::Request>,
