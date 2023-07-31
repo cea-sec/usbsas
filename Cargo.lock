@@ -3384,7 +3384,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "systemstat",
- "tempfile",
  "time",
  "toml",
  "uname",

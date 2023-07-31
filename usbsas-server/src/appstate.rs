@@ -1,5 +1,5 @@
 use crate::error::{AuthentError, ServiceError};
-use crate::tmpfiles::TmpFiles;
+use crate::outfiles::OutFiles;
 use actix_web::web;
 use base64::{engine as b64eng, Engine as _};
 use futures::task::{Context, Poll, Waker};
@@ -345,7 +345,7 @@ pub(crate) struct AppState {
     comm: Mutex<Comm<proto::usbsas::Request>>,
     dest: Mutex<Option<Destination>>,
     hmac: Mutex<Hmac<Sha256>>,
-    tmpfiles: Mutex<TmpFiles>,
+    outfiles: Mutex<OutFiles>,
     pub status: Arc<RwLock<String>>,
     pub session_id: Arc<std::sync::RwLock<String>>,
 }
@@ -354,7 +354,12 @@ impl AppState {
     pub(crate) fn new(config_path: String) -> Result<Self, ServiceError> {
         let config = conf_parse(&conf_read(&config_path)?)?;
 
-        let tmpfiles = TmpFiles::new(config.out_directory.clone())?;
+        #[cfg(feature = "integration-tests")]
+        let session_id = "00000000000000000000000000000000".to_string();
+        #[cfg(not(feature = "integration-tests"))]
+        let session_id = uuid::Uuid::new_v4().simple().to_string();
+
+        let outfiles = OutFiles::new(config.out_directory.clone(), &session_id)?;
 
         // Create reports directory if it doesn't exists
         if let Some(report_config) = &config.report {
@@ -368,20 +373,15 @@ impl AppState {
             };
         };
 
-        #[cfg(feature = "integration-tests")]
-        let session_id = "0".to_string();
-        #[cfg(not(feature = "integration-tests"))]
-        let session_id = uuid::Uuid::new_v4().simple().to_string();
+        debug!("Out tar file name: {:?}", outfiles.out_tar);
+        debug!("Out fs file name: {:?}", outfiles.out_fs);
 
-        debug!("Out tar file name: {:?}", tmpfiles.out_tar);
-        debug!("Out fs file name: {:?}", tmpfiles.out_fs);
-
-        let comm = AppState::start_usbsas(&config, &config_path, &tmpfiles, &session_id)?;
+        let comm = AppState::start_usbsas(&config, &config_path, &outfiles, &session_id)?;
 
         Ok(AppState {
             config: Mutex::new(config),
             config_path: Mutex::new(config_path),
-            tmpfiles: Mutex::new(tmpfiles),
+            outfiles: Mutex::new(outfiles),
             comm: Mutex::new(comm),
             dest: Mutex::new(None),
             hmac: Mutex::new(Hmac::new_from_slice(
@@ -395,14 +395,14 @@ impl AppState {
     fn start_usbsas(
         config: &Config,
         config_path: &str,
-        tmpfiles: &TmpFiles,
+        outfiles: &OutFiles,
         session_id: &str,
     ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
         debug!("starting usbsas");
 
         let mut usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas")
-            .arg(&tmpfiles.out_tar)
-            .arg(&tmpfiles.out_fs)
+            .arg(&outfiles.out_tar)
+            .arg(&outfiles.out_fs)
             .args(&["-c", config_path]);
 
         if config.analyzer.is_some() {
@@ -421,17 +421,17 @@ impl AppState {
         let _ = comm.end(proto::usbsas::RequestEnd {})?;
         nix::sys::wait::wait()?;
 
-        self.tmpfiles.lock()?.reset()?;
-
         #[cfg(not(feature = "integration-tests"))]
         let new_session_id = uuid::Uuid::new_v4().simple().to_string();
         #[cfg(feature = "integration-tests")]
         let new_session_id = "0".to_string();
 
+        self.outfiles.lock()?.reset(&new_session_id)?;
+
         let new_comm = AppState::start_usbsas(
             &*self.config.lock()?,
             &self.config_path.lock()?,
-            &*self.tmpfiles.lock()?,
+            &*self.outfiles.lock()?,
             &new_session_id,
         )?;
 
@@ -1057,7 +1057,7 @@ impl AppState {
                     // Keep out fs
                     let datetime = time::OffsetDateTime::now_utc();
                     fs::rename(
-                        self.tmpfiles.lock()?.out_fs.clone(),
+                        self.outfiles.lock()?.out_fs.clone(),
                         format!(
                             "{}/imgdisk_{:04}{:02}{:02}{:02}{:02}{:02}_{}_{}_{}.bin",
                             self.config.lock()?.out_directory,
