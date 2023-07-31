@@ -5,6 +5,7 @@
     "confirm": "Confirm",
     "copy_cmd_start": "Running custom command",
     "copy_fromtar_tofs": "Creating filesystem",
+    "copy_fromtar_totar": "Creating clean archive",
     "copy_fs2dev_start": "Writing filesystem on output device",
     "copy_start": "Starting copy",
     "copy_upload_start": "Uploading archive",

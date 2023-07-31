@@ -5,6 +5,7 @@
     "confirm": "Confirmer",
     "copy_cmd_start": "Exécution de la commande custom",
     "copy_fromtar_tofs": "Création du système de fichier",
+    "copy_fromtar_totar": "Création de l'archive",
     "copy_fs2dev_start": "Écriture du système de fichier sur la clé destination",
     "copy_start": "Préparation de la copie",
     "copy_upload_start": "Téléversement de l'archive",

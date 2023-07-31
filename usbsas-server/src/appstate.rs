@@ -334,6 +334,10 @@ impl ReqAuthentication for Vec<u8> {
     }
 }
 
+// 1536 == tar with only a "/data" entry (512b) + 1024b zeroes (created by
+// files2tar when it starts)
+const USBSAS_EMPTY_TAR: u64 = 1536;
+
 /// Actix data struct
 pub(crate) struct AppState {
     config: Mutex<Config>,
@@ -413,6 +417,11 @@ impl AppState {
             self.config.lock()?.out_directory.trim_end_matches('/'),
             self.session_id.read()?
         );
+        let clean_tar_path = format!(
+            "{}/usbsas_{}_clean.tar",
+            self.config.lock()?.out_directory.trim_end_matches('/'),
+            self.session_id.read()?
+        );
         let fs_path = format!(
             "{}/usbsas_{}.img",
             self.config.lock()?.out_directory.trim_end_matches('/'),
@@ -424,9 +433,13 @@ impl AppState {
             }
         };
         if let Ok(metadata) = fs::metadata(&tar_path) {
-            // 1536 == tar with only a data entry (512b) + 1024b zeroes
-            if metadata.len() == 1536 {
+            if metadata.len() == USBSAS_EMPTY_TAR {
                 let _ = fs::remove_file(Path::new(&tar_path)).ok();
+            }
+        };
+        if let Ok(metadata) = fs::metadata(&clean_tar_path) {
+            if metadata.len() == USBSAS_EMPTY_TAR {
+                let _ = fs::remove_file(Path::new(&clean_tar_path)).ok();
             }
         };
 
@@ -660,7 +673,10 @@ impl AppState {
     ) -> Result<(), ServiceError> {
         use proto::usbsas::response::Msg;
         let mut src_is_net = false;
-
+        let dest_lock = self.dest.lock()?;
+        let dest = dest_lock
+            .as_ref()
+            .ok_or(ServiceError::InternalServerError)?;
         let source = match download_pin {
             Some(pin) => {
                 let pin = pin
@@ -694,8 +710,14 @@ impl AppState {
         let mut comm = self.comm.lock()?;
         resp_stream.report_progress("copy_start", progress)?;
 
-        let dest = self.dest.lock()?;
-        let destination = match dest.as_ref().ok_or(ServiceError::InternalServerError)? {
+        let (analyze_usb, analyze_net, analyze_cmd) =
+            if let Some(conf) = &self.config.lock()?.analyzer {
+                (conf.analyze_usb, conf.analyze_net, conf.analyze_cmd)
+            } else {
+                (false, false, false)
+            };
+
+        let (destination, analyze) = match dest {
             Destination::Usb { busnum, devnum } => {
                 debug!("do copy usb {} {} ({})", busnum, devnum, fsfmt);
                 let fstype = match fsfmt.as_str() {
@@ -704,25 +726,36 @@ impl AppState {
                     "fat32" => OutFsType::Fat,
                     _ => return Err(ServiceError::InternalServerError),
                 };
-                proto::usbsas::request_copy_start::Destination::Usb(proto::usbsas::DestUsb {
-                    busnum: *busnum,
-                    devnum: *devnum,
-                    fstype: fstype.into(),
-                })
+                (
+                    proto::usbsas::request_copy_start::Destination::Usb(proto::usbsas::DestUsb {
+                        busnum: *busnum,
+                        devnum: *devnum,
+                        fstype: fstype.into(),
+                    }),
+                    analyze_usb,
+                )
             }
             Destination::Net {
                 url,
                 krb_service_name,
             } => {
                 debug!("do copy net");
-                proto::usbsas::request_copy_start::Destination::Net(proto::common::DestNet {
-                    url: url.to_owned(),
-                    krb_service_name: krb_service_name.clone().unwrap_or_else(|| String::from("")),
-                })
+                (
+                    proto::usbsas::request_copy_start::Destination::Net(proto::common::DestNet {
+                        url: url.to_owned(),
+                        krb_service_name: krb_service_name
+                            .clone()
+                            .unwrap_or_else(|| String::from("")),
+                    }),
+                    analyze_net,
+                )
             }
             Destination::Cmd { .. } => {
                 debug!("do copy cmd");
-                proto::usbsas::request_copy_start::Destination::Cmd(proto::usbsas::DestCmd {})
+                (
+                    proto::usbsas::request_copy_start::Destination::Cmd(proto::usbsas::DestCmd {}),
+                    analyze_cmd,
+                )
             }
         };
 
@@ -790,81 +823,84 @@ impl AppState {
         }
         progress = current_progress + 30.0;
 
-        if self.config.lock()?.analyzer.is_some() && !src_is_net {
-            if let Some(Destination::Usb { .. }) = *dest {
-                resp_stream.report_progress("analyzing", progress)?;
-                current_progress = progress;
-                loop {
-                    resp = comm.recv()?;
-                    match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                        Msg::AnalyzeStatus(msg) => {
-                            progress = current_progress
-                                + (msg.current_size as f32 / msg.total_size as f32 * 5.0);
-                            resp_stream.report_progress("analyze_update", progress)?;
-                        }
-                        Msg::AnalyzeDone(_) => break,
-                        Msg::Error(err) => {
-                            resp_stream.report_error(&err.err)?;
-                            return Err(ServiceError::InternalServerError);
-                        }
-                        _ => {
-                            error!("Unexpected resp");
-                            resp_stream.report_error("Unexpected response from usbsas")?;
-                            return Err(ServiceError::InternalServerError);
-                        }
+        if analyze && !src_is_net {
+            resp_stream.report_progress("analyzing", progress)?;
+            current_progress = progress;
+            loop {
+                resp = comm.recv()?;
+                match resp.msg.ok_or(ServiceError::InternalServerError)? {
+                    Msg::AnalyzeStatus(msg) => {
+                        progress = current_progress
+                            + (msg.current_size as f32 / msg.total_size as f32 * 5.0);
+                        resp_stream.report_progress("analyze_update", progress)?;
+                    }
+                    Msg::AnalyzeDone(_) => break,
+                    Msg::Error(err) => {
+                        resp_stream.report_error(&err.err)?;
+                        return Err(ServiceError::InternalServerError);
+                    }
+                    _ => {
+                        error!("Unexpected resp");
+                        resp_stream.report_error("Unexpected response from usbsas")?;
+                        return Err(ServiceError::InternalServerError);
                     }
                 }
-                progress = current_progress + 5.0;
-            };
+            }
+            progress = current_progress + 5.0;
         };
 
         size_read = 0;
         current_progress = progress;
 
-        match dest.as_ref().ok_or(ServiceError::InternalServerError)? {
-            Destination::Usb { .. } => {
-                resp_stream.report_progress("copy_fromtar_tofs", progress)?;
-                // create fs
-                loop {
-                    resp = comm.recv()?;
-                    match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                        Msg::CopyStatus(msg) => {
-                            size_read += msg.current_size;
-                            progress =
-                                current_progress + (size_read as f32 / total_size as f32 * 30.0);
-                            resp_stream.report_progress("copy_fromtar_update", progress)?;
-                        }
-                        Msg::CopyStatusDone(_) => break,
-                        Msg::NothingToCopy(msg) => {
-                            resp_stream.add_message(ReportCopy {
-                                status: "nothing_to_copy",
-                                report: serde_json::from_slice(&msg.report)?,
-                            })?;
-                            resp_stream.done()?;
-                            return Ok(());
-                        }
-                        Msg::Error(err) => {
-                            error!("{}", err.err);
-                            resp_stream.report_error(&err.err)?;
-                            return Err(ServiceError::InternalServerError);
-                        }
-                        _ => {
-                            resp_stream.report_error("Unexpected response from usbsas")?;
-                            return Err(ServiceError::InternalServerError);
-                        }
+        if analyze || matches!(dest, &Destination::Usb { .. }) {
+            match dest {
+                Destination::Usb { .. } => {
+                    resp_stream.report_progress("copy_fromtar_tofs", progress)?;
+                }
+                Destination::Net { .. } | Destination::Cmd { .. } => {
+                    resp_stream.report_progress("copy_fromtar_totar", progress)?;
+                }
+            }
+            // create fs or clean tar
+            loop {
+                resp = comm.recv()?;
+                match resp.msg.ok_or(ServiceError::InternalServerError)? {
+                    Msg::CopyStatus(msg) => {
+                        size_read += msg.current_size;
+                        progress = current_progress + (size_read as f32 / total_size as f32 * 30.0);
+                        resp_stream.report_progress("copy_fromtar_update", progress)?;
+                    }
+                    Msg::CopyStatusDone(_) => break,
+                    Msg::NothingToCopy(msg) => {
+                        resp_stream.add_message(ReportCopy {
+                            status: "nothing_to_copy",
+                            report: serde_json::from_slice(&msg.report)?,
+                        })?;
+                        resp_stream.done()?;
+                        return Ok(());
+                    }
+                    Msg::Error(err) => {
+                        error!("{}", err.err);
+                        resp_stream.report_error(&err.err)?;
+                        return Err(ServiceError::InternalServerError);
+                    }
+                    _ => {
+                        resp_stream.report_error("Unexpected response from usbsas")?;
+                        return Err(ServiceError::InternalServerError);
                     }
                 }
-                progress = current_progress + 30.0;
+            }
+        }
+
+        progress = current_progress + 30.0;
+        match dest {
+            Destination::Usb { .. } => {
                 resp_stream.report_progress("copy_fs2dev_start", progress)?
             }
             Destination::Net { .. } => {
-                progress = current_progress + 30.0;
                 resp_stream.report_progress("copy_upload_start", progress)?
             }
-            Destination::Cmd { .. } => {
-                progress = current_progress + 30.0;
-                resp_stream.report_progress("copy_cmd_start", progress)?
-            }
+            Destination::Cmd { .. } => resp_stream.report_progress("copy_cmd_start", progress)?,
         }
 
         progress += 1.0;
@@ -925,7 +961,7 @@ impl AppState {
 
         // post copy cmd
         if let Some(usbsas_config::PostCopy { .. }) = self.config.lock()?.post_copy {
-            let outfiletype = match dest.as_ref().ok_or(ServiceError::InternalServerError)? {
+            let outfiletype = match dest {
                 Destination::Usb { .. } => OutFileType::Fs,
                 Destination::Net { .. } | Destination::Cmd { .. } => OutFileType::Tar,
             };

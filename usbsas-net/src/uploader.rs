@@ -1,4 +1,5 @@
 use crate::{Error, HttpClient, Result};
+use byteorder::ReadBytesExt;
 use log::{error, trace};
 use reqwest::blocking::Body;
 use std::{
@@ -72,10 +73,12 @@ struct RunningState {
 struct WaitEndState {}
 
 impl InitState {
-    fn run(self, _comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
+        let cleantarpath = format!("{}_clean.tar", self.tarpath.trim_end_matches(".tar"));
         usbsas_sandbox::landlock(
             Some(&[
                 &self.tarpath,
+                &cleantarpath,
                 "/etc",
                 "/lib",
                 "/usr/lib/",
@@ -83,6 +86,19 @@ impl InitState {
             ]),
             None,
         )?;
+
+        match comm.read_u8()? {
+            // Nothing to do, exit
+            0 => return Ok(State::WaitEnd(WaitEndState {})),
+            // Use provided tar path
+            1 => (),
+            // Files of this transfer were analyzed, use clean tar path
+            2 => self.tarpath = cleantarpath,
+            _ => {
+                error!("bad unlock value");
+                return Ok(State::WaitEnd(WaitEndState {}));
+            }
+        }
 
         let file = File::open(self.tarpath)?;
 

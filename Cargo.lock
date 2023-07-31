@@ -3114,6 +3114,7 @@ dependencies = [
 name = "usbsas-cmdexec"
 version = "0.1.2"
 dependencies = [
+ "byteorder",
  "env_logger 0.10.0",
  "log",
  "thiserror",
@@ -3290,6 +3291,7 @@ name = "usbsas-net"
 version = "0.1.4"
 dependencies = [
  "base64",
+ "byteorder",
  "env_logger 0.10.0",
  "libgssapi",
  "log",

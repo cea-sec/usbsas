@@ -184,7 +184,9 @@ enum State {
     DevOpened(DevOpenedState),
     PartitionOpened(PartitionOpenedState),
     CopyFiles(CopyFilesState),
+    Analyze(AnalyzeState),
     DownloadTar(DownloadTarState),
+    WriteCleanTar(WriteCleanTarState),
     WriteFs(WriteFsState),
     UploadOrCmd(UploadOrCmdState),
     TransferDone(TransferDoneState),
@@ -201,7 +203,9 @@ impl State {
             State::DevOpened(s) => s.run(comm, children),
             State::PartitionOpened(s) => s.run(comm, children),
             State::CopyFiles(s) => s.run(comm, children),
+            State::Analyze(s) => s.run(comm, children),
             State::DownloadTar(s) => s.run(comm, children),
+            State::WriteCleanTar(s) => s.run(comm, children),
             State::WriteFs(s) => s.run(comm, children),
             State::UploadOrCmd(s) => s.run(comm, children),
             State::TransferDone(s) => s.run(comm, children),
@@ -585,27 +589,48 @@ impl CopyFilesState {
             &report,
         )?;
 
-        match self.destination {
-            Destination::Usb(usb) => {
-                children.tar2files.unlock_with(&[1_u8])?;
-                Ok(State::WriteFs(WriteFsState {
-                    directories: all_directories_filtered,
-                    errors,
-                    files: all_files_filtered,
-                    id: self.id,
-                    usb,
-                    report,
-                    config: self.config,
-                }))
-            }
-            Destination::Net(_) | Destination::Cmd(_) => {
-                children.tar2files.unlock_with(&[0_u8])?;
-                Ok(State::UploadOrCmd(UploadOrCmdState {
-                    errors,
-                    id: self.id,
-                    destination: self.destination,
-                    report,
-                }))
+        let analyze = match self.destination {
+            Destination::Usb(_) => self.config.analyze_usb,
+            Destination::Net(_) => self.config.analyze_net,
+            Destination::Cmd(_) => self.config.analyze_cmd,
+        };
+
+        if analyze {
+            Ok(State::Analyze(AnalyzeState {
+                directories: all_directories_filtered,
+                files: all_files_filtered,
+                errors,
+                id: self.id,
+                destination: self.destination,
+                report,
+                config: self.config,
+            }))
+        } else {
+            match self.destination {
+                Destination::Usb(usb) => {
+                    children.uploader.unlock_with(&[0_u8])?;
+                    children.cmdexec.unlock_with(&[0_u8])?;
+                    children.tar2files.unlock_with(&[1_u8])?;
+                    Ok(State::WriteFs(WriteFsState {
+                        directories: all_directories_filtered,
+                        errors,
+                        files: all_files_filtered,
+                        usb,
+                        report,
+                        config: self.config,
+                    }))
+                }
+                Destination::Net(_) | Destination::Cmd(_) => {
+                    report["error_files"] = errors.into();
+                    children.uploader.unlock_with(&[1_u8])?;
+                    children.cmdexec.unlock_with(&[1_u8])?;
+                    children.tar2files.unlock_with(&[0_u8])?;
+                    Ok(State::UploadOrCmd(UploadOrCmdState {
+                        id: self.id,
+                        destination: self.destination,
+                        report,
+                    }))
+                }
             }
         }
     }
@@ -714,7 +739,7 @@ impl CopyFilesState {
     }
 
     fn tar_src_files(
-        &mut self,
+        &self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
         entries_filtered: &[String],
@@ -740,7 +765,7 @@ impl CopyFilesState {
     }
 
     fn file_to_tar(
-        &mut self,
+        &self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
         path: &str,
@@ -867,22 +892,23 @@ impl DownloadTarState {
         report["source"] = "network".into();
         report["file_names"] = all_files.clone().into();
 
-        self.config.analyze = false;
+        self.config.analyze_usb = false;
+        self.config.analyze_net = false;
+        self.config.analyze_cmd = false;
         self.config.write_report_dest = false;
         match self.destination {
             Destination::Usb(usb) => Ok(State::WriteFs(WriteFsState {
                 directories: all_directories,
                 errors,
                 files: all_files,
-                id: self.id,
                 usb,
                 report,
                 config: self.config,
             })),
             Destination::Net(_) | Destination::Cmd(_) => {
+                report["error_files"] = errors.into();
                 children.tar2files.unlock_with(&[0_u8])?;
                 Ok(State::UploadOrCmd(UploadOrCmdState {
-                    errors,
                     id: self.id,
                     destination: self.destination,
                     report,
@@ -1013,28 +1039,27 @@ impl DownloadTarState {
     }
 }
 
-struct WriteFsState {
+struct AnalyzeState {
     directories: Vec<String>,
     errors: Vec<String>,
     files: Vec<String>,
     id: String,
-    usb: proto::usbsas::DestUsb,
+    destination: Destination,
     report: serde_json::Value,
     config: Config,
 }
 
-impl WriteFsState {
+impl AnalyzeState {
     fn run(
         mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
         let mut dirty: Vec<String> = Vec::new();
-        let analyze_report = if self.config.analyze {
-            Some(self.analyze_files(comm, children, &mut dirty)?)
-        } else {
-            None
-        };
+        let analyze_report = self.analyze_files(comm, children, &mut dirty)?;
+        self.report["analyzer_report"] = analyze_report;
+
+        children.tar2files.unlock_with(&[1])?;
 
         // Abort if no files survived antivirus and no report requested
         if self.files.is_empty() && !self.config.write_report_dest {
@@ -1045,115 +1070,29 @@ impl WriteFsState {
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
-        self.init_fs(children)?;
+        children.cmdexec.unlock_with(&[2])?;
+        children.uploader.unlock_with(&[2])?;
 
-        trace!("copy usb");
-
-        // Create directory tree
-        for dir in &self.directories {
-            let timestamp = children
-                .tar2files
-                .comm
-                .getattr(proto::files::RequestGetAttr { path: dir.clone() })?
-                .timestamp;
-            children
-                .files2fs
-                .comm
-                .newfile(proto::writefs::RequestNewFile {
-                    path: dir.to_string(),
-                    size: 0,
-                    ftype: FileType::Directory.into(),
-                    timestamp,
-                })?;
-        }
-
-        // Copy files
-        for path in &self.files {
-            let attrs = match children
-                .tar2files
-                .comm
-                .getattr(proto::files::RequestGetAttr { path: path.clone() })
-            {
-                Ok(rep) => rep,
-                Err(err) => {
-                    error!("{}", err);
-                    self.errors.push(path.clone());
-                    continue;
-                }
-            };
-
-            match self.write_file(
-                comm,
-                children,
-                path,
-                attrs.size,
-                attrs.ftype,
-                attrs.timestamp,
-            ) {
-                Ok(_) => (),
-                Err(err) => {
-                    warn!("didn't copy file {}: {}", path, err);
-                    self.errors.push(path.clone());
-                }
+        match self.destination {
+            Destination::Usb(usb) => Ok(State::WriteFs(WriteFsState {
+                directories: self.directories,
+                errors: self.errors,
+                files: self.files,
+                usb,
+                report: self.report,
+                config: self.config,
+            })),
+            Destination::Net(_) | Destination::Cmd(_) => {
+                Ok(State::WriteCleanTar(WriteCleanTarState {
+                    directories: self.directories,
+                    errors: self.errors,
+                    files: self.files,
+                    id: self.id,
+                    destination: self.destination,
+                    report: self.report,
+                }))
             }
         }
-
-        self.report["error_files"] = self.errors.clone().into();
-
-        if let Some(report) = analyze_report {
-            self.report["analyzer_report"] = report;
-        }
-
-        if self.config.write_report_dest {
-            if let Err(err) = self.write_report_file(children) {
-                error!("Couldn't write report on destination fs");
-                comm.error(proto::usbsas::ResponseError {
-                    err: format!("err writing report on dest fs: {err}"),
-                })?;
-                return Ok(State::WaitEnd(WaitEndState {}));
-            }
-        }
-
-        children
-            .files2fs
-            .comm
-            .close(proto::writefs::RequestClose {})?;
-        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
-
-        children.forward_bitvec()?;
-        match self.write_fs(comm, children) {
-            Ok(()) => {
-                comm.copydone(proto::usbsas::ResponseCopyDone {
-                    report: serde_json::to_vec(&self.report)?,
-                })?;
-                info!("transfer done");
-            }
-            Err(err) => {
-                comm.error(proto::usbsas::ResponseError {
-                    err: format!("err writing fs: {err}"),
-                })?;
-                error!("transfer failed: {}", err);
-            }
-        }
-
-        Ok(State::TransferDone(TransferDoneState {}))
-    }
-
-    fn init_fs(&mut self, children: &mut Children) -> Result<()> {
-        trace!("init fs");
-        let dev_size = children
-            .fs2dev
-            .comm
-            .size(proto::fs2dev::RequestDevSize {})?
-            .size;
-        children
-            .files2fs
-            .comm
-            .setfsinfos(proto::writefs::RequestSetFsInfos {
-                dev_size,
-                fstype: self.usb.fstype,
-            })?;
-        Ok(())
     }
 
     fn analyze_files(
@@ -1238,6 +1177,233 @@ impl WriteFsState {
                 _ => return Err(Error::Analyze("Unexpected response".into())),
             }
         }
+    }
+}
+
+struct WriteCleanTarState {
+    directories: Vec<String>,
+    errors: Vec<String>,
+    files: Vec<String>,
+    id: String,
+    destination: Destination,
+    report: serde_json::Value,
+}
+
+impl WriteCleanTarState {
+    fn run(
+        mut self,
+        comm: &mut Comm<proto::usbsas::Request>,
+        children: &mut Children,
+    ) -> Result<State> {
+        trace!("write clean tar");
+
+        for path in self.directories.iter().chain(self.files.iter()) {
+            if let Err(err) = self.file_to_clean_tar(comm, children, path) {
+                error!("Couldn't copy file {}: {}", &path, err);
+                self.errors.push(path.clone());
+            };
+        }
+
+        self.report["error_files"] = self.errors.clone().into();
+
+        children
+            .files2cleantar
+            .comm
+            .close(proto::writetar::RequestClose {
+                infos: serde_json::to_vec(&self.report)?,
+            })?;
+
+        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
+
+        Ok(State::UploadOrCmd(UploadOrCmdState {
+            id: self.id,
+            destination: self.destination,
+            report: self.report,
+        }))
+    }
+
+    fn file_to_clean_tar(
+        &self,
+        comm: &mut Comm<proto::usbsas::Request>,
+        children: &mut Children,
+        path: &str,
+    ) -> Result<()> {
+        let mut attrs = children
+            .tar2files
+            .comm
+            .getattr(proto::files::RequestGetAttr { path: path.into() })?;
+
+        children
+            .files2cleantar
+            .comm
+            .newfile(proto::writetar::RequestNewFile {
+                path: path.to_string(),
+                size: attrs.size,
+                ftype: attrs.ftype,
+                timestamp: attrs.timestamp,
+            })?;
+
+        let mut offset: u64 = 0;
+        while attrs.size > 0 {
+            let size_todo = if attrs.size < READ_FILE_MAX_SIZE {
+                attrs.size
+            } else {
+                READ_FILE_MAX_SIZE
+            };
+            let rep = children
+                .tar2files
+                .comm
+                .readfile(proto::files::RequestReadFile {
+                    path: path.to_string(),
+                    offset,
+                    size: size_todo,
+                })?;
+            children
+                .files2cleantar
+                .comm
+                .writefile(proto::writetar::RequestWriteFile {
+                    path: path.to_string(),
+                    offset,
+                    data: rep.data,
+                })?;
+            offset += size_todo;
+            attrs.size -= size_todo;
+            comm.copystatus(proto::usbsas::ResponseCopyStatus {
+                current_size: size_todo,
+            })?;
+        }
+
+        children
+            .files2cleantar
+            .comm
+            .endfile(proto::writetar::RequestEndFile {
+                path: path.to_string(),
+            })?;
+
+        Ok(())
+    }
+}
+
+struct WriteFsState {
+    directories: Vec<String>,
+    errors: Vec<String>,
+    files: Vec<String>,
+    usb: proto::usbsas::DestUsb,
+    report: serde_json::Value,
+    config: Config,
+}
+
+impl WriteFsState {
+    fn run(
+        mut self,
+        comm: &mut Comm<proto::usbsas::Request>,
+        children: &mut Children,
+    ) -> Result<State> {
+        self.init_fs(children)?;
+
+        trace!("copy usb");
+
+        // Create directory tree
+        for dir in &self.directories {
+            let timestamp = children
+                .tar2files
+                .comm
+                .getattr(proto::files::RequestGetAttr { path: dir.clone() })?
+                .timestamp;
+            children
+                .files2fs
+                .comm
+                .newfile(proto::writefs::RequestNewFile {
+                    path: dir.to_string(),
+                    size: 0,
+                    ftype: FileType::Directory.into(),
+                    timestamp,
+                })?;
+        }
+
+        // Copy files
+        for path in &self.files {
+            let attrs = match children
+                .tar2files
+                .comm
+                .getattr(proto::files::RequestGetAttr { path: path.clone() })
+            {
+                Ok(rep) => rep,
+                Err(err) => {
+                    error!("{}", err);
+                    self.errors.push(path.clone());
+                    continue;
+                }
+            };
+
+            match self.write_file(
+                comm,
+                children,
+                path,
+                attrs.size,
+                attrs.ftype,
+                attrs.timestamp,
+            ) {
+                Ok(_) => (),
+                Err(err) => {
+                    warn!("didn't copy file {}: {}", path, err);
+                    self.errors.push(path.clone());
+                }
+            }
+        }
+
+        self.report["error_files"] = self.errors.clone().into();
+
+        if self.config.write_report_dest {
+            if let Err(err) = self.write_report_file(children) {
+                error!("Couldn't write report on destination fs");
+                comm.error(proto::usbsas::ResponseError {
+                    err: format!("err writing report on dest fs: {err}"),
+                })?;
+                return Ok(State::WaitEnd(WaitEndState {}));
+            }
+        }
+
+        children
+            .files2fs
+            .comm
+            .close(proto::writefs::RequestClose {})?;
+        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
+
+        children.forward_bitvec()?;
+        match self.write_fs(comm, children) {
+            Ok(()) => {
+                comm.copydone(proto::usbsas::ResponseCopyDone {
+                    report: serde_json::to_vec(&self.report)?,
+                })?;
+                info!("transfer done");
+            }
+            Err(err) => {
+                comm.error(proto::usbsas::ResponseError {
+                    err: format!("err writing fs: {err}"),
+                })?;
+                error!("transfer failed: {}", err);
+            }
+        }
+
+        Ok(State::TransferDone(TransferDoneState {}))
+    }
+
+    fn init_fs(&mut self, children: &mut Children) -> Result<()> {
+        trace!("init fs");
+        let dev_size = children
+            .fs2dev
+            .comm
+            .size(proto::fs2dev::RequestDevSize {})?
+            .size;
+        children
+            .files2fs
+            .comm
+            .setfsinfos(proto::writefs::RequestSetFsInfos {
+                dev_size,
+                fstype: self.usb.fstype,
+            })?;
+        Ok(())
     }
 
     fn write_file(
@@ -1365,7 +1531,6 @@ impl WriteFsState {
 
 struct UploadOrCmdState {
     destination: Destination,
-    errors: Vec<String>,
     id: String,
     report: serde_json::Value,
 }
@@ -1376,7 +1541,6 @@ impl UploadOrCmdState {
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<State> {
-        self.report["error_files"] = self.errors.clone().into();
         match &self.destination {
             Destination::Usb(_) => unreachable!("already handled"),
             Destination::Net(dest_net) => self.upload_files(comm, children, dest_net.clone())?,
@@ -1704,6 +1868,7 @@ struct Children {
     downloader: UsbsasChild<proto::downloader::Request>,
     files2fs: UsbsasChild<proto::writefs::Request>,
     files2tar: UsbsasChild<proto::writetar::Request>,
+    files2cleantar: UsbsasChild<proto::writetar::Request>,
     filter: UsbsasChild<proto::filter::Request>,
     fs2dev: UsbsasChild<proto::fs2dev::Request>,
     scsi2files: UsbsasChild<proto::files::Request>,
@@ -1807,6 +1972,7 @@ impl Children {
         {
             error!("Couldn't end identificator: {}", err);
         };
+        self.cmdexec.unlock_with(&[0]).ok();
         if let Err(err) = self.cmdexec.comm.end(proto::cmdexec::RequestEnd {}) {
             error!("Couldn't end cmdexec: {}", err);
         };
@@ -1819,24 +1985,24 @@ impl Children {
         if let Err(err) = self.files2tar.comm.end(proto::writetar::RequestEnd {}) {
             error!("Couldn't end files2tar: {}", err);
         };
+        if let Err(err) = self.files2cleantar.comm.end(proto::writetar::RequestEnd {}) {
+            error!("Couldn't end files2cleantar: {}", err);
+        };
         if let Err(err) = self.filter.comm.end(proto::filter::RequestEnd {}) {
             error!("Couldn't end filter: {}", err);
         };
-        if self.fs2dev.locked {
-            self.fs2dev.unlock_with(&(0_u64).to_ne_bytes()).ok();
-        }
+        self.fs2dev.unlock_with(&(0_u64).to_ne_bytes()).ok();
         if let Err(err) = self.fs2dev.comm.end(proto::fs2dev::RequestEnd {}) {
             error!("Couldn't end fs2dev: {}", err);
         };
         if let Err(err) = self.scsi2files.comm.end(proto::files::RequestEnd {}) {
             error!("Couldn't end scsi2files: {}", err);
         };
-        if self.tar2files.locked {
-            self.tar2files.unlock_with(&[0_u8]).ok();
-        }
+        self.tar2files.unlock_with(&[0]).ok();
         if let Err(err) = self.tar2files.comm.end(proto::files::RequestEnd {}) {
             error!("Couldn't end tar2files: {}", err);
         };
+        self.uploader.unlock_with(&[0]).ok();
         if let Err(err) = self.uploader.comm.end(proto::uploader::RequestEnd {}) {
             error!("Couldn't end uploader: {}", err);
         };
@@ -1870,6 +2036,9 @@ impl Children {
         };
         trace!("waiting files2tar");
         if let Err(err) = self.files2tar.wait() {
+            error!("Waiting files2tar failed: {}", err);
+        };
+        if let Err(err) = self.files2cleantar.wait() {
             error!("Waiting files2tar failed: {}", err);
         };
         trace!("waiting filter");
@@ -1937,6 +2106,7 @@ impl Usbsas {
             .arg(&out_files.tar_path)
             .arg(&out_files.fs_path)
             .args(&["-c", config_path])
+            .wait_on_startup()
             .spawn::<proto::cmdexec::Request>()?;
         pipes_read.push(cmdexec.comm.input_fd());
         pipes_write.push(cmdexec.comm.output_fd());
@@ -1964,6 +2134,15 @@ impl Usbsas {
             .spawn::<proto::writetar::Request>()?;
         pipes_read.push(files2tar.comm.input_fd());
         pipes_write.push(files2tar.comm.output_fd());
+
+        let files2cleantar = UsbsasChildSpawner::new("usbsas-files2tar")
+            .arg(&format!(
+                "{}_clean.tar",
+                &out_files.tar_path.trim_end_matches(".tar")
+            ))
+            .spawn::<proto::writetar::Request>()?;
+        pipes_read.push(files2cleantar.comm.input_fd());
+        pipes_write.push(files2cleantar.comm.output_fd());
 
         let files2fs = UsbsasChildSpawner::new("usbsas-files2fs")
             .arg(&out_files.fs_path)
@@ -1993,6 +2172,7 @@ impl Usbsas {
 
         let uploader = UsbsasChildSpawner::new("usbsas-uploader")
             .arg(&out_files.tar_path)
+            .wait_on_startup()
             .spawn::<proto::uploader::Request>()?;
         pipes_read.push(uploader.comm.input_fd());
         pipes_write.push(uploader.comm.output_fd());
@@ -2014,6 +2194,7 @@ impl Usbsas {
             downloader,
             files2fs,
             files2tar,
+            files2cleantar,
             filter,
             fs2dev,
             scsi2files,
@@ -2049,12 +2230,15 @@ impl Usbsas {
 }
 
 struct Config {
-    analyze: bool,
+    analyze_usb: bool,
+    analyze_net: bool,
+    analyze_cmd: bool,
     write_report_dest: bool,
 }
 
 struct OutFiles {
     pub tar_path: String,
+    pub clean_tar_path: String,
     pub fs_path: String,
 }
 
@@ -2077,11 +2261,15 @@ fn main() -> Result<()> {
     let config = conf_parse(&conf_read(config_path)?)?;
 
     let mut conf = Config {
-        analyze: false,
+        analyze_usb: false,
+        analyze_net: false,
+        analyze_cmd: false,
         write_report_dest: false,
     };
-    if config.analyzer.is_some() {
-        conf.analyze = true;
+    if let Some(analyzer_conf) = config.analyzer {
+        conf.analyze_usb = analyzer_conf.analyze_usb;
+        conf.analyze_net = analyzer_conf.analyze_net;
+        conf.analyze_cmd = analyzer_conf.analyze_cmd;
     }
     if let Some(report_conf) = &config.report {
         conf.write_report_dest = report_conf.write_dest;
@@ -2093,6 +2281,11 @@ fn main() -> Result<()> {
             &config.out_directory.trim_end_matches('/'),
             session_id,
         ),
+        clean_tar_path: format!(
+            "{}/usbsas_{}_clean.tar",
+            &config.out_directory.trim_end_matches('/'),
+            session_id,
+        ),
         fs_path: format!(
             "{}/usbsas_{}.img",
             &config.out_directory.trim_end_matches('/'),
@@ -2101,13 +2294,15 @@ fn main() -> Result<()> {
     };
 
     info!(
-        "init ({}): {} {}",
+        "init ({}): {} {} {}",
         std::process::id(),
         &out_files.tar_path,
+        &out_files.clean_tar_path,
         &out_files.fs_path
     );
 
     let _ = File::create(&out_files.tar_path)?;
+    let _ = File::create(&out_files.clean_tar_path)?;
     let _ = File::create(&out_files.fs_path)?;
 
     Usbsas::new(Comm::from_env()?, conf, config_path, out_files)?

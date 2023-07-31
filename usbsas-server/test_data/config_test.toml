@@ -13,6 +13,9 @@ url = "http://127.0.0.1:8042/api/downloadbundle"
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 referer = "http://127.0.0.1"
+analyze_usb = true
+analyze_net = false
+analyze_cmd = false
 
 [report]
 write_dest = true
