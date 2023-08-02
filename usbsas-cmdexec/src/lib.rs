@@ -165,13 +165,13 @@ impl RunningState {
 
     fn exec_cmd(&self, binpath: String, args: Vec<String>) -> Result<()> {
         info!("executing {} {:?}", binpath, args);
-        if let Ok(cmd) = Command::new(binpath)
+        match Command::new(binpath)
             .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
         {
-            match cmd.wait_with_output() {
+            Ok(cmd) => match cmd.wait_with_output() {
                 Ok(output) => {
                     if !output.status.success() {
                         error!("cmd failed");
@@ -183,14 +183,11 @@ impl RunningState {
                         }
                         return Err(Error::Exec("Cmd failed".into()));
                     }
+                    Ok(())
                 }
-                Err(err) => {
-                    return Err(Error::Exec(format!("Can't get cmd result: {err}")));
-                }
-            }
-            Ok(())
-        } else {
-            Err(Error::Exec("Failed to start child cmd".into()))
+                Err(err) => Err(Error::Exec(format!("Can't get cmd result: {err}"))),
+            },
+            Err(err) => Err(Error::Exec(format!("Failed to start child cmd: {err}"))),
         }
     }
 }
