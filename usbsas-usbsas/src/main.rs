@@ -2244,7 +2244,7 @@ struct OutFiles {
 
 fn main() -> Result<()> {
     let session_id = match env::var("USBSAS_SESSION_ID") {
-        Ok(id) => id.to_string(),
+        Ok(id) => id,
         Err(_) => {
             let id = uuid::Uuid::new_v4().simple().to_string();
             env::set_var("USBSAS_SESSION_ID", &id);
