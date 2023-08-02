@@ -1,5 +1,4 @@
 use crate::error::{AuthentError, ServiceError};
-use crate::tmpfiles::TmpFiles;
 use actix_web::web;
 use base64::{engine as b64eng, Engine as _};
 use futures::task::{Context, Poll, Waker};
@@ -11,7 +10,7 @@ use sha2::{Digest, Sha256};
 use std::{
     fs,
     io::Write,
-    path,
+    path::{self, Path},
     pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -22,7 +21,7 @@ use usbsas_comm::{protorequest, Comm};
 use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
-use usbsas_proto::common::OutFileType;
+use usbsas_proto::common::{OutFileType, OutFsType};
 
 protorequest!(
     CommUsbsas,
@@ -37,7 +36,6 @@ protorequest!(
     getattr = GetAttr[RequestGetAttr, ResponseGetAttr],
     wipe = Wipe[RequestWipe, ResponseWipe],
     imgdisk = ImgDisk[RequestImgDisk, ResponseImgDisk],
-    report = Report[RequestReport, ResponseReport],
     end = End[RequestEnd, ResponseEnd]
 );
 
@@ -61,7 +59,7 @@ pub(crate) struct TargetDevice {
     is_dst: bool,
 }
 
-enum CopyDestination {
+enum Destination {
     Usb {
         busnum: u32,
         devnum: u32,
@@ -73,7 +71,7 @@ enum CopyDestination {
     Cmd,
 }
 
-enum CopySource {
+enum Source {
     Usb {
         opendev: proto::usbsas::RequestOpenDevice,
     },
@@ -119,7 +117,7 @@ pub struct ReadDir {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct USBDeviceDesc {
+pub struct USBDesc {
     vendorid: u32,
     productid: u32,
     manufacturer: String,
@@ -143,7 +141,7 @@ pub struct CmdDesc {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum Desc {
-    Usb(USBDeviceDesc),
+    Usb(USBDesc),
     Net(NetDesc),
     Cmd(CmdDesc),
 }
@@ -189,7 +187,7 @@ impl From<&TargetDevice> for DeviceDesc {
                 }
             }
             Device::Usb(ref usb) => {
-                let net_json = USBDeviceDesc {
+                let net_json = USBDesc {
                     vendorid: usb.vendorid,
                     productid: usb.productid,
                     manufacturer: usb.manufacturer.to_owned(),
@@ -292,9 +290,7 @@ struct ReportDeviceSize<'a> {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ReportCopy<'a> {
     status: &'a str,
-    pub error_path: Vec<String>,
-    pub filtered_path: Vec<String>,
-    pub dirty_path: Vec<String>,
+    pub report: serde_json::Value,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -338,14 +334,17 @@ impl ReqAuthentication for Vec<u8> {
     }
 }
 
+// 1536 == tar with only a "/data" entry (512b) + 1024b zeroes (created by
+// files2tar when it starts)
+const USBSAS_EMPTY_TAR: u64 = 1536;
+
 /// Actix data struct
 pub(crate) struct AppState {
     config: Mutex<Config>,
     pub config_path: Mutex<String>,
     comm: Mutex<Comm<proto::usbsas::Request>>,
-    out_dev: Mutex<Option<CopyDestination>>,
+    dest: Mutex<Option<Destination>>,
     hmac: Mutex<Hmac<Sha256>>,
-    tmpfiles: Mutex<TmpFiles>,
     pub status: Arc<RwLock<String>>,
     pub session_id: Arc<std::sync::RwLock<String>>,
 }
@@ -354,7 +353,10 @@ impl AppState {
     pub(crate) fn new(config_path: String) -> Result<Self, ServiceError> {
         let config = conf_parse(&conf_read(&config_path)?)?;
 
-        let tmpfiles = TmpFiles::new(config.out_directory.clone())?;
+        #[cfg(feature = "integration-tests")]
+        let session_id = "00000000000000000000000000000000".to_string();
+        #[cfg(not(feature = "integration-tests"))]
+        let session_id = uuid::Uuid::new_v4().simple().to_string();
 
         // Create reports directory if it doesn't exists
         if let Some(report_config) = &config.report {
@@ -368,22 +370,13 @@ impl AppState {
             };
         };
 
-        #[cfg(feature = "integration-tests")]
-        let session_id = "0".to_string();
-        #[cfg(not(feature = "integration-tests"))]
-        let session_id = uuid::Uuid::new_v4().simple().to_string();
-
-        debug!("Out tar file name: {:?}", tmpfiles.out_tar);
-        debug!("Out fs file name: {:?}", tmpfiles.out_fs);
-
-        let comm = AppState::start_usbsas(&config, &config_path, &tmpfiles, &session_id)?;
+        let comm = AppState::start_usbsas(&config_path, &session_id)?;
 
         Ok(AppState {
             config: Mutex::new(config),
             config_path: Mutex::new(config_path),
-            tmpfiles: Mutex::new(tmpfiles),
             comm: Mutex::new(comm),
-            out_dev: Mutex::new(None),
+            dest: Mutex::new(None),
             hmac: Mutex::new(Hmac::new_from_slice(
                 &rand::thread_rng().gen::<[u8; 0x10]>(),
             )?),
@@ -393,21 +386,12 @@ impl AppState {
     }
 
     fn start_usbsas(
-        config: &Config,
         config_path: &str,
-        tmpfiles: &TmpFiles,
         session_id: &str,
     ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
         debug!("starting usbsas");
 
-        let mut usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas")
-            .arg(&tmpfiles.out_tar)
-            .arg(&tmpfiles.out_fs)
-            .args(&["-c", config_path]);
-
-        if config.analyzer.is_some() {
-            usbsas_cmd = usbsas_cmd.arg("--analyze");
-        }
+        let usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas").args(&["-c", config_path]);
 
         std::env::set_var("USBSAS_SESSION_ID", session_id);
 
@@ -421,19 +405,45 @@ impl AppState {
         let _ = comm.end(proto::usbsas::RequestEnd {})?;
         nix::sys::wait::wait()?;
 
-        self.tmpfiles.lock()?.reset()?;
-
         #[cfg(not(feature = "integration-tests"))]
         let new_session_id = uuid::Uuid::new_v4().simple().to_string();
         #[cfg(feature = "integration-tests")]
         let new_session_id = "0".to_string();
+        std::env::set_var("USBSAS_SESSION_ID", &new_session_id);
 
-        let new_comm = AppState::start_usbsas(
-            &*self.config.lock()?,
-            &self.config_path.lock()?,
-            &*self.tmpfiles.lock()?,
-            &new_session_id,
-        )?;
+        // Delete out files if empty
+        let tar_path = format!(
+            "{}/usbsas_{}.tar",
+            self.config.lock()?.out_directory.trim_end_matches('/'),
+            self.session_id.read()?
+        );
+        let clean_tar_path = format!(
+            "{}/usbsas_{}_clean.tar",
+            self.config.lock()?.out_directory.trim_end_matches('/'),
+            self.session_id.read()?
+        );
+        let fs_path = format!(
+            "{}/usbsas_{}.img",
+            self.config.lock()?.out_directory.trim_end_matches('/'),
+            self.session_id.read()?
+        );
+        if let Ok(metadata) = fs::metadata(&fs_path) {
+            if metadata.len() == 0 {
+                let _ = fs::remove_file(Path::new(&fs_path)).ok();
+            }
+        };
+        if let Ok(metadata) = fs::metadata(&tar_path) {
+            if metadata.len() == USBSAS_EMPTY_TAR {
+                let _ = fs::remove_file(Path::new(&tar_path)).ok();
+            }
+        };
+        if let Ok(metadata) = fs::metadata(&clean_tar_path) {
+            if metadata.len() == USBSAS_EMPTY_TAR {
+                let _ = fs::remove_file(Path::new(&clean_tar_path)).ok();
+            }
+        };
+
+        let new_comm = AppState::start_usbsas(&self.config_path.lock()?, &new_session_id)?;
 
         *self.session_id.write()? = new_session_id;
 
@@ -522,51 +532,51 @@ impl AppState {
         let devices = self.list_all_devices()?;
 
         let mut in_dev = None;
-        let mut out_dev = None;
+        let mut dest = None;
         for dev in devices {
             let fingerprint = dev.device.fingerprint();
             if fingerprint_in == fingerprint {
                 debug!("in_dev set");
                 match &dev.device {
                     Device::Usb(ref usb) => {
-                        in_dev = Some(CopySource::Usb {
+                        in_dev = Some(Source::Usb {
                             opendev: proto::usbsas::RequestOpenDevice {
                                 device: Some(usb.to_owned()),
                             },
                         });
                     }
                     Device::Net(_) => {
-                        in_dev = Some(CopySource::Net);
+                        in_dev = Some(Source::Net);
                     }
                     Device::Cmd(_) => in_dev = None,
                 }
             }
             if fingerprint_out == fingerprint {
-                debug!("out_dev set");
+                debug!("dest set");
                 match &dev.device {
                     Device::Usb(ref usb) => {
-                        out_dev = Some(CopyDestination::Usb {
+                        dest = Some(Destination::Usb {
                             busnum: usb.busnum,
                             devnum: usb.devnum,
                         });
                     }
                     Device::Net(ref net) => {
-                        out_dev = Some(CopyDestination::Net {
+                        dest = Some(Destination::Net {
                             url: net.url.clone(),
                             krb_service_name: net.krb_service_name.clone(),
                         })
                     }
-                    Device::Cmd(_) => out_dev = Some(CopyDestination::Cmd),
+                    Device::Cmd(_) => dest = Some(Destination::Cmd),
                 }
             }
         }
 
-        let in_dev = match (in_dev, &out_dev) {
-            (Some(CopySource::Net), Some(_)) => {
-                *self.out_dev.lock()? = out_dev;
+        let in_dev = match (in_dev, &dest) {
+            (Some(Source::Net), Some(_)) => {
+                *self.dest.lock()? = dest;
                 return Ok(());
             }
-            (Some(CopySource::Usb { opendev }), Some(_)) => opendev,
+            (Some(Source::Usb { opendev }), Some(_)) => opendev,
             (_, _) => {
                 error!("Cannot find in or out dev");
                 return Err(ServiceError::Error("Cannot find in or out dev".to_string()));
@@ -577,7 +587,7 @@ impl AppState {
             .lock()?
             .opendev(in_dev)
             .map_err(|err| ServiceError::Error(format!("couldn't open input device: {err}")))?;
-        *self.out_dev.lock()? = out_dev;
+        *self.dest.lock()? = dest;
 
         Ok(())
     }
@@ -663,7 +673,10 @@ impl AppState {
     ) -> Result<(), ServiceError> {
         use proto::usbsas::response::Msg;
         let mut src_is_net = false;
-
+        let dest_lock = self.dest.lock()?;
+        let dest = dest_lock
+            .as_ref()
+            .ok_or(ServiceError::InternalServerError)?;
         let source = match download_pin {
             Some(pin) => {
                 let pin = pin
@@ -697,35 +710,52 @@ impl AppState {
         let mut comm = self.comm.lock()?;
         resp_stream.report_progress("copy_start", progress)?;
 
-        let out_dev = self.out_dev.lock()?;
-        let destination = match out_dev.as_ref().ok_or(ServiceError::InternalServerError)? {
-            CopyDestination::Usb { busnum, devnum } => {
+        let (analyze_usb, analyze_net, analyze_cmd) =
+            if let Some(conf) = &self.config.lock()?.analyzer {
+                (conf.analyze_usb, conf.analyze_net, conf.analyze_cmd)
+            } else {
+                (false, false, false)
+            };
+
+        let (destination, analyze) = match dest {
+            Destination::Usb { busnum, devnum } => {
                 debug!("do copy usb {} {} ({})", busnum, devnum, fsfmt);
                 let fstype = match fsfmt.as_str() {
-                    "ntfs" => proto::common::OutFsType::Ntfs,
-                    "exfat" => proto::common::OutFsType::Exfat,
-                    "fat32" => proto::common::OutFsType::Fat,
+                    "ntfs" => OutFsType::Ntfs,
+                    "exfat" => OutFsType::Exfat,
+                    "fat32" => OutFsType::Fat,
                     _ => return Err(ServiceError::InternalServerError),
                 };
-                proto::usbsas::request_copy_start::Destination::Usb(proto::usbsas::DestUsb {
-                    busnum: *busnum,
-                    devnum: *devnum,
-                    fstype: fstype.into(),
-                })
+                (
+                    proto::usbsas::request_copy_start::Destination::Usb(proto::usbsas::DestUsb {
+                        busnum: *busnum,
+                        devnum: *devnum,
+                        fstype: fstype.into(),
+                    }),
+                    analyze_usb,
+                )
             }
-            CopyDestination::Net {
+            Destination::Net {
                 url,
                 krb_service_name,
             } => {
                 debug!("do copy net");
-                proto::usbsas::request_copy_start::Destination::Net(proto::common::DestNet {
-                    url: url.to_owned(),
-                    krb_service_name: krb_service_name.clone().unwrap_or_else(|| String::from("")),
-                })
+                (
+                    proto::usbsas::request_copy_start::Destination::Net(proto::common::DestNet {
+                        url: url.to_owned(),
+                        krb_service_name: krb_service_name
+                            .clone()
+                            .unwrap_or_else(|| String::from("")),
+                    }),
+                    analyze_net,
+                )
             }
-            CopyDestination::Cmd { .. } => {
+            Destination::Cmd { .. } => {
                 debug!("do copy cmd");
-                proto::usbsas::request_copy_start::Destination::Cmd(proto::usbsas::DestCmd {})
+                (
+                    proto::usbsas::request_copy_start::Destination::Cmd(proto::usbsas::DestCmd {}),
+                    analyze_cmd,
+                )
             }
         };
 
@@ -734,19 +764,12 @@ impl AppState {
         progress += 1.0;
         resp_stream.report_progress("copy_usb_filter", progress)?;
 
-        let write_report = if let Some(report_conf) = &self.config.lock()?.report {
-            report_conf.write_dest
-        } else {
-            false
-        };
-
         comm.send(proto::usbsas::Request {
             msg: Some(proto::usbsas::request::Msg::CopyStart(
                 proto::usbsas::RequestCopyStart {
                     destination: Some(destination),
                     selected,
                     source,
-                    write_report,
                 },
             )),
         })?;
@@ -781,9 +804,7 @@ impl AppState {
                 Msg::NothingToCopy(msg) => {
                     resp_stream.add_message(ReportCopy {
                         status: "nothing_to_copy",
-                        filtered_path: msg.rejected_filter,
-                        dirty_path: msg.rejected_dirty,
-                        error_path: vec![],
+                        report: serde_json::from_slice(&msg.report)?,
                     })?;
                     resp_stream.done()?;
                     return Ok(());
@@ -802,83 +823,84 @@ impl AppState {
         }
         progress = current_progress + 30.0;
 
-        if self.config.lock()?.analyzer.is_some() && !src_is_net {
-            if let Some(CopyDestination::Usb { .. }) = *out_dev {
-                resp_stream.report_progress("analyzing", progress)?;
-                current_progress = progress;
-                loop {
-                    resp = comm.recv()?;
-                    match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                        Msg::AnalyzeStatus(msg) => {
-                            progress = current_progress
-                                + (msg.current_size as f32 / msg.total_size as f32 * 5.0);
-                            resp_stream.report_progress("analyze_update", progress)?;
-                        }
-                        Msg::AnalyzeDone(_) => break,
-                        Msg::Error(err) => {
-                            resp_stream.report_error(&err.err)?;
-                            return Err(ServiceError::InternalServerError);
-                        }
-                        _ => {
-                            error!("Unexpected resp");
-                            resp_stream.report_error("Unexpected response from usbsas")?;
-                            return Err(ServiceError::InternalServerError);
-                        }
+        if analyze && !src_is_net {
+            resp_stream.report_progress("analyzing", progress)?;
+            current_progress = progress;
+            loop {
+                resp = comm.recv()?;
+                match resp.msg.ok_or(ServiceError::InternalServerError)? {
+                    Msg::AnalyzeStatus(msg) => {
+                        progress = current_progress
+                            + (msg.current_size as f32 / msg.total_size as f32 * 5.0);
+                        resp_stream.report_progress("analyze_update", progress)?;
+                    }
+                    Msg::AnalyzeDone(_) => break,
+                    Msg::Error(err) => {
+                        resp_stream.report_error(&err.err)?;
+                        return Err(ServiceError::InternalServerError);
+                    }
+                    _ => {
+                        error!("Unexpected resp");
+                        resp_stream.report_error("Unexpected response from usbsas")?;
+                        return Err(ServiceError::InternalServerError);
                     }
                 }
-                progress = current_progress + 5.0;
-            };
+            }
+            progress = current_progress + 5.0;
         };
 
         size_read = 0;
         current_progress = progress;
 
-        match out_dev.as_ref().ok_or(ServiceError::InternalServerError)? {
-            CopyDestination::Usb { .. } => {
-                resp_stream.report_progress("copy_fromtar_tofs", progress)?;
-                // create fs
-                loop {
-                    resp = comm.recv()?;
-                    match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                        Msg::CopyStatus(msg) => {
-                            size_read += msg.current_size;
-                            progress =
-                                current_progress + (size_read as f32 / total_size as f32 * 30.0);
-                            resp_stream.report_progress("copy_fromtar_update", progress)?;
-                        }
-                        Msg::CopyStatusDone(_) => break,
-                        Msg::NothingToCopy(msg) => {
-                            resp_stream.add_message(ReportCopy {
-                                status: "nothing_to_copy",
-                                filtered_path: msg.rejected_filter,
-                                dirty_path: msg.rejected_dirty,
-                                error_path: vec![],
-                            })?;
-                            resp_stream.done()?;
-                            return Ok(());
-                        }
-                        Msg::Error(err) => {
-                            error!("{}", err.err);
-                            resp_stream.report_error(&err.err)?;
-                            return Err(ServiceError::InternalServerError);
-                        }
-                        _ => {
-                            resp_stream.report_error("Unexpected response from usbsas")?;
-                            return Err(ServiceError::InternalServerError);
-                        }
+        if analyze || matches!(dest, &Destination::Usb { .. }) {
+            match dest {
+                Destination::Usb { .. } => {
+                    resp_stream.report_progress("copy_fromtar_tofs", progress)?;
+                }
+                Destination::Net { .. } | Destination::Cmd { .. } => {
+                    resp_stream.report_progress("copy_fromtar_totar", progress)?;
+                }
+            }
+            // create fs or clean tar
+            loop {
+                resp = comm.recv()?;
+                match resp.msg.ok_or(ServiceError::InternalServerError)? {
+                    Msg::CopyStatus(msg) => {
+                        size_read += msg.current_size;
+                        progress = current_progress + (size_read as f32 / total_size as f32 * 30.0);
+                        resp_stream.report_progress("copy_fromtar_update", progress)?;
+                    }
+                    Msg::CopyStatusDone(_) => break,
+                    Msg::NothingToCopy(msg) => {
+                        resp_stream.add_message(ReportCopy {
+                            status: "nothing_to_copy",
+                            report: serde_json::from_slice(&msg.report)?,
+                        })?;
+                        resp_stream.done()?;
+                        return Ok(());
+                    }
+                    Msg::Error(err) => {
+                        error!("{}", err.err);
+                        resp_stream.report_error(&err.err)?;
+                        return Err(ServiceError::InternalServerError);
+                    }
+                    _ => {
+                        resp_stream.report_error("Unexpected response from usbsas")?;
+                        return Err(ServiceError::InternalServerError);
                     }
                 }
-                progress = current_progress + 30.0;
+            }
+        }
+
+        progress = current_progress + 30.0;
+        match dest {
+            Destination::Usb { .. } => {
                 resp_stream.report_progress("copy_fs2dev_start", progress)?
             }
-            CopyDestination::Net { .. } => {
-                progress = current_progress + 30.0;
+            Destination::Net { .. } => {
                 resp_stream.report_progress("copy_upload_start", progress)?
             }
-            CopyDestination::Cmd { .. } => {
-                progress = current_progress + 30.0;
-                resp_stream.report_progress("copy_cmd_start", progress)?
-            }
+            Destination::Cmd { .. } => resp_stream.report_progress("copy_cmd_start", progress)?,
         }
 
         progress += 1.0;
@@ -899,15 +921,10 @@ impl AppState {
                     // wait for response copy to break
                     continue;
                 }
-                Msg::CopyDone(info) => {
+                Msg::CopyDone(msg) => {
                     progress = current_progress + 30.0;
                     resp_stream.report_progress("terminate", progress)?;
-                    break ReportCopy {
-                        status: "final_report",
-                        error_path: info.error_path,
-                        filtered_path: info.filtered_path,
-                        dirty_path: info.dirty_path,
-                    };
+                    break msg.report;
                 }
                 Msg::Error(err) => {
                     error!("{}", err.err);
@@ -925,7 +942,6 @@ impl AppState {
         if let Some(report_conf) = &self.config.lock()?.report {
             if let Some(report_dir) = &report_conf.write_local {
                 // save report on local disk
-                let transfer_report = comm.report(proto::usbsas::RequestReport {})?.report;
                 let datetime = time::OffsetDateTime::now_utc();
                 let report_file_name = format!(
                     "usbsas_transfer_{:04}{:02}{:02}{:02}{:02}{:02}_{}.json",
@@ -939,22 +955,25 @@ impl AppState {
                 );
                 let mut report_file =
                     fs::File::create(path::Path::new(&report_dir).join(report_file_name))?;
-                report_file.write_all(&transfer_report)?;
+                report_file.write_all(&final_report)?;
             }
         }
 
         // post copy cmd
         if let Some(usbsas_config::PostCopy { .. }) = self.config.lock()?.post_copy {
-            let outfiletype = match out_dev.as_ref().ok_or(ServiceError::InternalServerError)? {
-                CopyDestination::Usb { .. } => OutFileType::Fs,
-                CopyDestination::Net { .. } | CopyDestination::Cmd { .. } => OutFileType::Tar,
+            let outfiletype = match dest {
+                Destination::Usb { .. } => OutFileType::Fs,
+                Destination::Net { .. } | Destination::Cmd { .. } => OutFileType::Tar,
             };
             comm.postcopycmd(proto::usbsas::RequestPostCopyCmd {
                 outfiletype: outfiletype.into(),
             })?;
         };
 
-        resp_stream.add_message(final_report)?;
+        resp_stream.add_message(ReportCopy {
+            status: "final_report",
+            report: serde_json::from_slice(&final_report)?,
+        })?;
         resp_stream.done()?;
         Ok(())
     }
@@ -972,9 +991,9 @@ impl AppState {
         resp_stream.report_progress("wipe_start", 0.0)?;
 
         let fstype = match fsfmt.as_str() {
-            "ntfs" => proto::common::OutFsType::Ntfs,
-            "exfat" => proto::common::OutFsType::Exfat,
-            "fat32" => proto::common::OutFsType::Fat,
+            "ntfs" => OutFsType::Ntfs,
+            "exfat" => OutFsType::Exfat,
+            "fat32" => OutFsType::Fat,
             _ => return Err(ServiceError::InternalServerError),
         };
 
@@ -1057,7 +1076,11 @@ impl AppState {
                     // Keep out fs
                     let datetime = time::OffsetDateTime::now_utc();
                     fs::rename(
-                        self.tmpfiles.lock()?.out_fs.clone(),
+                        format!(
+                            "{}/usbsas_{}.img",
+                            self.config.lock()?.out_directory.trim_end_matches('/'),
+                            self.session_id.read()?
+                        ),
                         format!(
                             "{}/imgdisk_{:04}{:02}{:02}{:02}{:02}{:02}_{}_{}_{}.bin",
                             self.config.lock()?.out_directory,

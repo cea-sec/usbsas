@@ -712,7 +712,7 @@ function do_copy() {
           tbody.appendChild(nothing_tr);
           document.querySelector("#cancel-button").classList.remove("d-none");
           document.querySelector("#cancel-button").innerText = langDocument["return"];
-          for (let filtered_path of json.filtered_path) {
+          for (let filtered_path of json.report.filtered_files) {
             // Display filtered elements
             has_error = true;
             let tr_err = document.createElement("tr");
@@ -735,28 +735,30 @@ function do_copy() {
             tr_err.appendChild(name_td_err);
             tbody.appendChild(tr_err);
           }
-          for (let dirty_path of json.dirty_path) {
-            // Display dirty elements
-            has_error = true;
-            let tr_err = document.createElement("tr");
-            let status_td_err = document.createElement("td");
-            status_td_err.innerHTML = "&nbsp;";
-            let format_status_icon_err = document.createElement("i");
-            format_status_icon_err.classList.add("fas");
-            format_status_icon_err.classList.add("fa-times");
-            format_status_icon_err.classList.add("text-danger");
-            status_td_err.insertBefore(format_status_icon_err, status_td_err.firstChild);
-            tr_err.appendChild(status_td_err);
-            let name_td_err = document.createElement("td");
-            let p_err = document.createElement("p");
-            p_err.classList.add("text-danger");
-            p_err.innerHTML = "<strong data-langkey=\"filterav\">" + langDocument["filterav"] + "</strong>";
-            let span_err = document.createElement("span");
-            span_err.innerText = dirty_path;
-            p_err.appendChild(span_err);
-            name_td_err.appendChild(p_err);
-            tr_err.appendChild(name_td_err);
-            tbody.appendChild(tr_err);
+          for (let path in json.report.analyzer_report.files) {
+            if (json.report.analyzer_report.files[path].status === "DIRTY") {
+              // Display dirty elements
+              has_error = true;
+              let tr_err = document.createElement("tr");
+              let status_td_err = document.createElement("td");
+              status_td_err.innerHTML = "&nbsp;";
+              let format_status_icon_err = document.createElement("i");
+              format_status_icon_err.classList.add("fas");
+              format_status_icon_err.classList.add("fa-times");
+              format_status_icon_err.classList.add("text-danger");
+              status_td_err.insertBefore(format_status_icon_err, status_td_err.firstChild);
+              tr_err.appendChild(status_td_err);
+              let name_td_err = document.createElement("td");
+              let p_err = document.createElement("p");
+              p_err.classList.add("text-danger");
+              p_err.innerHTML = "<strong data-langkey=\"filterav\">" + langDocument["filterav"] + "</strong>";
+              let span_err = document.createElement("span");
+              span_err.innerText = path;
+              p_err.appendChild(span_err);
+              name_td_err.appendChild(p_err);
+              tr_err.appendChild(name_td_err);
+              tbody.appendChild(tr_err);
+            }
           }
           set_state("WAIT_REMOVAL");
           break;
@@ -783,7 +785,7 @@ function do_copy() {
         case "final_report":
           elements[elements.length - 1].icon.classList.remove("spinner-border");
           elements[elements.length - 1].icon.classList.add("fa-check");
-          for (let error_path of json.error_path) {
+          for (let error_path of json.report.error_files) {
             // Display failed elements
             has_error = true;
             let tr_err = document.createElement("tr");
@@ -807,7 +809,7 @@ function do_copy() {
             tr_err.appendChild(name_td_err);
             tbody.appendChild(tr_err);
           }
-          for (let filtered_path of json.filtered_path) {
+          for (let filtered_path of json.report.filtered_files) {
             // Display failed elements
             has_error = true;
             let tr_err = document.createElement("tr");
@@ -831,29 +833,31 @@ function do_copy() {
             tr_err.appendChild(name_td_err);
             tbody.appendChild(tr_err);
           }
-          for (let dirty_path of json.dirty_path) {
-            // Display failed elements
-            has_error = true;
-            let tr_err = document.createElement("tr");
-            let status_td_err = document.createElement("td");
-            status_td_err.innerHTML = "&nbsp;";
-            let format_status_icon_err = document.createElement("i");
-            format_status_icon_err.classList.add("fas");
-            format_status_icon_err.classList.add("fa-times");
-            format_status_icon_err.classList.add("text-danger");
-            status_td_err.insertBefore(format_status_icon_err, status_td_err.firstChild);
-            tr_err.appendChild(status_td_err);
+          for (let path in json.report.analyzer_report.files) {
+            if (json.report.analyzer_report.files[path].status === "DIRTY") {
+               // Display dirty elements
+               has_error = true;
+               let tr_err = document.createElement("tr");
+               let status_td_err = document.createElement("td");
+               status_td_err.innerHTML = "&nbsp;";
+               let format_status_icon_err = document.createElement("i");
+               format_status_icon_err.classList.add("fas");
+               format_status_icon_err.classList.add("fa-times");
+               format_status_icon_err.classList.add("text-danger");
+               status_td_err.insertBefore(format_status_icon_err, status_td_err.firstChild);
+               tr_err.appendChild(status_td_err);
 
-            let name_td_err = document.createElement("td");
-            let p_err = document.createElement("p");
-            p_err.classList.add("text-danger");
-            p_err.innerHTML = "<strong data-langkey=\"filterav\">" + langDocument["filterav"] + "</strong>";
-            let span_err = document.createElement("span");
-            span_err.innerText = dirty_path;
-            p_err.appendChild(span_err);
-            name_td_err.appendChild(p_err);
-            tr_err.appendChild(name_td_err);
-            tbody.appendChild(tr_err);
+               let name_td_err = document.createElement("td");
+               let p_err = document.createElement("p");
+               p_err.classList.add("text-danger");
+               p_err.innerHTML = "<strong data-langkey=\"filterav\">" + langDocument["filterav"] + "</strong>";
+               let span_err = document.createElement("span");
+               span_err.innerText = path;
+               p_err.appendChild(span_err);
+               name_td_err.appendChild(p_err);
+               tr_err.appendChild(name_td_err);
+               tbody.appendChild(tr_err);
+            }
           }
           break;
         case "fatal_error":

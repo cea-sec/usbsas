@@ -3,6 +3,7 @@
 //! This process will execute the target command specified in the configuration
 //! file with the output of the transfer as argument.
 
+use byteorder::ReadBytesExt;
 use log::{error, info, trace};
 use std::process::{Command, Stdio};
 use thiserror::Error;
@@ -81,8 +82,24 @@ struct RunningState {
 struct WaitEndState {}
 
 impl InitState {
-    fn run(self, _comm: &mut Comm<proto::cmdexec::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut Comm<proto::cmdexec::Request>) -> Result<State> {
         let config = conf_parse(&conf_read(&self.config_path)?)?;
+
+        match comm.read_u8()? {
+            // Nothing to do, exit
+            0 => return Ok(State::WaitEnd(WaitEndState {})),
+            // Use provided tar path
+            1 => (),
+            // Files of this transfer were analyzed, use clean tar path
+            2 => self.out_tar = format!("{}_clean.tar", self.out_tar.trim_end_matches(".tar")),
+            _ => {
+                error!("bad unlock value");
+                return Ok(State::WaitEnd(WaitEndState {}));
+            }
+        }
+
+        log::trace!("unlocked, using archive {}", self.out_tar);
+
         Ok(State::Running(RunningState {
             out_tar: self.out_tar,
             out_fs: self.out_fs,

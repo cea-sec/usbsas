@@ -1,6 +1,6 @@
 [package]
 name = "usbsas-usbsas"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2021"
 license = "GPL-3.0"
 
@@ -12,12 +12,14 @@ thiserror = "1.0"
 time = "0.3"
 uname = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
+usbsas-config = { path = "../usbsas-config" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
+uuid = { version = "1.4", features = ["v4"] }
 
 [features]
 integration-tests = []

@@ -93,13 +93,6 @@ impl From<std::string::FromUtf8Error> for ServiceError {
     }
 }
 
-impl From<tempfile::PersistError> for ServiceError {
-    fn from(error: tempfile::PersistError) -> ServiceError {
-        error!("{}", error);
-        ServiceError::InternalServerError
-    }
-}
-
 impl From<usbsas_process::Error> for ServiceError {
     fn from(_error: usbsas_process::Error) -> ServiceError {
         dbg!(_error);

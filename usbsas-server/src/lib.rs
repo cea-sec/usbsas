@@ -6,4 +6,3 @@ pub mod appstate;
 pub(crate) mod error;
 pub mod server;
 pub(crate) mod srv_infos;
-pub(crate) mod tmpfiles;
