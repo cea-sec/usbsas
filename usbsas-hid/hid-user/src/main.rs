@@ -539,6 +539,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
     let mut items = vec![];
     let mut usages = vec![];
     let mut usage_page = None;
+    let mut controller_ok = true;
 
     let mut reports = HashMap::new();
     let mut report_id = 0;
@@ -731,6 +732,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             value => format!("Unknown: {value}"),
                         };
                         log::debug!("{}Usage_Page({})", gen_space(indent), description);
+
                         usage_page = Some(HidUsagePage::from_value(value as u16));
                     }
 
@@ -849,7 +851,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
 
                     0b1000 => {
                         // REPORT_ID
-                        if !items.is_empty() {
+                        if !items.is_empty() && controller_ok {
                             reports.insert(report_id, (items.clone(), total_report_size));
                         }
 
@@ -858,6 +860,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         report_id = value;
                         items.clear();
                         total_report_size = 8;
+                        controller_ok = true;
                     }
 
                     0b1001 => {
@@ -879,9 +882,18 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         // USAGE
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
                         let usage = match &usage_page {
-                            Some(HidUsagePage::GenericDesktopControls) => HidUsage::GenericDesktop(
-                                HidUsageGenericDesktop::from_value(value as u8),
-                            ),
+                            Some(HidUsagePage::GenericDesktopControls) => {
+                                let desktop_usage = HidUsage::GenericDesktop(
+                                    HidUsageGenericDesktop::from_value(value as u8),
+                                );
+                                // Filter keyboards
+                                if desktop_usage
+                                    == HidUsage::GenericDesktop(HidUsageGenericDesktop::Keyboard)
+                                {
+                                    controller_ok = false;
+                                }
+                                desktop_usage
+                            }
                             Some(HidUsagePage::Consumer) => HidUsage::Consumer(value as u8),
                             Some(HidUsagePage::Digitizer) => {
                                 HidUsage::Digitizer(HidUsageDigitizer::from_value(value as u8))
@@ -919,7 +931,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
         }
     }
 
-    if !items.is_empty() {
+    if !items.is_empty() && controller_ok {
         reports.insert(report_id, (items, total_report_size));
         if total_report_size % 8 != 0 {
             return Err(Error::new(ErrorKind::Other, "Size report is not % 8"));
