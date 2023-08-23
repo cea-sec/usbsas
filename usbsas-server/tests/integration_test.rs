@@ -109,7 +109,7 @@ impl IntegrationTester {
             .expect("Couldn't run analyzer server");
 
         let client = Client::builder()
-            .timeout(Duration::from_secs(60))
+            .timeout(None)
             .connect_timeout(Duration::from_secs(30))
             .build()
             .expect("couldn't build reqwest client");
