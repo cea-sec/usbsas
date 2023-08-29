@@ -55,7 +55,7 @@ impl MassStorage {
         let mut scsiusb = scsiusb;
         let (max_lba, block_size, dev_size) = scsiusb.init_mass_storage()?;
         // TODO: support more sector size
-        assert!(vec![0x200, 0x800, 0x1000].contains(&block_size));
+        assert!([0x200, 0x800, 0x1000].contains(&block_size));
         Ok(MassStorage {
             scsiusb: RwLock::new(scsiusb),
             max_lba,
