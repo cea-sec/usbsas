@@ -32,7 +32,7 @@ message RequestOpenPartition {
 };
 
 message RequestOpenDevice {
-  common.Device device = 1;
+  common.USBDevice device = 1;
 };
 
 message RequestGetAttr {
@@ -84,7 +84,7 @@ message RequestWipe {
 };
 
 message RequestImgDisk {
-  common.Device device = 1;
+  common.USBDevice device = 1;
 };
 
 message Request {
@@ -118,7 +118,7 @@ message ResponseId {
 };
 
 message ResponseDevices {
-  repeated common.Device devices = 1;
+  repeated common.USBDevice devices = 1;
 };
 
 message ResponseOpenDevice {

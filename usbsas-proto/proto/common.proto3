@@ -30,7 +30,7 @@ message FileInfo {
   int64 timestamp = 4;
 };
 
-message Device {
+message USBDevice {
   uint32 busnum = 1;
   uint32 devnum = 2;
   uint32 vendorid = 3;

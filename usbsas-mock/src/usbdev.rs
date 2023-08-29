@@ -3,7 +3,7 @@ use std::env;
 use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 use usbsas_proto as proto;
-use usbsas_proto::common::Device as UsbDevice;
+use usbsas_proto::common::UsbDevice;
 
 #[derive(Error, Debug)]
 pub enum Error {

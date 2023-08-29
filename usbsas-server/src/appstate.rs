@@ -21,7 +21,7 @@ use usbsas_comm::{protorequest, Comm};
 use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
-use usbsas_proto::common::{OutFileType, OutFsType};
+use usbsas_proto::common::{OutFileType, OutFsType, UsbDevice};
 
 protorequest!(
     CommUsbsas,
@@ -41,7 +41,6 @@ protorequest!(
 
 /// Private device structures, they contain elements which should not be leaked
 /// to the web clients (busnum, devnum etc.)
-type UsbDevice = proto::common::Device;
 type NetDevice = usbsas_config::Network;
 type CmdDevice = usbsas_config::Command;
 

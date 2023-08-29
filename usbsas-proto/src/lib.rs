@@ -16,7 +16,7 @@ pub mod cmdexec {
 pub mod common {
     include!(concat!(env!("OUT_DIR"), "/common.rs"));
 
-    impl std::fmt::Display for Device {
+    impl std::fmt::Display for UsbDevice {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             write!(
                 f,

@@ -16,7 +16,6 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{protorequest, protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read};
-use usbsas_mass_storage::UsbDevice;
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_proto::{
@@ -179,6 +178,19 @@ protorequest!(
     end = End[RequestEnd, ResponseEnd]
 );
 
+#[derive(Clone, Debug)]
+pub struct UsbMS {
+    pub dev: UsbDevice,
+    pub sector_size: u32,
+    pub dev_size: u64,
+}
+
+impl std::fmt::Display for UsbMS {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} ({} - {})", self.dev, self.sector_size, self.dev_size)
+    }
+}
+
 enum State {
     Init(InitState),
     DevOpened(DevOpenedState),
@@ -317,8 +329,8 @@ impl InitState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-        dev_req: Device,
-    ) -> Result<UsbDevice> {
+        dev_req: proto::common::UsbDevice,
+    ) -> Result<UsbMS> {
         info!("Opening device {}", dev_req);
         let device = children
             .scsi2files
@@ -331,14 +343,18 @@ impl InitState {
             sector_size: device.block_size,
             dev_size: device.dev_size,
         })?;
-        Ok(UsbDevice {
-            busnum: dev_req.busnum,
-            devnum: dev_req.devnum,
-            vendorid: dev_req.vendorid,
-            productid: dev_req.productid,
-            manufacturer: dev_req.manufacturer,
-            serial: dev_req.serial,
-            description: dev_req.description,
+        Ok(UsbMS {
+            dev: UsbDevice {
+                busnum: dev_req.busnum,
+                devnum: dev_req.devnum,
+                vendorid: dev_req.vendorid,
+                productid: dev_req.productid,
+                manufacturer: dev_req.manufacturer,
+                serial: dev_req.serial,
+                description: dev_req.description,
+                is_src: dev_req.is_src,
+                is_dst: dev_req.is_dst,
+            },
             sector_size: u32::try_from(device.block_size)?,
             dev_size: device.dev_size,
         })
@@ -346,7 +362,7 @@ impl InitState {
 }
 
 struct DevOpenedState {
-    device: UsbDevice,
+    device: UsbMS,
     id: Option<String>,
     config: Config,
 }
@@ -424,7 +440,7 @@ impl DevOpenedState {
 }
 
 struct PartitionOpenedState {
-    device: UsbDevice,
+    device: UsbMS,
     id: Option<String>,
     config: Config,
 }
@@ -513,7 +529,7 @@ impl PartitionOpenedState {
 
 struct CopyFilesState {
     destination: Destination,
-    device: UsbDevice,
+    device: UsbMS,
     id: String,
     selected: Vec<String>,
     config: Config,
@@ -556,11 +572,11 @@ impl CopyFilesState {
         report["filtered_files"] = filtered.clone().into();
         report["user"] = serde_json::Value::String(self.id.clone());
         report["source"] = json!({
-            "vendorid": self.device.vendorid,
-            "productid": self.device.productid,
-            "manufacturer": self.device.manufacturer,
-            "serial": self.device.serial,
-            "description": self.device.description
+            "vendorid": self.device.dev.vendorid,
+            "productid": self.device.dev.productid,
+            "manufacturer": self.device.dev.manufacturer,
+            "serial": self.device.dev.serial,
+            "description": self.device.dev.description
         });
 
         // Abort if no files passed name filtering and no report requested
@@ -1704,7 +1720,7 @@ impl WipeState {
 }
 
 struct ImgDiskState {
-    device: UsbDevice,
+    device: UsbMS,
 }
 
 impl ImgDiskState {

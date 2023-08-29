@@ -26,7 +26,7 @@ message ResponseError {
 };
 
 message ResponseDevices {
-  repeated common.Device devices = 1;
+  repeated common.USBDevice devices = 1;
 };
 
 message Response {

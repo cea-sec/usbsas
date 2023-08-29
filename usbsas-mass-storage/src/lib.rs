@@ -222,29 +222,6 @@ impl ReadAt for MassStorage {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct UsbDevice {
-    pub busnum: u32,
-    pub devnum: u32,
-    pub vendorid: u32,
-    pub productid: u32,
-    pub manufacturer: String,
-    pub serial: String,
-    pub description: String,
-    pub sector_size: u32,
-    pub dev_size: u64,
-}
-
-impl std::fmt::Display for UsbDevice {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} - {} - {} ({}-{})",
-            self.manufacturer, self.description, self.serial, self.vendorid, self.productid
-        )
-    }
-}
-
 // mass storage struct used by scsi2files
 pub struct MassStorageComm {
     pub block_size: u32,
