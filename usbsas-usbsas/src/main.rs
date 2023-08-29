@@ -59,7 +59,8 @@ protoresponse!(
     end = End[ResponseEnd],
     error = Error[ResponseError],
     id = Id[ResponseId],
-    devices = Devices[ResponseDevices],
+    usbdevices = UsbDevices[ResponseUsbDevices],
+    alttargets = AltTargets[ResponseAltTargets],
     opendevice = OpenDevice[ResponseOpenDevice],
     openpartition = OpenPartition[ResponseOpenPartition],
     partitions = Partitions[ResponsePartitions],
@@ -244,7 +245,8 @@ impl InitState {
             let req: proto::usbsas::Request = comm.recv()?;
             let res = match req.msg.ok_or(Error::BadRequest)? {
                 Msg::Id(_) => children.id(comm, &mut id),
-                Msg::Devices(_) => self.devices(comm, children),
+                Msg::UsbDevices(_) => self.usb_devices(comm, children),
+                Msg::AltTargets(_) => self.alt_targets(comm),
                 Msg::OpenDevice(req) => {
                     match self.open_device(comm, children, req.device.ok_or(Error::BadRequest)?) {
                         Ok(device) => {
@@ -309,19 +311,75 @@ impl InitState {
         Ok(State::End)
     }
 
-    fn devices(
+    fn usb_devices(
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<()> {
         trace!("req devices");
-        comm.devices(proto::usbsas::ResponseDevices {
+        comm.usbdevices(proto::usbsas::ResponseUsbDevices {
             devices: children
                 .usbdev
                 .comm
                 .devices(proto::usbdev::RequestDevices {})?
                 .devices,
         })?;
+        Ok(())
+    }
+
+    fn alt_targets(&mut self, comm: &mut Comm<proto::usbsas::Request>) -> Result<()> {
+        let mut alt_targets: Vec<usbsas_proto::common::AltTarget> = Vec::new();
+        if let Some(dst_networks) = &self.config.dst_networks {
+            for network in dst_networks {
+                alt_targets.push(AltTarget {
+                    target: Some(usbsas_proto::common::alt_target::Target::Network(
+                        usbsas_proto::common::Network {
+                            url: network.url.clone(),
+                            krb_service_name: network
+                                .krb_service_name
+                                .clone()
+                                .unwrap_or(String::from("")),
+                        },
+                    )),
+                    descr: network.description.clone(),
+                    long_descr: network.longdescr.clone(),
+                    is_src: false,
+                    is_dst: true,
+                });
+            }
+        };
+        if let Some(network) = &self.config.src_network {
+            alt_targets.push(AltTarget {
+                target: Some(usbsas_proto::common::alt_target::Target::Network(
+                    usbsas_proto::common::Network {
+                        url: network.url.clone(),
+                        krb_service_name: network
+                            .krb_service_name
+                            .clone()
+                            .unwrap_or(String::from("")),
+                    },
+                )),
+                descr: network.description.clone(),
+                long_descr: network.longdescr.clone(),
+                is_src: true,
+                is_dst: false,
+            });
+        };
+        if let Some(cmd) = &self.config.command {
+            alt_targets.push(AltTarget {
+                target: Some(usbsas_proto::common::alt_target::Target::Command(
+                    usbsas_proto::common::Command {
+                        bin: cmd.command_bin.clone(),
+                        args: cmd.command_args.clone(),
+                    },
+                )),
+                descr: cmd.description.clone(),
+                long_descr: cmd.longdescr.clone(),
+                is_src: false,
+                is_dst: true,
+            });
+        };
+        comm.alttargets(proto::usbsas::ResponseAltTargets { alt_targets })?;
         Ok(())
     }
 
@@ -2250,6 +2308,9 @@ struct Config {
     analyze_net: bool,
     analyze_cmd: bool,
     write_report_dest: bool,
+    dst_networks: Option<Vec<usbsas_config::Network>>,
+    src_network: Option<usbsas_config::Network>,
+    command: Option<usbsas_config::Command>,
 }
 
 struct OutFiles {
@@ -2281,6 +2342,9 @@ fn main() -> Result<()> {
         analyze_net: false,
         analyze_cmd: false,
         write_report_dest: false,
+        dst_networks: config.networks,
+        src_network: config.source_network,
+        command: config.command,
     };
     if let Some(analyzer_conf) = config.analyzer {
         conf.analyze_usb = analyzer_conf.analyze_usb;

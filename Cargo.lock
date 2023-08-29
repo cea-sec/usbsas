@@ -3296,7 +3296,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-proto"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "prost",
  "prost-build",

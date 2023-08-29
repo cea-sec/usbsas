@@ -18,16 +18,32 @@ enum OutFsType {
   EXFAT = 2;
 };
 
-message Network {
-  string url = 1;
-  string krb_service_name = 2;
-};
-
 message FileInfo {
   string path = 1;
   FileType ftype = 2;
   uint64 size = 3;
   int64 timestamp = 4;
+};
+
+message Network {
+  string url = 1;
+  string krb_service_name = 2;
+};
+
+message Command {
+  string bin = 1;
+  repeated string args = 2;
+};
+
+message AltTarget {
+  oneof target {
+    Network network = 1;
+    Command command = 2;
+  }
+  string descr = 3;
+  string long_descr = 4;
+  bool is_src = 5;
+  bool is_dst = 6;
 };
 
 message USBDevice {
