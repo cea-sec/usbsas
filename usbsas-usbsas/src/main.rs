@@ -600,6 +600,7 @@ impl CopyFilesState {
         children: &mut Children,
     ) -> Result<State> {
         trace!("req copy");
+
         info!(
             "Starting transfer from {} to {:?} for user: {}",
             self.device, self.destination, self.id
@@ -636,6 +637,25 @@ impl CopyFilesState {
             "serial": self.device.dev.serial,
             "description": self.device.dev.description
         });
+
+        if let Destination::Usb(dest) = &self.destination {
+            if let Some(out_dev) = children
+                .usbdev
+                .comm
+                .devices(proto::usbdev::RequestDevices {})?
+                .devices
+                .iter()
+                .find(|&dev| dev.busnum == dest.busnum && dev.devnum == dest.devnum)
+            {
+                report["destination"] = json!({
+                    "vendorid": out_dev.vendorid,
+                    "productid": out_dev.productid,
+                    "manufacturer": out_dev.manufacturer,
+                    "serial": out_dev.serial,
+                    "description": out_dev.description
+                });
+            };
+        };
 
         // Abort if no files passed name filtering and no report requested
         if all_entries_filtered.is_empty() && !self.config.write_report_dest {
