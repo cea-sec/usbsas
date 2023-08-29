@@ -66,7 +66,7 @@ message RequestPostCopyCmd {
 message RequestCopyStart {
   oneof destination {
     DestUSB usb = 1;
-    common.DestNet net = 2;
+    common.Network net = 2;
     DestCmd cmd = 3;
   };
   oneof source {

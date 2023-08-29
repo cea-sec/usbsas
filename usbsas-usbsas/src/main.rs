@@ -1583,7 +1583,7 @@ impl UploadOrCmdState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-        dstnet: proto::common::DestNet,
+        network: proto::common::Network,
     ) -> Result<()> {
         use proto::uploader::response::Msg;
         trace!("upload bundle");
@@ -1591,7 +1591,7 @@ impl UploadOrCmdState {
             msg: Some(proto::uploader::request::Msg::Upload(
                 proto::uploader::RequestUpload {
                     id: self.id.clone(),
-                    dstnet: Some(dstnet),
+                    network: Some(network),
                 },
             )),
         })?;

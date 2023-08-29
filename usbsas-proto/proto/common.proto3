@@ -18,7 +18,7 @@ enum OutFsType {
   EXFAT = 2;
 };
 
-message DestNet {
+message Network {
   string url = 1;
   string krb_service_name = 2;
 };

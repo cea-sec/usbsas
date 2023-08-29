@@ -740,7 +740,7 @@ impl AppState {
             } => {
                 debug!("do copy net");
                 (
-                    proto::usbsas::request_copy_start::Destination::Net(proto::common::DestNet {
+                    proto::usbsas::request_copy_start::Destination::Net(proto::common::Network {
                         url: url.to_owned(),
                         krb_service_name: krb_service_name
                             .clone()

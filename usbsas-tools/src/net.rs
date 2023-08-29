@@ -100,7 +100,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         msg: Some(proto::uploader::request::Msg::Upload(
             proto::uploader::RequestUpload {
                 id: id.to_string(),
-                dstnet: Some(proto::common::DestNet {
+                network: Some(proto::common::Network {
                     url: network.url.to_owned(),
                     krb_service_name: network
                         .krb_service_name
