@@ -56,6 +56,7 @@ default-members = [
   "usbsas-usbsas",
   "usbsas-server"
 ]
+resolver = "2"
 
 [profile.release]
 overflow-checks = true
