@@ -765,14 +765,14 @@ impl CopyFilesState {
                     continue;
                 }
             };
-            match FileType::from_i32(rep.ftype) {
-                Some(FileType::Regular) => {
+            match FileType::try_from(rep.ftype) {
+                Ok(FileType::Regular) => {
                     if all_entries.insert(entry.clone()) {
                         files.push(entry);
                         total_size += rep.size;
                     }
                 }
-                Some(FileType::Directory) => {
+                Ok(FileType::Directory) => {
                     let mut todo_dir = VecDeque::from(vec![entry]);
                     while let Some(dir) = todo_dir.pop_front() {
                         if all_entries.insert(dir.clone()) {
@@ -783,14 +783,14 @@ impl CopyFilesState {
                             .comm
                             .readdir(proto::files::RequestReadDir { path: dir })?;
                         for file in rep.filesinfo.iter() {
-                            match FileType::from_i32(file.ftype) {
-                                Some(FileType::Regular) => {
+                            match FileType::try_from(file.ftype) {
+                                Ok(FileType::Regular) => {
                                     if all_entries.insert(file.path.clone()) {
                                         files.push(file.path.clone());
                                         total_size += file.size;
                                     }
                                 }
-                                Some(FileType::Directory) => {
+                                Ok(FileType::Directory) => {
                                     todo_dir.push_back(file.path.clone());
                                 }
                                 _ => errors.push(file.path.clone()),
@@ -881,7 +881,7 @@ impl CopyFilesState {
         }
 
         // Some FS (like ext4) have a directory size != 0, fix it here for the tar archive.
-        if let Some(FileType::Directory) = FileType::from_i32(attrs.ftype) {
+        if let Ok(FileType::Directory) = FileType::try_from(attrs.ftype) {
             attrs.size = 0;
         }
 
@@ -1092,8 +1092,8 @@ impl DownloadTarState {
                     continue;
                 }
             };
-            match FileType::from_i32(rep.ftype) {
-                Some(FileType::Regular) => {
+            match FileType::try_from(rep.ftype) {
+                Ok(FileType::Regular) => {
                     if !all_entries.contains(&entry) {
                         let file_too_large = match max_file_size {
                             Some(m) => rep.size > m,
@@ -1109,7 +1109,7 @@ impl DownloadTarState {
                         all_entries.insert(entry);
                     }
                 }
-                Some(FileType::Directory) => {
+                Ok(FileType::Directory) => {
                     if !all_entries.contains(&entry) {
                         if !entry.is_empty() {
                             directories.push(String::from("/") + &entry);
@@ -2043,8 +2043,8 @@ impl Children {
                     error!("Aborting, dest dev too small");
                     return Err(Error::NotEnoughSpace);
                 }
-                match OutFsType::from_i32(usb.fstype)
-                    .ok_or_else(|| Error::Error("bad fstype".into()))?
+                match OutFsType::try_from(usb.fstype)
+                    .map_err(|err| Error::Error(format!("{err}")))?
                 {
                     OutFsType::Fat => Ok(Some(0xFFFF_FFFF)),
                     _ => Ok(None),

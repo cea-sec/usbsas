@@ -166,7 +166,7 @@ impl WaitFsInfosState {
         fstype: i32,
     ) -> Result<Box<dyn FSWrite<StreamSlice<SparseFile<File>>>>> {
         let out_fs_type =
-            OutFsType::from_i32(fstype).ok_or_else(|| Error::FSError("bad fstype".into()))?;
+            OutFsType::try_from(fstype).map_err(|err| Error::FSError(format!("{err}")))?;
 
         log::debug!("mkfs dev_size: {}", dev_size);
 
@@ -281,13 +281,13 @@ impl WaitNewFileState {
         ftype: i32,
     ) -> Result<State> {
         debug!("New file: \"{}\"", &path);
-        let newstate: State = match FileType::from_i32(ftype) {
-            Some(FileType::Regular) => State::WritingFile(WritingFileState {
+        let newstate: State = match FileType::try_from(ftype) {
+            Ok(FileType::Regular) => State::WritingFile(WritingFileState {
                 fs: self.fs,
                 path,
                 timestamp,
             }),
-            Some(FileType::Directory) => {
+            Ok(FileType::Directory) => {
                 match self.fs.newdir(&path, timestamp) {
                     Ok(_) => comm.newfile(proto::writefs::ResponseNewFile {})?,
                     Err(err) => {

@@ -155,8 +155,8 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
                 return Err(libc::ENOENT);
             }
         };
-        let ftype = match usbsas_proto::common::FileType::from_i32(rep.ftype) {
-            Some(usbsas_proto::common::FileType::Directory) => fuse_mt::FileType::Directory,
+        let ftype = match usbsas_proto::common::FileType::try_from(rep.ftype) {
+            Ok(usbsas_proto::common::FileType::Directory) => fuse_mt::FileType::Directory,
             _ => fuse_mt::FileType::RegularFile,
         };
         let entry = Entry {
@@ -219,8 +219,8 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
             })
             .unwrap();
         for attrs in rep.filesinfo {
-            let ftype = match usbsas_proto::common::FileType::from_i32(attrs.ftype) {
-                Some(usbsas_proto::common::FileType::Directory) => fuse_mt::FileType::Directory,
+            let ftype = match usbsas_proto::common::FileType::try_from(attrs.ftype) {
+                Ok(usbsas_proto::common::FileType::Directory) => fuse_mt::FileType::Directory,
                 _ => fuse_mt::FileType::RegularFile,
             };
             result_entries.push(DirectoryEntry {
