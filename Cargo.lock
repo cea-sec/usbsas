@@ -3296,7 +3296,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-proto"
-version = "0.1.4"
+version = "0.1.6"
 dependencies = [
  "prost",
  "prost-build",
@@ -3343,7 +3343,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-server"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -3431,7 +3431,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-usbsas"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap 4.4.1",
  "log",
@@ -3441,7 +3441,6 @@ dependencies = [
  "uname",
  "usbsas-comm",
  "usbsas-config",
- "usbsas-mass-storage",
  "usbsas-mock",
  "usbsas-process",
  "usbsas-proto",

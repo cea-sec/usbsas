@@ -64,7 +64,8 @@ class Comm(object):
 class CommUsbsas(Comm):
     req_types = {
         "CopyStart": proto_usbsas.RequestCopyStart,
-        "Devices": proto_usbsas.RequestDevices,
+        "USBDevices": proto_usbsas.RequestUSBDevices,
+        "AltTargets": proto_usbsas.RequestAltTargets,
         "End": proto_usbsas.RequestEnd,
         "GetAttr": proto_usbsas.RequestGetAttr,
         "Id": proto_usbsas.RequestId,
@@ -83,7 +84,8 @@ class CommUsbsas(Comm):
         "CopyStart": proto_usbsas.ResponseCopyStart,
         "CopyStatus": proto_usbsas.ResponseCopyStatus,
         "CopyStatusDone": proto_usbsas.ResponseCopyStatusDone,
-        "Devices": proto_usbsas.ResponseDevices,
+        "USBDevices": proto_usbsas.ResponseUSBDevices,
+        "AltTargets": proto_usbsas.ResponseAltTargets,
         "End": proto_usbsas.ResponseEnd,
         "Error": proto_usbsas.ResponseError,
         "FinalCopyStatus": proto_usbsas.ResponseFinalCopyStatus,
@@ -118,12 +120,16 @@ class CommUsbsas(Comm):
         return self.recv_resp()
 
     def devices(self):
-        self.send_req(proto_usbsas.RequestDevices())
+        self.send_req(proto_usbsas.RequestUSBDevices())
         return self.recv_resp()
 
-    def open_device(self, busnum, devnum):
+    def alt_targets(self):
+        self.send_req(proto_usbsas.RequestAltTargets())
+        return self.recv_resp()
+
+    def open_device(self, device):
         self.send_req(proto_usbsas.RequestOpenDevice(
-            device=proto_common.Device(busnum=busnum, devnum=devnum)
+            device=device
             ))
         return self.recv_resp()
 
@@ -162,7 +168,7 @@ class CommUsbsas(Comm):
 
     def imgdisk(self, busnum, devnum):
         self.send_req(proto_usbsas.RequestImgDisk(
-            device=proto_common.Device(busnum=busnum, devnum=devnum)
+            device=proto_common.USBDevice(busnum=busnum, devnum=devnum)
             ))
         return self.recv_resp()
 

@@ -55,7 +55,7 @@ impl MassStorage {
         let mut scsiusb = scsiusb;
         let (max_lba, block_size, dev_size) = scsiusb.init_mass_storage()?;
         // TODO: support more sector size
-        assert!(vec![0x200, 0x800, 0x1000].contains(&block_size));
+        assert!([0x200, 0x800, 0x1000].contains(&block_size));
         Ok(MassStorage {
             scsiusb: RwLock::new(scsiusb),
             max_lba,
@@ -219,29 +219,6 @@ impl ReadAt for MassStorage {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct UsbDevice {
-    pub busnum: u32,
-    pub devnum: u32,
-    pub vendorid: u32,
-    pub productid: u32,
-    pub manufacturer: String,
-    pub serial: String,
-    pub description: String,
-    pub sector_size: u32,
-    pub dev_size: u64,
-}
-
-impl std::fmt::Display for UsbDevice {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} - {} - {} ({}-{})",
-            self.manufacturer, self.description, self.serial, self.vendorid, self.productid
-        )
     }
 }
 

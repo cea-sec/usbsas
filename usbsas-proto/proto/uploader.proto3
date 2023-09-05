@@ -6,7 +6,7 @@ import public "common.proto3";
 
 message RequestUpload {
   string id = 1;
-  common.DestNet dstnet = 2;
+  common.Network network = 2;
 };
 
 message RequestEnd {

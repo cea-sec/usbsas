@@ -132,12 +132,12 @@ impl RunningState {
         req: proto::uploader::RequestUpload,
     ) -> Result<()> {
         trace!("upload");
-        let dstnet = req.dstnet.ok_or(Error::BadRequest)?;
-        let url = format!("{}/{}", dstnet.url.trim_end_matches('/'), req.id);
+        let network = req.network.ok_or(Error::BadRequest)?;
+        let url = format!("{}/{}", network.url.trim_end_matches('/'), req.id);
         let mut http_client = HttpClient::new(
             #[cfg(feature = "authkrb")]
-            if !dstnet.krb_service_name.is_empty() {
-                Some(dstnet.krb_service_name)
+            if !network.krb_service_name.is_empty() {
+                Some(network.krb_service_name)
             } else {
                 None
             },

@@ -115,9 +115,7 @@ impl RunningState {
             let req: proto::cmdexec::Request = comm.recv()?;
             let res = match req.msg.ok_or(Error::BadRequest)? {
                 Msg::Exec(_) => self.exec(comm),
-                Msg::PostCopyExec(req) => {
-                    self.post_copy(comm, OutFileType::from_i32(req.outfiletype))
-                }
+                Msg::PostCopyExec(req) => self.post_copy(comm, req.outfiletype),
                 Msg::End(_) => {
                     comm.end(proto::cmdexec::ResponseEnd {})?;
                     break;
@@ -147,13 +145,9 @@ impl RunningState {
         Ok(())
     }
 
-    fn post_copy(
-        &mut self,
-        comm: &mut Comm<proto::cmdexec::Request>,
-        outft: Option<OutFileType>,
-    ) -> Result<()> {
+    fn post_copy(&mut self, comm: &mut Comm<proto::cmdexec::Request>, outft: i32) -> Result<()> {
         let cmd = self.post_copy_cmd.take().ok_or(Error::NoCmdConf)?;
-        let outft = outft.ok_or(Error::BadRequest)?;
+        let outft = OutFileType::try_from(outft).map_err(|_| Error::BadRequest)?;
         let args = match outft {
             OutFileType::Fs => replace_arg_source(&cmd.command_args, &self.out_fs),
             OutFileType::Tar => replace_arg_source(&cmd.command_args, &self.out_tar),

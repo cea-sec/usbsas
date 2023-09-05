@@ -21,7 +21,10 @@ message RequestEnd {
 message RequestId {
 };
 
-message RequestDevices {
+message RequestUSBDevices {
+};
+
+message RequestAltTargets {
 };
 
 message RequestPartitions {
@@ -32,7 +35,7 @@ message RequestOpenPartition {
 };
 
 message RequestOpenDevice {
-  common.Device device = 1;
+  common.USBDevice device = 1;
 };
 
 message RequestGetAttr {
@@ -66,7 +69,7 @@ message RequestPostCopyCmd {
 message RequestCopyStart {
   oneof destination {
     DestUSB usb = 1;
-    common.DestNet net = 2;
+    common.Network net = 2;
     DestCmd cmd = 3;
   };
   oneof source {
@@ -84,14 +87,14 @@ message RequestWipe {
 };
 
 message RequestImgDisk {
-  common.Device device = 1;
+  common.USBDevice device = 1;
 };
 
 message Request {
   oneof msg {
     RequestEnd End = 1;
     RequestId Id = 2;
-    RequestDevices Devices = 3;
+    RequestUSBDevices USBDevices = 3;
     RequestOpenDevice OpenDevice = 4;
     RequestPartitions Partitions = 5;
     RequestOpenPartition OpenPartition = 6;
@@ -101,6 +104,7 @@ message Request {
     RequestWipe Wipe = 10;
     RequestPostCopyCmd PostCopyCmd = 11;
     RequestImgDisk ImgDisk = 12;
+    RequestAltTargets AltTargets = 13;
   }
 };
 
@@ -117,8 +121,12 @@ message ResponseId {
   string id = 1;
 };
 
-message ResponseDevices {
-  repeated common.Device devices = 1;
+message ResponseUSBDevices {
+  repeated common.USBDevice devices = 1;
+};
+
+message ResponseAltTargets {
+  repeated common.AltTarget alt_targets = 1;
 };
 
 message ResponseOpenDevice {
@@ -196,7 +204,7 @@ message Response {
     ResponseEnd End = 1;
     ResponseError Error = 2;
     ResponseId Id = 3;
-    ResponseDevices Devices = 4;
+    ResponseUSBDevices USBDevices = 4;
     ResponseOpenDevice OpenDevice = 5;
     ResponseOpenPartition OpenPartition = 6;
     ResponsePartitions Partitions = 7;
@@ -215,5 +223,6 @@ message Response {
     ResponseImgDisk ImgDisk = 20;
     ResponseCopyDone CopyDone = 21;
     ResponseNothingToCopy NothingToCopy = 22;
+    ResponseAltTargets AltTargets = 23;
   }
 };

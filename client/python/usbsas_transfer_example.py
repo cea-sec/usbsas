@@ -74,7 +74,7 @@ def wait_2_devices(comm):
 
 def open_dev_and_part(comm, device, index=0):
     print("Opening first partition of first device")
-    rep = comm.open_device(device.busnum, device.devnum)
+    rep = comm.open_device(device)
     ok_or_exit(comm, rep, "error opening device")
     rep = comm.partitions()
     ok_or_exit(comm, rep, "error reading partitions")

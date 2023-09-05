@@ -431,7 +431,7 @@ impl<T: UsbContext> ScsiUsb<T> {
                                                 }
                                             }
                                         }
-                                        3 | 4 | 5 => {
+                                        3..=5 => {
                                             error!("Medium error");
                                             is_ok = false;
                                             break;

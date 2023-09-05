@@ -21,14 +21,15 @@ use usbsas_comm::{protorequest, Comm};
 use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
-use usbsas_proto::common::{OutFileType, OutFsType};
+use usbsas_proto::common::{OutFileType, OutFsType, UsbDevice};
 
 protorequest!(
     CommUsbsas,
     usbsas,
     id = Id[RequestId, ResponseId],
     postcopycmd = PostCopyCmd[RequestPostCopyCmd, ResponsePostCopyCmd],
-    devices = Devices[RequestDevices, ResponseDevices],
+    usbdevices = UsbDevices[RequestUsbDevices, ResponseUsbDevices],
+    alttargets = AltTargets[RequestAltTargets, ResponseAltTargets],
     opendev = OpenDevice[RequestOpenDevice, ResponseOpenDevice],
     partitions = Partitions[RequestPartitions, ResponsePartitions],
     openpartition = OpenPartition[RequestOpenPartition, ResponseOpenPartition],
@@ -41,7 +42,6 @@ protorequest!(
 
 /// Private device structures, they contain elements which should not be leaked
 /// to the web clients (busnum, devnum etc.)
-type UsbDevice = proto::common::Device;
 type NetDevice = usbsas_config::Network;
 type CmdDevice = usbsas_config::Command;
 
@@ -455,7 +455,10 @@ impl AppState {
     pub fn list_usb_devices(&self) -> Result<Vec<TargetDevice>, ServiceError> {
         let mut comm = self.comm.lock()?;
         let mut devices = vec![];
-        for device in comm.devices(proto::usbsas::RequestDevices {})?.devices {
+        for device in comm
+            .usbdevices(proto::usbsas::RequestUsbDevices {})?
+            .devices
+        {
             devices.push(TargetDevice {
                 device: Device::Usb(device.clone()),
                 is_src: device.is_src,
@@ -466,30 +469,38 @@ impl AppState {
     }
 
     fn list_alt_targets(&self) -> Result<Vec<TargetDevice>, ServiceError> {
-        let config = self.config.lock()?;
         let mut targets = vec![];
-        if let Some(networks) = &config.networks {
-            for network in networks {
-                targets.push(TargetDevice {
-                    device: Device::Net(network.clone()),
-                    is_src: false,
-                    is_dst: true,
-                });
+        let mut comm = self.comm.lock()?;
+        for target in comm
+            .alttargets(proto::usbsas::RequestAltTargets {})?
+            .alt_targets
+        {
+            match target.target.ok_or(ServiceError::InternalServerError)? {
+                usbsas_proto::common::alt_target::Target::Network(network) => {
+                    targets.push(TargetDevice {
+                        device: Device::Net(NetDevice {
+                            url: network.url,
+                            krb_service_name: Some(network.krb_service_name),
+                            description: target.descr,
+                            longdescr: target.long_descr,
+                        }),
+                        is_src: target.is_src,
+                        is_dst: target.is_dst,
+                    })
+                }
+                usbsas_proto::common::alt_target::Target::Command(cmd) => {
+                    targets.push(TargetDevice {
+                        device: Device::Cmd(CmdDevice {
+                            command_bin: cmd.bin,
+                            command_args: cmd.args,
+                            description: target.descr,
+                            longdescr: target.long_descr,
+                        }),
+                        is_src: target.is_src,
+                        is_dst: target.is_dst,
+                    })
+                }
             }
-        }
-        if let Some(cmd) = &config.command {
-            targets.push(TargetDevice {
-                device: Device::Cmd(cmd.clone()),
-                is_src: false,
-                is_dst: true,
-            });
-        }
-        if let Some(source_network) = &config.source_network {
-            targets.push(TargetDevice {
-                device: Device::Net(source_network.clone()),
-                is_src: true,
-                is_dst: false,
-            });
         }
         Ok(targets)
     }
@@ -741,7 +752,7 @@ impl AppState {
             } => {
                 debug!("do copy net");
                 (
-                    proto::usbsas::request_copy_start::Destination::Net(proto::common::DestNet {
+                    proto::usbsas::request_copy_start::Destination::Net(proto::common::Network {
                         url: url.to_owned(),
                         krb_service_name: krb_service_name
                             .clone()

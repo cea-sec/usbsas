@@ -67,6 +67,7 @@ pub fn seccomp_thread(udev_socket: RawFd, poll_fd: RawFd) -> Result<()> {
     ctx.allow_syscall(Syscall::lstat)?;
     ctx.allow_syscall(Syscall::fstatfs)?;
     ctx.allow_syscall(Syscall::newfstatat)?;
+    ctx.allow_syscall(Syscall::statx)?;
     ctx.allow_syscall(Syscall::access)?;
     ctx.allow_syscall(Syscall::faccessat2)?;
     ctx.allow_syscall(Syscall::getdents64)?;

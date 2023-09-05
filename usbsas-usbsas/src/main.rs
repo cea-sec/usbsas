@@ -16,7 +16,6 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{protorequest, protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read};
-use usbsas_mass_storage::UsbDevice;
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_proto::{
@@ -60,7 +59,8 @@ protoresponse!(
     end = End[ResponseEnd],
     error = Error[ResponseError],
     id = Id[ResponseId],
-    devices = Devices[ResponseDevices],
+    usbdevices = UsbDevices[ResponseUsbDevices],
+    alttargets = AltTargets[ResponseAltTargets],
     opendevice = OpenDevice[ResponseOpenDevice],
     openpartition = OpenPartition[ResponseOpenPartition],
     partitions = Partitions[ResponsePartitions],
@@ -179,6 +179,19 @@ protorequest!(
     end = End[RequestEnd, ResponseEnd]
 );
 
+#[derive(Clone, Debug)]
+pub struct UsbMS {
+    pub dev: UsbDevice,
+    pub sector_size: u32,
+    pub dev_size: u64,
+}
+
+impl std::fmt::Display for UsbMS {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} ({} - {})", self.dev, self.sector_size, self.dev_size)
+    }
+}
+
 enum State {
     Init(InitState),
     DevOpened(DevOpenedState),
@@ -232,7 +245,8 @@ impl InitState {
             let req: proto::usbsas::Request = comm.recv()?;
             let res = match req.msg.ok_or(Error::BadRequest)? {
                 Msg::Id(_) => children.id(comm, &mut id),
-                Msg::Devices(_) => self.devices(comm, children),
+                Msg::UsbDevices(_) => self.usb_devices(comm, children),
+                Msg::AltTargets(_) => self.alt_targets(comm),
                 Msg::OpenDevice(req) => {
                     match self.open_device(comm, children, req.device.ok_or(Error::BadRequest)?) {
                         Ok(device) => {
@@ -297,13 +311,13 @@ impl InitState {
         Ok(State::End)
     }
 
-    fn devices(
+    fn usb_devices(
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
     ) -> Result<()> {
         trace!("req devices");
-        comm.devices(proto::usbsas::ResponseDevices {
+        comm.usbdevices(proto::usbsas::ResponseUsbDevices {
             devices: children
                 .usbdev
                 .comm
@@ -313,12 +327,68 @@ impl InitState {
         Ok(())
     }
 
+    fn alt_targets(&mut self, comm: &mut Comm<proto::usbsas::Request>) -> Result<()> {
+        let mut alt_targets: Vec<usbsas_proto::common::AltTarget> = Vec::new();
+        if let Some(dst_networks) = &self.config.dst_networks {
+            for network in dst_networks {
+                alt_targets.push(AltTarget {
+                    target: Some(usbsas_proto::common::alt_target::Target::Network(
+                        usbsas_proto::common::Network {
+                            url: network.url.clone(),
+                            krb_service_name: network
+                                .krb_service_name
+                                .clone()
+                                .unwrap_or(String::from("")),
+                        },
+                    )),
+                    descr: network.description.clone(),
+                    long_descr: network.longdescr.clone(),
+                    is_src: false,
+                    is_dst: true,
+                });
+            }
+        };
+        if let Some(network) = &self.config.src_network {
+            alt_targets.push(AltTarget {
+                target: Some(usbsas_proto::common::alt_target::Target::Network(
+                    usbsas_proto::common::Network {
+                        url: network.url.clone(),
+                        krb_service_name: network
+                            .krb_service_name
+                            .clone()
+                            .unwrap_or(String::from("")),
+                    },
+                )),
+                descr: network.description.clone(),
+                long_descr: network.longdescr.clone(),
+                is_src: true,
+                is_dst: false,
+            });
+        };
+        if let Some(cmd) = &self.config.command {
+            alt_targets.push(AltTarget {
+                target: Some(usbsas_proto::common::alt_target::Target::Command(
+                    usbsas_proto::common::Command {
+                        bin: cmd.command_bin.clone(),
+                        args: cmd.command_args.clone(),
+                    },
+                )),
+                descr: cmd.description.clone(),
+                long_descr: cmd.longdescr.clone(),
+                is_src: false,
+                is_dst: true,
+            });
+        };
+        comm.alttargets(proto::usbsas::ResponseAltTargets { alt_targets })?;
+        Ok(())
+    }
+
     fn open_device(
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-        dev_req: Device,
-    ) -> Result<UsbDevice> {
+        dev_req: proto::common::UsbDevice,
+    ) -> Result<UsbMS> {
         info!("Opening device {}", dev_req);
         let device = children
             .scsi2files
@@ -331,14 +401,18 @@ impl InitState {
             sector_size: device.block_size,
             dev_size: device.dev_size,
         })?;
-        Ok(UsbDevice {
-            busnum: dev_req.busnum,
-            devnum: dev_req.devnum,
-            vendorid: dev_req.vendorid,
-            productid: dev_req.productid,
-            manufacturer: dev_req.manufacturer,
-            serial: dev_req.serial,
-            description: dev_req.description,
+        Ok(UsbMS {
+            dev: UsbDevice {
+                busnum: dev_req.busnum,
+                devnum: dev_req.devnum,
+                vendorid: dev_req.vendorid,
+                productid: dev_req.productid,
+                manufacturer: dev_req.manufacturer,
+                serial: dev_req.serial,
+                description: dev_req.description,
+                is_src: dev_req.is_src,
+                is_dst: dev_req.is_dst,
+            },
             sector_size: u32::try_from(device.block_size)?,
             dev_size: device.dev_size,
         })
@@ -346,7 +420,7 @@ impl InitState {
 }
 
 struct DevOpenedState {
-    device: UsbDevice,
+    device: UsbMS,
     id: Option<String>,
     config: Config,
 }
@@ -424,7 +498,7 @@ impl DevOpenedState {
 }
 
 struct PartitionOpenedState {
-    device: UsbDevice,
+    device: UsbMS,
     id: Option<String>,
     config: Config,
 }
@@ -513,7 +587,7 @@ impl PartitionOpenedState {
 
 struct CopyFilesState {
     destination: Destination,
-    device: UsbDevice,
+    device: UsbMS,
     id: String,
     selected: Vec<String>,
     config: Config,
@@ -526,6 +600,7 @@ impl CopyFilesState {
         children: &mut Children,
     ) -> Result<State> {
         trace!("req copy");
+
         info!(
             "Starting transfer from {} to {:?} for user: {}",
             self.device, self.destination, self.id
@@ -556,12 +631,31 @@ impl CopyFilesState {
         report["filtered_files"] = filtered.clone().into();
         report["user"] = serde_json::Value::String(self.id.clone());
         report["source"] = json!({
-            "vendorid": self.device.vendorid,
-            "productid": self.device.productid,
-            "manufacturer": self.device.manufacturer,
-            "serial": self.device.serial,
-            "description": self.device.description
+            "vendorid": self.device.dev.vendorid,
+            "productid": self.device.dev.productid,
+            "manufacturer": self.device.dev.manufacturer,
+            "serial": self.device.dev.serial,
+            "description": self.device.dev.description
         });
+
+        if let Destination::Usb(dest) = &self.destination {
+            if let Some(out_dev) = children
+                .usbdev
+                .comm
+                .devices(proto::usbdev::RequestDevices {})?
+                .devices
+                .iter()
+                .find(|&dev| dev.busnum == dest.busnum && dev.devnum == dest.devnum)
+            {
+                report["destination"] = json!({
+                    "vendorid": out_dev.vendorid,
+                    "productid": out_dev.productid,
+                    "manufacturer": out_dev.manufacturer,
+                    "serial": out_dev.serial,
+                    "description": out_dev.description
+                });
+            };
+        };
 
         // Abort if no files passed name filtering and no report requested
         if all_entries_filtered.is_empty() && !self.config.write_report_dest {
@@ -671,14 +765,14 @@ impl CopyFilesState {
                     continue;
                 }
             };
-            match FileType::from_i32(rep.ftype) {
-                Some(FileType::Regular) => {
+            match FileType::try_from(rep.ftype) {
+                Ok(FileType::Regular) => {
                     if all_entries.insert(entry.clone()) {
                         files.push(entry);
                         total_size += rep.size;
                     }
                 }
-                Some(FileType::Directory) => {
+                Ok(FileType::Directory) => {
                     let mut todo_dir = VecDeque::from(vec![entry]);
                     while let Some(dir) = todo_dir.pop_front() {
                         if all_entries.insert(dir.clone()) {
@@ -689,14 +783,14 @@ impl CopyFilesState {
                             .comm
                             .readdir(proto::files::RequestReadDir { path: dir })?;
                         for file in rep.filesinfo.iter() {
-                            match FileType::from_i32(file.ftype) {
-                                Some(FileType::Regular) => {
+                            match FileType::try_from(file.ftype) {
+                                Ok(FileType::Regular) => {
                                     if all_entries.insert(file.path.clone()) {
                                         files.push(file.path.clone());
                                         total_size += file.size;
                                     }
                                 }
-                                Some(FileType::Directory) => {
+                                Ok(FileType::Directory) => {
                                     todo_dir.push_back(file.path.clone());
                                 }
                                 _ => errors.push(file.path.clone()),
@@ -787,7 +881,7 @@ impl CopyFilesState {
         }
 
         // Some FS (like ext4) have a directory size != 0, fix it here for the tar archive.
-        if let Some(FileType::Directory) = FileType::from_i32(attrs.ftype) {
+        if let Ok(FileType::Directory) = FileType::try_from(attrs.ftype) {
             attrs.size = 0;
         }
 
@@ -998,8 +1092,8 @@ impl DownloadTarState {
                     continue;
                 }
             };
-            match FileType::from_i32(rep.ftype) {
-                Some(FileType::Regular) => {
+            match FileType::try_from(rep.ftype) {
+                Ok(FileType::Regular) => {
                     if !all_entries.contains(&entry) {
                         let file_too_large = match max_file_size {
                             Some(m) => rep.size > m,
@@ -1015,7 +1109,7 @@ impl DownloadTarState {
                         all_entries.insert(entry);
                     }
                 }
-                Some(FileType::Directory) => {
+                Ok(FileType::Directory) => {
                     if !all_entries.contains(&entry) {
                         if !entry.is_empty() {
                             directories.push(String::from("/") + &entry);
@@ -1567,7 +1661,7 @@ impl UploadOrCmdState {
         &mut self,
         comm: &mut Comm<proto::usbsas::Request>,
         children: &mut Children,
-        dstnet: proto::common::DestNet,
+        network: proto::common::Network,
     ) -> Result<()> {
         use proto::uploader::response::Msg;
         trace!("upload bundle");
@@ -1575,7 +1669,7 @@ impl UploadOrCmdState {
             msg: Some(proto::uploader::request::Msg::Upload(
                 proto::uploader::RequestUpload {
                     id: self.id.clone(),
-                    dstnet: Some(dstnet),
+                    network: Some(network),
                 },
             )),
         })?;
@@ -1704,7 +1798,7 @@ impl WipeState {
 }
 
 struct ImgDiskState {
-    device: UsbDevice,
+    device: UsbMS,
 }
 
 impl ImgDiskState {
@@ -1949,8 +2043,8 @@ impl Children {
                     error!("Aborting, dest dev too small");
                     return Err(Error::NotEnoughSpace);
                 }
-                match OutFsType::from_i32(usb.fstype)
-                    .ok_or_else(|| Error::Error("bad fstype".into()))?
+                match OutFsType::try_from(usb.fstype)
+                    .map_err(|err| Error::Error(format!("{err}")))?
                 {
                     OutFsType::Fat => Ok(Some(0xFFFF_FFFF)),
                     _ => Ok(None),
@@ -2234,6 +2328,9 @@ struct Config {
     analyze_net: bool,
     analyze_cmd: bool,
     write_report_dest: bool,
+    dst_networks: Option<Vec<usbsas_config::Network>>,
+    src_network: Option<usbsas_config::Network>,
+    command: Option<usbsas_config::Command>,
 }
 
 struct OutFiles {
@@ -2265,6 +2362,9 @@ fn main() -> Result<()> {
         analyze_net: false,
         analyze_cmd: false,
         write_report_dest: false,
+        dst_networks: config.networks,
+        src_network: config.source_network,
+        command: config.command,
     };
     if let Some(analyzer_conf) = config.analyzer {
         conf.analyze_usb = analyzer_conf.analyze_usb;

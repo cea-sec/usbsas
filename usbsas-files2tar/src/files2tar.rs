@@ -67,8 +67,8 @@ impl WaitNewFileState {
         let req: proto::writetar::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::NewFile(req) => {
-                let fstype = FileType::from_i32(req.ftype)
-                    .ok_or_else(|| Error::Error("Bad file type".to_string()))?;
+                let fstype =
+                    FileType::try_from(req.ftype).map_err(|err| Error::Error(format!("{err}")))?;
                 match self
                     .archive
                     .newfile(&req.path, fstype, req.size, req.timestamp)

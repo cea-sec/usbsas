@@ -16,7 +16,7 @@ use thiserror::Error;
 use usbsas_comm::{protoresponse, Comm};
 use usbsas_config::{conf_parse, conf_read, UsbPortAccesses};
 use usbsas_proto as proto;
-use usbsas_proto::{common::Device as UsbDevice, usbdev::request::Msg};
+use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
 
 #[derive(Error, Debug)]
 pub enum Error {
