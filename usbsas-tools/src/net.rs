@@ -59,6 +59,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::uploader::response::Msg;
     let mut uploader = UsbsasChildSpawner::new("usbsas-uploader")
         .arg(bundle_path)
+        .wait_on_startup()
         .spawn::<proto::uploader::Request>()?;
 
     let config = conf_parse(&conf_read(config_path)?)?;
@@ -95,6 +96,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         &networks[n]
     };
 
+    uploader.unlock_with(&[1])?;
     log::info!("Uploading bundle");
     uploader.comm.send(proto::uploader::Request {
         msg: Some(proto::uploader::request::Msg::Upload(
