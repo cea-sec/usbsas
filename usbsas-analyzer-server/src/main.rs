@@ -3,10 +3,6 @@
 
 use actix_files::NamedFile;
 use actix_web::{get, head, http::header, post, web, App, HttpResponse, HttpServer, Responder};
-use clamav_rs::{
-    db, engine,
-    scan_settings::{ScanSettings, ScanSettingsBuilder},
-};
 use clap::{Arg, Command};
 use futures::StreamExt;
 use serde_json::json;
@@ -14,12 +10,16 @@ use std::{
     collections::HashMap,
     fs,
     io::{self, Read, Seek, Write},
-    path::{Path, PathBuf},
+    os::unix::net::UnixStream,
+    path::PathBuf,
+    process,
     sync::Mutex,
     thread,
 };
-use tar::Archive;
+use tar::{Archive, EntryType};
 use tempfile::TempDir;
+
+const TAR_DATA_DIR: &str = "data/";
 
 struct AnalyzeStatus {
     status: String,
@@ -29,115 +29,79 @@ struct AnalyzeStatus {
 struct AppState {
     working_dir: Mutex<String>,
     current_scans: Mutex<HashMap<String, AnalyzeStatus>>,
-    clamav_engine: Mutex<engine::Engine>,
-    clamav_settings: Mutex<ScanSettings>,
+    clamav: Mutex<Clamav>,
 }
 
 impl AppState {
-    fn analyze(&self, bundle_id: String, tar: String) -> Result<(), actix_web::Error> {
+    fn analyze(&self, bundle_id: &str, tar: &str) -> Result<(), actix_web::Error> {
         let tmpdir = tempfile::Builder::new()
             .prefix(&bundle_id)
-            .tempdir_in(PathBuf::from(&*self.working_dir.lock().unwrap()))
-            .unwrap();
-        let mut archive = Archive::new(fs::File::open(tar).unwrap());
-        // XXX TODO maybe mmap archive file and use clamav's scan_map function instead of unpacking
-        if let Err(err) = archive.unpack(tmpdir.path()) {
-            log::error!("err: {}, not a tar ?", err);
-            self.current_scans
-                .lock()
-                .unwrap()
-                .get_mut(&bundle_id)
-                .unwrap()
-                .status = "error".to_string();
-            drop(archive);
-            return Ok(());
-        }
+            .tempdir_in(PathBuf::from(&*self.working_dir.lock().unwrap()))?;
+        let mut archive = Archive::new(fs::File::open(tar)?);
 
-        // If we received a bundle (with "/data" and "/config.json" at the root), only analyze the
-        // data directory.
-        let base_path = if tmpdir.path().join("data").as_path().is_dir()
-            && tmpdir.path().join("config.json").as_path().is_file()
-        {
-            tmpdir.path().join("data")
-        } else {
-            tmpdir.path().to_path_buf()
-        };
+        let mut entries_paths = Vec::new();
 
-        self.analyze_recursive(
-            base_path.as_path(),
-            base_path.as_path().to_str().unwrap(),
-            &bundle_id,
-        )?;
-
-        self.current_scans
-            .lock()
-            .unwrap()
-            .get_mut(&bundle_id)
-            .unwrap()
-            .status = "scanned".to_string();
-
-        Ok(())
-    }
-
-    fn analyze_recursive<P: AsRef<Path>>(
-        &self,
-        path: P,
-        base_path: &str,
-        bundle_id: &str,
-    ) -> Result<(), actix_web::Error> {
-        for file in fs::read_dir(path).unwrap() {
-            let file = file.unwrap();
-            let file_type = file.file_type().unwrap();
-            let filename = file.path().into_os_string().into_string().unwrap();
-            let relative_filename = filename
-                .strip_prefix(&format!("{base_path}/"))
-                .unwrap()
-                .to_string();
-            if file_type.is_symlink() {
-                self.current_scans
-                    .lock()
-                    .unwrap()
-                    .get_mut(bundle_id)
-                    .unwrap()
-                    .files
-                    .insert(relative_filename, "CLEAN".to_string());
-            } else if file_type.is_dir() {
-                self.analyze_recursive(file.path(), base_path, bundle_id)?;
-            } else {
-                let scan_res = self
-                    .clamav_engine
-                    .lock()
-                    .unwrap()
-                    .scan_file(&filename, &mut self.clamav_settings.lock().unwrap());
-                let mut current_scans = self.current_scans.lock().unwrap();
-                match scan_res {
-                    Ok(engine::ScanResult::Clean) | Ok(engine::ScanResult::Whitelisted) => {
-                        log::debug!("Clean or whitelisted file: {}", &relative_filename);
-                        current_scans
-                            .get_mut(bundle_id)
-                            .unwrap()
-                            .files
-                            .insert(relative_filename, "CLEAN".to_string());
-                    }
-                    Ok(engine::ScanResult::Virus(vname)) => {
-                        log::warn!("Dirty file: {}, reason: {}", &relative_filename, vname);
-                        current_scans
-                            .get_mut(bundle_id)
-                            .unwrap()
-                            .files
-                            .insert(relative_filename, "DIRTY".to_string());
-                    }
-                    Err(err) => {
-                        log::error!("scan error: {}", err);
-                        current_scans
-                            .get_mut(bundle_id)
-                            .unwrap()
-                            .files
-                            .insert(relative_filename, "DIRTY".to_string());
-                    }
-                }
+        for entry in archive.entries()? {
+            let mut entry = entry.unwrap();
+            let path = entry
+                .path()?
+                .to_path_buf()
+                .into_os_string()
+                .into_string()
+                .unwrap();
+            if !path.starts_with(TAR_DATA_DIR) {
+                continue;
+            }
+            if matches!(
+                entry.header().entry_type(),
+                EntryType::Regular | EntryType::Directory | EntryType::Symlink
+            ) {
+                entry.unpack_in(tmpdir.path())?;
+            }
+            if matches!(
+                entry.header().entry_type(),
+                EntryType::Regular | EntryType::Symlink
+            ) {
+                entries_paths.push(path.strip_prefix(TAR_DATA_DIR).unwrap().to_string());
             }
         }
+
+        if entries_paths.is_empty() {
+            log::error!("not files to analyze");
+            return Err(actix_web::error::ErrorNotFound(io::Error::new(
+                io::ErrorKind::NotFound,
+                "tar's \"data\" is empty or absent, no files to analyze",
+            )));
+        }
+
+        let base_path = tmpdir
+            .path()
+            .join(TAR_DATA_DIR)
+            .into_os_string()
+            .into_string()
+            .unwrap();
+        let mut dirty_paths = self.clamav.lock().unwrap().analyze(&base_path)?;
+
+        dirty_paths.iter_mut().for_each(|path| {
+            *path = path.strip_prefix(base_path.as_str()).unwrap().to_string();
+        });
+
+        let mut current_scans = self.current_scans.lock().unwrap();
+        let current_scan = current_scans.get_mut(bundle_id).unwrap();
+
+        entries_paths.iter().for_each(|path| {
+            if dirty_paths.contains(path) {
+                current_scan
+                    .files
+                    .insert(path.to_owned(), "DIRTY".to_string());
+            } else {
+                current_scan
+                    .files
+                    .insert(path.to_owned(), "CLEAN".to_string());
+            };
+        });
+
+        current_scan.status = "scanned".to_string();
         Ok(())
     }
 
@@ -179,7 +143,12 @@ async fn scan_bundle(
 
     let bundle_id_clone = bundle_id.clone();
     thread::spawn(move || {
-        let _ = data.analyze(bundle_id_clone, out_file_name);
+        if let Err(err) = data.analyze(&bundle_id_clone, &out_file_name) {
+            log::error!("{err}");
+            if let Some(status) = data.current_scans.lock().unwrap().get_mut(&bundle_id_clone) {
+                status.status = "error".to_string();
+            };
+        }
     });
 
     Ok(HttpResponse::Ok().json(json!(
@@ -203,17 +172,16 @@ async fn scan_result(
         {
             let entry = current_scans.remove(&bundle_id).unwrap();
             #[cfg(not(feature = "integration-tests"))]
-            let av_infos = json!({
-                "ClamAV": {
-                    "version": clamav_rs::version(),
-                    "database_version": data.clamav_engine
-                        .lock().unwrap().database_version().unwrap(),
-                    "database_timestamp": data.clamav_engine
-                        .lock().unwrap().database_timestamp().unwrap()
-                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                        .unwrap().as_secs_f64()
-                }
-            });
+            let av_infos = {
+                let (clam_ver, db_ver, db_date) = data.clamav.lock().unwrap().version()?;
+                json!({
+                    "ClamAV": {
+                    "version": clam_ver,
+                    "database_version": db_ver,
+                    "database_timestamp": db_date,
+                    }
+                })
+            };
             // Fixed timestamp to keep a determistic filesystem hash
             #[cfg(feature = "integration-tests")]
             let av_infos = json!({
@@ -331,16 +299,111 @@ async fn download_bundle(
     Ok(named_file)
 }
 
-fn init_clamav() -> (engine::Engine, ScanSettings) {
-    clamav_rs::initialize().expect("couldn't init clamav");
-    let settings = ScanSettingsBuilder::new().build();
-    let engine = engine::Engine::new();
-    engine
-        .load_databases(&db::default_directory())
-        .expect("clamav database load failed");
-    engine.compile().expect("clamav compile failed");
-    log::info!("clamav initialized, starting server");
-    (engine, settings)
+#[get("/shutdown")]
+async fn shutdown(data: web::Data<AppState>) -> Result<impl Responder, actix_web::Error> {
+    data.clamav.lock().unwrap().cmd("SHUTDOWN")?;
+    Ok(HttpResponse::Ok())
+}
+
+struct Clamav {
+    _process: process::Child,
+    socket_path: String,
+}
+
+impl Clamav {
+    fn new(working_path: &str) -> io::Result<Self> {
+        let clamav_config_path = format!("{}/clamd.conf", working_path);
+        let clamav_socket_path = format!("{}/clamd.socket", working_path);
+
+        std::fs::write(
+            &clamav_config_path,
+            format!(
+                "TemporaryDirectory {}\nLocalSocket {}\nForeground true\n",
+                working_path, clamav_socket_path
+            ),
+        )?;
+
+        log::debug!("start clamd");
+        let clamav_child = process::Command::new("clamd")
+            .args(["--config", &clamav_config_path])
+            .spawn()?;
+
+        // Try opening the socket, this may take some times as the socket will
+        // only be created by clamd when the database is loaded.
+        let mut timeout_retry = 30;
+        let mut clamav_socket = loop {
+            log::trace!("attempt to connect to clamd socket");
+            match UnixStream::connect(&clamav_socket_path) {
+                Ok(socket) => break socket,
+                Err(err) => match err.kind() {
+                    std::io::ErrorKind::NotFound => {
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        timeout_retry -= 1;
+                        if timeout_retry == 0 {
+                            return Err(err);
+                        } else {
+                            continue;
+                        }
+                    }
+                    _ => return Err(err),
+                },
+            }
+        };
+
+        let mut response = String::new();
+        clamav_socket.write_all(b"PING")?;
+        clamav_socket.read_to_string(&mut response)?;
+
+        if response.trim() != "PONG" {
+            log::error!("{:#?}", response);
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Couldn't connect to clamd socket",
+            ));
+        }
+
+        log::debug!("clamd ping pong ok");
+
+        Ok(Clamav {
+            _process: clamav_child,
+            socket_path: clamav_socket_path,
+        })
+    }
+
+    fn cmd(&mut self, cmd: &str) -> io::Result<String> {
+        let mut socket = UnixStream::connect(&self.socket_path)?;
+        let mut response = String::new();
+        socket.write_all(cmd.as_bytes())?;
+        socket.read_to_string(&mut response)?;
+        Ok(response)
+    }
+
+    #[cfg(not(feature = "integration-tests"))]
+    fn version(&mut self) -> io::Result<(String, String, String)> {
+        let version = self.cmd("VERSION")?;
+        let versions: Vec<&str> = version.trim().split('/').collect();
+        let (clam_ver, db_ver, db_date) = (
+            versions[0].to_string(),
+            versions[1].to_string(),
+            versions[2].to_string(),
+        );
+        Ok((clam_ver, db_ver, db_date))
+    }
+
+    fn analyze(&mut self, path: &str) -> io::Result<Vec<String>> {
+        let response = self.cmd(&format!("CONTSCAN {}", path))?;
+        let mut dirty = Vec::new();
+        if response.ends_with("OK") {
+            return Ok(dirty);
+        }
+        for line in response.lines() {
+            match line.rfind(": ") {
+                Some(index) => dirty.push(line.split_at(index).0.to_string()),
+                None => continue,
+            }
+        }
+        Ok(dirty)
+    }
 }
 
 #[actix_web::main]
@@ -349,7 +412,7 @@ async fn main() -> io::Result<()> {
 
     let command = Command::new("usbsas-analyzer-server")
         .about("simple usbsas remote server for integrations tests")
-        .version("0.1")
+        .version("0.2")
         .arg(
             Arg::new("working-dir")
                 .value_name("WORKING-DIR")
@@ -373,12 +436,11 @@ async fn main() -> io::Result<()> {
             (working_path, Some(tmpdir))
         };
 
-    let (engine, settings) = init_clamav();
+    let clamav = Clamav::new(&working_path)?;
     let app_data = web::Data::new(AppState {
         working_dir: Mutex::new(working_path),
         current_scans: Mutex::new(HashMap::new()),
-        clamav_engine: Mutex::new(engine),
-        clamav_settings: Mutex::new(settings),
+        clamav: Mutex::new(clamav),
     });
     HttpServer::new(move || {
         App::new()
@@ -388,6 +450,7 @@ async fn main() -> io::Result<()> {
             .service(upload_bundle)
             .service(head_bundle_size)
             .service(download_bundle)
+            .service(shutdown)
     })
     .bind("127.0.0.1:8042")?
     .run()

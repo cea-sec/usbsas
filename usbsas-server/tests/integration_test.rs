@@ -482,6 +482,7 @@ impl Drop for IntegrationTester {
             println!("Couldn't sigterm usbsas server: {err}");
             sleep(Duration::from_secs(1));
         }
+        let _ = self.client.get("http://localhost:8042/shutdown").send();
         if let Err(e) = self.analyzer_server.kill() {
             println!("Couldn't kill analyzer server: {e}");
         }
