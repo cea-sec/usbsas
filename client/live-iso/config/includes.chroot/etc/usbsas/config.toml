@@ -2,6 +2,9 @@ out_directory = "/tmp/"
 
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
+analyze_usb = true
+analyze_net = false
+analyze_cmd = false
 
 [post_copy]
 description = "Remove transfer files"

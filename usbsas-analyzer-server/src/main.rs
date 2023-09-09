@@ -67,7 +67,7 @@ impl AppState {
         }
 
         if entries_paths.is_empty() {
-            log::error!("not files to analyze");
+            log::error!("no files to analyze");
             return Err(actix_web::error::ErrorNotFound(io::Error::new(
                 io::ErrorKind::NotFound,
                 "tar's \"data\" is empty or absent, no files to analyze",
