@@ -23,8 +23,6 @@ RUN set -eux; \
     dpkg-dev \
     clamav-freshclam && \
     cargo install cargo-deb && \
-    cargo install cargo-audit && \
-    rustup component add rustfmt && \
     rustup component add clippy; \
     freshclam
 
