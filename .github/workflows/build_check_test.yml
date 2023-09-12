@@ -10,49 +10,103 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test-and-checks:
+
+  fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: build docker image
-        run: |
-          cd debian && \
-          docker build -t usbsas-builder:debian -f Dockerfile .
       - name: cargo fmt
-        run: |
-          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC  \
-          --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
-          cargo fmt
-      - name: cargo clippy
-        run: |
-          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC  \
-          --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
-          cargo clippy
+        run: cargo fmt --all
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
       - name: cargo audit
+        run: cargo audit
+
+  docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build docker image
+        run: cd debian && docker build -t usbsas-builder:debian -f Dockerfile .
+      - name: save docker image
+        run: docker save --output /tmp/usbsas-builder.tar usbsas-builder
+      - uses: actions/upload-artifact@v3
+        with:
+          name: usbsas-builder
+          path: /tmp/usbsas-builder.tar
+
+  clippy:
+    runs-on: ubuntu-latest
+    needs: docker-image
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+        with:
+          name: usbsas-builder
+          path: /tmp
+      - name: load docker image
+        run: docker load --input /tmp/usbsas-builder.tar
+      - name: clippy
         run: |
-          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC  \
-          --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
-          cargo audit
-      - name: build usbsas
+          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
+          --env CARGO_HOME=/SRC/target/.cargo \
+          usbsas-builder:debian \
+          cargo clippy --all
+
+  build-and-tests:
+    runs-on: ubuntu-latest
+    needs: docker-image
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+        with:
+          name: usbsas-builder
+          path: /tmp
+      - name: load docker image
+        run: docker load --input /tmp/usbsas-builder.tar
+      - name: build
         run: |
-          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC  \
-          --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
-          cargo build --release --all --verbose
+          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
+          --env CARGO_HOME=/SRC/target/.cargo \
+          usbsas-builder:debian \
+          cargo build --release --all
       - name: tests
         run: |
-          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC  \
-          --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
-          cargo test --release --all --verbose --exclude usbsas-server
-      - name: rebuild usbsas for integration tests
+          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
+          --env CARGO_HOME=/SRC/target/.cargo \
+          usbsas-builder:debian \
+          cargo test --release --all --exclude usbsas-server
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: docker-image
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+        with:
+          name: usbsas-builder
+          path: /tmp
+      - name: load docker image
+        run: docker load --input /tmp/usbsas-builder.tar
+      - name: build
         run: |
-          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC  \
-          --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
-          cargo build --release --all --verbose --features mock,integration-tests
+          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
+          --env CARGO_HOME=/SRC/target/.cargo \
+          usbsas-builder:debian \
+          cargo build --release --all --features mock,integration-tests
       - name: integration tests
         run: |
-          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC  \
-          --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
-          cargo test --release --verbose -p usbsas-server --features integration-tests
+          docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
+          --env CARGO_HOME=/SRC/target/.cargo \
+          usbsas-builder:debian \
+          cargo test --release -p usbsas-server --features integration-tests
+
