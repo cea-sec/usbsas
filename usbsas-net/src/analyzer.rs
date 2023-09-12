@@ -204,7 +204,10 @@ impl RunningState {
             match report.status.as_str() {
                 "scanned" => return Ok(raw_report),
                 "uploaded" | "processing" => sleep(Duration::from_secs(1)),
-                _ => return Err(Error::Remote),
+                _ => {
+                    log::error!("{report:?}");
+                    return Err(Error::Remote);
+                }
             }
         }
     }

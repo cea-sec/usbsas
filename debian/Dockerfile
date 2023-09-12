@@ -13,7 +13,6 @@ RUN set -eux; \
     libfuse3-dev \
     libssl-dev \
     libkrb5-dev \
-    libclamav-dev \
     libx11-dev \
     libxtst-dev \
     libdbus-1-dev \
@@ -21,6 +20,7 @@ RUN set -eux; \
     libseccomp-dev \
     live-build \
     dpkg-dev \
+    clamav-daemon \
     clamav-freshclam && \
     cargo install cargo-deb && \
     rustup component add clippy; \
