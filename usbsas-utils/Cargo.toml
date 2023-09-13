@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [build-dependencies]
-toml = "0.7"
+toml = "0.8"
 
 [dependencies]
 clap = "4.4"
