@@ -73,8 +73,8 @@ impl From<&Entry> for fuse_mt::FileAttr {
             kind: entry.ftype,
             perm,
             nlink: 2,
-            uid: users::get_current_uid(),
-            gid: users::get_current_gid(),
+            uid: nix::unistd::getuid().into(),
+            gid: nix::unistd::getgid().into(),
             rdev: 0,
             flags: 0,
         }
