@@ -13,6 +13,7 @@ fuse_mt = { version = "0.6", optional = true }
 indicatif = { version = "0.17", optional = true }
 libc = { version = "0.2", optional = true }
 log = "0.4"
+nix = { version = "0.27", optional = true, features = ["user"] }
 tempfile = { version = "3.8", optional = true }
 serde_json = { version = "1.0", optional = true}
 thiserror = "1.0"
@@ -23,12 +24,11 @@ usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils", optional = true }
-users = { version = "0.11", optional = true }
 
 [features]
 imager = ["indicatif", "tempfile", "usbsas-config", "usbsas-utils"]
 fswriter = ["bitvec"]
-fuse-mount = ["fuse_mt", "libc", "time", "users"]
+fuse-mount = ["fuse_mt", "libc", "time", "nix"]
 net = ["serde_json"]
 default = ["imager", "fswriter", "fuse-mount", "net"]
 
