@@ -1154,12 +1154,18 @@ impl ResponseStream {
         }
     }
 
-    fn add_serialized_message(&mut self, message: &mut Vec<u8>) -> Result<(), ServiceError> {
+    fn add_serialized_message(
+        &mut self,
+        message: &mut Vec<u8>,
+        done: bool,
+    ) -> Result<(), ServiceError> {
         let mut messages = self.messages.lock()?;
         messages.append(message);
         // Also append "\r\n" in case multiple json messages are added between 2 polls
         messages.append(&mut vec![13, 10]);
-        drop(messages);
+        if done {
+            self.done.store(true, Ordering::Relaxed);
+        }
         if let Some(waker) = self.waker.lock()?.take() {
             waker.wake();
         }
@@ -1167,7 +1173,7 @@ impl ResponseStream {
     }
 
     fn add_message<T: Serialize>(&mut self, message: T) -> Result<(), ServiceError> {
-        self.add_serialized_message(&mut serde_json::to_vec(&message)?)
+        self.add_serialized_message(&mut serde_json::to_vec(&message)?, false)
     }
 
     fn report_progress(&mut self, status: &str, progress: f32) -> Result<(), ServiceError> {
@@ -1175,14 +1181,17 @@ impl ResponseStream {
     }
 
     fn report_error(&mut self, msg: &str) -> Result<(), ServiceError> {
-        self.add_message(ReportError {
-            status: "fatal_error",
-            msg,
-        })?;
-        self.done()
+        self.add_serialized_message(
+            &mut serde_json::to_vec(&ReportError {
+                status: "fatal_error",
+                msg,
+            })?,
+            true,
+        )
     }
 
     pub fn done(&mut self) -> Result<(), ServiceError> {
+        let _messages = self.messages.lock().unwrap();
         self.done.store(true, Ordering::Relaxed);
         if let Some(waker) = self.waker.lock()?.take() {
             waker.wake();
@@ -1200,7 +1209,8 @@ impl Drop for ResponseStream {
 impl futures::Stream for ResponseStream {
     type Item = Result<web::Bytes, actix_web::Error>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.messages.lock().unwrap().len() == 0 {
+        let mut messages = self.messages.lock().unwrap();
+        if messages.len() == 0 {
             if self.done.load(Ordering::Relaxed) {
                 return Poll::Ready(None);
             } else {
@@ -1208,8 +1218,7 @@ impl futures::Stream for ResponseStream {
                 return Poll::Pending;
             }
         }
-        Poll::Ready(Some(Ok(web::Bytes::copy_from_slice(
-            self.messages.lock().unwrap().drain(0..).as_slice(),
-        ))))
+        let mess = messages.drain(0..);
+        Poll::Ready(Some(Ok(web::Bytes::copy_from_slice(mess.as_slice()))))
     }
 }
