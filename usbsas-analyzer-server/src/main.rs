@@ -392,8 +392,9 @@ impl Clamav {
 
     fn analyze(&mut self, path: &str) -> io::Result<Vec<String>> {
         let response = self.cmd(&format!("CONTSCAN {}", path))?;
+        log::debug!("{response:#?}");
         let mut dirty = Vec::new();
-        if response.ends_with("OK") {
+        if response.ends_with("OK\n") {
             return Ok(dirty);
         }
         for line in response.lines() {
