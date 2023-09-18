@@ -8,7 +8,7 @@ license = "GPL-3.0"
 log = "0.4"
 lru = "0.11"
 positioned-io2 = "0.3"
-rusb = { git = "https://github.com/losynix/rusb", branch = "disable_device_discovery", features = ["vendored"] }
+rusb = { version = "0.9", features = ["vendored"] }
 thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-proto = { path = "../usbsas-proto" }
