@@ -5,6 +5,6 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-byteorder = "1.4"
+byteorder = "1.5"
 prost = "0.12"
 usbsas-utils = { path = "../usbsas-utils" }
