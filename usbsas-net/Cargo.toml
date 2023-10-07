@@ -6,7 +6,7 @@ license = "GPL-3.0"
 
 [dependencies]
 base64 = { version = "0.21", optional = true }
-byteorder = "1.4"
+byteorder = "1.5"
 env_logger = "0.10"
 libgssapi = { version = "0.6", optional = true }
 log = "0.4"
