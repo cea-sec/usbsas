@@ -8,7 +8,7 @@ license = "GPL-3.0"
 cc = "1.0"
 
 [dependencies]
-landlock = "0.2"
+landlock = "0.3"
 libc = "0.2"
 log = "0.4"
 procfs = { version = "0.15", default-features = false }
