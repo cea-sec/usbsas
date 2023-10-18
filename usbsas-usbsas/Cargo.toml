@@ -18,7 +18,7 @@ usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
-uuid = { version = "1.4", features = ["v4"] }
+uuid = { version = "1.5", features = ["v4"] }
 
 [features]
 integration-tests = []
