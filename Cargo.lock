@@ -1437,7 +1437,7 @@ dependencies = [
 [[package]]
 name = "iso9660"
 version = "0.1.1"
-source = "git+https://github.com/losynix/iso9660-rs?branch=into_inner#895f3d46c62788f1ca2504c92ab0096b8979f1ac"
+source = "git+https://github.com/losynix/iso9660-rs?branch=into_inner#417eefa3ca9024bd62560ca6043a5d423bf59095"
 dependencies = [
  "bitflags 2.4.0",
  "nom",
