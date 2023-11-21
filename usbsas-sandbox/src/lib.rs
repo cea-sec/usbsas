@@ -52,7 +52,7 @@ extern "C" {
 }
 
 pub fn landlock(paths_ro: Option<&[&str]>, paths_rw: Option<&[&str]>) -> Result<()> {
-    let mut ruleset = Ruleset::new()
+    let mut ruleset = Ruleset::default()
         .handle_access(AccessFs::from_all(crate::LLABI))?
         .create()?
         .set_no_new_privs(true);
