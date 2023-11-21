@@ -92,8 +92,7 @@ impl<R> Comm<R> {
             .write_u64::<LittleEndian>(req.encoded_len() as u64)?;
 
         // Encode request
-        let mut buf = Vec::new();
-        buf.reserve(req.encoded_len());
+        let mut buf = Vec::with_capacity(req.encoded_len());
         req.encode(&mut buf)?;
 
         // Send request
