@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="static/fontawesome/css/all.css" />
     <link rel="stylesheet" href="static/bs/css/bootstrap.min.css" />
     <link rel="stylesheet" href="static/css/style.css" />
-    <script src="static/js/jquery.min.js"></script>
     <script src="static/bs/js/bootstrap.min.js"></script>
     <script src="static/js/script.js"></script>
     <script>var API = "http://localhost:8080";</script>
@@ -24,32 +23,29 @@
         <img class="navbar-brand" src="static/img/usbsas-logo-w.svg" height="75px" alt="" />
         <p class="navbar-brand" data-langkey="title">SASUSB</p>
         <div class="pull-right btn-toolbar" role="toolbar">
-          <div class="btn-group mr-2" role="group">
-            <button
-              id="tools-button"
-              type="button"
-              class="btn btn-lg btn-primary d-none"
-              onclick="set_state('TOOLS');"
-              data-langkey="tools"
-            >
-            <!-- Tools -->
-            </button>
-          </div>
-          <div class="btn-group mr-2" role="group">
-            <button
-              id="doc-button"
-              type="button"
-              class="btn btn-lg btn-primary d-none"
-              onclick="set_state('DOCUMENTATION');"
-              data-langkey="faq"
-            >
-            </button>
-          </div>
+          <button
+            id="tools-button"
+            type="button"
+            class="btn btn-lg btn-space btn-primary d-none"
+            onclick="set_state('TOOLS');"
+            data-langkey="tools"
+          >
+          <!-- Tools -->
+          </button>
+          <button
+            id="doc-button"
+            type="button"
+            class="btn btn-lg btn-space btn-primary d-none"
+            onclick="set_state('DOCUMENTATION');"
+            data-langkey="faq"
+          >
+          </button>
           <select id="langsel" class="form-select"
             onchange="switchLanguage(this.options[this.selectedIndex].value);">
             <option selected class="language" value="fr">&#127467&#127479</option>
             <option class="language" value="en">&#127468&#127463</option>
           </select>
+
         </div>
         <p class="navbar-brand" id="usbsas_infos" style="font-size: 20px"></p>
       </div>
@@ -57,7 +53,7 @@
 
     <div class="container my-auto" id="main" >
       <div class="jumbotron d-none" >
-	<div class="d-none text-center d-flex" style="height: 70vh">
+	<div class="text-center d-flex" style="height: 70vh">
           <div id="schema" class="mx-auto my-auto">
             <i id="s_file" class="far fa-file"></i>
             <i id="s_file_filtered">

@@ -1,5 +1,4 @@
 @charset "UTF-8";
-@import url("Lato.css");
 * {
   font-family: Lato;
 }
@@ -152,6 +151,14 @@ body[data-state="WAIT_DESTINATION"] #usb-arrow p strong {
   margin-top: 1rem;
   margin-bottom: 5%;
   margin-right: 5%;
+}
+
+.btn-toolbar {
+  flex-wrap: nowrap;
+}
+
+.btn-space {
+  margin-right: 5px;
 }
 
 .list-group-item-text, #key-serial {
