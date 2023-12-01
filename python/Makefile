@@ -1,8 +1,8 @@
 all: proto/usbsas/proto3_pb2.py proto/common/proto3_pb2.py
 
-proto/%/proto3_pb2.py: ../../usbsas-proto/proto/%.proto3
+proto/%/proto3_pb2.py: ../usbsas-proto/proto/%.proto3
 	mkdir -p proto
-	protoc  --proto_path=../../usbsas-proto/proto \
+	protoc  --proto_path=../usbsas-proto/proto \
 		--python_out=proto \
 		$<
 	# fix import

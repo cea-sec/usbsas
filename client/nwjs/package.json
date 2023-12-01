@@ -1,9 +1,0 @@
-{
-    "name": "usbsas",
-    "main": "web/index.html",
-    "node-main": "node-main.js",
-    "chromium-args" : "--disable-accelerated-video --disable-pinch --enable-logging=stderr",
-    "window": {
-        "name": "usbsas"
-    }
-}

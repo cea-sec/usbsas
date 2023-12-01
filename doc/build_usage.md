@@ -36,9 +36,6 @@ Already included in the project:
 `USBSAS_BIN_PATH`: location of the executables (e.g. `/usr/bin/`, default is the
 build target directory)
 
-`USBSAS_WEBFILES_DIR`: location of HTML files for the web server (default is
-`client/web`).
-
 `USBSAS_CONFIG`: path of the configuration file (default is
 `/etc/usbsas/config.toml`)
 

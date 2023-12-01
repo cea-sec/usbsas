@@ -23,12 +23,12 @@ from comm import CommUsbsas
 from proto.usbsas import proto3_pb2 as proto_usbsas
 
 usbsas_bin = "/usr/libexec/usbsas-usbsas"
-config_path = "../../config.example.toml"
+config_path = "../config.example.toml"
 date = datetime.datetime.now()
 pid_usbsas = -1
 
 if not os.path.exists(usbsas_bin):
-    usbsas_bin = "../../target/release/usbsas-usbsas"
+    usbsas_bin = "../target/release/usbsas-usbsas"
     if not os.path.exists(usbsas_bin):
         print("usbsas-usbsas binary not found")
         sys.exit(1)

@@ -28,7 +28,6 @@ $ cd usbsas
 
 ### Set environment variables
 ```shell
-$ export USBSAS_WEBFILES_DIR="/usr/share/usbsas/web"
 $ export USBSAS_BIN_PATH="/usr/libexec"
 ```
 

@@ -1,1 +1,0 @@
-window.nw.App.clearCache();

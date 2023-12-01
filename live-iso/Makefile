@@ -1,15 +1,15 @@
-ISO_VER=$(shell grep '^version' ../../Cargo.toml | cut -d'"' -f2)
+ISO_VER=$(shell grep '^version' ../Cargo.toml | cut -d'"' -f2)
 
 DST_PKG_DIR=config/includes.chroot
-SRC_PKG_DIR=../../target/debian
+SRC_PKG_DIR=../target/debian
 
 export USBSAS_ISO_VER=$(ISO_VER)
 
-CORE_VER := $(shell grep '^version = ' ../../usbsas-usbsas/Cargo.toml | cut -d'"' -f2)
-SRV_VER := $(shell grep '^version = ' ../../usbsas-server/Cargo.toml | cut -d'"' -f2)
-ASRV_VER := $(shell grep '^version = ' ../../usbsas-analyzer-server/Cargo.toml | cut -d'"' -f2)
-HID_VER := $(shell grep '^version = ' ../../usbsas-hid/hid-dealer/Cargo.toml | cut -d'"' -f2)
-KIOSK_VER := $(shell grep 'Version' ../kiosk/usbsas-kiosk/DEBIAN/control | cut -d' ' -f2)
+CORE_VER := $(shell grep '^version = ' ../usbsas-usbsas/Cargo.toml | cut -d'"' -f2)-1
+SRV_VER := $(shell grep '^version = ' ../usbsas-server/Cargo.toml | cut -d'"' -f2)-1
+ASRV_VER := $(shell grep '^version = ' ../usbsas-analyzer-server/Cargo.toml | cut -d'"' -f2)-1
+HID_VER := $(shell grep '^version = ' ../usbsas-hid/hid-dealer/Cargo.toml | cut -d'"' -f2)-1
+KIOSK_VER := $(shell grep '^version = ' ../usbsas-client/Cargo.toml | cut -d'"' -f2)-1
 
 SU=sudo
 

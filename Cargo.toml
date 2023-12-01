@@ -28,7 +28,7 @@ members = [
   "usbsas-server",
   "usbsas-hid/hid-user",
   "usbsas-hid/hid-dealer",
-  "client/usbsas-client",
+  "usbsas-client",
   "usbsas-tools"
 ]
 default-members = [
@@ -64,4 +64,4 @@ overflow-checks = true
 strip = true
 
 [workspace.metadata]
-version = "0.2.1"
+version = "0.2.2"
