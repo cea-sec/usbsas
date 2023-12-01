@@ -19,23 +19,15 @@
 //   - IMAGE_KEY
 var state = "INIT";
 var wipe_type = "quick";
-
-// i18n - from https://www.webcodegeeks.com/html5/html5-internationalization-example/
-var languages = Array.from(document.getElementsByClassName('language'));
-var lang_http = new XMLHttpRequest();
 var langDocument = {};
 
-lang_http.onreadystatechange = function(){
-    if (this.readyState === 4 && this.status === 200) {
-        langDocument = JSON.parse(this.responseText);
-        processLangDocument();
-    }
-};
-
-function switchLanguage(language){
-    lang_http.open("GET", "static/i18n/" + language + ".json", true);
-    lang_http.setRequestHeader("Content-type", "application/json");
-    lang_http.send();
+function switchLanguage(language) {
+  if (language == "en") {
+    langDocument = lang_en;
+  } else if (language == "fr") {
+    langDocument = lang_fr;
+  }
+  processLangDocument();
 }
 
 function processLangDocument(){

@@ -1,4 +1,4 @@
-{
+var lang_fr = {
     "advancedopts": "Options avancées",
     "analyzing": "Analyse antivirale des fichiers",
     "cancel": "Annuler",
@@ -87,4 +87,4 @@
     "pin-ok": "Valider",
     "pin-clear": "Effacer",
     "pin-missing": "PIN manquant"
-}
+};

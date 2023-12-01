@@ -1,4 +1,4 @@
-{
+var lang_en = {
     "advancedopts": "Advanced options",
     "analyzing": "Analyzing files",
     "cancel": "Cancel",
@@ -87,4 +87,4 @@
     "pin-ok": "OK",
     "pin-clear": "Clear",
     "pin-missing": "Missing PIN"
-}
+};
