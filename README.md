@@ -76,7 +76,6 @@ Dependencies included in this project:
 - `fontawesome` is CC BY 4.0 (icons), SIL OFL 1.1 (fonts) and MIT (code) (see
   client/web/static/fontawesome/LICENSE.txt)
 - `bootstrap` is MIT (see client/web/static/bs/LICENSE)
-- `Lato` font is SIL OFL 1.1 (see client/web/static/fonts/LICENSE.txt)
 
 usbsas is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software

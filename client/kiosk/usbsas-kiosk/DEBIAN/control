@@ -4,5 +4,5 @@ Maintainer: usbsas
 Architecture: amd64
 Section: utility
 Priority: optional
-Depends: usbsas-server, xserver-xorg-core, x11-xserver-utils, xinit, xdotool, unclutter, fonts-noto-color-emoji, libnss3, libatspi2.0-0, libgtk-3-0, libatomic1, libasound2, kbd
+Depends: usbsas-server, xserver-xorg-core, x11-xserver-utils, xinit, xdotool, unclutter, fonts-noto-color-emoji, fonts-lato, libnss3, libatspi2.0-0, libgtk-3-0, libatomic1, libasound2, kbd
 Description: usbsas kiosk client
