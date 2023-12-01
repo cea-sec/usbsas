@@ -44,16 +44,6 @@ body {
   background-color: #efefef !important;
 }
 
-#langsel {
-  background: #007bff;
-  border-radius: 5px;
-  border: 0px;
-}
-
-#langsel option {
-  background: white;
-}
-
 body[data-state="INIT"] #error {
   display: flex !important;
 }

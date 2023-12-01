@@ -1,12 +1,11 @@
 [package]
 name = "usbsas-server"
-version = "0.1.8"
+version = "0.2.0"
 edition = "2021"
 license = "GPL-3.0"
 description = "usbsas web server"
 
 [dependencies]
-actix-files = "0.6"
 actix-web = "4.4"
 base64 = "0.21"
 clap = "4.4"
@@ -49,20 +48,5 @@ priority = "optional"
 maintainer-scripts = "debian/"
 systemd-units = { enable = false }
 assets = [
-  ["target/release/usbsas-server", "usr/bin/", "755"],
-  ["../client/web/*", "usr/share/usbsas/web/", "644"],
-  ["../client/web/static/css/*", "usr/share/usbsas/web/static/css/", "644"],
-  ["../client/web/static/js/*", "usr/share/usbsas/web/static/js/", "644"],
-  ["../client/web/static/i18n/*", "usr/share/usbsas/web/static/i18n/", "644"],
-  ["../client/web/static/img/*", "usr/share/usbsas/web/static/img/", "644"],
-  ["../client/web/static/bs/css/*", "usr/share/usbsas/web/static/bs/css/", "644"],
-  ["../client/web/static/bs/js/*", "usr/share/usbsas/web/static/bs/js/", "644"],
-  ["../client/web/static/fontawesome/*", "usr/share/usbsas/web/static/fontawesome/", "644"],
-  ["../client/web/static/fontawesome/css/*", "usr/share/usbsas/web/static/fontawesome/css/", "644"],
-  ["../client/web/static/fontawesome/js/*", "usr/share/usbsas/web/static/fontawesome/js/", "644"],
-  ["../client/web/static/fontawesome/less/*", "usr/share/usbsas/web/static/fontawesome/less/", "644"],
-  ["../client/web/static/fontawesome/metadata/*", "usr/share/usbsas/web/static/fontawesome/metadata/*", "644"],
-  ["../client/web/static/fontawesome/scss/*", "usr/share/usbsas/web/static/fontawesome/scss/", "644"],
-  ["../client/web/static/fontawesome/sprites/*", "usr/share/usbsas/web/static/fontawesome/sprites/", "644"],
-  ["../client/web/static/fontawesome/webfonts/*", "usr/share/usbsas/web/static/fontawesome/webfonts/", "644"],
+  ["target/release/usbsas-server", "usr/bin/", "755"]
 ]

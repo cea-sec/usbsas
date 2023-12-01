@@ -1,6 +1,6 @@
 {
     "name": "usbsas",
-    "main": "http://localhost:8080",
+    "main": "web/index.html",
     "node-main": "node-main.js",
     "chromium-args" : "--disable-accelerated-video --disable-pinch",
     "window": {

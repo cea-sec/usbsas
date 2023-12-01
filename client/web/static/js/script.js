@@ -1,6 +1,6 @@
 "use strict";
 
-// État interne
+// Internal states
 //   - INIT
 //   - WAIT_SOURCE
 //   - WAIT_DESTINATION
@@ -361,7 +361,7 @@ function toggle_select(target) {
 
 function parse_json_and_call(url, callback) {
   var request = new XMLHttpRequest();
-  request.open("GET", "/" + url, true);
+  request.open("GET", API + "/" + url, true);
   request.onload = function () {
     if (this.status >= 200 && this.status < 400) {
       var data = JSON.parse(this.response);
@@ -375,7 +375,7 @@ function parse_json_and_call(url, callback) {
 
 function update() {
   var request = new XMLHttpRequest();
-  request.open("GET", "/devices/dirty/read_dir/?path=" + cur_path.path, true);
+  request.open("GET", API + "/devices/dirty/read_dir/?path=" + cur_path.path, true);
   request.onload = function () {
     if (this.status >= 200 && this.status < 400) {
       var data = JSON.parse(this.response);
@@ -908,7 +908,7 @@ function do_copy() {
     post_body.download_pin = pin_input;
   }
 
-  fetch("/copy", {
+  fetch(API + "/copy", {
     method: "POST",
     body: JSON.stringify(post_body),
     headers: {
@@ -928,7 +928,7 @@ function do_copy() {
 function select_partition(partition) {
   document.querySelector("#partition-choice").style.display = "none";
   var request = new XMLHttpRequest();
-  request.open("GET", "/devices/dirty/open/" + partition.index, true);
+  request.open("GET", API + "/devices/dirty/open/" + partition.index, true);
   request.onload = function () {
     if (this.status >= 200 && this.status < 400) {
       set_state("SELECT_FILES");
@@ -981,7 +981,7 @@ function end_get_pin() {
 function partition_choice() {
   var part_table = document.querySelector("#partition-view");
   var request = new XMLHttpRequest();
-  request.open("GET", "/devices/dirty", true);
+  request.open("GET", API + "/devices/dirty", true);
   request.onload = function () {
     if (this.status >= 200 && this.status < 400) {
       var data = JSON.parse(this.response);
@@ -1140,7 +1140,7 @@ function check_render_device_choice() {
     clearInterval(refresh_device);
     var request = new XMLHttpRequest();
     request.open(
-      "GET", "/devices/select/" + devices.device_in.id + "/" + devices.device_out.id,
+      "GET", API + "/devices/select/" + devices.device_in.id + "/" + devices.device_out.id,
       true
     );
     let destination_descr = "";
@@ -1207,7 +1207,7 @@ function check_device_removal() {
 
 function device_choice() {
   var request = new XMLHttpRequest();
-  request.open("GET", "/devices", true);
+  request.open("GET", API + "/devices", true);
   request.onload = function () {
     clear_error();
     if (state == "INIT") {
@@ -1239,7 +1239,7 @@ function device_choice() {
 
 function check_id() {
   var request = new XMLHttpRequest();
-  request.open("GET", "/id", true);
+  request.open("GET", API + "/id", true);
   request.onload = function () {
     clear_error();
     if (this.status >= 400) {
@@ -1257,7 +1257,7 @@ function check_id() {
 
 function get_id() {
   var request = new XMLHttpRequest();
-  request.open("GET", "/id", true);
+  request.open("GET", API + "/id", true);
   request.onload = function () {
     if (this.status >= 200 && this.status < 400) {
       var data = JSON.parse(this.response);
@@ -1453,7 +1453,7 @@ function do_wipe_key() {
   var fschoice = document.querySelector("#fsfmt");
   var fsfmt = fschoice.options[fschoice.selectedIndex].value;
 
-  fetch("/wipe" + "/" + devices.device_in.id + "/" + fsfmt + "/" + quick, {
+  fetch(API + "/wipe" + "/" + devices.device_in.id + "/" + fsfmt + "/" + quick, {
     method: "GET",
     headers: {
       Accept: "application/json",
@@ -1546,7 +1546,7 @@ function do_image_disk() {
     }
   };
 
-  fetch("/imagedisk" + "/" + devices.device_in.id, {
+  fetch(API + "/imagedisk" + "/" + devices.device_in.id, {
     method: "GET",
     headers: {
       Accept: "application/json",
@@ -1572,7 +1572,7 @@ function reset_usbsas() {
   get_usbsas_infos();
   clearInterval(reset_timer);
   var request = new XMLHttpRequest();
-  request.open("GET", "/reset", true);
+  request.open("GET", API + "/reset", true);
   request.onload = function (data) {
     if (this.status >= 200 && this.status < 400) {
       device_choice();

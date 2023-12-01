@@ -3156,9 +3156,8 @@ dependencies = [
 
 [[package]]
 name = "usbsas-server"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
- "actix-files",
  "actix-web",
  "assert_cmd",
  "base64",

@@ -1,5 +1,5 @@
 VER := $(shell grep 'Version' usbsas-kiosk/DEBIAN/control | cut -d' ' -f2)
-NWJS_VER=0.79.1
+NWJS_VER=0.80.0
 
 PKG=../../target/debian/usbsas-kiosk_$(VER)_amd64.deb
 
@@ -16,18 +16,22 @@ usbsas-kiosk/opt/nwjs/nw: nwjs-v$(NWJS_VER)-linux-x64.tar.gz
 	find usbsas-kiosk/opt/nwjs -type d | xargs chmod og+rx
 	touch usbsas-kiosk/opt/nwjs/nw
 
-
 usbsas-kiosk/usr/share/usbsas/nwjs:
-	mkdir -p usbsas-kiosk/usr/share/usbsas
-	cp -r ../nwjs usbsas-kiosk/usr/share/usbsas/
-	mv -f usbsas-kiosk/usr/share/usbsas/nwjs/package.kiosk.json usbsas-kiosk/usr/share/usbsas/nwjs/package.json
+	mkdir -p usbsas-kiosk/usr/share/usbsas/nwjs
+	cp ../nwjs/node-main.js usbsas-kiosk/usr/share/usbsas/nwjs
+	cp -P ../nwjs/web usbsas-kiosk/usr/share/usbsas/nwjs
+	cp ../nwjs/package.kiosk.json usbsas-kiosk/usr/share/usbsas/nwjs/package.json
 
-$(PKG): usbsas-kiosk/usr/share/usbsas/nwjs usbsas-kiosk/opt/nwjs/nw
+usbsas-kiosk/usr/share/usbsas/web:
+	mkdir -p usbsas-kiosk/usr/share/usbsas/web
+	cp -r ../web usbsas-kiosk/usr/share/usbsas
+
+$(PKG): usbsas-kiosk/usr/share/usbsas/web usbsas-kiosk/usr/share/usbsas/nwjs usbsas-kiosk/opt/nwjs/nw
 	mkdir -p ../../target/debian
 	dpkg-deb --root-owner-group --build usbsas-kiosk ../../target/debian
 
 clean:
-	rm -rf usbsas-kiosk/usr/share/usbsas/nwjs
+	rm -rf usbsas-kiosk/usr/share/
 	rm -rf usbsas-kiosk/opt/nwjs/*
 
 distclean: clean
