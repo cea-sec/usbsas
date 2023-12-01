@@ -28,6 +28,7 @@ integration-tests = []
 name = "usbsas-core"
 maintainer = "usbsas"
 copyright = "usbsas"
+revision = "1"
 depends = "$auto"
 section = "utility"
 priority = "optional"

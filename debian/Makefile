@@ -6,11 +6,11 @@ export USBSAS_ISO_VER=$(ISO_VER)
 export USBSAS_BIN_PATH=/usr/libexec
 export USBSAS_WEBFILES_DIR=/usr/share/usbsas/web
 
-CORE_VER := $(shell grep '^version = ' ../usbsas-usbsas/Cargo.toml | cut -d'"' -f2)
-SRV_VER := $(shell grep '^version = ' ../usbsas-server/Cargo.toml | cut -d'"' -f2)
-ASRV_VER := $(shell grep '^version = ' ../usbsas-analyzer-server/Cargo.toml | cut -d'"' -f2)
-HID_VER := $(shell grep '^version = ' ../usbsas-hid/hid-dealer/Cargo.toml | cut -d'"' -f2)
-KIOSK_VER := $(shell grep 'Version' ../client/kiosk/usbsas-kiosk/DEBIAN/control | cut -d' ' -f2)
+CORE_VER := $(shell grep '^version = ' ../usbsas-usbsas/Cargo.toml | cut -d'"' -f2)-1
+SRV_VER := $(shell grep '^version = ' ../usbsas-server/Cargo.toml | cut -d'"' -f2)-1
+ASRV_VER := $(shell grep '^version = ' ../usbsas-analyzer-server/Cargo.toml | cut -d'"' -f2)-1
+HID_VER := $(shell grep '^version = ' ../usbsas-hid/hid-dealer/Cargo.toml | cut -d'"' -f2)-1
+KIOSK_VER := $(shell grep 'Version' ../client/kiosk/usbsas-kiosk/DEBIAN/control | cut -d' ' -f2)-1
 
 all: ../client/live-iso/usbsas-$(ISO_VER)-amd64.hybrid.iso
 

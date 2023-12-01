@@ -42,6 +42,7 @@ integration-tests = []
 [package.metadata.deb]
 maintainer = "usbsas"
 copyright = "usbsas"
+revision = "1"
 depends = "$auto, usbsas-core"
 section = "utility"
 priority = "optional"

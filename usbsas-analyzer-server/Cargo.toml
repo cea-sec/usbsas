@@ -25,6 +25,7 @@ integration-tests = []
 [package.metadata.deb]
 maintainer = "usbsas"
 copyright = "usbsas"
+revision = "1"
 depends = "$auto, clamav-daemon, clamav-freshclam"
 section = "utility"
 priority = "optional"
