@@ -6,6 +6,7 @@ license = "GPL-3.0"
 description = "usbsas web server"
 
 [dependencies]
+actix-cors = "0.6"
 actix-web = "4.4"
 base64 = "0.21"
 clap = "4.4"

@@ -3,7 +3,7 @@ use crate::appstate::{
 };
 use crate::error::ServiceError;
 use crate::srv_infos::get_server_infos;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, http::header, post, web, App, HttpResponse, HttpServer, Responder};
 use log::{debug, error, info};
 use std::{
     collections::HashMap,
@@ -11,7 +11,6 @@ use std::{
     thread,
 };
 use usbsas_config::{conf_parse, conf_read};
-
 
 #[get("/id")]
 async fn id(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
@@ -188,6 +187,12 @@ pub async fn start_server(
                     .exclude("/favicon.ico")
                     .exclude_regex("/static/*")
                     .log_target("http"),
+            )
+            .wrap(
+                actix_cors::Cors::default()
+                    .allow_any_origin()
+                    .allowed_methods(vec!["GET", "POST"])
+                    .allowed_headers(vec![header::ACCEPT, header::CONTENT_TYPE]),
             )
             .service(id)
             .service(status)
