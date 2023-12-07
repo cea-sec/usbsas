@@ -1944,7 +1944,7 @@ fn init_report() -> Result<serde_json::Value> {
     );
 
     let report = json!({
-        "title": format!("usbsas_tranfer_{}", time),
+        "title": format!("usbsas_transfer_{}", time),
         "timestamp": time.unix_timestamp(),
         "datetime": format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
             time.year(), time.month() as u8, time.day(),
