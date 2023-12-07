@@ -29,6 +29,7 @@ members = [
   "usbsas-hid/hid-user",
   "usbsas-hid/hid-dealer",
   "usbsas-client",
+  "usbsas-server",
   "usbsas-tools"
 ]
 default-members = [
@@ -54,8 +55,7 @@ default-members = [
   "usbsas-tar2files",
   "usbsas-net",
   "usbsas-usbdev",
-  "usbsas-usbsas",
-  "usbsas-server"
+  "usbsas-usbsas"
 ]
 resolver = "2"
 

@@ -52,8 +52,7 @@ Applications built on top of usbsas:
   a secure USB to USB file transfer kiosk.
 - **[Fuse](https://en.wikipedia.org/wiki/Filesystem_in_Userspace)
   implementation**: mount USB devices (read-only) with usbsas.
-- **Python**: usbsas can also be used with Python, a script that copies
-  everything from a device to another is given as example.
+- **Python**: usbsas can also be used with Python
 
 ## Documentation
 

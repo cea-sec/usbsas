@@ -26,7 +26,7 @@ $ sudo apt install live-build
 $ make
 ```
 
-The resulting image will be `usbsas-0.1.1-amd64.hybrid.iso`.
+The resulting image will be `usbsas-X.Y.Z-amd64.hybrid.iso`.
 
 # How to use
 
