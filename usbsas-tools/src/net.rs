@@ -26,10 +26,10 @@ enum Error {
     Upload(String),
     #[error("analyze error: {0}")]
     Analyze(String),
-    #[error("Error: {0}")]
-    Error(String),
     #[error("download error: {0}")]
     Download(String),
+    #[error("configuration or argument error: {0}")]
+    ArgConf(String),
 }
 type Result<T> = std::result::Result<T, Error>;
 
@@ -66,7 +66,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
 
     let networks = &config
         .networks
-        .ok_or_else(|| Error::Error("No networks in conf".into()))?;
+        .ok_or_else(|| Error::ArgConf("No networks".into()))?;
 
     let network = if networks.len() == 1 {
         &networks[0]
@@ -288,12 +288,12 @@ fn main() -> Result<()> {
             "analyze" => analyze(config_path, path, id)?,
             "download" => download(config_path, path, id)?,
             _ => {
-                return Err(Error::Error(
+                return Err(Error::ArgConf(
                     "Bad action specified, either: upload, analyze or download".to_owned(),
                 ))
             }
         },
-        _ => return Err(Error::Error("args parse failed".to_owned())),
+        _ => return Err(Error::ArgConf("args parse failed".to_owned())),
     }
 
     Ok(())
