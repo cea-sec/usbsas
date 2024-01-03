@@ -21,13 +21,17 @@ enum Error {
     #[error("int error: {0}")]
     Tryfromint(#[from] std::num::TryFromIntError),
     #[error("{0}")]
-    Error(String),
+    Arg(String),
+    #[error("{0}")]
+    OpenDevice(String),
     #[error("persist error: {0}")]
     Persist(#[from] tempfile::PersistError),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
+    #[error("progress error: {0}")]
+    Progress(#[from] indicatif::style::TemplateError),
 }
 type Result<T> = std::result::Result<T, Error>;
 
@@ -101,7 +105,7 @@ impl Imager {
             if let Some(proto::scsi::response::Msg::OpenDevice(rep)) = rep.msg {
                 (rep.dev_size, rep.block_size)
             } else {
-                return Err(Error::Error("Couldn't open device".to_string()));
+                return Err(Error::OpenDevice("Couldn't open device".to_string()));
             };
 
         let mut todo = dev_size;
@@ -112,8 +116,8 @@ impl Imager {
         let pb = indicatif::ProgressBar::new(dev_size);
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
-                .template("[{wide_bar}] {bytes}/{total_bytes} ({eta})")
-                .map_err(|err| Error::Error(format!("progress bar err: {err}")))?
+                .template("[{wide_bar}] {bytes}/{total_bytes} ({eta})")?
+                // .map_err(|err| Error::Progress(format!("progress bar err: {err}")))?
                 .progress_chars("#>-"),
         );
 
@@ -250,7 +254,7 @@ fn main() -> Result<()> {
     ) {
         (Some(busnum), Some(devnum)) => (busnum.to_owned(), devnum.to_owned()),
         _ => {
-            return Err(Error::Error(
+            return Err(Error::Arg(
                 "Must specify both busnum and devnum".to_string(),
             ));
         }

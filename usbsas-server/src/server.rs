@@ -3,7 +3,7 @@ use crate::appstate::{
 };
 use crate::error::ServiceError;
 use crate::srv_infos::get_server_infos;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, http::header, post, web, App, HttpResponse, HttpServer, Responder};
 use log::{debug, error, info};
 use std::{
     collections::HashMap,
@@ -11,11 +11,6 @@ use std::{
     thread,
 };
 use usbsas_config::{conf_parse, conf_read};
-
-const USBSAS_WEBFILES_DIR: &str = match option_env!("USBSAS_WEBFILES_DIR") {
-    Some(val) => val,
-    None => "client/web",
-};
 
 #[get("/id")]
 async fn id(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
@@ -164,14 +159,6 @@ async fn reset(data: web::Data<AppState>) -> Result<impl Responder, ServiceError
     Ok(HttpResponse::Ok())
 }
 
-#[get("/")]
-async fn index() -> Result<impl Responder, ServiceError> {
-    Ok(actix_files::NamedFile::open(format!(
-        "{}/index.html",
-        USBSAS_WEBFILES_DIR
-    ))?)
-}
-
 #[actix_web::main]
 pub async fn start_server(
     config_path: String,
@@ -201,6 +188,12 @@ pub async fn start_server(
                     .exclude_regex("/static/*")
                     .log_target("http"),
             )
+            .wrap(
+                actix_cors::Cors::default()
+                    .allow_any_origin()
+                    .allowed_methods(vec!["GET", "POST"])
+                    .allowed_headers(vec![header::ACCEPT, header::CONTENT_TYPE]),
+            )
             .service(id)
             .service(status)
             .service(server_infos)
@@ -213,11 +206,6 @@ pub async fn start_server(
             .service(wipe)
             .service(imagedisk)
             .service(reset)
-            .service(actix_files::Files::new(
-                "/static/",
-                format!("{}/static/", USBSAS_WEBFILES_DIR),
-            ))
-            .service(index)
     })
     .bind(format!("{bind_addr}:{bind_port}"))?
     .run()

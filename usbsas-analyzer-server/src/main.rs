@@ -330,7 +330,7 @@ impl Clamav {
 
         // Try opening the socket, this may take some times as the socket will
         // only be created by clamd when the database is loaded.
-        let mut timeout_retry = 30;
+        let mut timeout_retry = 60;
         let mut clamav_socket = loop {
             log::trace!("attempt to connect to clamd socket");
             match UnixStream::connect(&clamav_socket_path) {

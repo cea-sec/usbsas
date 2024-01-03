@@ -52,8 +52,7 @@ Applications built on top of usbsas:
   a secure USB to USB file transfer kiosk.
 - **[Fuse](https://en.wikipedia.org/wiki/Filesystem_in_Userspace)
   implementation**: mount USB devices (read-only) with usbsas.
-- **Python**: usbsas can also be used with Python, a script that copies
-  everything from a device to another is given as example.
+- **Python**: usbsas can also be used with Python
 
 ## Documentation
 
@@ -76,7 +75,6 @@ Dependencies included in this project:
 - `fontawesome` is CC BY 4.0 (icons), SIL OFL 1.1 (fonts) and MIT (code) (see
   client/web/static/fontawesome/LICENSE.txt)
 - `bootstrap` is MIT (see client/web/static/bs/LICENSE)
-- `Lato` font is SIL OFL 1.1 (see client/web/static/fonts/LICENSE.txt)
 
 usbsas is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software

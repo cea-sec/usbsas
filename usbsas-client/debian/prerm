@@ -1,0 +1,15 @@
+#! /bin/sh
+set -e
+
+if [ "remove" = "$1" ]; then
+    echo "stopping usbsas-client service"
+    if systemctl -q is-active usbsas-client; then
+        systemctl stop usbsas-client
+    fi
+    if systemctl -q is-enabled usbsas-client; then
+        systemctl disable usbsas-client
+    fi
+    pkill -u usbsas-client 2>/dev/null || true
+fi
+
+#DEBHELPER#

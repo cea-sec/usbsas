@@ -1,0 +1,41 @@
+[package]
+name = "usbsas-client"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+clap = "4.4"
+tao = "0.24"
+usbsas-sandbox = { path = "../usbsas-sandbox" }
+wry = { version = "0.35", default-features = false, features = ["os-webview", "fullscreen"] }
+
+# cargo-deb
+[package.metadata.deb]
+name = "usbsas-kiosk"
+maintainer = "usbsas"
+copyright = "usbsas"
+revision = "1"
+depends = "$auto, usbsas-server, xserver-xorg-core, x11-xserver-utils, xinit, xdotool, unclutter, fonts-noto-color-emoji, fonts-lato"
+section = "utility"
+priority = "optional"
+maintainer-scripts = "debian/"
+systemd-units = { enable = false }
+assets = [
+  ["target/release/usbsas-client", "usr/bin/", "755"],
+  ["assets/usbsas-client-xinit", "usr/bin/", "755"],
+  ["web/*", "usr/share/usbsas/web/", "644"],
+  ["web/static/css/*", "usr/share/usbsas/web/static/css/", "644"],
+  ["web/static/js/*", "usr/share/usbsas/web/static/js/", "644"],
+  ["web/static/i18n/*", "usr/share/usbsas/web/static/i18n/", "644"],
+  ["web/static/img/*", "usr/share/usbsas/web/static/img/", "644"],
+  ["web/static/bs/css/*", "usr/share/usbsas/web/static/bs/css/", "644"],
+  ["web/static/bs/js/*", "usr/share/usbsas/web/static/bs/js/", "644"],
+  ["web/static/fontawesome/*", "usr/share/usbsas/web/static/fontawesome/", "644"],
+  ["web/static/fontawesome/css/*", "usr/share/usbsas/web/static/fontawesome/css/", "644"],
+  ["web/static/fontawesome/js/*", "usr/share/usbsas/web/static/fontawesome/js/", "644"],
+  ["web/static/fontawesome/less/*", "usr/share/usbsas/web/static/fontawesome/less/", "644"],
+  ["web/static/fontawesome/metadata/*", "usr/share/usbsas/web/static/fontawesome/metadata/*", "644"],
+  ["web/static/fontawesome/scss/*", "usr/share/usbsas/web/static/fontawesome/scss/", "644"],
+  ["web/static/fontawesome/sprites/*", "usr/share/usbsas/web/static/fontawesome/sprites/", "644"],
+  ["web/static/fontawesome/webfonts/*", "usr/share/usbsas/web/static/fontawesome/webfonts/", "644"],
+]

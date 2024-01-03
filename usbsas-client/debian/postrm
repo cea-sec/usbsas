@@ -1,0 +1,12 @@
+#! /bin/sh
+set -e
+
+if [ "remove" = "$1" ]; then
+    echo "deleting usbsas-client user"
+    userdel -r -f usbsas-client
+
+    systemctl unmask getty@tty2.service
+    systemctl unmask autovt@tty2.service
+fi
+
+#DEBHELPER#

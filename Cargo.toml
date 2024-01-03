@@ -28,6 +28,8 @@ members = [
   "usbsas-server",
   "usbsas-hid/hid-user",
   "usbsas-hid/hid-dealer",
+  "usbsas-client",
+  "usbsas-server",
   "usbsas-tools"
 ]
 default-members = [
@@ -53,8 +55,7 @@ default-members = [
   "usbsas-tar2files",
   "usbsas-net",
   "usbsas-usbdev",
-  "usbsas-usbsas",
-  "usbsas-server"
+  "usbsas-usbsas"
 ]
 resolver = "2"
 
@@ -63,4 +64,4 @@ overflow-checks = true
 strip = true
 
 [workspace.metadata]
-version = "0.2.1"
+version = "0.2.2"

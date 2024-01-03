@@ -18,13 +18,17 @@ enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
-    Error(String),
+    Arg(String),
+    #[error("{0}")]
+    Write(String),
     #[error("sandbox: {0}")]
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
     #[error("Bad Request")]
     BadRequest,
+    #[error("progress error: {0}")]
+    Progress(#[from] indicatif::style::TemplateError),
 }
 type Result<T> = std::result::Result<T, Error>;
 
@@ -75,7 +79,7 @@ impl FsWriter {
         let fs_size = self.fs.seek(SeekFrom::End(0))?;
         self.fs.rewind()?;
         if fs_size % SECTOR_SIZE != 0 {
-            return Err(Error::Error(format!(
+            return Err(Error::Write(format!(
                 "fs size ({fs_size}) % sector size ({SECTOR_SIZE}) != 0"
             )));
         }
@@ -85,7 +89,7 @@ impl FsWriter {
             .size(proto::fs2dev::RequestDevSize {})?
             .size;
         if fs_size > dev_size {
-            return Err(Error::Error(format!(
+            return Err(Error::Write(format!(
                 "filesystem size ({fs_size}) > device size ({dev_size}), aborting"
             )));
         }
@@ -113,8 +117,7 @@ impl FsWriter {
         let pb = indicatif::ProgressBar::new(fs_size);
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
-                .template("[{wide_bar}] {bytes}/{total_bytes} ({eta})")
-                .map_err(|err| Error::Error(format!("progress bar err: {err}")))?
+                .template("[{wide_bar}] {bytes}/{total_bytes} ({eta})")?
                 .progress_chars("#>-"),
         );
 
@@ -128,8 +131,8 @@ impl FsWriter {
                     pb.set_position(fs_size);
                     break;
                 }
-                Msg::Error(msg) => return Err(Error::Error(msg.err)),
-                _ => return Err(Error::Error("an error occured".to_string())),
+                Msg::Error(msg) => return Err(Error::Write(msg.err)),
+                _ => return Err(Error::Write("bad resp from fs2dev".to_string())),
             }
         }
 
@@ -196,7 +199,7 @@ fn main() -> Result<()> {
         matches.get_one::<u32>("devnum"),
     ) {
         (Some(fs), Some(bn), Some(dn)) => (fs, bn, dn),
-        _ => return Err(Error::Error("missing arg".to_string())),
+        _ => return Err(Error::Arg("missing arg".to_string())),
     };
 
     let mut fswriter = FsWriter::new(fs_path.to_owned(), busnum.to_owned(), devnum.to_owned())?;

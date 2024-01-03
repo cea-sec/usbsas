@@ -28,8 +28,6 @@ use usbsas_utils::{self, clap::UsbsasClap, READ_FILE_MAX_SIZE, TAR_DATA_DIR};
 enum Error {
     #[error("io error: {0}")]
     IO(#[from] std::io::Error),
-    #[error("{0}")]
-    Error(String),
     #[error("analyze error: {0}")]
     Analyze(String),
     #[error("download error: {0}")]
@@ -44,8 +42,16 @@ enum Error {
     Process(#[from] usbsas_process::Error),
     #[error("Not enough space on destination device")]
     NotEnoughSpace,
+    #[error("Error filtering files (bad count)")]
+    Filter,
+    #[error("File too large")]
+    FileTooLarge,
+    #[error("{0}")]
+    Wipe(String),
+    #[error("{0}")]
+    WriteFs(String),
     #[error("serde_json: {0}")]
-    JsonError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
     #[error("Bad Request")]
     BadRequest,
     #[error("State error")]
@@ -820,7 +826,7 @@ impl CopyFilesState {
                 path: files.to_vec(),
             })?;
         if rep.results.len() != files_count {
-            return Err(Error::Error("filter error".to_string()));
+            return Err(Error::Filter);
         }
         for (i, f) in files.iter().enumerate().take(files_count) {
             if rep.results[i] == proto::filter::FilterResult::PathOk as i32 {
@@ -876,7 +882,7 @@ impl CopyFilesState {
                     "File '{}' is larger ({}B) than max size ({}B)",
                     &path, attrs.size, max_size
                 );
-                return Err(Error::Error("file too large".into()));
+                return Err(Error::FileTooLarge);
             }
         }
 
@@ -1211,7 +1217,7 @@ impl AnalyzeState {
                 Msg::Analyze(res) => {
                     let report_json: serde_json::Value = serde_json::from_str(&res.report)?;
                     log::trace!("analyzer report: {:?}", report_json);
-                    let files_status = report_json["files"].as_object().ok_or(Error::Error(
+                    let files_status = report_json["files"].as_object().ok_or(Error::Analyze(
                         "Couldn't get files from analyzer report".into(),
                     ))?;
 
@@ -1526,19 +1532,14 @@ impl WriteFsState {
             } else {
                 READ_FILE_MAX_SIZE
             };
-            let rep = match children
+            let rep = children
                 .tar2files
                 .comm
                 .readfile(proto::files::RequestReadFile {
                     path: path.to_string(),
                     offset,
                     size: size_todo,
-                }) {
-                Ok(rep) => rep,
-                Err(err) => {
-                    return Err(Error::Error(format!("{err}")));
-                }
-            };
+                })?;
             children
                 .files2fs
                 .comm
@@ -1615,8 +1616,8 @@ impl WriteFsState {
                     comm.finalcopystatusdone(proto::usbsas::ResponseFinalCopyStatusDone {})?;
                     break;
                 }
-                Msg::Error(msg) => return Err(Error::Error(msg.err)),
-                _ => return Err(Error::Error("error writing fs".into())),
+                Msg::Error(msg) => return Err(Error::WriteFs(msg.err)),
+                _ => return Err(Error::WriteFs("error writing fs".into())),
             }
         }
         Ok(())
@@ -1739,8 +1740,12 @@ impl WipeState {
                         })?
                     }
                     Msg::CopyStatusDone(_) => break,
+                    Msg::Error(err) => {
+                        log::error!("{}", err.err);
+                        return Err(Error::Wipe(err.err));
+                    }
                     _ => {
-                        return Err(Error::Error("fs2dev err while wiping".into()));
+                        return Err(Error::Wipe("fs2dev err while wiping".into()));
                     }
                 }
             }
@@ -1944,7 +1949,7 @@ fn init_report() -> Result<serde_json::Value> {
     );
 
     let report = json!({
-        "title": format!("usbsas_tranfer_{}", time),
+        "title": format!("usbsas_transfer_{}", time),
         "timestamp": time.unix_timestamp(),
         "datetime": format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
             time.year(), time.month() as u8, time.day(),
@@ -2013,7 +2018,7 @@ impl Children {
         Ok(())
     }
 
-    // If destination is USB, check that device will have enough space to stores
+    // If destination is USB, check that device will have enough space to store
     // src files.
     // Returns max size of a single file (4GB if dest is FAT, None otherwise)
     fn check_dst_size(
@@ -2043,10 +2048,8 @@ impl Children {
                     error!("Aborting, dest dev too small");
                     return Err(Error::NotEnoughSpace);
                 }
-                match OutFsType::try_from(usb.fstype)
-                    .map_err(|err| Error::Error(format!("{err}")))?
-                {
-                    OutFsType::Fat => Ok(Some(0xFFFF_FFFF)),
+                match OutFsType::try_from(usb.fstype) {
+                    Ok(OutFsType::Fat) => Ok(Some(0xFFFF_FFFF)),
                     _ => Ok(None),
                 }
             }

@@ -15,10 +15,10 @@ Debian specific instructions.
 Most dependencies are managed by `cargo` but before building usbsas, the
 following packages must also be installed (the names may change depending on the
 Linux distribution): `rust`, `cargo`, `pkgconf`, `clang`, `cmake`, `protobuf`,
-`libseccomp`, `libusb`, `libudev`, `libkrb5 `.
+`libseccomp`, `libusb`, `libudev`, `libkrb5 `, `libwebkit2gtk`.
 
 Optional dependencies to build the analyzer-server, the tools and the HID
-manager: `libclamav`, `libdbus`, `libxtst`, `libx11`, `libfuse`
+manager: `libclamav`, `libdbus`, `libxtst`, `libx11`, `libfuse3`
 
 A recent version of `rustc` and `cargo` (edition 2021) is needed: instead of a
 packaged version, a [rustup](https://rustup.rs/) installation may be necessary.
@@ -36,26 +36,27 @@ Already included in the project:
 `USBSAS_BIN_PATH`: location of the executables (e.g. `/usr/bin/`, default is the
 build target directory)
 
-`USBSAS_WEBFILES_DIR`: location of HTML files for the web server (default is
-`client/web`).
-
 `USBSAS_CONFIG`: path of the configuration file (default is
 `/etc/usbsas/config.toml`)
 
 ### Build
+Usbsas core:
 ```shell
 $ cargo build --release
 ```
-Only `usbsas` is built by default, to build the analyzer-server:
 
+Client / server / analyzer server:
 ```shell
+$ cargo build --release -p usbsas-client
+$ cargo build --release -p usbsas-server
 $ cargo build --release -p usbsas-analyzer-server
 ```
-To build the tools (like `usbsas-fuse-mount`):
 
+To build the tools (like `usbsas-fuse-mount`):
 ```shell
 $ cargo build --release -p usbsas-tools
 ```
+
 To build the userland HID manager:
 ```shell
 $ cargo build --release --manifest-path=usbsas-hid/hid-user/Cargo.toml
@@ -63,7 +64,7 @@ $ cargo build --release --manifest-path=usbsas-hid/hid-dealer/Cargo.toml
 ```
 
 ## Tests
-#### Integration test
+### Integration tests
 
 Integration tests are written for the `usbsas-server` crate, they test the WEB
 API, USB to USB transfer, USB to NET transfer, device wipe etc.
@@ -75,6 +76,9 @@ Run the integration tests:
 $ cargo build --all --features mock,integration-tests
 $ cargo test -p usbsas-server --features integration-tests
 ```
+
+### Configuration
+See the described `config.example.toml`.
 
 ## Usage
 
@@ -118,12 +122,10 @@ This rule will give ownership of the device to user `usbsas` if the device has
 an interface with the class mass storage (0x80), SCSI command set (0x06) and
 Bulk transport mode (0x50).
 
-### Configuration
-See the described `config.example.toml`.
 
 ### Web client / server
 
-After building, start usbsas-server, usbsas-analyzer-server and a web client:
+After building, start usbsas-server, usbsas-analyzer-server and the web client:
 
 ```shell
 $ ./target/release/usbsas-server
@@ -133,12 +135,7 @@ $ ./target/release/usbsas-analyzer-server
 ```
 
 ```shell
-$ $BROWSER http://localhost:8080
-```
-or with nwjs:
-
-```shell
-$ nw client/nwjs
+$ ./target/release/usbsas-client usbsas-client/web
 ```
 
 The antivirus analysis with the analyzer server is optional. To disable it,
@@ -146,9 +143,7 @@ comment or remove the `[analyzer]` section of the `config.toml` file. The
 provided analyzer-server based on clamAV is mainly given as example, an
 analyzer-server with multiple antiviruses should be preferred.
 
-### Other applications
-
-#### Fuse
+### Fuse
 
 Standalone tool to mount a USB Mass Storage device with fuse.
 After building `usbsas-tools`:
@@ -171,7 +166,7 @@ OPTIONS:
     -V, --version               Print version information
 ```
 
-#### Imager
+### Imager
 
 Standalone tool to make an image of a USB Mass Storage device (like `dd`).
 ```
@@ -191,7 +186,7 @@ Options:
   -V, --version          Print version
 ```
 
-#### Filesystem writer
+### Filesystem writer
 Standalone tool to write a filesystem on a USB Mass Storage device (like `dd)`.
 ```
 $ ./target/release/usbsas-fswriter --help
@@ -209,7 +204,7 @@ Options:
 ```
 
 
-#### Python
+### Python module
 
 ```shell
 $ cd client/python
@@ -228,13 +223,16 @@ $ make
 $ python usbsas_transfer_example.py
 ```
 
-#### Try usbsas without USB devices
+### Try usbsas without USB devices
 
 The `mock` feature used for the integration tests also allows using usbsas with
-_fake_ (file-backed) USB devices. After building with this feature:
+_fake_ (file-backed) USB devices. After building with this feature, 2 variables
+can be set:
 
 ```shell
 $ export USBSAS_MOCK_IN_DEV=/tmp/mock_input_dev.img
 $ export USBSAS_MOCK_OUT_DEV=/tmp/mock_output_dev.img
-$ ./target/debug/usbsas-server
 ```
+
+Then usbsas can be used as usual with the web server / client or the python
+module.
