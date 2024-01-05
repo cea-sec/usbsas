@@ -17,7 +17,8 @@ Install dependencies:
 ```shell
 $ sudo apt install -y --no-install-recommends \
       pkgconf \
-      clang \ cmake \
+      clang \
+      cmake \
       git \
       curl \
       libssl-dev \
