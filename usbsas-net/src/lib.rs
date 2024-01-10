@@ -100,7 +100,7 @@ impl HttpClient {
             let service = Name::new(krb_service_name.as_bytes(), Some(&GSS_NT_HOSTBASED_SERVICE))?;
             let client_cred = Cred::acquire(None, None, CredUsage::Initiate, Some(&desired_mechs))?;
             let mut client_ctx = ClientCtx::new(
-                client_cred,
+                Some(client_cred),
                 service,
                 CtxFlags::GSS_C_MUTUAL_FLAG,
                 Some(&GSS_MECH_KRB5),

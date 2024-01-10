@@ -606,28 +606,6 @@ checksum = "35636a1494ede3b646cc98f74f8e62c773a38a659ebc777a2cf26b9b74171df9"
 
 [[package]]
 name = "bindgen"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4243e6031260db77ede97ad86c27e501d646a27ab57b59a574f725d98ab1fb4"
-dependencies = [
- "bitflags 1.3.2",
- "cexpr",
- "clang-sys",
- "lazy_static",
- "lazycell",
- "log",
- "peeking_take_while",
- "proc-macro2",
- "quote",
- "regex",
- "rustc-hash",
- "shlex",
- "syn 1.0.109",
- "which",
-]
-
-[[package]]
-name = "bindgen"
 version = "0.69.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ffcebc3849946a7170a05992aac39da343a90676ab392c51a4280981d6379c2"
@@ -1448,7 +1426,7 @@ dependencies = [
 name = "ff"
 version = "0.1.2"
 dependencies = [
- "bindgen 0.69.1",
+ "bindgen",
  "cc",
  "time",
 ]
@@ -2447,9 +2425,9 @@ dependencies = [
 
 [[package]]
 name = "libgssapi"
-version = "0.6.4"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dcfb7f77cbefc242a46ea667491c4f1129712f563cd368623d3f1b261a90e5f"
+checksum = "c22f0430969e524b2177498ca3eeed48faca6f6c80f1b098d27ecbec84222f3a"
 dependencies = [
  "bitflags 2.4.1",
  "bytes",
@@ -2459,11 +2437,12 @@ dependencies = [
 
 [[package]]
 name = "libgssapi-sys"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efdcdd31923aa6280d41ff2636fd93a18cc60fe25983b24887d1a8d24478cbfb"
+checksum = "b57d9a71c774ec53b1b9119dbbcc589b5209831f0ddc0ff4210640051f545372"
 dependencies = [
- "bindgen 0.64.0",
+ "bindgen",
+ "pkg-config",
 ]
 
 [[package]]
@@ -2818,7 +2797,7 @@ dependencies = [
 name = "ntfs3g"
 version = "0.1.1"
 dependencies = [
- "bindgen 0.69.1",
+ "bindgen",
  "cc",
  "libc",
 ]
