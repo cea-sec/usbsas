@@ -14,7 +14,7 @@ indicatif = { version = "0.17", optional = true }
 libc = { version = "0.2", optional = true }
 log = "0.4"
 nix = { version = "0.27", optional = true, features = ["user"] }
-tempfile = { version = "3.8", optional = true }
+tempfile = { version = "3.9", optional = true }
 serde_json = { version = "1.0", optional = true}
 thiserror = "1.0"
 time = { version = "0.3", optional = true }
