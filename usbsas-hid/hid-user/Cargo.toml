@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 bitfield = "0.14"
-env_logger = "0.10"
+env_logger = "0.11"
 log = "0.4"
 rusb = { version = "0.9", features = ["vendored"] }
 usbsas-sandbox = { path = "../../usbsas-sandbox" }

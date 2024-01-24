@@ -7,7 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 bootsector = "0.2"
 byteorder = "1.5"
-env_logger = "0.10"
+env_logger = "0.11"
 log = "0.4"
 thiserror = "1.0"
 usbsas-comm = { path = "../usbsas-comm" }
