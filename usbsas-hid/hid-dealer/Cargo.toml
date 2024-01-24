@@ -6,7 +6,7 @@ license = "GPL-3.0"
 description = "usbsas userland HID manager"
 
 [dependencies]
-env_logger = "0.10"
+env_logger = "0.11"
 log = "0.4"
 dbus-crossroads = "0.5"
 dbus = "0.9"
