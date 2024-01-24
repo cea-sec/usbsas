@@ -52,6 +52,16 @@ pub(crate) fn new_context_with_common_rules(
         &[Comparator::new(0, Cmp::Eq, 2, None)],
     )?;
 
+    // Allow ioctl(2, TCGETS, ..), needed by env_logger >= 0.11
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, 2, None),
+            Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
+        ],
+    )?;
+
     // Allow mmap (for NULL addr only)
     ctx.set_rule_for_syscall(
         Action::Allow,
