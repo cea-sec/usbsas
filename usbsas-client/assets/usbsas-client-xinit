@@ -10,8 +10,8 @@ if systemctl --user list-unit-files | grep -q hid-dealer.service; then
 fi
 
 # Set max resolution
-monitor=$(xrandr | grep " connected primary" | awk '{print $1}')
-mode=$(xrandr | grep -A1 " connected primary" | tail -1 | cut -d ' ' -f4)
+monitor=$(xrandr | grep " connected" | awk '{print $1}')
+mode=$(xrandr | grep -A1 " connected" | tail -1 | cut -d ' ' -f4)
 xrandr --output "$monitor" --mode "$mode"
 window_w=$(echo $mode | cut -dx -f1)
 window_h=$(echo $mode | cut -dx -f2)
@@ -22,4 +22,4 @@ xset -dpms
 xset s noblank
 xset s off
 /usr/bin/unclutter -idle 1 -jitter 5 &
-exec /usr/bin/usbsas-client /usr/share/usbsas/web --fullscreen -W "$window_w" -H "$window_h"
+exec /usr/bin/usbsas-client /usr/share/usbsas/web --fullscreen -W "${window_w:-1920}" -H "${window_h:-1080}"
