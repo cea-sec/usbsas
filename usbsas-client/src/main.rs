@@ -61,6 +61,7 @@ fn main() -> wry::Result<()> {
             web_dir_path,
             "/dev",
             "/etc",
+            "/home",
             "/lib",
             "/proc",
             "/run",
