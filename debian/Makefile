@@ -28,6 +28,7 @@ $(PKG_DIR)/usbsas-core_$(CORE_VER)_amd64.deb:
 	cargo-deb --no-build --manifest-path=../usbsas-usbsas/Cargo.toml
 
 $(PKG_DIR)/usbsas-server_$(SRV_VER)_amd64.deb:
+	cargo build --release --manifest-path=../usbsas-server/Cargo.toml
 	cargo-deb --no-build --manifest-path=../usbsas-server/Cargo.toml
 
 $(PKG_DIR)/usbsas-analyzer-server_$(ASRV_VER)_amd64.deb:
