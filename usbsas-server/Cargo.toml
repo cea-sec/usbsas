@@ -9,7 +9,7 @@ description = "usbsas web server"
 actix-cors = "0.7"
 actix-web = "4.5"
 base64 = "0.21"
-clap = "4.4"
+clap = "4.5"
 err-derive = "0.3"
 futures = "0.3"
 hmac = { version = "0.12", features = ["reset"] }
