@@ -90,7 +90,7 @@ fn main() -> wry::Result<()> {
     let window = window_builder.build(&event_loop).unwrap();
     let builder = WebViewBuilder::new_gtk(window.default_vbox().unwrap());
     let webview = builder
-        .with_url(&format!("file:///{}/index.html", web_dir_path))?
+        .with_url(&format!("file:///{}/index.html", web_dir_path))
         .with_devtools(false)
         .with_focused(true)
         .build()?;
