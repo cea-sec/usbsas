@@ -9,7 +9,10 @@ use std::{
     fs::File,
     io::{self, Read, Write},
     marker::PhantomData,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd},
+    os::{
+        fd::OwnedFd,
+        unix::io::{AsRawFd, FromRawFd, RawFd},
+    },
     str::FromStr,
 };
 use usbsas_utils::{INPUT_PIPE_FD_VAR, OUTPUT_PIPE_FD_VAR};
@@ -72,16 +75,10 @@ impl<R> Comm<R> {
         })
     }
 
-    pub fn from_raw_fd(read: RawFd, write: RawFd) -> Self {
-        let output;
-        let input;
-        unsafe {
-            input = File::from_raw_fd(read);
-            output = File::from_raw_fd(write);
-        }
+    pub fn from_fd(read: OwnedFd, write: OwnedFd) -> Self {
         Comm {
-            input,
-            output,
+            input: File::from(read),
+            output: File::from(write),
             req: PhantomData,
         }
     }
