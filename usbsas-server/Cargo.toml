@@ -8,7 +8,7 @@ description = "usbsas web server"
 [dependencies]
 actix-cors = "0.7"
 actix-web = "4.5"
-base64 = "0.21"
+base64 = "0.22"
 clap = "4.5"
 err-derive = "0.3"
 futures = "0.3"
