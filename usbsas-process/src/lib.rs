@@ -7,7 +7,7 @@ use nix::{
 };
 use std::{
     io::{self, Write},
-    os::unix::io::RawFd,
+    os::unix::io::{AsRawFd, RawFd},
     path, process,
 };
 use thiserror::Error;
@@ -88,12 +88,18 @@ impl<'a> UsbsasChildSpawner<'a> {
 
         let (child_to_parent_rd, child_to_parent_wr) = unistd::pipe()?;
         let (parent_to_child_rd, parent_to_child_wr) = unistd::pipe()?;
-        set_cloexec(child_to_parent_rd)?;
-        set_cloexec(parent_to_child_wr)?;
+        set_cloexec(child_to_parent_rd.as_raw_fd())?;
+        set_cloexec(parent_to_child_wr.as_raw_fd())?;
 
         command.env_clear();
-        command.env(INPUT_PIPE_FD_VAR, parent_to_child_rd.to_string());
-        command.env(OUTPUT_PIPE_FD_VAR, child_to_parent_wr.to_string());
+        command.env(
+            INPUT_PIPE_FD_VAR,
+            parent_to_child_rd.as_raw_fd().to_string(),
+        );
+        command.env(
+            OUTPUT_PIPE_FD_VAR,
+            child_to_parent_wr.as_raw_fd().to_string(),
+        );
         DEFAULT_ENV_VARS
             .iter()
             .map(|k| std::env::var(k).map(|v| (k, v)))
@@ -104,12 +110,12 @@ impl<'a> UsbsasChildSpawner<'a> {
 
         let child = command.spawn()?;
 
-        unistd::close(parent_to_child_rd)?;
-        unistd::close(child_to_parent_wr)?;
+        drop(parent_to_child_rd);
+        drop(child_to_parent_wr);
 
         Ok(UsbsasChild {
             child,
-            comm: Comm::from_raw_fd(child_to_parent_rd, parent_to_child_wr),
+            comm: Comm::from_fd(child_to_parent_rd, parent_to_child_wr),
             locked: self.wait_on_startup,
         })
     }
