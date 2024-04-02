@@ -408,7 +408,7 @@ enum HidUsage {
 }
 
 #[derive(Debug, Clone)]
-enum HidUsagePage {
+pub enum HidUsagePage {
     GenericDesktopControls,
     SimulationControls,
     VRControls,
@@ -425,9 +425,7 @@ enum HidUsagePage {
     Reserved,
     PIDPage,
     Unicode,
-
     Vendor,
-
     Unknown(u16),
 }
 
@@ -1428,7 +1426,7 @@ fn request_reports(device: &UsbDevice, reports: &HashMap<u32, (Vec<HidItem>, usi
         }
 
         if items.len() == 1 {
-            let usages = vec![
+            let usages = [
                 HidUsage::Digitizer(HidUsageDigitizer::Unknown(82)),
                 HidUsage::Digitizer(HidUsageDigitizer::Unknown(83)),
             ];
