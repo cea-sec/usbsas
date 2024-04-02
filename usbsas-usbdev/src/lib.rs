@@ -166,7 +166,6 @@ impl CurrentDevices {
             .attribute_value("devpath")
             .ok_or(Error::NoneValue)?
             .to_string_lossy()
-            .to_string()
             .split('.')
         {
             dev_path.push(port.parse::<u8>()?)

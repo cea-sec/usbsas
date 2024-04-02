@@ -48,7 +48,11 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
         let dev_name = CString::new("").unwrap();
         unsafe {
             // See original mkntfs.c from ntfsprogs
-            std::ptr::write_bytes::<n3g_c::mkntfs_options>(&mut n3g_c::opts, 0, 1);
+            std::ptr::write_bytes::<n3g_c::mkntfs_options>(
+                std::ptr::addr_of_mut!(n3g_c::opts),
+                0,
+                1,
+            );
             n3g_c::opts.cluster_size = -1;
             n3g_c::opts.mft_zone_multiplier = -1;
             n3g_c::opts.with_uuid = n3g_c::BOOL_FALSE;
@@ -75,7 +79,7 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
             {
                 n3g_c::opts.dev_name = dev_name.as_ptr() as *mut u8;
             }
-            if n3g_c::mkntfs(&mut n3g_c::opts, priv_data) != 0 {
+            if n3g_c::mkntfs(std::ptr::addr_of_mut!(n3g_c::opts), priv_data) != 0 {
                 return Err(Error::new(ErrorKind::Other, "ntfs3g mkntfs error"));
             }
         }
