@@ -678,6 +678,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
+name = "cfg_aliases"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+
+[[package]]
 name = "clang-sys"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2184,9 +2190,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.153"
+version = "0.2.155"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
+checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
 name = "libdbus-sys"
@@ -2485,13 +2491,13 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
+checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
 dependencies = [
  "bitflags 2.5.0",
  "cfg-if",
- "cfg_aliases",
+ "cfg_aliases 0.2.1",
  "libc",
 ]
 
@@ -4403,7 +4409,7 @@ version = "0.1.2"
 dependencies = [
  "libc",
  "log",
- "nix 0.28.0",
+ "nix 0.29.0",
  "thiserror",
  "usbsas-comm",
  "usbsas-utils",
@@ -4470,7 +4476,7 @@ dependencies = [
  "hmac",
  "log",
  "mac_address",
- "nix 0.28.0",
+ "nix 0.29.0",
  "rand 0.8.5",
  "reqwest",
  "serde",
@@ -4514,7 +4520,7 @@ dependencies = [
  "indicatif",
  "libc",
  "log",
- "nix 0.28.0",
+ "nix 0.29.0",
  "serde_json",
  "tempfile",
  "thiserror",
@@ -5153,7 +5159,7 @@ checksum = "4eca9d50437c04fc67e82c196ddd31d8e35794150713ae2d647f3a58c7f45d1a"
 dependencies = [
  "base64 0.21.7",
  "block",
- "cfg_aliases",
+ "cfg_aliases 0.1.1",
  "cocoa",
  "core-graphics",
  "crossbeam-channel",
