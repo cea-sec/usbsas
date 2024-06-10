@@ -77,7 +77,7 @@ fn open_device(busnum: u8, devnum: u8) -> Result<UsbDevice, rusb::Error> {
         Err(_) => return Err(rusb::Error::NotFound),
     };
 
-    let mut handle = unsafe { libusb_ctx.open_device_with_fd(dev_file.as_raw_fd())? };
+    let handle = unsafe { libusb_ctx.open_device_with_fd(dev_file.as_raw_fd())? };
 
     for interface in handle.device().active_config_descriptor()?.interfaces() {
         for desc in interface.descriptors() {
