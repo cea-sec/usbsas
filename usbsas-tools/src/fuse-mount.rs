@@ -206,7 +206,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
         let mut dir_str = path.to_string_lossy().to_string();
 
         if dir_str == "/" {
-            dir_str = "".to_owned();
+            "".clone_into(&mut dir_str);
         }
 
         let mut scsi2files = self.scsi2files.write().unwrap();

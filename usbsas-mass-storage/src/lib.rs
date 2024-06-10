@@ -71,7 +71,7 @@ impl MassStorage {
         assert!(rusb::supports_detach_kernel_driver());
 
         let context = rusb::GlobalContext::default();
-        let mut handle = unsafe { context.open_device_with_fd(file.as_raw_fd())? };
+        let handle = unsafe { context.open_device_with_fd(file.as_raw_fd())? };
         let mut endpoints: [Option<u8>; 2] = [None; 2];
         for interface in handle.device().active_config_descriptor()?.interfaces() {
             for desc in interface.descriptors() {
