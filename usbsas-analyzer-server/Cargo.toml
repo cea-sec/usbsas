@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 actix-files = "0.6"
-actix-web = "4.6"
+actix-web = "4.7"
 clap = "4.5"
 env_logger = "0.11"
 futures = "0.3"
