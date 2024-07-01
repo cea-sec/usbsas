@@ -10,7 +10,7 @@ env_logger = "0.11"
 log = "0.4"
 dbus-crossroads = "0.5"
 dbus = "0.9"
-lazy_static = "1.4"
+lazy_static = "1.5"
 
 # cargo-deb
 [package.metadata.deb]
