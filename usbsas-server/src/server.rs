@@ -31,6 +31,7 @@ async fn status(data: web::Data<AppState>) -> Result<impl Responder, ServiceErro
     Ok(HttpResponse::Ok().json(UsbsasInfos {
         name: node_name,
         message: config.message.unwrap_or_else(|| "".into()),
+        web_title: config.web_title.unwrap_or_else(|| "USBSAS".into()),
         version: usbsas_utils::USBSAS_VERSION.into(),
         status: data.status.read()?.to_string(),
     }))

@@ -84,6 +84,7 @@ enum Source {
 pub(crate) struct UsbsasInfos {
     pub(crate) name: String,
     pub(crate) message: String,
+    pub(crate) web_title: String,
     pub(crate) version: String,
     pub(crate) status: String,
 }

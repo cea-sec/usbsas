@@ -73,7 +73,6 @@ var lang_fr = {
     "size": "Taille",
     "source": "Source",
     "startcopy": "Lancer la copie",
-    "title": "SASUSB",
     "tools": "Outils",
     "transferdone": "Transfert terminé",
     "trfail": "Le transfert a échoué: ",
