@@ -73,7 +73,6 @@ var lang_en = {
     "size": "Size",
     "source": "Input",
     "startcopy": "Start copy",
-    "title": "USBSAS",
     "tools": "Tools",
     "transferdone": "Transfer done",
     "trfail": "Transfer failed: ",

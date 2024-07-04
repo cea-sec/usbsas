@@ -299,6 +299,8 @@ class Devices {
 function set_usbsas_infos(infos) {
   let usbsas_infos = document.getElementById("usbsas_infos");
   usbsas_infos.innerHTML = infos.name + infos.message;
+  let title = document.getElementById("web_title");
+  title.innerText = infos.web_title;
   let version = document.getElementById("sasver");
   version.innerHTML = "Version: " + infos.version;
 }

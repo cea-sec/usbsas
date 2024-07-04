@@ -108,6 +108,8 @@ write_dest = true
 # Message can be in HTML.
 #message="<strong>Under maintenance</strong>"
 
+# Web page title
+#web_title="USBSAS"
 
 # Filename filters. (Optional)
 # They should be written in lower case as their are tested case insensitive.

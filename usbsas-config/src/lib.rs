@@ -66,6 +66,7 @@ pub struct Config {
     pub out_directory: String,
     pub report: Option<Report>,
     pub message: Option<String>,
+    pub web_title: Option<String>,
     pub command: Option<Command>,
     pub networks: Option<Vec<Network>>,
     pub source_network: Option<Network>,
