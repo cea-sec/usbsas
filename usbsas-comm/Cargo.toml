@@ -6,5 +6,5 @@ license = "GPL-3.0"
 
 [dependencies]
 byteorder = "1.5"
-prost = "0.12"
+prost = "0.13"
 usbsas-utils = { path = "../usbsas-utils" }
