@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [build-dependencies]
-prost-build = "0.12"
+prost-build = "0.13"
 
 [dependencies]
 prost = "0.13"
