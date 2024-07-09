@@ -9,4 +9,4 @@ time = "0.3"
 
 [build-dependencies]
 bindgen = "0.69"
-cc = "1.0"
+cc = "1.1"

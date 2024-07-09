@@ -6,7 +6,7 @@ license = "GPL-3.0"
 
 [build-dependencies]
 bindgen = "0.69"
-cc = "1.0"
+cc = "1.1"
 
 [dependencies]
 libc = "0.2"
