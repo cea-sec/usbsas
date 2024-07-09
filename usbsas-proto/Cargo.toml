@@ -8,4 +8,4 @@ license = "GPL-3.0"
 prost-build = "0.12"
 
 [dependencies]
-prost = "0.12"
+prost = "0.13"
