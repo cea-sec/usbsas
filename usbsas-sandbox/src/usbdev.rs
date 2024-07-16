@@ -46,7 +46,10 @@ pub fn seccomp_thread(udev_socket: RawFd, poll_fd: RawFd) -> Result<()> {
     )?;
     ctx.set_rule_for_syscall(
         Action::Allow,
+        #[cfg(not(target_arch = "aarch64"))]
         Syscall::epoll_wait,
+        #[cfg(target_arch = "aarch64")]
+        Syscall::epoll_pwait,
         &[Comparator::new(0, Cmp::Eq, poll_fd as u64, None)],
     )?;
 
@@ -64,10 +67,12 @@ pub fn seccomp_thread(udev_socket: RawFd, poll_fd: RawFd) -> Result<()> {
     )?;
 
     ctx.allow_syscall(Syscall::fstat)?;
+    #[cfg(not(target_arch = "aarch64"))]
     ctx.allow_syscall(Syscall::lstat)?;
     ctx.allow_syscall(Syscall::fstatfs)?;
     ctx.allow_syscall(Syscall::newfstatat)?;
     ctx.allow_syscall(Syscall::statx)?;
+    #[cfg(not(target_arch = "aarch64"))]
     ctx.allow_syscall(Syscall::access)?;
     ctx.allow_syscall(Syscall::faccessat2)?;
     ctx.allow_syscall(Syscall::getdents64)?;
