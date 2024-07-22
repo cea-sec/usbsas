@@ -7,9 +7,9 @@ license = "GPL-3.0"
 [dependencies]
 env_logger = "0.11"
 log = "0.4"
-mio = { version = "0.8", features = ["os-ext"] }
+mio = { version = "1.0", features = ["os-ext"] }
 thiserror = "1.0"
-udev = { version = "0.8", features = ["mio"] }
+udev = { version = "0.9", features = ["mio"] }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }
