@@ -23,6 +23,9 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 1, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
+            #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;
@@ -32,6 +35,9 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 2, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
+            #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;
@@ -41,6 +47,9 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 2, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ as u64, None),
+            #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ, None),
         ],
     )?;
