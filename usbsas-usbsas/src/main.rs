@@ -5,8 +5,6 @@
 
 use log::{debug, error, info, trace, warn};
 use serde_json::json;
-#[cfg(feature = "log-json")]
-use std::sync::{Arc, RwLock};
 use std::{
     collections::{HashSet, VecDeque},
     convert::TryFrom,
