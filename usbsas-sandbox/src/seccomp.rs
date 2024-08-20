@@ -58,6 +58,9 @@ pub(crate) fn new_context_with_common_rules(
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 2, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
+            #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;

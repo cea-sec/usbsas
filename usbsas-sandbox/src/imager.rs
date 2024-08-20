@@ -15,6 +15,9 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 1, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
+            #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;
@@ -24,6 +27,9 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 2, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
+            #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;
@@ -33,6 +39,9 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
         Syscall::ioctl,
         &[
             Comparator::new(0, Cmp::Eq, 2, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ as u64, None),
+            #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ, None),
         ],
     )?;
