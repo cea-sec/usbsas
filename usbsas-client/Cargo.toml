@@ -7,7 +7,7 @@ edition = "2021"
 clap = "4.5"
 tao = "0.29"
 usbsas-sandbox = { path = "../usbsas-sandbox" }
-wry = { version = "0.41", default-features = false, features = ["os-webview", "fullscreen"] }
+wry = { version = "0.42", default-features = false, features = ["os-webview", "fullscreen"] }
 
 # cargo-deb
 [package.metadata.deb]
