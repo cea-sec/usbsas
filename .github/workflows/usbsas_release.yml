@@ -42,11 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download usbsas deb packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: usbsas-deb-packages
       - name: Download usbsas live ISO
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: usbsas-live-iso
       - name: Get artifacts names
