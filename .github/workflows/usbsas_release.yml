@@ -27,12 +27,12 @@ jobs:
             --env CARGO_HOME=/SRC/target/.cargo usbsas-builder:debian \
             make SU= -C debian
       - name: Upload deb packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: usbsas-deb-packages
           path: ./target/debian/usbsas-*.deb
       - name: Upload live ISO
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: usbsas-live-iso
           path: ./live-iso/usbsas-*.iso
@@ -42,11 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download usbsas deb packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: usbsas-deb-packages
       - name: Download usbsas live ISO
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: usbsas-live-iso
       - name: Get artifacts names
