@@ -116,11 +116,12 @@ struct WaitEndState;
 struct BitVecIterOnes {
     pub bv: BitVec<u8, Lsb0>,
     pos: usize,
+    next_stop: usize,
 }
 
 impl BitVecIterOnes {
     fn new(bv: BitVec<u8, Lsb0>) -> Self {
-        BitVecIterOnes { bv, pos: 0 }
+        BitVecIterOnes { bv, pos: 0, next_stop: 0 }
     }
     fn count_ones(&self) -> usize {
         self.bv.count_ones()
@@ -132,15 +133,17 @@ impl Iterator for BitVecIterOnes {
 
     fn next(&mut self) -> Option<Self::Item> {
         let index_start = self.pos + self.bv[self.pos..].iter().position(|bit| *bit)?;
-        let index_stop = index_start
+        if self.next_stop <= index_start {
+            self.next_stop = index_start
             + self.bv[index_start..]
                 .iter()
                 .position(|bit| !*bit)
                 .unwrap_or_else(|| self.bv[index_start..].len());
-        self.pos = if index_stop - index_start > MAX_WRITE_SECTORS {
+        }
+        self.pos = if self.next_stop - index_start > MAX_WRITE_SECTORS {
             index_start + MAX_WRITE_SECTORS
         } else {
-            index_stop
+            self.next_stop
         };
         Some((index_start as u64, self.pos as u64))
     }
