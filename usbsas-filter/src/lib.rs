@@ -6,7 +6,7 @@ use log::debug;
 #[cfg(test)]
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpFilter, ProtoRespCommon, ProtoRespFilter, SendRecv, ToFromFd};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{filter::request::Msg, filter::FilterResult};
@@ -25,14 +25,6 @@ pub enum Error {
     State,
 }
 pub type Result<T> = std::result::Result<T, Error>;
-
-protoresponse!(
-    CommFilter,
-    filter,
-    filterpaths = FilterPaths[ResponseFilterPaths],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
 
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 pub struct Rule {
@@ -104,7 +96,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::filter::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpFilter) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::Running(s) => s.run(comm),
@@ -121,7 +113,7 @@ struct RunningState {
 }
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::filter::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFilter) -> Result<State> {
         let config_str = conf_read(&self.config_path)?;
 
         usbsas_sandbox::filter::seccomp(comm.input_fd(), comm.output_fd())?;
@@ -144,13 +136,13 @@ impl InitState {
 }
 
 impl RunningState {
-    fn run(self, comm: &mut Comm<proto::filter::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFilter) -> Result<State> {
         loop {
             let req: proto::filter::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
                 Msg::FilterPaths(req) => self.filterpaths(comm, req.path)?,
                 Msg::End(_) => {
-                    comm.end(proto::filter::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
             }
@@ -158,11 +150,7 @@ impl RunningState {
         Ok(State::End)
     }
 
-    fn filterpaths(
-        &self,
-        comm: &mut Comm<proto::filter::Request>,
-        paths: Vec<String>,
-    ) -> Result<()> {
+    fn filterpaths(&self, comm: &mut ComRpFilter, paths: Vec<String>) -> Result<()> {
         let results = paths
             .iter()
             .map(|p| self.rules.match_all(p) as i32)
@@ -174,12 +162,12 @@ impl RunningState {
 }
 
 pub struct Filter {
-    comm: Comm<proto::filter::Request>,
+    comm: ComRpFilter,
     state: State,
 }
 
 impl Filter {
-    pub fn new(comm: Comm<proto::filter::Request>, config_path: String) -> Result<Self> {
+    pub fn new(comm: ComRpFilter, config_path: String) -> Result<Self> {
         Ok(Filter {
             comm,
             state: State::Init(InitState { config_path }),

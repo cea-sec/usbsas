@@ -1,5 +1,6 @@
 syntax = "proto3";
 package downloader;
+import "common.proto3";
 
 /* Requests */
 
@@ -25,11 +26,6 @@ message Request {
 
 /* Response */
 
-message ResponseDownloadStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
-}
-
 message ResponseDownload {
 }
 
@@ -37,19 +33,12 @@ message ResponseArchiveInfos {
   uint64 size = 1;
 }
 
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message Response {
   oneof msg {
     ResponseDownload Download = 1;
-    ResponseDownloadStatus DownloadStatus = 2;
+    common.ResponseStatus Status = 2;
     ResponseArchiveInfos ArchiveInfos = 3;
-    ResponseEnd End = 4;
-    ResponseError Error = 5;
+    common.ResponseEnd End = 4;
+    common.ResponseError Error = 5;
   }
 };

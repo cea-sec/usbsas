@@ -45,9 +45,6 @@ message Device {
 
 /* Responses */
 
-message ResponseEnd {
-};
-
 message ResponseDevices {
   repeated Device devices = 1;
 };
@@ -65,17 +62,14 @@ message ResponseReadSectors {
   bytes data = 1;
 };
 
-message ResponseError {
-  string err = 1;
-};
-
 message Response {
   oneof msg {
-    ResponseError Error = 1;
+    common.ResponseError Error = 1;
     ResponseDevices Devices = 2;
     ResponseOpenDevice OpenDevice = 3;
-    ResponseEnd End = 4;
+    common.ResponseEnd End = 4;
     ResponsePartitions Partitions = 5;
     ResponseReadSectors ReadSectors = 6;
+    common.ResponseStatus Status = 7;
   }
 };

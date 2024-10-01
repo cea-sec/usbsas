@@ -41,14 +41,6 @@ message Request {
 };
 
 /* Responses */
-
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message ResponseNewFile {
 };
 
@@ -64,11 +56,12 @@ message ResponseClose {
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
     ResponseNewFile NewFile = 3;
     ResponseWriteFile WriteFile = 4;
     ResponseEndFile EndFile = 5;
     ResponseClose Close = 6;
+    common.ResponseStatus Status = 7;
   }
 };

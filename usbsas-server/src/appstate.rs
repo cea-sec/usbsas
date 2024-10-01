@@ -17,28 +17,11 @@ use std::{
         Arc, Mutex, RwLock,
     },
 };
-use usbsas_comm::{protorequest, Comm};
+use usbsas_comm::{ComRqUsbsas, ProtoReqCommon, ProtoReqUsbsas, SendRecv};
 use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
 use usbsas_proto::common::{OutFileType, OutFsType, UsbDevice};
-
-protorequest!(
-    CommUsbsas,
-    usbsas,
-    id = Id[RequestId, ResponseId],
-    postcopycmd = PostCopyCmd[RequestPostCopyCmd, ResponsePostCopyCmd],
-    usbdevices = UsbDevices[RequestUsbDevices, ResponseUsbDevices],
-    alttargets = AltTargets[RequestAltTargets, ResponseAltTargets],
-    opendev = OpenDevice[RequestOpenDevice, ResponseOpenDevice],
-    partitions = Partitions[RequestPartitions, ResponsePartitions],
-    openpartition = OpenPartition[RequestOpenPartition, ResponseOpenPartition],
-    readdir = ReadDir[RequestReadDir, ResponseReadDir],
-    getattr = GetAttr[RequestGetAttr, ResponseGetAttr],
-    wipe = Wipe[RequestWipe, ResponseWipe],
-    imgdisk = ImgDisk[RequestImgDisk, ResponseImgDisk],
-    end = End[RequestEnd, ResponseEnd]
-);
 
 /// Private device structures, they contain elements which should not be leaked
 /// to the web clients (busnum, devnum etc.)
@@ -343,7 +326,7 @@ const USBSAS_EMPTY_TAR: u64 = 1536;
 pub(crate) struct AppState {
     config: Mutex<Config>,
     pub config_path: Mutex<String>,
-    comm: Mutex<Comm<proto::usbsas::Request>>,
+    comm: Mutex<ComRqUsbsas>,
     dest: Mutex<Option<Destination>>,
     hmac: Mutex<Hmac<Sha256>>,
     pub status: Arc<RwLock<String>>,
@@ -386,24 +369,21 @@ impl AppState {
         })
     }
 
-    fn start_usbsas(
-        config_path: &str,
-        session_id: &str,
-    ) -> Result<Comm<proto::usbsas::Request>, ServiceError> {
+    fn start_usbsas(config_path: &str, session_id: &str) -> Result<ComRqUsbsas, ServiceError> {
         debug!("starting usbsas");
 
         let usbsas_cmd = UsbsasChildSpawner::new("usbsas-usbsas").args(&["-c", config_path]);
 
         std::env::set_var("USBSAS_SESSION_ID", session_id);
 
-        let usbsas_child = usbsas_cmd.spawn::<proto::usbsas::Request>()?;
+        let usbsas_child = usbsas_cmd.spawn::<ComRqUsbsas>()?;
 
         Ok(usbsas_child.comm)
     }
 
     pub(crate) fn reset(&self) -> Result<(), ServiceError> {
         let mut comm = self.comm.lock()?;
-        let _ = comm.end(proto::usbsas::RequestEnd {})?;
+        let _ = comm.end();
         nix::sys::wait::wait()?;
 
         #[cfg(not(feature = "integration-tests"))]
@@ -597,7 +577,7 @@ impl AppState {
 
         self.comm
             .lock()?
-            .opendev(in_dev)
+            .opendevice(in_dev)
             .map_err(|err| ServiceError::Error(format!("couldn't open input device: {err}")))?;
         *self.dest.lock()? = dest;
 
@@ -786,7 +766,6 @@ impl AppState {
             )),
         })?;
 
-        let mut size_read = 0;
         let mut total_size = 0;
         let mut current_progress = progress;
         let mut resp: proto::usbsas::Response = comm.recv()?;
@@ -798,9 +777,8 @@ impl AppState {
                     progress += 1.0;
                     resp_stream.report_progress("copy_usb_tar_start", progress)?;
                 }
-                Msg::CopyStatus(msg) => {
-                    size_read += msg.current_size;
-                    progress = current_progress + (size_read as f32 / total_size as f32 * 30.0);
+                Msg::Status(msg) => {
+                    progress = current_progress + (msg.current as f32 / msg.total as f32 * 30.0);
                     resp_stream.report_progress("copy_usb_tar_update", progress)?;
                 }
                 Msg::CopyStatusDone(_) => break,
@@ -841,9 +819,8 @@ impl AppState {
             loop {
                 resp = comm.recv()?;
                 match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                    Msg::AnalyzeStatus(msg) => {
-                        progress = current_progress
-                            + (msg.current_size as f32 / msg.total_size as f32 * 5.0);
+                    Msg::Status(msg) => {
+                        progress = current_progress + (msg.current as f32 / msg.total as f32 * 5.0);
                         resp_stream.report_progress("analyze_update", progress)?;
                     }
                     Msg::AnalyzeDone(_) => break,
@@ -861,7 +838,6 @@ impl AppState {
             progress = current_progress + 5.0;
         };
 
-        size_read = 0;
         current_progress = progress;
 
         if analyze || matches!(dest, &Destination::Usb { .. }) {
@@ -877,9 +853,9 @@ impl AppState {
             loop {
                 resp = comm.recv()?;
                 match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                    Msg::CopyStatus(msg) => {
-                        size_read += msg.current_size;
-                        progress = current_progress + (size_read as f32 / total_size as f32 * 30.0);
+                    Msg::Status(msg) => {
+                        progress =
+                            current_progress + (msg.current as f32 / total_size as f32 * 30.0);
                         resp_stream.report_progress("copy_fromtar_update", progress)?;
                     }
                     Msg::CopyStatusDone(_) => break,
@@ -922,10 +898,10 @@ impl AppState {
         let final_report = loop {
             resp = comm.recv()?;
             match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                Msg::FinalCopyStatus(msg) => {
-                    if msg.total_size != 0 && msg.current_size != 0 {
-                        progress = current_progress
-                            + (msg.current_size as f32 / msg.total_size as f32 * 30.0);
+                Msg::Status(msg) => {
+                    if msg.total != 0 && msg.current != 0 {
+                        progress =
+                            current_progress + (msg.current as f32 / msg.total as f32 * 30.0);
                         resp_stream.report_progress("copy_final_update", progress)?;
                     }
                 }
@@ -1024,10 +1000,10 @@ impl AppState {
         loop {
             let resp: proto::usbsas::Response = comm.recv()?;
             match resp.msg.ok_or(ServiceError::InternalServerError)? {
-                Msg::FinalCopyStatus(ref msg) => resp_stream.add_message(ReportDeviceSize {
+                Msg::Status(ref msg) => resp_stream.add_message(ReportDeviceSize {
                     status: "wipe_status",
-                    current_size: msg.current_size,
-                    total_size: msg.total_size,
+                    current_size: msg.current,
+                    total_size: msg.total,
                 })?,
                 Msg::FinalCopyStatusDone(_) => resp_stream.add_message(ReportDeviceSize {
                     status: "format_status",
@@ -1079,10 +1055,10 @@ impl AppState {
             let resp: proto::usbsas::Response = comm.recv()?;
             match resp.msg.ok_or(ServiceError::InternalServerError)? {
                 Msg::OpenDevice(_) => continue,
-                Msg::FinalCopyStatus(msg) => resp_stream.add_message(ReportDeviceSize {
+                Msg::Status(msg) => resp_stream.add_message(ReportDeviceSize {
                     status: "imgdisk_update",
-                    current_size: msg.current_size,
-                    total_size: msg.total_size,
+                    current_size: msg.current,
+                    total_size: msg.total,
                 })?,
                 Msg::ImgDisk(_) => {
                     // Keep out fs
@@ -1132,7 +1108,7 @@ impl Drop for AppState {
     fn drop(&mut self) {
         // End usbsas and its children properly
         let mut comm = self.comm.lock().unwrap();
-        let _ = comm.end(proto::usbsas::RequestEnd {}).ok();
+        let _ = comm.end().ok();
         nix::sys::wait::wait().unwrap();
     }
 }

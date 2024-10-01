@@ -6,12 +6,13 @@ use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
 use std::{convert::TryFrom, io::prelude::*, str};
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpScsi, ProtoRespCommon, ProtoRespScsi, SendRecv};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
 #[cfg(not(feature = "mock"))]
 use {
     std::os::unix::io::AsRawFd,
+    usbsas_comm::ToFromFd,
     usbsas_mass_storage::{self, MassStorage},
 };
 #[cfg(feature = "mock")]
@@ -44,16 +45,6 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommScsi,
-    scsi,
-    partitions = Partitions[ResponsePartitions],
-    readsectors = ReadSectors[ResponseReadSectors],
-    end = End[ResponseEnd],
-    opendev = OpenDevice[ResponseOpenDevice],
-    error = Error[ResponseError]
-);
-
 // Max we need to read for ext4 check (other fs need less) and iso9660
 const MAX_LEN_PART_HEADER: u64 = 0x464;
 const MAX_LEN_ISO_HEADER: u64 = 0x8806;
@@ -67,7 +58,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpScsi) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::DevOpened(s) => s.run(comm),
@@ -91,7 +82,7 @@ struct PartitionsListedState {
 struct WaitEndState {}
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpScsi) -> Result<State> {
         let mut buf = vec![0u8; 8];
         comm.read_exact(&mut buf)?;
 
@@ -121,9 +112,7 @@ impl InitState {
                 }
                 Err(err) => {
                     error!("Error opening device file: {}", err);
-                    comm.error(proto::scsi::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    comm.error(err)?;
                     return Ok(State::WaitEnd(WaitEndState {}));
                 }
             }
@@ -139,9 +128,7 @@ impl InitState {
             Ok(ums) => ums,
             Err(err) => {
                 error!("Init mass storage error: {}, waiting end", err);
-                comm.error(proto::scsi::ResponseError {
-                    err: format!("{err}"),
-                })?;
+                comm.error(err)?;
                 return Ok(State::WaitEnd(WaitEndState {}));
             }
         };
@@ -149,7 +136,7 @@ impl InitState {
         #[cfg(not(feature = "mock"))]
         usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), Some(device_fd))?;
 
-        comm.opendev(proto::scsi::ResponseOpenDevice {
+        comm.opendevice(proto::scsi::ResponseOpenDevice {
             block_size: u64::from(usb_mass_storage.block_size),
             dev_size: usb_mass_storage.dev_size,
         })?;
@@ -159,7 +146,7 @@ impl InitState {
 }
 
 impl DevOpenedState {
-    fn run(mut self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpScsi) -> Result<State> {
         loop {
             let req: proto::scsi::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
@@ -167,9 +154,7 @@ impl DevOpenedState {
                     Ok(_) => break,
                     Err(err) => {
                         error!("{}", err);
-                        comm.error(proto::scsi::ResponseError {
-                            err: format!("{err}"),
-                        })?;
+                        comm.error(err)?;
                     }
                 },
                 Msg::ReadSectors(req) => {
@@ -181,14 +166,12 @@ impl DevOpenedState {
                         Ok(data) => comm.readsectors(proto::scsi::ResponseReadSectors { data })?,
                         Err(err) => {
                             error!("{}", err);
-                            comm.error(proto::scsi::ResponseError {
-                                err: format!("{err}"),
-                            })?;
+                            comm.error(err)?;
                         }
                     }
                 }
                 Msg::End(_) => {
-                    comm.end(proto::scsi::ResponseEnd {})?;
+                    comm.end()?;
                     return Ok(State::End);
                 }
                 _ => {
@@ -202,7 +185,7 @@ impl DevOpenedState {
         }))
     }
 
-    fn partitions(&mut self, comm: &mut Comm<proto::scsi::Request>) -> Result<()> {
+    fn partitions(&mut self, comm: &mut ComRpScsi) -> Result<()> {
         trace!("req partitions");
         let mut partitions = vec![];
         let block_size = self.usb_mass_storage.block_size as u64;
@@ -384,7 +367,7 @@ impl DevOpenedState {
 }
 
 impl PartitionsListedState {
-    fn run(mut self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpScsi) -> Result<State> {
         loop {
             let req: proto::scsi::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
@@ -397,14 +380,12 @@ impl PartitionsListedState {
                         Ok(data) => comm.readsectors(proto::scsi::ResponseReadSectors { data })?,
                         Err(err) => {
                             error!("{}", err);
-                            comm.error(proto::scsi::ResponseError {
-                                err: format!("{err}"),
-                            })?;
+                            comm.error(err)?;
                         }
                     }
                 }
                 Msg::End(_) => {
-                    comm.end(proto::scsi::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
@@ -418,18 +399,16 @@ impl PartitionsListedState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::scsi::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpScsi) -> Result<State> {
         trace!("wait end state");
         let req: proto::scsi::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::End(_) => {
-                comm.end(proto::scsi::ResponseEnd {})?;
+                comm.end()?;
             }
             _ => {
                 error!("unexpected req");
-                comm.error(proto::scsi::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("unexpected request")?;
             }
         }
         Ok(State::End)
@@ -437,12 +416,12 @@ impl WaitEndState {
 }
 
 pub struct Dev2Scsi {
-    comm: Comm<proto::scsi::Request>,
+    comm: ComRpScsi,
     state: State,
 }
 
 impl Dev2Scsi {
-    pub fn new(comm: Comm<proto::scsi::Request>) -> Result<Self> {
+    pub fn new(comm: ComRpScsi) -> Result<Self> {
         let state = State::Init(InitState {});
         Ok(Dev2Scsi { comm, state })
     }
@@ -455,9 +434,7 @@ impl Dev2Scsi {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
-                    comm.error(proto::scsi::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             }

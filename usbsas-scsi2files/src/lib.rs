@@ -8,7 +8,10 @@ use std::{
     sync::{Arc, RwLock},
 };
 use thiserror::Error;
-use usbsas_comm::{protorequest, protoresponse, Comm};
+use usbsas_comm::{
+    ComRpFiles, ComRqScsi, ProtoReqCommon, ProtoReqScsi, ProtoRespCommon, ProtoRespFiles, SendRecv,
+    ToFromFd,
+};
 use usbsas_fsrw::{ext4fs, ff, iso9660fs, ntfs, FSRead};
 use usbsas_mass_storage::MassStorageComm;
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
@@ -41,29 +44,6 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommFiles,
-    files,
-    opendevice = OpenDevice[ResponseOpenDevice],
-    partitions = Partitions[ResponsePartitions],
-    openpartition = OpenPartition[ResponseOpenPartition],
-    getattr = GetAttr[ResponseGetAttr],
-    readdir = ReadDir[ResponseReadDir],
-    readfile = ReadFile[ResponseReadFile],
-    readsectors = ReadSectors[ResponseReadSectors],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
-
-protorequest!(
-    CommScsi,
-    scsi,
-    partitions = Partitions[RequestPartitions, ResponsePartitions],
-    readsectors = ReadSectors[RequestReadSectors, ResponseReadSectors],
-    end = End[RequestEnd, ResponseEnd],
-    opendev = OpenDevice[RequestOpenDevice, ResponseOpenDevice]
-);
-
 enum State {
     Init(InitState),
     ChildStarted(ChildStartedState),
@@ -75,7 +55,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpFiles) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::ChildStarted(s) => s.run(comm),
@@ -91,10 +71,10 @@ impl State {
 struct InitState {}
 
 impl InitState {
-    fn run(self, comm_parent: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(self, comm_parent: &mut ComRpFiles) -> Result<State> {
         let dev2scsi = UsbsasChildSpawner::new("usbsas-dev2scsi")
             .wait_on_startup()
-            .spawn::<proto::scsi::Request>()?;
+            .spawn::<ComRqScsi>()?;
         let UsbsasChild { comm, .. } = dev2scsi;
 
         usbsas_sandbox::scsi2files::seccomp(
@@ -126,19 +106,17 @@ struct PartitionOpenedState {
 }
 
 struct WaitEndState {
-    child_comm: Option<Arc<RwLock<Comm<proto::scsi::Request>>>>,
+    child_comm: Option<Arc<RwLock<ComRqScsi>>>,
 }
 
 impl ChildStartedState {
-    fn run(mut self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpFiles) -> Result<State> {
         let req: proto::files::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::OpenDevice(req) => {
                 if let Err(err) = self.opendevice(comm, req.busnum, req.devnum) {
                     error!("err open device: {}, waiting end", err);
-                    comm.error(proto::files::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    comm.error(err)?;
                     return Ok(State::WaitEnd(WaitEndState {
                         child_comm: Some(self.usb_mass.comm.clone()),
                     }));
@@ -147,8 +125,8 @@ impl ChildStartedState {
             Msg::End(_) => {
                 // unlock and end dev2scsi
                 self.usb_mass.comm()?.write_all(&(0u64.to_le_bytes()))?;
-                self.usb_mass.comm()?.end(proto::scsi::RequestEnd {})?;
-                comm.end(proto::files::ResponseEnd {})?;
+                self.usb_mass.comm()?.end()?;
+                comm.end()?;
                 return Ok(State::End);
             }
             _ => return Err(Error::BadRequest),
@@ -158,12 +136,7 @@ impl ChildStartedState {
         }))
     }
 
-    fn opendevice(
-        &mut self,
-        comm: &mut Comm<proto::files::Request>,
-        busnum: u32,
-        devnum: u32,
-    ) -> Result<()> {
+    fn opendevice(&mut self, comm: &mut ComRpFiles, busnum: u32, devnum: u32) -> Result<()> {
         trace!("req opendevice");
         let buf = (u64::from(devnum)) << 32 | u64::from(busnum);
         // unlock dev2scsi
@@ -186,7 +159,7 @@ impl ChildStartedState {
 }
 
 impl DevOpenedState {
-    fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         loop {
             let req: proto::files::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
@@ -199,8 +172,8 @@ impl DevOpenedState {
                 }
                 Msg::ReadSectors(req) => self.read_sectors(comm, req.offset, req.count)?,
                 Msg::End(_) => {
-                    self.usb_mass.comm()?.end(proto::scsi::RequestEnd {})?;
-                    comm.end(proto::files::ResponseEnd {})?;
+                    self.usb_mass.comm()?.end()?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
@@ -211,7 +184,7 @@ impl DevOpenedState {
         Ok(State::End)
     }
 
-    fn partitions(&self, comm: &mut Comm<proto::files::Request>) -> Result<Vec<PartitionInfo>> {
+    fn partitions(&self, comm: &mut ComRpFiles) -> Result<Vec<PartitionInfo>> {
         trace!("req partitions");
         let rep = self
             .usb_mass
@@ -223,12 +196,7 @@ impl DevOpenedState {
         Ok(rep.partitions)
     }
 
-    fn read_sectors(
-        &self,
-        comm: &mut Comm<proto::files::Request>,
-        offset: u64,
-        count: u64,
-    ) -> Result<()> {
+    fn read_sectors(&self, comm: &mut ComRpFiles, offset: u64, count: u64) -> Result<()> {
         let rep = self
             .usb_mass
             .comm()?
@@ -239,7 +207,7 @@ impl DevOpenedState {
 }
 
 impl PartitionsListedState {
-    fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         let req: proto::files::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::OpenPartition(req) => {
@@ -248,9 +216,7 @@ impl PartitionsListedState {
                 match self.open_partition(comm, req.index) {
                     Ok(fs) => Ok(State::PartitionOpened(PartitionOpenedState { fs })),
                     Err(err) => {
-                        comm.error(proto::files::ResponseError {
-                            err: format!("{err}"),
-                        })?;
+                        comm.error(err)?;
                         Ok(State::WaitEnd(WaitEndState {
                             child_comm: Some(comm_bk),
                         }))
@@ -258,8 +224,8 @@ impl PartitionsListedState {
                 }
             }
             Msg::End(_) => {
-                self.usb_mass.comm()?.end(proto::scsi::RequestEnd {})?;
-                comm.end(proto::files::ResponseEnd {})?;
+                self.usb_mass.comm()?.end()?;
+                comm.end()?;
                 Ok(State::End)
             }
             _ => Err(Error::BadRequest),
@@ -268,7 +234,7 @@ impl PartitionsListedState {
 
     fn open_partition(
         mut self,
-        comm: &mut Comm<proto::files::Request>,
+        comm: &mut ComRpFiles,
         index: u32,
     ) -> Result<Box<dyn FSRead<MassStorageComm>>> {
         trace!("req open partition {}", index);
@@ -293,7 +259,7 @@ impl PartitionsListedState {
 }
 
 impl PartitionOpenedState {
-    fn run(mut self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpFiles) -> Result<State> {
         loop {
             let req: proto::files::Request = comm.recv()?;
             let res = match req.msg.ok_or(Error::BadRequest)? {
@@ -304,18 +270,16 @@ impl PartitionOpenedState {
                 _ => Err(Error::BadRequest),
             };
             if let Err(err) = res {
-                comm.error(proto::files::ResponseError {
-                    err: format!("{err}"),
-                })?;
+                comm.error(err)?;
             };
         }
         let usb_mass = self.fs.unmount_fs()?;
-        usb_mass.comm()?.end(proto::scsi::RequestEnd {})?;
-        comm.end(proto::files::ResponseEnd {})?;
+        usb_mass.comm()?.end()?;
+        comm.end()?;
         Ok(State::End)
     }
 
-    fn getattr(&mut self, comm: &mut Comm<proto::files::Request>, path: String) -> Result<()> {
+    fn getattr(&mut self, comm: &mut ComRpFiles, path: String) -> Result<()> {
         trace!("req getattr {}", path);
         let (ftype, size, timestamp) = self.fs.get_attr(&path)?;
         comm.getattr(proto::files::ResponseGetAttr {
@@ -326,7 +290,7 @@ impl PartitionOpenedState {
         Ok(())
     }
 
-    fn readdir(&mut self, comm: &mut Comm<proto::files::Request>, path: String) -> Result<()> {
+    fn readdir(&mut self, comm: &mut ComRpFiles, path: String) -> Result<()> {
         trace!("req readdir {}", path);
         comm.readdir(proto::files::ResponseReadDir {
             filesinfo: self.fs.read_dir(&path)?,
@@ -336,7 +300,7 @@ impl PartitionOpenedState {
 
     fn readfile(
         &mut self,
-        comm: &mut Comm<proto::files::Request>,
+        comm: &mut ComRpFiles,
         path: String,
         offset: u64,
         size: u64,
@@ -352,7 +316,7 @@ impl PartitionOpenedState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("wait end state");
         loop {
             let req: proto::files::Request = comm.recv()?;
@@ -360,17 +324,15 @@ impl WaitEndState {
                 Msg::End(_) => {
                     if let Some(child_comm) = self.child_comm {
                         if let Ok(mut child_comm) = child_comm.write() {
-                            child_comm.end(proto::scsi::RequestEnd {})?;
+                            child_comm.end()?;
                         }
                     }
-                    comm.end(proto::files::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
                     error!("bad request");
-                    comm.error(proto::files::ResponseError {
-                        err: "bad req, waiting end".into(),
-                    })?;
+                    comm.error("bad request")?;
                 }
             }
         }
@@ -379,12 +341,12 @@ impl WaitEndState {
 }
 
 pub struct Scsi2Files {
-    comm: Comm<proto::files::Request>,
+    comm: ComRpFiles,
     state: State,
 }
 
 impl Scsi2Files {
-    pub fn new(comm: Comm<proto::files::Request>) -> Result<Self> {
+    pub fn new(comm: ComRpFiles) -> Result<Self> {
         let state = State::Init(InitState {});
         Ok(Scsi2Files { comm, state })
     }
@@ -397,9 +359,7 @@ impl Scsi2Files {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
-                    comm.error(proto::files::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState { child_comm: None })
                 }
             }

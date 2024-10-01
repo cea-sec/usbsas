@@ -4,7 +4,7 @@ use clap::{Arg, Command};
 use std::{ffi::OsStr, path::Path, sync::RwLock, time::Duration};
 
 use thiserror::Error;
-use usbsas_comm::{protorequest, Comm};
+use usbsas_comm::{ComRqFiles, ProtoReqCommon, ProtoReqFiles};
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 
@@ -27,19 +27,6 @@ enum Error {
     Process(#[from] usbsas_process::Error),
 }
 type Result<T> = std::result::Result<T, Error>;
-
-protorequest!(
-    CommFiles,
-    files,
-    opendevice = OpenDevice[RequestOpenDevice, ResponseOpenDevice],
-    partitions = Partitions[RequestPartitions, ResponsePartitions],
-    openpartition = OpenPartition[RequestOpenPartition, ResponseOpenPartition],
-    getattr = GetAttr[RequestGetAttr, ResponseGetAttr],
-    readdir = ReadDir[RequestReadDir, ResponseReadDir],
-    readfile = ReadFile[RequestReadFile, ResponseReadFile],
-    readsectors = ReadSectors[RequestReadSectors, ResponseReadSectors],
-    end = End[RequestEnd, ResponseEnd]
-);
 
 const TTL: Duration = Duration::from_secs(1);
 
@@ -82,14 +69,13 @@ impl From<&Entry> for fuse_mt::FileAttr {
 }
 
 struct UsbsasFS {
-    scsi2files: RwLock<UsbsasChild<proto::files::Request>>,
+    scsi2files: RwLock<UsbsasChild<ComRqFiles>>,
 }
 
 impl UsbsasFS {
     fn new(busnum: u32, devnum: u32, partnum: u32) -> Result<Self> {
         log::debug!("Opening device {} {}", busnum, devnum);
-        let mut scsi2files =
-            UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<proto::files::Request>()?;
+        let mut scsi2files = UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<ComRqFiles>()?;
         let _ = scsi2files
             .comm
             .opendevice(proto::files::RequestOpenDevice { busnum, devnum })?;
@@ -117,13 +103,7 @@ impl UsbsasFS {
 
 impl Drop for UsbsasFS {
     fn drop(&mut self) {
-        if let Err(err) = self
-            .scsi2files
-            .get_mut()
-            .unwrap()
-            .comm
-            .end(proto::files::RequestEnd {})
-        {
+        if let Err(err) = self.scsi2files.get_mut().unwrap().comm.end() {
             log::error!("Couldn't end scsi2files: {}", err);
         };
     }

@@ -8,7 +8,7 @@ use std::{
     path,
 };
 use thiserror::Error;
-use usbsas_comm::{protorequest, Comm};
+use usbsas_comm::{ComRqScsi, ProtoReqCommon, ProtoReqScsi, SendRecv, ToFromFd};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
@@ -35,31 +35,8 @@ enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
-protorequest!(
-    CommScsi,
-    scsi,
-    partitions = Partitions[RequestPartitions, ResponsePartitions],
-    readsectors = ReadSectors[RequestReadSectors, ResponseReadSectors],
-    end = End[RequestEnd, ResponseEnd],
-    opendev = OpenDevice[RequestOpenDevice, ResponseOpenDevice]
-);
-
-protorequest!(
-    CommWritefs,
-    writefs,
-    setfsinfos = SetFsInfos[RequestSetFsInfos, ResponseSetFsInfos],
-    newfile = NewFile[RequestNewFile, ResponseNewFile],
-    writefile = WriteFile[RequestWriteFile, ResponseWriteFile],
-    endfile = EndFile[RequestEndFile, ResponseEndFile],
-    close = Close[RequestClose, ResponseClose],
-    bitvec = BitVec[RequestBitVec, ResponseBitVec],
-    imgdisk = ImgDisk[RequestImgDisk, ResponseImgDisk],
-    writedata = WriteData[RequestWriteData, ResponseWriteData],
-    end = End[RequestEnd, ResponseEnd]
-);
-
 struct Imager {
-    dev2scsi: UsbsasChild<proto::scsi::Request>,
+    dev2scsi: UsbsasChild<ComRqScsi>,
     writer: Box<dyn Write>,
     busnum: u32,
     devnum: u32,
@@ -73,7 +50,7 @@ impl Imager {
         log::debug!("spawn dev2scsi ");
         let dev2scsi = UsbsasChildSpawner::new("usbsas-dev2scsi")
             .wait_on_startup()
-            .spawn::<proto::scsi::Request>()?;
+            .spawn::<ComRqScsi>()?;
         pipes_read.push(dev2scsi.comm.input_fd());
         pipes_write.push(dev2scsi.comm.output_fd());
 
@@ -164,10 +141,7 @@ impl Drop for Imager {
                 .write_all(&(0_u64).to_ne_bytes())
                 .expect("Couldn't unlock dev2scsi");
         }
-        self.dev2scsi
-            .comm
-            .end(proto::scsi::RequestEnd {})
-            .expect("Couldn't end dev2scsi");
+        self.dev2scsi.comm.end().expect("Couldn't end dev2scsi");
     }
 }
 

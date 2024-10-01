@@ -65,3 +65,16 @@ message PartitionInfo {
   string name_str = 4;
   string type_str = 5;
 }
+
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseStatus {
+  bool done = 1;
+  uint64 current = 2;
+  uint64 total = 3;
+};

@@ -59,14 +59,7 @@ message Request {
 
 /* Responses */
 
-message ResponseEnd {
-};
-
 message ResponseSetFsInfos {
-};
-
-message ResponseError {
-  string err = 1;
 };
 
 message ResponseNewFile {
@@ -94,9 +87,9 @@ message ResponseWriteData {
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
+    common.ResponseEnd End = 1;
     ResponseSetFsInfos SetFsInfos = 2;
-    ResponseError Error = 3;
+    common.ResponseError Error = 3;
     ResponseNewFile NewFile = 4;
     ResponseWriteFile WriteFile = 5;
     ResponseEndFile EndFile = 6;
@@ -104,6 +97,7 @@ message Response {
     ResponseBitVec BitVec = 8;
     ResponseImgDisk ImgDisk = 9;
     ResponseWriteData WriteData = 10;
+    common.ResponseStatus Status = 11;
   }
 };
 

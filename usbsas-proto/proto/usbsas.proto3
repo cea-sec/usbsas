@@ -110,13 +110,6 @@ message Request {
 
 
 /* Responses */
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message ResponseId {
   string id = 1;
 };
@@ -159,24 +152,10 @@ message ResponseCopyDone {
   bytes report = 1;
 };
 
-message ResponseCopyStatus {
-  uint64 current_size = 1;
-};
-
 message ResponseCopyStatusDone {
 };
 
-message ResponseAnalyzeStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
-};
-
 message ResponseAnalyzeDone {
-};
-
-message ResponseFinalCopyStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
 };
 
 message ResponseFinalCopyStatusDone {
@@ -201,8 +180,8 @@ message ResponsePostCopyCmd {
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
     ResponseId Id = 3;
     ResponseUSBDevices USBDevices = 4;
     ResponseOpenDevice OpenDevice = 5;
@@ -211,12 +190,9 @@ message Response {
     ResponseGetAttr GetAttr = 8;
     ResponseReadDir ReadDir = 9;
     ResponseCopyStart CopyStart = 10;
-    ResponseCopyStatus CopyStatus = 11;
-    ResponseFinalCopyStatus FinalCopyStatus = 12;
     ResponseNotEnoughSpace NotEnoughSpace = 13;
     ResponseWipe Wipe = 14;
     ResponsePostCopyCmd PostCopyCmd = 15;
-    ResponseAnalyzeStatus AnalyzeStatus = 16;
     ResponseAnalyzeDone AnalyzeDone = 17;
     ResponseCopyStatusDone CopyStatusDone = 18;
     ResponseFinalCopyStatusDone FinalCopyStatusDone = 19;
@@ -224,5 +200,6 @@ message Response {
     ResponseCopyDone CopyDone = 21;
     ResponseNothingToCopy NothingToCopy = 22;
     ResponseAltTargets AltTargets = 23;
+    common.ResponseStatus Status = 24;
   }
 };

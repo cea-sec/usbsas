@@ -6,21 +6,12 @@ use std::{
     fs::File,
     io::{self, Read},
 };
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpUploader, ProtoRespCommon, ProtoRespUploader, SendRecv};
 use usbsas_proto as proto;
 use usbsas_proto::uploader::request::Msg;
 
-protoresponse!(
-    CommUploader,
-    uploader,
-    upload = Upload[ResponseUpload],
-    uploadstatus = UploadStatus[ResponseUploadStatus],
-    end = End[ResponseEnd],
-    error = Error[ResponseError]
-);
-
 struct FileReaderProgress {
-    comm: Comm<proto::uploader::Request>,
+    comm: ComRpUploader,
     file: File,
     filesize: u64,
     offset: u64,
@@ -34,11 +25,7 @@ impl Read for FileReaderProgress {
         // the server polled by the client will quickly become very large and
         // will cause errors. 1 in 10 is enough.
         if (self.offset / size_read as u64) % 10 == 0 || self.offset == self.filesize {
-            self.comm
-                .uploadstatus(proto::uploader::ResponseUploadStatus {
-                    current_size: self.offset,
-                    total_size: self.filesize,
-                })?;
+            self.comm.status(self.offset, self.filesize, false)?;
         }
         Ok(size_read)
     }
@@ -52,7 +39,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::uploader::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpUploader) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::Running(s) => s.run(comm),
@@ -73,7 +60,7 @@ struct RunningState {
 struct WaitEndState {}
 
 impl InitState {
-    fn run(mut self, comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpUploader) -> Result<State> {
         let cleantarpath = format!("{}_clean.tar", self.tarpath.trim_end_matches(".tar"));
         usbsas_sandbox::landlock(
             Some(&[
@@ -107,20 +94,18 @@ impl InitState {
 }
 
 impl RunningState {
-    fn run(mut self, comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpUploader) -> Result<State> {
         let req: proto::uploader::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::Upload(req) => {
                 if let Err(err) = self.upload(comm, req) {
                     error!("upload error: {}", err);
-                    comm.error(proto::uploader::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    comm.error(err)?;
                 };
                 Ok(State::WaitEnd(WaitEndState {}))
             }
             Msg::End(_) => {
-                comm.end(proto::uploader::ResponseEnd {})?;
+                comm.end()?;
                 Ok(State::End)
             }
         }
@@ -128,7 +113,7 @@ impl RunningState {
 
     fn upload(
         &mut self,
-        comm: &mut Comm<proto::uploader::Request>,
+        comm: &mut ComRpUploader,
         req: proto::uploader::RequestUpload,
     ) -> Result<()> {
         trace!("upload");
@@ -173,20 +158,18 @@ impl RunningState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::uploader::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpUploader) -> Result<State> {
         trace!("wait end state");
         loop {
             let req: proto::uploader::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
                 Msg::End(_) => {
-                    comm.end(proto::uploader::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
                     error!("bad request");
-                    comm.error(proto::uploader::ResponseError {
-                        err: "bad req, waiting end".into(),
-                    })?;
+                    comm.error("bad request")?;
                 }
             }
         }
@@ -195,12 +178,12 @@ impl WaitEndState {
 }
 
 pub struct Uploader {
-    comm: Comm<proto::uploader::Request>,
+    comm: ComRpUploader,
     state: State,
 }
 
 impl Uploader {
-    pub fn new(comm: Comm<proto::uploader::Request>, tarpath: String) -> Result<Self> {
+    pub fn new(comm: ComRpUploader, tarpath: String) -> Result<Self> {
         let state = State::Init(InitState { tarpath });
         Ok(Uploader { comm, state })
     }
@@ -213,9 +196,7 @@ impl Uploader {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
-                    comm.error(proto::uploader::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             };

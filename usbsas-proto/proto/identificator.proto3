@@ -1,5 +1,6 @@
 syntax = "proto3";
 package identificator;
+import "common.proto3";
 
 
 /* Requests */
@@ -18,21 +19,15 @@ message Request {
 };
 
 /* Responses */
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message ResponseId {
   string id = 1;
 };
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
     ResponseId Id = 3;
+    common.ResponseStatus Status = 4;
   }
 };

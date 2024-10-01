@@ -4,23 +4,13 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, Write},
 };
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpDownloader, ProtoRespCommon, ProtoRespDownloader, SendRecv};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::downloader::request::Msg;
 
-protoresponse!(
-    CommDownloader,
-    downloader,
-    download = Download[ResponseDownload],
-    downloadstatus = DownloadStatus[ResponseDownloadStatus],
-    archiveinfos = ArchiveInfos[ResponseArchiveInfos],
-    end = End[ResponseEnd],
-    error = Error[ResponseError]
-);
-
 struct FileWriterProgress {
-    comm: Comm<proto::downloader::Request>,
+    comm: ComRpDownloader,
     file: File,
     filesize: u64,
     offset: u64,
@@ -34,11 +24,7 @@ impl Write for FileWriterProgress {
         // the server polled by the client will quickly become very large and
         // will cause errors. 1 in 10 is enough.
         if (self.offset / size_written as u64) % 10 == 0 || self.offset == self.filesize {
-            self.comm
-                .downloadstatus(proto::downloader::ResponseDownloadStatus {
-                    current_size: self.offset,
-                    total_size: self.filesize,
-                })?;
+            self.comm.status(self.offset, self.filesize, false)?;
         }
         Ok(size_written)
     }
@@ -55,7 +41,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::downloader::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpDownloader) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::Running(s) => s.run(comm),
@@ -79,7 +65,7 @@ struct RunningState {
 struct WaitEndState {}
 
 impl InitState {
-    fn run(self, _comm: &mut Comm<proto::downloader::Request>) -> Result<State> {
+    fn run(self, _comm: &mut ComRpDownloader) -> Result<State> {
         usbsas_sandbox::landlock(
             Some(&[
                 &self.config_path,
@@ -111,7 +97,7 @@ impl InitState {
 }
 
 impl RunningState {
-    fn run(mut self, comm: &mut Comm<proto::downloader::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpDownloader) -> Result<State> {
         let mut filesize = None;
         loop {
             let req: proto::downloader::Request = comm.recv()?;
@@ -121,9 +107,7 @@ impl RunningState {
                         Ok(size) => filesize = Some(size),
                         Err(err) => {
                             error!("download error: {}", err);
-                            comm.error(proto::downloader::ResponseError {
-                                err: format!("{err}"),
-                            })?;
+                            comm.error(err)?;
                         }
                     };
                 }
@@ -131,30 +115,22 @@ impl RunningState {
                     if let Some(size) = filesize {
                         if let Err(err) = self.download(comm, size) {
                             error!("download error: {}", err);
-                            comm.error(proto::downloader::ResponseError {
-                                err: format!("{err}"),
-                            })?;
+                            comm.error(err)?;
                         };
                         return Ok(State::WaitEnd(WaitEndState {}));
                     } else {
-                        comm.error(proto::downloader::ResponseError {
-                            err: "can't download before knowing the size".to_owned(),
-                        })?;
+                        comm.error("can't download before knowing the size")?;
                     }
                 }
                 Msg::End(_) => {
-                    comm.end(proto::downloader::ResponseEnd {})?;
+                    comm.end()?;
                     return Ok(State::End);
                 }
             }
         }
     }
 
-    fn archive_infos(
-        &mut self,
-        comm: &mut Comm<proto::downloader::Request>,
-        id: &str,
-    ) -> Result<u64> {
+    fn archive_infos(&mut self, comm: &mut ComRpDownloader, id: &str) -> Result<u64> {
         trace!("req size");
         self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
 
@@ -184,11 +160,7 @@ impl RunningState {
         Ok(size)
     }
 
-    fn download(
-        mut self,
-        comm: &mut Comm<proto::downloader::Request>,
-        filesize: u64,
-    ) -> Result<()> {
+    fn download(mut self, comm: &mut ComRpDownloader, filesize: u64) -> Result<()> {
         trace!("download");
         let comm_progress = comm.try_clone()?;
         let mut resp = self.http_client.get(&self.url)?;
@@ -213,20 +185,18 @@ impl RunningState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::downloader::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpDownloader) -> Result<State> {
         trace!("wait end state");
         loop {
             let req: proto::downloader::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
                 Msg::End(_) => {
-                    comm.end(proto::downloader::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
                     error!("bad request");
-                    comm.error(proto::downloader::ResponseError {
-                        err: "bad req, waiting end".into(),
-                    })?;
+                    comm.error("bad request")?;
                 }
             }
         }
@@ -235,16 +205,12 @@ impl WaitEndState {
 }
 
 pub struct Downloader {
-    comm: Comm<proto::downloader::Request>,
+    comm: ComRpDownloader,
     state: State,
 }
 
 impl Downloader {
-    pub fn new(
-        comm: Comm<proto::downloader::Request>,
-        tarpath: String,
-        config_path: String,
-    ) -> Result<Self> {
+    pub fn new(comm: ComRpDownloader, tarpath: String, config_path: String) -> Result<Self> {
         let state = State::Init(InitState {
             tarpath,
             config_path,
@@ -264,9 +230,7 @@ impl Downloader {
                 }
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
-                    comm.error(proto::downloader::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             };

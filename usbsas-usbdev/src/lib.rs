@@ -13,7 +13,7 @@ use std::{
     thread,
 };
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, SendRecv, ToFromFd};
 use usbsas_config::{conf_parse, conf_read, UsbPortAccesses};
 use usbsas_proto as proto;
 use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
@@ -46,14 +46,6 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
     }
 }
 pub type Result<T> = std::result::Result<T, Error>;
-
-protoresponse!(
-    CommUsbdev,
-    usbdev,
-    devices = Devices[ResponseDevices],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
 
 /// Thread for getting plugged devices at startup and handling udev events
 fn handle_udev_events(
@@ -276,7 +268,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::usbdev::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpUsbDev) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::Running(s) => s.run(comm),
@@ -297,7 +289,7 @@ struct RunningState {
 struct WaitEndState {}
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::usbdev::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpUsbDev) -> Result<State> {
         trace!("init state");
 
         usbsas_sandbox::landlock(
@@ -323,7 +315,7 @@ impl InitState {
 }
 
 impl RunningState {
-    fn run(self, comm: &mut Comm<proto::usbdev::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpUsbDev) -> Result<State> {
         trace!("running state");
         loop {
             let req: proto::usbdev::Request = comm.recv()?;
@@ -338,7 +330,7 @@ impl RunningState {
                     comm.devices(proto::usbdev::ResponseDevices { devices })
                 }
                 Msg::End(_) => {
-                    comm.end(proto::usbdev::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
             };
@@ -346,9 +338,7 @@ impl RunningState {
                 Ok(_) => continue,
                 Err(err) => {
                     error!("{}", err);
-                    comm.error(proto::usbdev::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    comm.error(err)?;
                 }
             }
         }
@@ -357,20 +347,18 @@ impl RunningState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::usbdev::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpUsbDev) -> Result<State> {
         trace!("wait end state");
         loop {
             let req: proto::usbdev::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
                 Msg::End(_) => {
-                    comm.end(proto::usbdev::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
                     error!("bad request");
-                    comm.error(proto::usbdev::ResponseError {
-                        err: "bad req, waiting end".into(),
-                    })?;
+                    comm.error("bad request")?;
                 }
             }
         }
@@ -379,12 +367,12 @@ impl WaitEndState {
 }
 
 pub struct UsbDev {
-    comm: Comm<proto::usbdev::Request>,
+    comm: ComRpUsbDev,
     state: State,
 }
 
 impl UsbDev {
-    pub fn new(comm: Comm<proto::usbdev::Request>, config_path: String) -> Result<Self> {
+    pub fn new(comm: ComRpUsbDev, config_path: String) -> Result<Self> {
         Ok(UsbDev {
             comm,
             state: State::Init(InitState { config_path }),
@@ -399,9 +387,7 @@ impl UsbDev {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
-                    comm.error(proto::usbdev::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             }

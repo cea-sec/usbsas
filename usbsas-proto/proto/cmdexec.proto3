@@ -25,29 +25,18 @@ message Request {
 
 /* Response */
 
-message ResponseExecStatus {
-  uint32 status = 1;
-}
-
 message ResponseExec {
 }
 
 message ResponsePostCopyExec {
 }
 
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message Response {
   oneof msg {
     ResponseExec Exec = 1;
     ResponsePostCopyExec PostCopyExec = 2;
-    ResponseExecStatus ExecStatus = 3;
-    ResponseEnd End = 4;
-    ResponseError Error = 5;
+    common.ResponseStatus Status = 3;
+    common.ResponseEnd End = 4;
+    common.ResponseError Error = 5;
   }
 };

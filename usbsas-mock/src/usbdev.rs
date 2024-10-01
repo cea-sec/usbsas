@@ -1,7 +1,7 @@
 use log::{error, trace};
 use std::env;
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, SendRecv};
 use usbsas_proto as proto;
 use usbsas_proto::common::UsbDevice;
 
@@ -14,21 +14,13 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommUsbdev,
-    usbdev,
-    devices = Devices[ResponseDevices],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
-
 pub struct MockUsbDev {
-    comm: Comm<proto::usbdev::Request>,
+    comm: ComRpUsbDev,
     devices: Vec<UsbDevice>,
 }
 
 impl MockUsbDev {
-    pub fn new(comm: Comm<proto::usbdev::Request>, _: String) -> Result<Self> {
+    pub fn new(comm: ComRpUsbDev, _: String) -> Result<Self> {
         let mut devices = Vec::new();
 
         // Fake input device
@@ -79,7 +71,7 @@ impl MockUsbDev {
             let res = match req.msg {
                 Some(proto::usbdev::request::Msg::Devices(_)) => self.handle_req_devices(),
                 Some(proto::usbdev::request::Msg::End(_)) => {
-                    self.comm.end(proto::usbdev::ResponseEnd {})?;
+                    self.comm.end()?;
                     break;
                 }
                 None => Err(Error::BadRequest),
@@ -87,9 +79,7 @@ impl MockUsbDev {
             match res {
                 Ok(_) => continue,
                 Err(err) => {
-                    self.comm.error(proto::usbdev::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    self.comm.error(err)?;
                 }
             }
         }

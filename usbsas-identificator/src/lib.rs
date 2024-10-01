@@ -1,9 +1,10 @@
 //! Dummy identificator
 
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
-use usbsas_proto as proto;
-use usbsas_proto::identificator::request::Msg;
+use usbsas_comm::{
+    ComRpIdentificator, ProtoRespCommon, ProtoRespIdentificator, SendRecv, ToFromFd,
+};
+use usbsas_proto::{self as proto, identificator::request::Msg};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -18,14 +19,6 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommIdentificator,
-    identificator,
-    id = Id[ResponseId],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
-
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -33,7 +26,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::identificator::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpIdentificator) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::Running(s) => s.run(comm),
@@ -49,14 +42,14 @@ struct RunningState {
 }
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::identificator::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpIdentificator) -> Result<State> {
         usbsas_sandbox::identificator::seccomp(comm.input_fd(), comm.output_fd())?;
         Ok(State::Running(RunningState { current_id: None }))
     }
 }
 
 impl RunningState {
-    fn run(mut self, comm: &mut Comm<proto::identificator::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpIdentificator) -> Result<State> {
         loop {
             let req: proto::identificator::Request = comm.recv()?;
             match req.msg.ok_or(Error::BadRequest)? {
@@ -65,7 +58,7 @@ impl RunningState {
                     comm.id(proto::identificator::ResponseId { id })?;
                 }
                 Msg::End(_) => {
-                    comm.end(proto::identificator::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
             }
@@ -85,12 +78,12 @@ impl RunningState {
 }
 
 pub struct Identificator {
-    comm: Comm<proto::identificator::Request>,
+    comm: ComRpIdentificator,
     state: State,
 }
 
 impl Identificator {
-    pub fn new(comm: Comm<proto::identificator::Request>) -> Result<Self> {
+    pub fn new(comm: ComRpIdentificator) -> Result<Self> {
         Ok(Identificator {
             comm,
             state: State::Init(InitState {}),

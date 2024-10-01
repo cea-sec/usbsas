@@ -1,5 +1,6 @@
 syntax = "proto3";
 package analyzer;
+import "common.proto3";
 
 /* Requests */
 
@@ -24,23 +25,11 @@ message ResponseAnalyze {
   string report = 1;
 }
 
-message ResponseUploadStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
-}
-
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message Response {
   oneof msg {
     ResponseAnalyze Analyze = 1;
-    ResponseEnd End = 2;
-    ResponseError Error = 3;
-    ResponseUploadStatus UploadStatus = 4;
+    common.ResponseEnd End = 2;
+    common.ResponseError Error = 3;
+    common.ResponseStatus Status = 4;
   }
 };

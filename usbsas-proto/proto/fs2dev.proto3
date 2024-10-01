@@ -1,5 +1,6 @@
 syntax = "proto3";
 package fs2dev;
+import "common.proto3";
 
 
 /* Requests */
@@ -34,13 +35,6 @@ message Request {
 
 
 /* Responses */
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message ResponseDevSize {
   uint64 size = 1;
 };
@@ -51,26 +45,17 @@ message ResponseStartCopy {
 message ResponseWipe {
 };
 
-message ResponseCopyStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
-};
-
-message ResponseCopyStatusDone {
-};
-
 message ResponseLoadBitVec {
 };
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
-    ResponseCopyStatus CopyStatus = 3;
-    ResponseDevSize DevSize = 4;
-    ResponseStartCopy StartCopy = 5;
-    ResponseWipe Wipe = 6;
-    ResponseCopyStatusDone CopyStatusDone = 7;
-    ResponseLoadBitVec LoadBitVec = 8;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
+    ResponseDevSize DevSize = 3;
+    ResponseStartCopy StartCopy = 4;
+    ResponseWipe Wipe = 5;
+    ResponseLoadBitVec LoadBitVec = 6;
+    common.ResponseStatus Status = 7;
   }
 };

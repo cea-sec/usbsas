@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use usbsas_comm::{protorequest, Comm};
+use usbsas_comm::{ComRqScsi, Comm, ProtoReqScsi};
 use usbsas_proto as proto;
 use usbsas_scsi::ScsiUsb;
 
@@ -24,15 +24,6 @@ pub enum Error {
     Error(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
-
-protorequest!(
-    CommScsi,
-    scsi,
-    partitions = Partitions[RequestPartitions, ResponsePartitions],
-    readsectors = ReadSectors[RequestReadSectors, ResponseReadSectors],
-    end = End[RequestEnd, ResponseEnd],
-    opendev = OpenDevice[RequestOpenDevice, ResponseOpenDevice]
-);
 
 pub const MAX_SECTORS_COUNT_CACHE: u64 = 8;
 const MSC_SUBCLASS_RBC: u8 = 0x1; // Reduced Block Commands
@@ -235,7 +226,7 @@ pub struct MassStorageComm {
 }
 
 impl MassStorageComm {
-    pub fn new(comm: Comm<proto::scsi::Request>) -> Self {
+    pub fn new(comm: ComRqScsi) -> Self {
         MassStorageComm {
             block_size: 0,
             seek: 0,

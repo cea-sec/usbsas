@@ -1,5 +1,6 @@
 syntax = "proto3";
 package filter;
+import "common.proto3";
 
 
 /* Requests */
@@ -26,21 +27,15 @@ enum FilterResult {
   PATH_ERROR = 2;
 };
 
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message ResponseFilterPaths {
   repeated FilterResult results = 1;
 };
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
     ResponseFilterPaths FilterPaths = 3;
+    common.ResponseStatus Status = 4;
   }
 };

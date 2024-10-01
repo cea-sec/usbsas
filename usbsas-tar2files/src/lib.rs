@@ -13,7 +13,7 @@ use std::{
 };
 use tar::Archive;
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpFiles, ProtoRespCommon, ProtoRespFiles, SendRecv, ToFromFd};
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::{FileInfo, FileType},
@@ -38,16 +38,6 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommReadTar,
-    files,
-    getattr = GetAttr[ResponseGetAttr],
-    readdir = ReadDir[ResponseReadDir],
-    readfile = ReadFile[ResponseReadFile],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
-
 enum State {
     Init(InitState),
     LoadMetadata(LoadMetadataState),
@@ -57,7 +47,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpFiles) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::LoadMetadata(s) => s.run(comm),
@@ -92,7 +82,7 @@ struct MainLoopState {
 struct WaitEndState;
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("waiting unlock");
         Ok(match comm.read_u8()? {
             1 => {
@@ -113,7 +103,7 @@ impl InitState {
 }
 
 impl LoadMetadataState {
-    fn run(self, _comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(self, _comm: &mut ComRpFiles) -> Result<State> {
         let mut metadata = HashMap::new();
         let mut archive = Archive::new(self.tar);
         let data_dir = TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/";
@@ -160,7 +150,7 @@ impl LoadMetadataState {
 }
 
 impl MainLoopState {
-    fn run(mut self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("main loop");
         loop {
             let req: proto::files::Request = comm.recv()?;
@@ -170,7 +160,7 @@ impl MainLoopState {
                 Msg::ReadFile(req) => self.readfile(comm, &req.path, req.offset, req.size as usize),
                 Msg::ReadDir(req) => self.readdir(comm, &req.path),
                 Msg::End(_) => {
-                    comm.end(proto::files::ResponseEnd {})?;
+                    comm.end()?;
                     return Ok(State::End);
                 }
                 _ => {
@@ -183,9 +173,7 @@ impl MainLoopState {
                 Ok(_) => continue,
                 Err(err) => {
                     error!("{}", err);
-                    comm.error(proto::files::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    comm.error(err)?;
                 }
             }
         }
@@ -198,7 +186,7 @@ impl MainLoopState {
             .ok_or_else(|| Error::Error(format!("didn't find {path} in metadata")))
     }
 
-    fn getattr(&mut self, comm: &mut Comm<proto::files::Request>, path: &str) -> Result<()> {
+    fn getattr(&mut self, comm: &mut ComRpFiles, path: &str) -> Result<()> {
         trace!("req_getattr: {}", path);
         let entry = self.get_entry(path)?;
         Ok(comm.getattr(proto::files::ResponseGetAttr {
@@ -210,7 +198,7 @@ impl MainLoopState {
 
     fn readfile(
         &mut self,
-        comm: &mut Comm<proto::files::Request>,
+        comm: &mut ComRpFiles,
         path: &str,
         file_offset: u64,
         size: usize,
@@ -231,7 +219,7 @@ impl MainLoopState {
         Ok(comm.readfile(proto::files::ResponseReadFile { data })?)
     }
 
-    fn readdir(&mut self, comm: &mut Comm<proto::files::Request>, path: &str) -> Result<()> {
+    fn readdir(&mut self, comm: &mut ComRpFiles, path: &str) -> Result<()> {
         debug!("req read_dir {}", path);
         let path = path.trim_start_matches('/');
         let filesinfo = self
@@ -259,18 +247,16 @@ impl MainLoopState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::files::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("wait end state");
         let req: proto::files::Request = comm.recv()?;
         match req.msg.ok_or(Error::BadRequest)? {
             Msg::End(_) => {
-                comm.end(proto::files::ResponseEnd {})?;
+                comm.end()?;
             }
             _ => {
                 error!("unexpected req");
-                comm.error(proto::files::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
             }
         }
         Ok(State::End)
@@ -278,12 +264,12 @@ impl WaitEndState {
 }
 
 pub struct Tar2Files {
-    comm: Comm<proto::files::Request>,
+    comm: ComRpFiles,
     state: State,
 }
 
 impl Tar2Files {
-    pub fn new(comm: Comm<proto::files::Request>, tarpath: String) -> Result<Self> {
+    pub fn new(comm: ComRpFiles, tarpath: String) -> Result<Self> {
         let state = State::Init(InitState { tarpath });
         Ok(Tar2Files { comm, state })
     }
@@ -296,9 +282,7 @@ impl Tar2Files {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}", err);
-                    comm.error(proto::files::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             }

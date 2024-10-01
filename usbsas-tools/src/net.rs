@@ -3,7 +3,10 @@
 use clap::{Arg, Command};
 use std::io::{self, Write};
 use thiserror::Error;
-use usbsas_comm::{protorequest, Comm};
+use usbsas_comm::{
+    ComRqAnalyzer, ComRqDownloader, ComRqUploader, ProtoReqAnalyzer, ProtoReqCommon,
+    ProtoReqDownloader, ProtoReqUploader, SendRecv,
+};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_process::UsbsasChildSpawner;
 use usbsas_proto as proto;
@@ -33,34 +36,12 @@ enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
-protorequest!(
-    CommUploader,
-    uploader,
-    upload = Upload[RequestUpload, ResponseUpload],
-    end = End[RequestEnd, ResponseEnd]
-);
-
-protorequest!(
-    CommDownloader,
-    downloader,
-    download = Download[RequestDownload, ResponseDownload],
-    archiveinfos = ArchiveInfos[RequestArchiveInfos, ResponseArchiveInfos],
-    end = End[RequestEnd, ResponseEnd]
-);
-
-protorequest!(
-    CommAnalyzer,
-    analyzer,
-    analyze = Analyze[RequestAnalyze, ResponseAnalyze],
-    end = End[RequestEnd, ResponseEnd]
-);
-
 fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     use proto::uploader::response::Msg;
     let mut uploader = UsbsasChildSpawner::new("usbsas-uploader")
         .arg(bundle_path)
         .wait_on_startup()
-        .spawn::<proto::uploader::Request>()?;
+        .spawn::<ComRqUploader>()?;
 
     let config = conf_parse(&conf_read(config_path)?)?;
 
@@ -116,8 +97,8 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     loop {
         let rep: proto::uploader::Response = uploader.comm.recv()?;
         match rep.msg.ok_or(Error::BadRequest)? {
-            Msg::UploadStatus(status) => {
-                log::debug!("status: {}/{}", status.current_size, status.total_size);
+            Msg::Status(status) => {
+                log::debug!("status: {}/{}", status.current, status.total);
                 continue;
             }
             Msg::Upload(_) => {
@@ -134,7 +115,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         }
     }
 
-    if let Err(err) = uploader.comm.end(proto::uploader::RequestEnd {}) {
+    if let Err(err) = uploader.comm.end() {
         log::error!("Couldn't end uploader: {}", err);
     };
 
@@ -148,7 +129,7 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let mut analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
         .arg(bundle_path)
         .args(&["-c", config_path])
-        .spawn::<proto::analyzer::Request>()?;
+        .spawn::<ComRqAnalyzer>()?;
 
     analyzer.comm.send(proto::analyzer::Request {
         msg: Some(proto::analyzer::request::Msg::Analyze(
@@ -168,8 +149,8 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
                 );
                 break;
             }
-            Msg::UploadStatus(status) => {
-                log::debug!("status: {}/{}", status.current_size, status.total_size);
+            Msg::Status(status) => {
+                log::debug!("status: {}/{}", status.current, status.total);
                 continue;
             }
             Msg::Error(err) => {
@@ -180,7 +161,7 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         }
     }
 
-    if let Err(err) = analyzer.comm.end(proto::analyzer::RequestEnd {}) {
+    if let Err(err) = analyzer.comm.end() {
         log::error!("Couldn't end analyzer: {}", err);
     };
 
@@ -192,7 +173,7 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let mut downloader = UsbsasChildSpawner::new("usbsas-downloader")
         .arg(bundle_path)
         .args(&["-c", config_path])
-        .spawn::<proto::downloader::Request>()?;
+        .spawn::<ComRqDownloader>()?;
 
     let _ = downloader
         .comm
@@ -209,8 +190,8 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     loop {
         let rep: proto::downloader::Response = downloader.comm.recv()?;
         match rep.msg.ok_or(Error::BadRequest)? {
-            Msg::DownloadStatus(status) => {
-                log::debug!("status: {}/{}", status.current_size, status.total_size);
+            Msg::Status(status) => {
+                log::debug!("status: {}/{}", status.current, status.total);
                 continue;
             }
             Msg::Download(_) => {
@@ -228,7 +209,7 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         }
     }
 
-    if let Err(err) = downloader.comm.end(proto::downloader::RequestEnd {}) {
+    if let Err(err) = downloader.comm.end() {
         log::error!("Couldn't end downloader: {}", err);
     };
 

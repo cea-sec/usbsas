@@ -18,21 +18,15 @@ message Request {
 };
 
 /* Responses */
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
 message ResponseDevices {
   repeated common.USBDevice devices = 1;
 };
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
-    ResponseDevices Devices = 3;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
+    common.ResponseStatus Status = 3;
+    ResponseDevices Devices = 4;
   }
 };
