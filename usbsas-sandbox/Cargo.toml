@@ -11,7 +11,7 @@ cc = "1.1"
 landlock = "0.4"
 libc = "0.2"
 log = "0.4"
-procfs = { version = "0.16", default-features = false }
+procfs = { version = "0.17", default-features = false }
 syscallz = "0.17"
 thiserror = "1.0"
 
