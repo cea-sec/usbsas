@@ -1,37 +1,11 @@
+use crate::FileWriterProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
-use std::{
-    fs::{File, OpenOptions},
-    io::{self, Write},
-};
+use std::fs::{File, OpenOptions};
 use usbsas_comm::{ComRpDownloader, ProtoRespCommon, ProtoRespDownloader, SendRecv};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::downloader::request::Msg;
-
-struct FileWriterProgress {
-    comm: ComRpDownloader,
-    file: File,
-    filesize: u64,
-    offset: u64,
-}
-
-impl Write for FileWriterProgress {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let size_written = self.file.write(buf)?;
-        self.offset += size_written as u64;
-        // if we report progression with each read (of 8kb), the json status of
-        // the server polled by the client will quickly become very large and
-        // will cause errors. 1 in 10 is enough.
-        if (self.offset / size_written as u64) % 10 == 0 || self.offset == self.filesize {
-            self.comm.status(self.offset, self.filesize, false)?;
-        }
-        Ok(size_written)
-    }
-    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
-        self.file.flush()
-    }
-}
 
 enum State {
     Init(InitState),

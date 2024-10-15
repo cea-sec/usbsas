@@ -21,9 +21,57 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
     Method, StatusCode,
 };
+use std::fs::File;
+use std::io::{self, Read, Write};
 use std::time::Duration;
+use usbsas_comm::ProtoRespCommon;
 
 use thiserror::Error;
+
+struct FileReaderProgress<T> {
+    comm: T,
+    file: File,
+    pub filesize: u64,
+    offset: u64,
+}
+
+impl<T: ProtoRespCommon> Read for FileReaderProgress<T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let size_read = self.file.read(buf)?;
+        self.offset += size_read as u64;
+        // if we report progression with each read (of 8kb), the json status of
+        // the server polled by the client will quickly become very large and
+        // will cause errors. 1 in 10 is enough.
+        if (self.offset / size_read as u64) % 10 == 0 || self.offset == self.filesize {
+            self.comm.status(self.offset, self.filesize, false)?;
+        }
+        Ok(size_read)
+    }
+}
+
+struct FileWriterProgress<T> {
+    comm: T,
+    file: File,
+    filesize: u64,
+    offset: u64,
+}
+
+impl<T: ProtoRespCommon> Write for FileWriterProgress<T> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let size_written = self.file.write(buf)?;
+        self.offset += size_written as u64;
+        // if we report progression with each read (of 8kb), the json status of
+        // the server polled by the client will quickly become very large and
+        // will cause errors. 1 in 10 is enough.
+        if (self.offset / size_written as u64) % 10 == 0 || self.offset == self.filesize {
+            self.comm.status(self.offset, self.filesize, false)?;
+        }
+        Ok(size_written)
+    }
+    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
+        self.file.flush()
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum Error {

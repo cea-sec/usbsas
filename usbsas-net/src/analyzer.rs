@@ -1,14 +1,9 @@
+use crate::FileReaderProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
 use reqwest::blocking::Body;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{self, Read},
-    thread::sleep,
-    time::Duration,
-};
+use std::{collections::HashMap, fs::File, thread::sleep, time::Duration};
 use usbsas_comm::{ComRpAnalyzer, ProtoRespAnalyzer, ProtoRespCommon, SendRecv};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
@@ -19,27 +14,6 @@ struct JsonRes {
     status: String,
     id: String,
     files: Option<HashMap<String, serde_json::Value>>,
-}
-
-struct FileReaderProgress {
-    comm: ComRpAnalyzer,
-    file: File,
-    pub filesize: u64,
-    offset: u64,
-}
-
-impl Read for FileReaderProgress {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let size_read = self.file.read(buf)?;
-        self.offset += size_read as u64;
-        // if we report progression with each read (of 8kb), the json status of
-        // the server polled by the client will quickly become very large and
-        // will cause errors. 1 in 10 is enough.
-        if (self.offset / size_read as u64) % 10 == 0 || self.offset == self.filesize {
-            self.comm.status(self.offset, self.filesize, false)?;
-        }
-        Ok(size_read)
-    }
 }
 
 enum State {

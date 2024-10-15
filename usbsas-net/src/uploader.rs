@@ -1,35 +1,12 @@
+use crate::FileReaderProgress;
 use crate::{Error, HttpClient, Result};
 use byteorder::ReadBytesExt;
 use log::{error, trace};
 use reqwest::blocking::Body;
-use std::{
-    fs::File,
-    io::{self, Read},
-};
+use std::fs::File;
 use usbsas_comm::{ComRpUploader, ProtoRespCommon, ProtoRespUploader, SendRecv};
 use usbsas_proto as proto;
 use usbsas_proto::uploader::request::Msg;
-
-struct FileReaderProgress {
-    comm: ComRpUploader,
-    file: File,
-    filesize: u64,
-    offset: u64,
-}
-
-impl Read for FileReaderProgress {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let size_read = self.file.read(buf)?;
-        self.offset += size_read as u64;
-        // if we report progression with each read (of 8kb), the json status of
-        // the server polled by the client will quickly become very large and
-        // will cause errors. 1 in 10 is enough.
-        if (self.offset / size_read as u64) % 10 == 0 || self.offset == self.filesize {
-            self.comm.status(self.offset, self.filesize, false)?;
-        }
-        Ok(size_read)
-    }
-}
 
 enum State {
     Init(InitState),
