@@ -152,12 +152,6 @@ message ResponseCopyDone {
   bytes report = 1;
 };
 
-message ResponseCopyStatusDone {
-};
-
-message ResponseAnalyzeDone {
-};
-
 message ResponseFinalCopyStatusDone {
 };
 
@@ -193,8 +187,6 @@ message Response {
     ResponseNotEnoughSpace NotEnoughSpace = 13;
     ResponseWipe Wipe = 14;
     ResponsePostCopyCmd PostCopyCmd = 15;
-    ResponseAnalyzeDone AnalyzeDone = 17;
-    ResponseCopyStatusDone CopyStatusDone = 18;
     ResponseFinalCopyStatusDone FinalCopyStatusDone = 19;
     ResponseImgDisk ImgDisk = 20;
     ResponseCopyDone CopyDone = 21;

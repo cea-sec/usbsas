@@ -718,7 +718,7 @@ impl CopyFilesState {
             .close(proto::writetar::RequestClose {
                 infos: serde_json::to_vec(&report)?,
             })?;
-        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
+        comm.status(current_size, total_size, true)?;
         Ok(())
     }
 
@@ -910,7 +910,7 @@ impl DownloadTarState {
         }
 
         log::debug!("Bundle successfully downloaded");
-        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
+        comm.done()?;
         Ok(())
     }
 
@@ -1111,7 +1111,7 @@ impl AnalyzeState {
                         }),
                     }
 
-                    comm.analyzedone(proto::usbsas::ResponseAnalyzeDone {})?;
+                    comm.done()?;
                     return Ok(report_json);
                 }
                 Msg::Status(status) => {
@@ -1158,7 +1158,7 @@ impl WriteCleanTarState {
                 infos: serde_json::to_vec(&self.report)?,
             })?;
 
-        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
+        comm.done()?;
 
         Ok(State::UploadOrCmd(UploadOrCmdState {
             id: self.id,
@@ -1309,7 +1309,7 @@ impl WriteFsState {
             .files2fs
             .comm
             .close(proto::writefs::RequestClose {})?;
-        comm.copystatusdone(proto::usbsas::ResponseCopyStatusDone {})?;
+        comm.done()?;
 
         children.forward_bitvec()?;
         match self.write_fs(comm, children) {

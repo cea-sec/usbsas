@@ -780,8 +780,10 @@ impl AppState {
                 Msg::Status(msg) => {
                     progress = current_progress + (msg.current as f32 / msg.total as f32 * 30.0);
                     resp_stream.report_progress("copy_usb_tar_update", progress)?;
+                    if msg.done {
+                        break;
+                    }
                 }
-                Msg::CopyStatusDone(_) => break,
                 Msg::NotEnoughSpace(msg) => {
                     resp_stream.report_progress("copy_usb_tar_start", progress)?;
                     resp_stream.add_message(ReportCopySize {
@@ -820,10 +822,12 @@ impl AppState {
                 resp = comm.recv()?;
                 match resp.msg.ok_or(ServiceError::InternalServerError)? {
                     Msg::Status(msg) => {
+                        if msg.done {
+                            break;
+                        }
                         progress = current_progress + (msg.current as f32 / msg.total as f32 * 5.0);
                         resp_stream.report_progress("analyze_update", progress)?;
                     }
-                    Msg::AnalyzeDone(_) => break,
                     Msg::Error(err) => {
                         resp_stream.report_error(&err.err)?;
                         return Err(ServiceError::InternalServerError);
@@ -854,11 +858,13 @@ impl AppState {
                 resp = comm.recv()?;
                 match resp.msg.ok_or(ServiceError::InternalServerError)? {
                     Msg::Status(msg) => {
+                        if msg.done {
+                            break;
+                        }
                         progress =
                             current_progress + (msg.current as f32 / total_size as f32 * 30.0);
                         resp_stream.report_progress("copy_fromtar_update", progress)?;
                     }
-                    Msg::CopyStatusDone(_) => break,
                     Msg::NothingToCopy(msg) => {
                         resp_stream.add_message(ReportCopy {
                             status: "nothing_to_copy",

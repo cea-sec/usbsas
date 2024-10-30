@@ -247,6 +247,7 @@ pub trait ProtoRespCommon: SendRecv {
     fn status(&mut self, current: u64, total: u64, done: bool) -> std::io::Result<()>;
     fn error(&mut self, err: impl std::string::ToString) -> std::io::Result<()>;
     fn end(&mut self) -> std::io::Result<()>;
+    fn done(&mut self) -> std::io::Result<()>;
 }
 
 #[macro_export]
@@ -276,6 +277,13 @@ macro_rules! protoresponse {
                 fn end(&mut self) -> std::io::Result<()> {
                     self.send(usbsas_proto::[<$proto:lower>]::Response {
                         msg: Some(usbsas_proto::[<$proto:lower>]::response::Msg::End(usbsas_proto::common::ResponseEnd {})),
+                    })
+                }
+                fn done(&mut self) -> std::io::Result<()> {
+                    self.send(usbsas_proto::[<$proto:lower>]::Response {
+                        msg: Some(usbsas_proto::[<$proto:lower>]::response::Msg::Status(usbsas_proto::common::ResponseStatus {
+                            current: 0, total: 0, done: true,
+                        })),
                     })
                 }
             }
@@ -356,8 +364,6 @@ protoresponse!(
     ReadDir,
     CopyStart,
     CopyDone,
-    CopyStatusDone,
-    AnalyzeDone,
     FinalCopyStatusDone,
     NotEnoughSpace,
     NothingToCopy,
