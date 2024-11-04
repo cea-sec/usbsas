@@ -56,11 +56,7 @@ pub extern "C" fn ntfs_dev_read(
 
     unsafe { std::ptr::copy(data.as_mut_ptr(), buf as *mut u8, data.len()) };
 
-    if let Ok(count) = i64::try_from(count) {
-        count
-    } else {
-        -1
-    }
+    i64::try_from(count).unwrap_or(-1)
 }
 
 #[no_mangle]
@@ -81,10 +77,5 @@ pub extern "C" fn ntfs_dev_write(
         eprintln!("ntfs write error: {err}");
         return -1;
     }
-
-    if let Ok(count) = i64::try_from(count) {
-        count
-    } else {
-        -1
-    }
+    i64::try_from(count).unwrap_or(-1)
 }

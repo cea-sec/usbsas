@@ -88,12 +88,12 @@ fn main() -> wry::Result<()> {
         window_builder
     };
     let window = window_builder.build(&event_loop).unwrap();
-    let builder = WebViewBuilder::new_gtk(window.default_vbox().unwrap());
+    let builder = WebViewBuilder::new();
     let webview = builder
-        .with_url(&format!("file:///{}/index.html", web_dir_path))
+        .with_url(format!("file:///{}/index.html", web_dir_path))
         .with_devtools(false)
         .with_focused(true)
-        .build()?;
+        .build_gtk(window.default_vbox().unwrap())?;
     let _ = webview.clear_all_browsing_data();
 
     event_loop.run(move |event, _, control_flow| {
