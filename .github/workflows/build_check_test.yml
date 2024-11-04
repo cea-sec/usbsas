@@ -19,7 +19,7 @@ jobs:
         with:
           toolchain: stable
       - name: cargo fmt
-        run: cargo fmt --all
+        run: cargo fmt --all --check
 
   audit:
     runs-on: ubuntu-latest
