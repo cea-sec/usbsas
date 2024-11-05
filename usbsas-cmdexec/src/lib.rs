@@ -3,7 +3,7 @@
 //! This process will execute the target command specified in the configuration
 //! file with the output of the transfer as argument.
 
-use byteorder::ReadBytesExt;
+use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, info, trace};
 use std::process::{Command, Stdio};
 use thiserror::Error;
@@ -75,7 +75,7 @@ impl InitState {
     fn run(mut self, comm: &mut ComRpCmdExec) -> Result<State> {
         let config = conf_parse(&conf_read(&self.config_path)?)?;
 
-        match comm.read_u8()? {
+        match comm.read_u64::<LittleEndian>()? {
             // Nothing to do, exit
             0 => return Ok(State::WaitEnd(WaitEndState {})),
             // Use provided tar path

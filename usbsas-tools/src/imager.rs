@@ -74,8 +74,8 @@ impl Imager {
 
     fn image_device(&mut self) -> Result<()> {
         // Unlock dev2scsi
-        let buf = (u64::from(self.devnum)) << 32 | u64::from(self.busnum);
-        self.dev2scsi.unlock_with(&buf.to_le_bytes())?;
+        self.dev2scsi
+            .unlock_with((u64::from(self.devnum)) << 32 | u64::from(self.busnum))?;
 
         let rep: proto::scsi::Response = self.dev2scsi.comm.recv()?;
         let (dev_size, block_size) =
@@ -137,8 +137,7 @@ impl Drop for Imager {
         log::debug!("End children");
         if self.dev2scsi.locked {
             self.dev2scsi
-                .comm
-                .write_all(&(0_u64).to_ne_bytes())
+                .unlock_with(0)
                 .expect("Couldn't unlock dev2scsi");
         }
         self.dev2scsi.comm.end().expect("Couldn't end dev2scsi");

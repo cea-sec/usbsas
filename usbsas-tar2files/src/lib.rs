@@ -2,7 +2,7 @@
 //! temp tar archive. It answers to usbsas's `readdir`, `getattr`, `readfile`,
 //! etc. requests
 
-use byteorder::ReadBytesExt;
+use byteorder::{LittleEndian, ReadBytesExt};
 use log::{debug, error, trace};
 use std::{
     collections::HashMap,
@@ -84,7 +84,7 @@ struct WaitEndState;
 impl InitState {
     fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("waiting unlock");
-        Ok(match comm.read_u8()? {
+        Ok(match comm.read_u64::<LittleEndian>()? {
             1 => {
                 let tar = File::open(self.tarpath)?;
                 usbsas_sandbox::tar2files::seccomp(

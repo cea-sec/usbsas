@@ -557,9 +557,9 @@ impl CopyFilesState {
         } else {
             match self.destination {
                 Destination::Usb(usb) => {
-                    children.uploader.unlock_with(&[0_u8])?;
-                    children.cmdexec.unlock_with(&[0_u8])?;
-                    children.tar2files.unlock_with(&[1_u8])?;
+                    children.uploader.unlock_with(0)?;
+                    children.cmdexec.unlock_with(0)?;
+                    children.tar2files.unlock_with(1)?;
                     Ok(State::WriteFs(WriteFsState {
                         directories: all_directories_filtered,
                         errors,
@@ -571,9 +571,9 @@ impl CopyFilesState {
                 }
                 Destination::Net(_) | Destination::Cmd(_) => {
                     report["error_files"] = errors.into();
-                    children.uploader.unlock_with(&[1_u8])?;
-                    children.cmdexec.unlock_with(&[1_u8])?;
-                    children.tar2files.unlock_with(&[0_u8])?;
+                    children.uploader.unlock_with(1)?;
+                    children.cmdexec.unlock_with(1)?;
+                    children.tar2files.unlock_with(0)?;
                     Ok(State::UploadOrCmd(UploadOrCmdState {
                         id: self.id,
                         destination: self.destination,
@@ -834,7 +834,7 @@ impl DownloadTarState {
 
         comm.copystart(proto::usbsas::ResponseCopyStart { total_files_size })?;
         self.download_tar(comm, children, &remote_path)?;
-        children.tar2files.unlock_with(&[1_u8])?;
+        children.tar2files.unlock_with(1)?;
         self.tar_to_files_list(
             children,
             &mut errors,
@@ -862,7 +862,7 @@ impl DownloadTarState {
             })),
             Destination::Net(_) | Destination::Cmd(_) => {
                 report["error_files"] = errors.into();
-                children.tar2files.unlock_with(&[0_u8])?;
+                children.tar2files.unlock_with(0)?;
                 Ok(State::UploadOrCmd(UploadOrCmdState {
                     id: self.id,
                     destination: self.destination,
@@ -1010,7 +1010,7 @@ impl AnalyzeState {
         let analyze_report = self.analyze_files(comm, children, &mut dirty)?;
         self.report["analyzer_report"] = analyze_report;
 
-        children.tar2files.unlock_with(&[1])?;
+        children.tar2files.unlock_with(1)?;
 
         // Abort if no files survived antivirus and no report requested
         if self.files.is_empty() && !self.config.write_report_dest {
@@ -1021,8 +1021,8 @@ impl AnalyzeState {
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
-        children.cmdexec.unlock_with(&[2])?;
-        children.uploader.unlock_with(&[2])?;
+        children.cmdexec.unlock_with(2)?;
+        children.uploader.unlock_with(2)?;
 
         match self.destination {
             Destination::Usb(usb) => Ok(State::WriteFs(WriteFsState {
@@ -1475,7 +1475,7 @@ impl UploadOrCmdState {
         }
 
         // Unlock fs2dev so it can exit
-        children.fs2dev.unlock_with(&(0_u64).to_ne_bytes())?;
+        children.fs2dev.unlock_with(0)?;
 
         comm.finalcopystatusdone(proto::usbsas::ResponseFinalCopyStatusDone {})?;
         comm.copydone(proto::usbsas::ResponseCopyDone {
@@ -1546,7 +1546,7 @@ impl WipeState {
         // Unlock fs2dev
         children
             .fs2dev
-            .unlock_with(&((self.devnum << 32) | self.busnum).to_ne_bytes())?;
+            .unlock_with((self.devnum << 32) | self.busnum)?;
 
         if !self.quick {
             trace!("secure wipe");
@@ -1821,9 +1821,8 @@ impl Children {
         match destination {
             Destination::Usb(ref usb) => {
                 // Unlock fs2dev to get dev_size
-                self.fs2dev.unlock_with(
-                    &(((u64::from(usb.devnum)) << 32) | (u64::from(usb.busnum))).to_ne_bytes(),
-                )?;
+                self.fs2dev
+                    .unlock_with((u64::from(usb.devnum) << 32) | u64::from(usb.busnum))?;
                 let dev_size = self
                     .fs2dev
                     .comm
@@ -1855,7 +1854,7 @@ impl Children {
         if let Err(err) = self.identificator.comm.end() {
             error!("Couldn't end identificator: {}", err);
         };
-        self.cmdexec.unlock_with(&[0]).ok();
+        self.cmdexec.unlock_with(0).ok();
         if let Err(err) = self.cmdexec.comm.end() {
             error!("Couldn't end cmdexec: {}", err);
         };
@@ -1874,18 +1873,18 @@ impl Children {
         if let Err(err) = self.filter.comm.end() {
             error!("Couldn't end filter: {}", err);
         };
-        self.fs2dev.unlock_with(&(0_u64).to_ne_bytes()).ok();
+        self.fs2dev.unlock_with(0).ok();
         if let Err(err) = self.fs2dev.comm.end() {
             error!("Couldn't end fs2dev: {}", err);
         };
         if let Err(err) = self.scsi2files.comm.end() {
             error!("Couldn't end scsi2files: {}", err);
         };
-        self.tar2files.unlock_with(&[0]).ok();
+        self.tar2files.unlock_with(0).ok();
         if let Err(err) = self.tar2files.comm.end() {
             error!("Couldn't end tar2files: {}", err);
         };
-        self.uploader.unlock_with(&[0]).ok();
+        self.uploader.unlock_with(0).ok();
         if let Err(err) = self.uploader.comm.end() {
             error!("Couldn't end uploader: {}", err);
         };

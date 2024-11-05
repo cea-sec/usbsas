@@ -77,7 +77,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         &networks[n]
     };
 
-    uploader.unlock_with(&[1])?;
+    uploader.unlock_with(1)?;
     log::info!("Uploading bundle");
     uploader.comm.send(proto::uploader::Request {
         msg: Some(proto::uploader::request::Msg::Upload(

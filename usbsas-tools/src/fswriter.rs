@@ -52,7 +52,7 @@ impl FsWriter {
         )?;
 
         // unlock fs2dev with busnum / devnum
-        fs2dev.unlock_with(&(((u64::from(devnum)) << 32) | (u64::from(busnum))).to_ne_bytes())?;
+        fs2dev.unlock_with((u64::from(devnum) << 32) | u64::from(busnum))?;
 
         log::info!(
             "Writing fs '{}' on device BUS {} DEV {}",
@@ -134,10 +134,7 @@ impl FsWriter {
 impl Drop for FsWriter {
     fn drop(&mut self) {
         if self.fs2dev.locked {
-            self.fs2dev
-                .comm
-                .write_all(&(0_u64).to_ne_bytes())
-                .expect("couldn't unlock fs2dev");
+            self.fs2dev.unlock_with(0).expect("couldn't unlock fs2dev");
         }
         self.fs2dev.comm.end().expect("couldn't end fs2dev");
     }

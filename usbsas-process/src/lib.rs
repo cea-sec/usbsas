@@ -131,11 +131,11 @@ impl<R: usbsas_comm::SendRecv> UsbsasChild<R> {
         Ok(self.child.wait()?)
     }
 
-    pub fn unlock_with(&mut self, buf: &[u8]) -> Result<()> {
+    pub fn unlock_with(&mut self, value: u64) -> Result<()> {
         if !self.locked {
             return Err(Error::Error("not locked".into()));
         }
-        self.comm.write_all(buf)?;
+        self.comm.write_all(&value.to_le_bytes())?;
         self.locked = false;
         Ok(())
     }

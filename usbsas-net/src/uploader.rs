@@ -1,6 +1,5 @@
-use crate::FileReaderProgress;
-use crate::{Error, HttpClient, Result};
-use byteorder::ReadBytesExt;
+use crate::{Error, FileReaderProgress, HttpClient, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, trace};
 use reqwest::blocking::Body;
 use std::fs::File;
@@ -51,7 +50,7 @@ impl InitState {
             None,
         )?;
 
-        match comm.read_u8()? {
+        match comm.read_u64::<LittleEndian>()? {
             // Nothing to do, exit
             0 => return Ok(State::WaitEnd(WaitEndState {})),
             // Use provided tar path
