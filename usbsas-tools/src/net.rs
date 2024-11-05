@@ -8,7 +8,7 @@ use usbsas_comm::{
     ProtoReqDownloader, ProtoReqUploader, SendRecv,
 };
 use usbsas_config::{conf_parse, conf_read};
-use usbsas_process::UsbsasChildSpawner;
+use usbsas_process::{ChildMngt, UsbsasChildSpawner};
 use usbsas_proto as proto;
 
 #[derive(Error, Debug)]

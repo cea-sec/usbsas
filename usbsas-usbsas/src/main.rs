@@ -20,7 +20,7 @@ use usbsas_comm::{
     ProtoReqWriteFs, ProtoReqWriteTar, ProtoRespCommon, ProtoRespUsbsas, SendRecv, ToFromFd,
 };
 use usbsas_config::{conf_parse, conf_read};
-use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
+use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::*,

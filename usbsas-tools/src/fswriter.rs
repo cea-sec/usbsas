@@ -9,7 +9,7 @@ use std::{
 };
 use thiserror::Error;
 use usbsas_comm::{ComRqFs2Dev, ProtoReqCommon, ProtoReqFs2Dev, SendRecv, ToFromFd};
-use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
+use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_utils::SECTOR_SIZE;
 
@@ -133,10 +133,7 @@ impl FsWriter {
 
 impl Drop for FsWriter {
     fn drop(&mut self) {
-        if self.fs2dev.locked {
-            self.fs2dev.unlock_with(0).expect("couldn't unlock fs2dev");
-        }
-        self.fs2dev.comm.end().expect("couldn't end fs2dev");
+        self.fs2dev.end().expect("couldn't end fs2dev");
     }
 }
 

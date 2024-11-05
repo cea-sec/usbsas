@@ -10,7 +10,7 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{ComRqScsi, ProtoReqCommon, ProtoReqScsi, SendRecv, ToFromFd};
 use usbsas_config::{conf_parse, conf_read};
-use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
+use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_utils::READ_FILE_MAX_SIZE;
 
@@ -135,12 +135,7 @@ impl Drop for Imager {
     // Properly end children
     fn drop(&mut self) {
         log::debug!("End children");
-        if self.dev2scsi.locked {
-            self.dev2scsi
-                .unlock_with(0)
-                .expect("Couldn't unlock dev2scsi");
-        }
-        self.dev2scsi.comm.end().expect("Couldn't end dev2scsi");
+        self.dev2scsi.end().expect("Couldn't end dev2scsi");
     }
 }
 
