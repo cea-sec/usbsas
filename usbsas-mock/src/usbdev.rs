@@ -1,9 +1,9 @@
 use log::{error, trace};
 use std::env;
 use thiserror::Error;
-use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, SendRecv};
+use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev};
 use usbsas_proto as proto;
-use usbsas_proto::common::UsbDevice;
+use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -67,14 +67,12 @@ impl MockUsbDev {
     pub fn main_loop(&mut self) -> Result<()> {
         trace!("main loop");
         loop {
-            let req: proto::usbdev::Request = self.comm.recv()?;
-            let res = match req.msg {
-                Some(proto::usbdev::request::Msg::Devices(_)) => self.handle_req_devices(),
-                Some(proto::usbdev::request::Msg::End(_)) => {
+            let res = match self.comm.recv_req()? {
+                Msg::Devices(_) => self.handle_req_devices(),
+                Msg::End(_) => {
                     self.comm.end()?;
                     break;
                 }
-                None => Err(Error::BadRequest),
             };
             match res {
                 Ok(_) => continue,

@@ -3,7 +3,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, trace};
 use reqwest::blocking::Body;
 use std::fs::File;
-use usbsas_comm::{ComRpUploader, ProtoRespCommon, ProtoRespUploader, SendRecv};
+use usbsas_comm::{ComRpUploader, ProtoRespCommon, ProtoRespUploader};
 use usbsas_proto as proto;
 use usbsas_proto::uploader::request::Msg;
 
@@ -71,8 +71,7 @@ impl InitState {
 
 impl RunningState {
     fn run(mut self, comm: &mut ComRpUploader) -> Result<State> {
-        let req: proto::uploader::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::Upload(req) => {
                 if let Err(err) = self.upload(comm, req) {
                     error!("upload error: {}", err);
@@ -137,8 +136,7 @@ impl WaitEndState {
     fn run(self, comm: &mut ComRpUploader) -> Result<State> {
         trace!("wait end state");
         loop {
-            let req: proto::uploader::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
                     comm.end()?;
                     break;

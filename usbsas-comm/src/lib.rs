@@ -257,6 +257,7 @@ macro_rules! protoresponse {
         paste!{
             pub type [<ComRp$proto>] = Comm<usbsas_proto::[<$proto:lower>]::Response>;
             pub trait [<ProtoResp$proto>]: SendRecv + ProtoRespCommon {
+                fn recv_req(&mut self) -> std::io::Result<usbsas_proto::[<$proto:lower>]::request::Msg>;
                 $(
                     fn [<$resp:lower>](&mut self, resp: usbsas_proto::[<$proto:lower>]::[<Response$resp>]) -> std::io::Result<()>;
                 )+
@@ -288,6 +289,10 @@ macro_rules! protoresponse {
                 }
             }
             impl [<ProtoResp$proto>] for [<ComRp$proto>] {
+                fn recv_req(&mut self) -> std::io::Result<usbsas_proto::[<$proto:lower>]::request::Msg> {
+                    let req: usbsas_proto::[<$proto:lower>]::Request = self.recv()?;
+                    req.msg.ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "Unhandled request"))
+                }
                 $(
                     fn [<$resp:lower>](&mut self, resp: usbsas_proto::[<$proto:lower>]::[<Response$resp>]) -> std::io::Result<()> {
                         self.send(usbsas_proto::[<$proto:lower>]::Response {

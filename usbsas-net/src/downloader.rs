@@ -2,7 +2,7 @@ use crate::FileWriterProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
 use std::fs::{File, OpenOptions};
-use usbsas_comm::{ComRpDownloader, ProtoRespCommon, ProtoRespDownloader, SendRecv};
+use usbsas_comm::{ComRpDownloader, ProtoRespCommon, ProtoRespDownloader};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::downloader::request::Msg;
@@ -74,8 +74,7 @@ impl RunningState {
     fn run(mut self, comm: &mut ComRpDownloader) -> Result<State> {
         let mut filesize = None;
         loop {
-            let req: proto::downloader::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::ArchiveInfos(req) => {
                     match self.archive_infos(comm, &req.id) {
                         Ok(size) => filesize = Some(size),
@@ -162,8 +161,7 @@ impl WaitEndState {
     fn run(self, comm: &mut ComRpDownloader) -> Result<State> {
         trace!("wait end state");
         loop {
-            let req: proto::downloader::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
                     comm.end()?;
                     break;

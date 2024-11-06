@@ -4,7 +4,7 @@ use log::{error, trace};
 use reqwest::blocking::Body;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::File, thread::sleep, time::Duration};
-use usbsas_comm::{ComRpAnalyzer, ProtoRespAnalyzer, ProtoRespCommon, SendRecv};
+use usbsas_comm::{ComRpAnalyzer, ProtoRespAnalyzer, ProtoRespCommon};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::analyzer::request::Msg;
@@ -85,8 +85,7 @@ impl InitState {
 impl RunningState {
     fn run(mut self, comm: &mut ComRpAnalyzer) -> Result<State> {
         loop {
-            let req: proto::analyzer::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::Analyze(req) => self.analyze(comm, &req.id),
                 Msg::End(_) => {
                     comm.end()?;
@@ -176,8 +175,7 @@ impl WaitEndState {
     fn run(self, comm: &mut ComRpAnalyzer) -> Result<State> {
         trace!("wait end state");
         loop {
-            let req: proto::analyzer::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
                     comm.end()?;
                     break;

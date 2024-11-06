@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
 use std::{convert::TryFrom, io::prelude::*, str};
 use thiserror::Error;
-use usbsas_comm::{ComRpScsi, ProtoRespCommon, ProtoRespScsi, SendRecv};
+use usbsas_comm::{ComRpScsi, ProtoRespCommon, ProtoRespScsi};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
 #[cfg(not(feature = "mock"))]
@@ -148,8 +148,7 @@ impl InitState {
 impl DevOpenedState {
     fn run(mut self, comm: &mut ComRpScsi) -> Result<State> {
         loop {
-            let req: proto::scsi::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::Partitions(_) => match self.partitions(comm) {
                     Ok(_) => break,
                     Err(err) => {
@@ -369,8 +368,7 @@ impl DevOpenedState {
 impl PartitionsListedState {
     fn run(mut self, comm: &mut ComRpScsi) -> Result<State> {
         loop {
-            let req: proto::scsi::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::ReadSectors(req) => {
                     match self.usb_mass_storage.read_sectors(
                         req.offset,
@@ -401,8 +399,7 @@ impl PartitionsListedState {
 impl WaitEndState {
     fn run(self, comm: &mut ComRpScsi) -> Result<State> {
         trace!("wait end state");
-        let req: proto::scsi::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
                 comm.end()?;
             }

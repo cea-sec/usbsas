@@ -111,8 +111,7 @@ struct WaitEndState {
 
 impl ChildStartedState {
     fn run(mut self, comm: &mut ComRpFiles) -> Result<State> {
-        let req: proto::files::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::OpenDevice(req) => {
                 if let Err(err) = self.opendevice(comm, req.busnum, req.devnum) {
                     error!("err open device: {}, waiting end", err);
@@ -161,8 +160,7 @@ impl ChildStartedState {
 impl DevOpenedState {
     fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         loop {
-            let req: proto::files::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::Partitions(_) => {
                     let partitions_infos = self.partitions(comm)?;
                     return Ok(State::PartitionsListed(PartitionsListedState {
@@ -208,8 +206,7 @@ impl DevOpenedState {
 
 impl PartitionsListedState {
     fn run(self, comm: &mut ComRpFiles) -> Result<State> {
-        let req: proto::files::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::OpenPartition(req) => {
                 // Keep comm in case of error so we can end dev2scsi properly
                 let comm_bk = self.usb_mass.comm.clone();
@@ -261,8 +258,7 @@ impl PartitionsListedState {
 impl PartitionOpenedState {
     fn run(mut self, comm: &mut ComRpFiles) -> Result<State> {
         loop {
-            let req: proto::files::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::GetAttr(req) => self.getattr(comm, req.path),
                 Msg::ReadDir(req) => self.readdir(comm, req.path),
                 Msg::ReadFile(req) => self.readfile(comm, req.path, req.offset, req.size),
@@ -319,8 +315,7 @@ impl WaitEndState {
     fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("wait end state");
         loop {
-            let req: proto::files::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
                     if let Some(child_comm) = self.child_comm {
                         if let Ok(mut child_comm) = child_comm.write() {

@@ -4,12 +4,13 @@
 use bitvec::prelude::*;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{debug, error, trace};
+use proto::fs2dev::{self, request::Msg};
 use std::{
     fs::File,
     io::{prelude::*, SeekFrom},
 };
 use thiserror::Error;
-use usbsas_comm::{ComRpFs2Dev, ProtoRespCommon, ProtoRespFs2Dev, SendRecv};
+use usbsas_comm::{ComRpFs2Dev, ProtoRespCommon, ProtoRespFs2Dev};
 use usbsas_proto as proto;
 use usbsas_utils::SECTOR_SIZE;
 #[cfg(not(feature = "mock"))]
@@ -291,11 +292,7 @@ impl WipingState {
 impl DevOpenedState {
     fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("dev opened state");
-        use proto::fs2dev;
-        use proto::fs2dev::request::Msg;
-
-        let req: fs2dev::Request = comm.recv()?;
-        Ok(match req.msg.ok_or(Error::BadRequest)? {
+        Ok(match comm.recv_req()? {
             Msg::DevSize(_) => {
                 comm.devsize(fs2dev::ResponseDevSize {
                     size: self.mass_storage.dev_size,
@@ -320,14 +317,12 @@ impl DevOpenedState {
     }
 
     fn load_bitvec(self, comm: &mut ComRpFs2Dev, chunk: &mut Vec<u8>, last: bool) -> Result<State> {
-        use proto::fs2dev::{self, request::Msg};
         let mut fs_bv_buf = Vec::new();
         fs_bv_buf.append(chunk);
         comm.loadbitvec(fs2dev::ResponseLoadBitVec {})?;
         if !last {
             loop {
-                let req: fs2dev::Request = comm.recv()?;
-                match req.msg.ok_or(Error::BadRequest)? {
+                match comm.recv_req()? {
                     Msg::LoadBitVec(ref mut msg) => {
                         fs_bv_buf.append(&mut msg.chunk);
                         comm.loadbitvec(fs2dev::ResponseLoadBitVec {})?;
@@ -355,9 +350,7 @@ impl DevOpenedState {
 impl BitVecLoadedState {
     fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("bitvec loaded state");
-        use proto::fs2dev::{self, request::Msg};
-        let req: fs2dev::Request = comm.recv()?;
-        Ok(match req.msg.ok_or(Error::BadRequest)? {
+        Ok(match comm.recv_req()? {
             Msg::StartCopy(_) => State::Copying(CopyingState {
                 fs: self.fs,
                 fs_bv: self.fs_bv,
@@ -378,12 +371,7 @@ impl BitVecLoadedState {
 
 impl WaitEndState {
     fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
-        use proto::fs2dev;
-        use proto::fs2dev::request::Msg;
-
-        let req: fs2dev::Request = comm.recv()?;
-
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
                 comm.end()?;
             }

@@ -13,7 +13,7 @@ use std::{
     thread,
 };
 use thiserror::Error;
-use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, SendRecv, ToFromFd};
+use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, ToFromFd};
 use usbsas_config::{conf_parse, conf_read, UsbPortAccesses};
 use usbsas_proto as proto;
 use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
@@ -318,8 +318,7 @@ impl RunningState {
     fn run(self, comm: &mut ComRpUsbDev) -> Result<State> {
         trace!("running state");
         loop {
-            let req: proto::usbdev::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::Devices(_) => {
                     let mut devices = Vec::new();
                     self.current_devices
@@ -350,8 +349,7 @@ impl WaitEndState {
     fn run(self, comm: &mut ComRpUsbDev) -> Result<State> {
         trace!("wait end state");
         loop {
-            let req: proto::usbdev::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
                     comm.end()?;
                     break;

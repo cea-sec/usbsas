@@ -2,7 +2,7 @@ use crate::{tarwriter::TarWriter, ArchiveWriter};
 use crate::{Error, Result};
 use log::{error, trace};
 use std::{fs, os::unix::io::AsRawFd};
-use usbsas_comm::{ComRpWriteTar, ProtoRespCommon, ProtoRespWriteTar, SendRecv, ToFromFd};
+use usbsas_comm::{ComRpWriteTar, ProtoRespCommon, ProtoRespWriteTar, ToFromFd};
 use usbsas_proto as proto;
 use usbsas_proto::{common::FileType, writetar::request::Msg};
 
@@ -53,8 +53,7 @@ struct WaitNewFileState {
 
 impl WaitNewFileState {
     fn run(mut self, comm: &mut ComRpWriteTar) -> Result<State> {
-        let req: proto::writetar::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::NewFile(req) => {
                 let fstype =
                     FileType::try_from(req.ftype).map_err(|err| Error::Error(format!("{err}")))?;
@@ -103,8 +102,7 @@ struct WritingFileState {
 impl WritingFileState {
     fn run(mut self, comm: &mut ComRpWriteTar) -> Result<State> {
         loop {
-            let req: proto::writetar::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::WriteFile(req) => {
                     self.len_written += req.data.len();
                     if self.len_written > self.total_size {
@@ -141,8 +139,7 @@ struct WaitEndState {}
 impl WaitEndState {
     fn run(self, comm: &mut ComRpWriteTar) -> Result<State> {
         trace!("wait end state");
-        let req: proto::writetar::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
                 comm.end()?;
             }

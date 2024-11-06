@@ -15,7 +15,7 @@ use std::{
     os::unix::io::AsRawFd,
 };
 use thiserror::Error;
-use usbsas_comm::{ComRpWriteFs, ProtoRespCommon, ProtoRespWriteFs, SendRecv, ToFromFd};
+use usbsas_comm::{ComRpWriteFs, ProtoRespCommon, ProtoRespWriteFs, ToFromFd};
 use usbsas_fsrw::{ff, ntfs, FSWrite};
 use usbsas_mbr::SECTOR_START;
 use usbsas_proto as proto;
@@ -117,8 +117,7 @@ impl InitState {
 impl WaitFsInfosState {
     fn run(self, comm: &mut ComRpWriteFs) -> Result<State> {
         trace!("wait fs infos");
-        let req: proto::writefs::Request = comm.recv()?;
-        let newstate = match req.msg.ok_or(Error::BadRequest)? {
+        let newstate = match comm.recv_req()? {
             Msg::SetFsInfos(fsinfos) => match self.mkfs(comm, fsinfos.dev_size, fsinfos.fstype) {
                 Ok(fs) => State::WaitNewFile(WaitNewFileState { fs }),
                 Err(err) => {
@@ -226,8 +225,7 @@ impl WaitFsInfosState {
 impl WaitNewFileState {
     fn run(self, comm: &mut ComRpWriteFs) -> Result<State> {
         trace!("wait new file state");
-        let req: proto::writefs::Request = comm.recv()?;
-        let newstate = match req.msg.ok_or(Error::BadRequest)? {
+        let newstate = match comm.recv_req()? {
             Msg::NewFile(msg) => self.newfile(comm, msg.path, msg.timestamp, msg.ftype)?,
             Msg::Close(_) => {
                 let bitvec = self.fs.unmount_fs()?.into_inner().get_bitvec()?;
@@ -303,8 +301,7 @@ impl WritingFileState {
         let mut file = self.fs.newfile(&self.path, self.timestamp)?;
         comm.newfile(proto::writefs::ResponseNewFile {})?;
         loop {
-            let req: proto::writefs::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::WriteFile(msg) => {
                     if file.seek(SeekFrom::End(0))? != msg.offset {
                         error!("sparse write not supported");
@@ -342,8 +339,7 @@ impl ImgDiskState {
     fn run(mut self, comm: &mut ComRpWriteFs) -> Result<State> {
         comm.imgdisk(proto::writefs::ResponseImgDisk {})?;
         loop {
-            let req: proto::writefs::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::WriteData(req) => self.write_data(comm, req.data)?,
                 Msg::End(_) => {
                     drop(self.fs);
@@ -372,8 +368,7 @@ impl ForwardBitVecState {
         let mut last = false;
         let mut chunks = self.bitvec.chunks(10 * 1024 * 1024).peekable(); // limit protobuf messages to 10Mb
         let newstate = loop {
-            let req: proto::writefs::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::BitVec(_) => {
                     let chunk = chunks.next().unwrap().to_bitvec().into_vec();
                     if chunks.peek().is_none() {
@@ -402,8 +397,7 @@ impl ForwardBitVecState {
 impl WaitEndState {
     fn run(self, comm: &mut ComRpWriteFs) -> Result<State> {
         trace!("wait end state");
-        let req: proto::writefs::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
                 comm.end()?;
             }

@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, info, trace};
 use std::process::{Command, Stdio};
 use thiserror::Error;
-use usbsas_comm::{ComRpCmdExec, ProtoRespCmdExec, ProtoRespCommon, SendRecv};
+use usbsas_comm::{ComRpCmdExec, ProtoRespCmdExec, ProtoRespCommon};
 use usbsas_config::{conf_parse, conf_read, Command as CmdConf, PostCopy};
 use usbsas_proto as proto;
 use usbsas_proto::{cmdexec::request::Msg, common::OutFileType};
@@ -102,8 +102,7 @@ impl InitState {
 impl RunningState {
     fn run(mut self, comm: &mut ComRpCmdExec) -> Result<State> {
         loop {
-            let req: proto::cmdexec::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::Exec(_) => self.exec(comm),
                 Msg::PostCopyExec(req) => self.post_copy(comm, req.outfiletype),
                 Msg::End(_) => {
@@ -178,8 +177,7 @@ impl WaitEndState {
     fn run(self, comm: &mut ComRpCmdExec) -> Result<State> {
         trace!("wait end state");
         loop {
-            let req: proto::cmdexec::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
                     comm.end()?;
                     break;

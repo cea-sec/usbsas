@@ -1,9 +1,7 @@
 //! Dummy identificator
 
 use thiserror::Error;
-use usbsas_comm::{
-    ComRpIdentificator, ProtoRespCommon, ProtoRespIdentificator, SendRecv, ToFromFd,
-};
+use usbsas_comm::{ComRpIdentificator, ProtoRespCommon, ProtoRespIdentificator, ToFromFd};
 use usbsas_proto::{self as proto, identificator::request::Msg};
 
 #[derive(Error, Debug)]
@@ -51,8 +49,7 @@ impl InitState {
 impl RunningState {
     fn run(mut self, comm: &mut ComRpIdentificator) -> Result<State> {
         loop {
-            let req: proto::identificator::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::Id(_) => {
                     let id = self.get_id()?;
                     comm.id(proto::identificator::ResponseId { id })?;

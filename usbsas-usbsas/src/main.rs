@@ -122,8 +122,7 @@ impl InitState {
     fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
         let mut id: Option<String> = None;
         loop {
-            let req: proto::usbsas::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::Id(_) => children.id(comm, &mut id),
                 Msg::UsbDevices(_) => self.usb_devices(comm, children),
                 Msg::AltTargets(_) => self.alt_targets(comm),
@@ -302,8 +301,7 @@ struct DevOpenedState {
 impl DevOpenedState {
     fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
         loop {
-            let req: proto::usbsas::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::Id(_) => children.id(comm, &mut self.id),
                 Msg::Partitions(_) => self.partitions(comm, children),
                 Msg::OpenPartition(req) => match self.open_partition(comm, children, req.index) {
@@ -370,8 +368,7 @@ struct PartitionOpenedState {
 impl PartitionOpenedState {
     fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
         loop {
-            let req: proto::usbsas::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::Id(_) => children.id(comm, &mut self.id),
                 Msg::GetAttr(req) => self.get_attr(comm, children, req.path),
                 Msg::ReadDir(req) => self.read_dir(comm, children, req.path),
@@ -1671,8 +1668,7 @@ struct TransferDoneState {}
 
 impl TransferDoneState {
     fn run(self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
-        let req: proto::usbsas::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
                 children.end_wait_all(comm)?;
                 return Ok(State::End);
@@ -1709,8 +1705,7 @@ struct WaitEndState {}
 impl WaitEndState {
     fn run(self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
         loop {
-            let req: proto::usbsas::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
                     children.end_wait_all(comm)?;
                     break;

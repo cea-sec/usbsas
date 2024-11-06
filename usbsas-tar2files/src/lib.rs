@@ -13,7 +13,7 @@ use std::{
 };
 use tar::Archive;
 use thiserror::Error;
-use usbsas_comm::{ComRpFiles, ProtoRespCommon, ProtoRespFiles, SendRecv, ToFromFd};
+use usbsas_comm::{ComRpFiles, ProtoRespCommon, ProtoRespFiles, ToFromFd};
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::{FileInfo, FileType},
@@ -153,9 +153,7 @@ impl MainLoopState {
     fn run(mut self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("main loop");
         loop {
-            let req: proto::files::Request = comm.recv()?;
-
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::GetAttr(req) => self.getattr(comm, &req.path),
                 Msg::ReadFile(req) => self.readfile(comm, &req.path, req.offset, req.size as usize),
                 Msg::ReadDir(req) => self.readdir(comm, &req.path),
@@ -168,7 +166,6 @@ impl MainLoopState {
                     Err(Error::BadRequest)
                 }
             };
-
             match res {
                 Ok(_) => continue,
                 Err(err) => {
@@ -249,8 +246,7 @@ impl MainLoopState {
 impl WaitEndState {
     fn run(self, comm: &mut ComRpFiles) -> Result<State> {
         trace!("wait end state");
-        let req: proto::files::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
                 comm.end()?;
             }

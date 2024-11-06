@@ -6,7 +6,7 @@ use log::debug;
 #[cfg(test)]
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use usbsas_comm::{ComRpFilter, ProtoRespCommon, ProtoRespFilter, SendRecv, ToFromFd};
+use usbsas_comm::{ComRpFilter, ProtoRespCommon, ProtoRespFilter, ToFromFd};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{filter::request::Msg, filter::FilterResult};
@@ -138,8 +138,7 @@ impl InitState {
 impl RunningState {
     fn run(self, comm: &mut ComRpFilter) -> Result<State> {
         loop {
-            let req: proto::filter::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::FilterPaths(req) => self.filterpaths(comm, req.path)?,
                 Msg::End(_) => {
                     comm.end()?;
