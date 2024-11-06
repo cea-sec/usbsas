@@ -9,7 +9,7 @@ bootsector = "0.2"
 byteorder = "1.5"
 env_logger = "0.11"
 log = "0.4"
-thiserror = "1.0"
+thiserror = "2.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
 usbsas-mock = { path = "../usbsas-mock", optional = true }

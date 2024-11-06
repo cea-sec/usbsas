@@ -651,7 +651,7 @@ dependencies = [
  "glib",
  "libc",
  "once_cell",
- "thiserror",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -1224,7 +1224,7 @@ dependencies = [
  "byteorder",
  "crc 1.8.1",
  "positioned-io2",
- "thiserror",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -1645,7 +1645,7 @@ dependencies = [
  "once_cell",
  "pin-project-lite",
  "smallvec",
- "thiserror",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -1681,7 +1681,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "smallvec",
- "thiserror",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -2207,7 +2207,7 @@ dependencies = [
  "combine",
  "jni-sys",
  "log",
- "thiserror",
+ "thiserror 1.0.68",
  "walkdir",
  "windows-sys 0.45.0",
 ]
@@ -2257,7 +2257,7 @@ checksum = "18738c5d4c7fae6727a96adb94722ef7ce82f3eafea0a11777e258a93816537e"
 dependencies = [
  "enumflags2",
  "libc",
- "thiserror",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -2322,7 +2322,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -2545,7 +2545,7 @@ dependencies = [
  "ndk-sys",
  "num_enum",
  "raw-window-handle",
- "thiserror",
+ "thiserror 1.0.68",
 ]
 
 [[package]]
@@ -4214,18 +4214,38 @@ checksum = "8eaa81235c7058867fa8c0e7314f33dcce9c215f535d1913822a2b3f5e289f3c"
 
 [[package]]
 name = "thiserror"
-version = "1.0.67"
+version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b3c6efbfc763e64eb85c11c25320f0737cb7364c4b6336db90aa9ebe27a0bbd"
+checksum = "02dd99dc800bbb97186339685293e1cc5d9df1f8fae2d0aecd9ff1c77efea892"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.68",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15291287e9bff1bc6f9ff3409ed9af665bec7a5fc8ac079ea96be07bca0e2668"
+dependencies = [
+ "thiserror-impl 2.0.0",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.67"
+version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b607164372e89797d78b8e23a6d67d5d1038c1c65efd52e1389ef8b77caba2a6"
+checksum = "a7c61ec9a6f64d2793d8a45faba21efbe3ced62a886d44c36a009b2b519b4c7e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22efd00f33f93fa62848a7cab956c3d38c8d43095efda1decfc2b3a5dc0b8972"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4539,7 +4559,7 @@ dependencies = [
  "byteorder",
  "env_logger",
  "log",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-config",
  "usbsas-proto",
@@ -4572,7 +4592,7 @@ dependencies = [
  "byteorder",
  "env_logger",
  "log",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-mass-storage",
  "usbsas-mock",
@@ -4589,7 +4609,7 @@ dependencies = [
  "env_logger",
  "fscommon",
  "log",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-fsrw",
  "usbsas-mbr",
@@ -4605,7 +4625,7 @@ dependencies = [
  "env_logger",
  "log",
  "tar",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-proto",
  "usbsas-sandbox",
@@ -4619,7 +4639,7 @@ dependencies = [
  "env_logger",
  "log",
  "serde",
- "thiserror",
+ "thiserror 2.0.0",
  "toml",
  "usbsas-comm",
  "usbsas-config",
@@ -4636,7 +4656,7 @@ dependencies = [
  "byteorder",
  "env_logger",
  "log",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-mass-storage",
  "usbsas-mock",
@@ -4658,7 +4678,7 @@ dependencies = [
  "ntfs",
  "ntfs3g",
  "positioned-io2",
- "thiserror",
+ "thiserror 2.0.0",
  "time",
  "usbsas-proto",
 ]
@@ -4669,7 +4689,7 @@ version = "0.1.1"
 dependencies = [
  "env_logger",
  "log",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-proto",
  "usbsas-sandbox",
@@ -4684,7 +4704,7 @@ dependencies = [
  "lru",
  "positioned-io2",
  "rusb",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-proto",
  "usbsas-scsi",
@@ -4703,7 +4723,7 @@ version = "0.1.2"
 dependencies = [
  "log",
  "positioned-io2",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-proto",
 ]
@@ -4720,7 +4740,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-config",
  "usbsas-proto",
@@ -4735,7 +4755,7 @@ dependencies = [
  "libc",
  "log",
  "nix 0.29.0",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-utils",
 ]
@@ -4758,7 +4778,7 @@ dependencies = [
  "log",
  "procfs",
  "syscallz",
- "thiserror",
+ "thiserror 2.0.0",
 ]
 
 [[package]]
@@ -4777,7 +4797,7 @@ dependencies = [
  "byteorder",
  "env_logger",
  "log",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-fsrw",
  "usbsas-mass-storage",
@@ -4827,7 +4847,7 @@ dependencies = [
  "env_logger",
  "log",
  "tar",
- "thiserror",
+ "thiserror 2.0.0",
  "usbsas-comm",
  "usbsas-proto",
  "usbsas-sandbox",
@@ -4848,7 +4868,7 @@ dependencies = [
  "nix 0.29.0",
  "serde_json",
  "tempfile",
- "thiserror",
+ "thiserror 2.0.0",
  "time",
  "usbsas-comm",
  "usbsas-config",
@@ -4865,7 +4885,7 @@ dependencies = [
  "env_logger",
  "log",
  "mio",
- "thiserror",
+ "thiserror 2.0.0",
  "udev",
  "usbsas-comm",
  "usbsas-config",
@@ -4881,7 +4901,7 @@ version = "0.2.1"
 dependencies = [
  "log",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.0",
  "time",
  "uname",
  "usbsas-comm",
@@ -4902,7 +4922,7 @@ dependencies = [
  "env_logger",
  "log",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.0",
  "time",
  "toml",
 ]
@@ -5144,7 +5164,7 @@ version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3a3e2eeb58f82361c93f9777014668eb3d07e7d174ee4c819575a9208011886"
 dependencies = [
- "thiserror",
+ "thiserror 1.0.68",
  "windows",
  "windows-core",
 ]
@@ -5189,7 +5209,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5536,7 +5556,7 @@ dependencies = [
  "sha2",
  "soup3",
  "tao-macros",
- "thiserror",
+ "thiserror 1.0.68",
  "webkit2gtk",
  "webkit2gtk-sys",
  "webview2-com",
