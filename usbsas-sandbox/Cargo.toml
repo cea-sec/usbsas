@@ -13,7 +13,7 @@ libc = "0.2"
 log = "0.4"
 procfs = { version = "0.17", default-features = false }
 syscallz = "0.17"
-thiserror = "1.0"
+thiserror = "2.0"
 
 [features]
 landlock-enforce = []

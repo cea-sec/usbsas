@@ -14,6 +14,6 @@ log = "0.4"
 ntfs = "0.4"
 ntfs3g = { path = "../ntfs3g" }
 positioned-io2 = "0.3"
-thiserror = "1.0"
+thiserror = "2.0"
 time = "0.3"
 usbsas-proto = { path = "../usbsas-proto" }
