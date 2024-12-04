@@ -7,7 +7,7 @@ license = "GPL-3.0"
 [dependencies]
 log = "0.4"
 serde_json = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 time = "0.3"
 uname = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
