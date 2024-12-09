@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = "4.5"
-tao = "0.30"
+tao = "0.31"
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 wry = { version = "0.47", default-features = false, features = ["os-webview", "fullscreen"] }
 
