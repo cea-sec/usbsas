@@ -13,7 +13,7 @@ use std::{
 };
 use tar::Archive;
 use thiserror::Error;
-use usbsas_comm::{ComRpFiles, ProtoRespCommon, ProtoRespFiles, ToFromFd};
+use usbsas_comm::{ComRpFiles, ProtoRespCommon, ProtoRespFiles, ToFd};
 use usbsas_proto as proto;
 use usbsas_proto::{
     common::{FileInfo, FileType},

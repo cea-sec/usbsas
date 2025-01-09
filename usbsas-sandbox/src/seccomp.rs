@@ -104,6 +104,7 @@ pub(crate) fn new_context_with_common_rules(
     )?;
 
     // Allow more syscalls
+    ctx.allow_syscall(Syscall::rt_sigprocmask)?;
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::munmap)?;
     ctx.allow_syscall(Syscall::exit_group)?;

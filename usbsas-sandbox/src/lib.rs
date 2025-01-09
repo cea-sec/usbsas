@@ -3,7 +3,6 @@
 pub mod dev2scsi;
 pub mod files2fs;
 pub mod files2tar;
-pub mod filter;
 pub mod fs2dev;
 pub mod fswriter;
 pub mod hiduser;

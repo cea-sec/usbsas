@@ -2,23 +2,18 @@ use crate::{Error, Result};
 use crate::{FSRead, FSWrite, WriteSeek};
 use ntfs::NtfsReadSeek;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     convert::TryFrom,
     io::{Read, Seek, SeekFrom, Write},
 };
-use usbsas_proto::common::{FileInfo, FileType, OutFsType};
+use usbsas_proto::common::{FileInfo, FileType, FsType};
 
 pub struct NTFS3G<T> {
     volume: ntfs3g::Ntfs3g<T>,
 }
 
 impl<T: Read + Write + Seek> FSWrite<T> for NTFS3G<T> {
-    fn mkfs(
-        writer: T,
-        sector_size: u64,
-        sector_count: u64,
-        _fstype: Option<OutFsType>,
-    ) -> Result<Self>
+    fn mkfs(writer: T, sector_size: u64, sector_count: u64, _fstype: Option<FsType>) -> Result<Self>
     where
         Self: Sized,
     {
@@ -203,7 +198,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
     fn read_dir(&mut self, path: &str) -> Result<Vec<FileInfo>> {
         log::trace!("readdir {}", path);
         let ntfs_dir = ntfs_file_from_path(&self.fs, &mut self.reader, path, &mut self.file_cache)?;
-        let mut ntfs_entries: HashMap<u64, FileInfo> = HashMap::new();
+        let mut ntfs_entries: BTreeMap<u64, FileInfo> = BTreeMap::new();
 
         let ntfs_index = ntfs_dir.directory_index(&mut self.reader)?;
         let mut index_entries = ntfs_index.entries();
@@ -228,7 +223,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
             ntfs_entries.insert(
                 ntfs_file.file_record_number(),
                 FileInfo {
-                    path: format!("{path}/{name_string}"),
+                    path: format!("{}/{name_string}", path.trim_end_matches('/')),
                     size: ntfs_file_size(&ntfs_file, &mut self.reader)?,
                     ftype: if ntfs_file.is_directory() {
                         FileType::Directory.into()

@@ -2426,7 +2426,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -2985,6 +2985,12 @@ dependencies = [
  "smallvec",
  "windows-targets 0.52.6",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "percent-encoding"
@@ -4678,22 +4684,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "usbsas-filter"
-version = "0.1.2"
-dependencies = [
- "env_logger",
- "log",
- "serde",
- "thiserror 2.0.12",
- "toml",
- "usbsas-comm",
- "usbsas-config",
- "usbsas-proto",
- "usbsas-sandbox",
- "usbsas-utils",
-]
-
-[[package]]
 name = "usbsas-fs2dev"
 version = "0.1.2"
 dependencies = [
@@ -4811,6 +4801,9 @@ version = "0.1.6"
 dependencies = [
  "prost",
  "prost-build",
+ "serde",
+ "serde_json",
+ "usbsas-config",
 ]
 
 [[package]]
@@ -4944,10 +4937,13 @@ dependencies = [
 name = "usbsas-usbsas"
 version = "0.2.1"
 dependencies = [
+ "anyhow",
  "log",
+ "serde",
  "serde_json",
  "thiserror 2.0.12",
  "time",
+ "toml",
  "uname",
  "usbsas-comm",
  "usbsas-config",
@@ -5277,7 +5273,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

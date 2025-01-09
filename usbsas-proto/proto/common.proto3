@@ -5,6 +5,7 @@ enum FileType {
   OTHER = 0;
   REGULAR = 1;
   DIRECTORY = 2;
+  METADATA = 3;
 };
 
 enum OutFileType {
@@ -12,7 +13,7 @@ enum OutFileType {
   FS = 1;
 };
 
-enum OutFsType {
+enum FsType {
   NTFS = 0;
   FAT = 1;
   EXFAT = 2;
@@ -25,28 +26,7 @@ message FileInfo {
   int64 timestamp = 4;
 };
 
-message Network {
-  string url = 1;
-  string krb_service_name = 2;
-};
-
-message Command {
-  string bin = 1;
-  repeated string args = 2;
-};
-
-message AltTarget {
-  oneof target {
-    Network network = 1;
-    Command command = 2;
-  }
-  string descr = 3;
-  string long_descr = 4;
-  bool is_src = 5;
-  bool is_dst = 6;
-};
-
-message USBDevice {
+message UsbDevice {
   uint32 busnum = 1;
   uint32 devnum = 2;
   uint32 vendorid = 3;
@@ -54,8 +34,37 @@ message USBDevice {
   string manufacturer = 5;
   string description = 6;
   string serial = 7;
-  bool is_src = 8;
-  bool is_dst = 9;
+  optional uint64 dev_size = 8;
+  optional uint64 block_size = 9;
+  bool is_src = 10;
+  bool is_dst = 11;
+};
+
+message Network {
+  string url = 1;
+  optional string krb_service_name = 2;
+  string title = 3;
+  string description = 4;
+  bool is_src = 5;
+  bool is_dst = 6;
+};
+
+message Command {
+  string bin = 1;
+  repeated string args = 2;
+  string title = 3;
+  string description = 4;
+  bool is_src = 5;
+  bool is_dst = 6;
+};
+
+message Device {
+  oneof device {
+    Network network = 1;
+    Command command = 2;
+    UsbDevice usb = 3;
+  }
+  uint64 id = 4;
 };
 
 message PartitionInfo {

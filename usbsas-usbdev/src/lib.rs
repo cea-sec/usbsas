@@ -13,7 +13,7 @@ use std::{
     thread,
 };
 use thiserror::Error;
-use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, ToFromFd};
+use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, ToFd};
 use usbsas_config::{conf_parse, conf_read, UsbPortAccesses};
 use usbsas_proto as proto;
 use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
@@ -227,6 +227,8 @@ impl CurrentDevices {
                 .unwrap_or(OsStr::new("unknown"))
                 .to_string_lossy()
                 .to_string(),
+            dev_size: None,
+            block_size: None,
             is_src,
             is_dst,
         };

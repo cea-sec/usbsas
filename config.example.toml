@@ -65,7 +65,7 @@ command_args = [
 # Like for network destination below, kerberos authentication can be enabled.
 # An analyzer report can optionally be written on the destination device.
 # Analyzing files can be enabled/disabled based on destination (usb, net (upload)
-# or cmd (command)).
+# or cmd (command), analysis only happens if source is usb.
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 #krb_service_name = "HTTP@your.domain"

@@ -19,7 +19,7 @@ message Request {
 
 /* Responses */
 message ResponseDevices {
-  repeated common.USBDevice devices = 1;
+  repeated common.UsbDevice devices = 1;
 };
 
 message Response {

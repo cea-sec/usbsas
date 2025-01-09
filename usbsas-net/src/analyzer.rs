@@ -84,27 +84,33 @@ impl InitState {
 
 impl RunningState {
     fn run(mut self, comm: &mut ComRpAnalyzer) -> Result<State> {
+        let mut report = None;
         loop {
-            let res = match comm.recv_req()? {
-                Msg::Analyze(req) => self.analyze(comm, &req.id),
+            match comm.recv_req()? {
+                Msg::Analyze(req) => match self.analyze(comm, &req.id) {
+                    Ok(rep) => report = Some(rep),
+                    Err(err) => comm.error(err)?,
+                },
                 Msg::End(_) => {
                     comm.end()?;
-                    break;
+                    return Ok(State::End);
+                }
+                Msg::Report(_) => {
+                    if let Some(report) = report {
+                        comm.report(proto::analyzer::ResponseReport { report })?;
+                        break;
+                    } else {
+                        comm.error("Files not analyzed yet")?;
+                    };
                 }
             };
-            match res {
-                Ok(_) => continue,
-                Err(err) => {
-                    error!("{}", err);
-                    comm.error(err)?;
-                }
-            }
         }
-        Ok(State::End)
+        Ok(State::WaitEnd(WaitEndState {}))
     }
 
-    fn analyze(&mut self, comm: &mut ComRpAnalyzer, uid: &str) -> Result<()> {
+    fn analyze(&mut self, comm: &mut ComRpAnalyzer, uid: &str) -> Result<String> {
         trace!("req analyze");
+        comm.analyze(proto::analyzer::ResponseAnalyze {})?;
 
         self.url = format!("{}/{}", self.url.trim_end_matches('/'), uid);
 
@@ -124,8 +130,7 @@ impl RunningState {
         let report = self.poll_result()?;
 
         trace!("analyzer report: {}", &report);
-        comm.analyze(proto::analyzer::ResponseAnalyze { report })?;
-        Ok(())
+        Ok(report)
     }
 
     fn upload(&mut self, comm: &mut ComRpAnalyzer) -> Result<JsonRes> {
@@ -144,6 +149,7 @@ impl RunningState {
         if !resp.status().is_success() {
             return Err(Error::Remote);
         }
+        comm.done()?;
         Ok(resp.json()?)
     }
 

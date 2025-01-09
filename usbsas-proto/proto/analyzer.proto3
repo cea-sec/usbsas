@@ -8,13 +8,17 @@ message RequestAnalyze {
   string id = 1;
 };
 
+message RequestReport {
+};
+
 message RequestEnd {
 };
 
 message Request {
   oneof msg {
     RequestAnalyze Analyze = 1;
-    RequestEnd End = 2;
+    RequestReport Report = 2;
+    RequestEnd End = 3;
   }
 };
 
@@ -22,14 +26,18 @@ message Request {
 /* Response */
 
 message ResponseAnalyze {
+}
+
+message ResponseReport {
   string report = 1;
 }
 
 message Response {
   oneof msg {
     ResponseAnalyze Analyze = 1;
-    common.ResponseEnd End = 2;
-    common.ResponseError Error = 3;
-    common.ResponseStatus Status = 4;
+    ResponseReport Report = 2;
+    common.ResponseEnd End = 3;
+    common.ResponseError Error = 4;
+    common.ResponseStatus Status = 5;
   }
 };

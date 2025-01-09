@@ -23,31 +23,31 @@ impl MockUsbDev {
     pub fn new(comm: ComRpUsbDev, _: String) -> Result<Self> {
         let mut devices = Vec::new();
 
-        // Fake input device
+        // Mock input device
         if env::var("USBSAS_MOCK_IN_DEV").is_ok() {
             devices.push(UsbDevice {
                 busnum: 1,
                 devnum: 1, // 1 = INPUT
                 vendorid: 1,
                 productid: 1,
-                manufacturer: "dd".to_string(),
-                description: "fake input dev".to_string(),
-                serial: "plop".to_string(),
+                manufacturer: "manufacturer".to_string(),
+                description: "mock input dev".to_string(),
+                serial: "serial".to_string(),
                 is_src: true,
                 is_dst: false,
             });
         }
 
-        // Fake output device
+        // Mock output device
         if env::var("USBSAS_MOCK_OUT_DEV").is_ok() {
             devices.push(UsbDevice {
                 busnum: 1,
                 devnum: 2, // 2 = OUTPUT
                 vendorid: 1,
                 productid: 1,
-                manufacturer: "dd".to_string(),
-                description: "fake output dev".to_string(),
-                serial: "plop".to_string(),
+                manufacturer: "manufacturer".to_string(),
+                description: "mock output dev".to_string(),
+                serial: "serial".to_string(),
                 is_src: false,
                 is_dst: true,
             });

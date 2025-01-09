@@ -11,7 +11,7 @@ message RequestEnd {
 message RequestDevSize {
 };
 
-message RequestStartCopy {
+message RequestWriteFs {
 };
 
 message RequestWipe {
@@ -26,7 +26,7 @@ message Request {
   oneof msg {
     RequestEnd End = 1;
     RequestDevSize DevSize = 2;
-    RequestStartCopy StartCopy = 3;
+    RequestWriteFs WriteFs = 3;
     RequestWipe wipe = 4;
     RequestLoadBitVec LoadBitVec = 5;
   }
@@ -39,7 +39,7 @@ message ResponseDevSize {
   uint64 size = 1;
 };
 
-message ResponseStartCopy {
+message ResponseWriteFs {
 };
 
 message ResponseWipe {
@@ -53,7 +53,7 @@ message Response {
     common.ResponseEnd End = 1;
     common.ResponseError Error = 2;
     ResponseDevSize DevSize = 3;
-    ResponseStartCopy StartCopy = 4;
+    ResponseWriteFs WriteFs = 4;
     ResponseWipe Wipe = 5;
     ResponseLoadBitVec LoadBitVec = 6;
     common.ResponseStatus Status = 7;

@@ -76,7 +76,7 @@ impl RunningState {
         loop {
             match comm.recv_req()? {
                 Msg::ArchiveInfos(req) => {
-                    match self.archive_infos(comm, &req.id) {
+                    match self.archive_infos(comm, &req.path) {
                         Ok(size) => filesize = Some(size),
                         Err(err) => {
                             error!("download error: {}", err);
@@ -103,9 +103,9 @@ impl RunningState {
         }
     }
 
-    fn archive_infos(&mut self, comm: &mut ComRpDownloader, id: &str) -> Result<u64> {
+    fn archive_infos(&mut self, comm: &mut ComRpDownloader, path: &str) -> Result<u64> {
         trace!("req size");
-        self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
+        self.url = format!("{}/{}", self.url.trim_end_matches('/'), path);
 
         let resp = self.http_client.head(&self.url)?;
         if !resp.status().is_success() {
@@ -135,6 +135,7 @@ impl RunningState {
 
     fn download(mut self, comm: &mut ComRpDownloader, filesize: u64) -> Result<()> {
         trace!("download");
+        comm.download(proto::downloader::ResponseDownload {})?;
         let comm_progress = comm.try_clone()?;
         let mut resp = self.http_client.get(&self.url)?;
         if !resp.status().is_success() {
@@ -152,7 +153,7 @@ impl RunningState {
         };
 
         resp.copy_to(&mut filewriterprogress)?;
-        comm.download(proto::downloader::ResponseDownload {})?;
+        comm.status(filesize, filesize, true)?;
         Ok(())
     }
 }

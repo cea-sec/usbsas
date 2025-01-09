@@ -8,7 +8,7 @@ use std::{
     os::unix::io::AsRawFd,
 };
 use thiserror::Error;
-use usbsas_comm::{ComRqFs2Dev, ProtoReqCommon, ProtoReqFs2Dev, SendRecv, ToFromFd};
+use usbsas_comm::{ComRqFs2Dev, ProtoReqFs2Dev, SendRecv, ToFd};
 use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_utils::SECTOR_SIZE;
@@ -101,9 +101,7 @@ impl FsWriter {
 
         // start copy with shiny progress bar
         use proto::fs2dev::response::Msg;
-        self.fs2dev
-            .comm
-            .startcopy(proto::fs2dev::RequestStartCopy {})?;
+        self.fs2dev.comm.writefs(proto::fs2dev::RequestWriteFs {})?;
         let pb = indicatif::ProgressBar::new(fs_size);
         pb.set_style(
             indicatif::ProgressStyle::default_bar()

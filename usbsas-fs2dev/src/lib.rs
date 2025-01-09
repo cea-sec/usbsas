@@ -16,7 +16,7 @@ use usbsas_utils::SECTOR_SIZE;
 #[cfg(not(feature = "mock"))]
 use {
     std::os::unix::io::AsRawFd,
-    usbsas_comm::ToFromFd,
+    usbsas_comm::ToFd,
     usbsas_mass_storage::{self, MassStorage},
 };
 #[cfg(feature = "mock")]
@@ -200,7 +200,7 @@ impl InitState {
 impl CopyingState {
     fn run(mut self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("copying state");
-        comm.startcopy(proto::fs2dev::ResponseStartCopy {})?;
+        comm.writefs(proto::fs2dev::ResponseWriteFs {})?;
 
         let fs_size = self.fs.seek(SeekFrom::End(0))?;
         self.fs.rewind()?;
@@ -351,7 +351,7 @@ impl BitVecLoadedState {
     fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("bitvec loaded state");
         Ok(match comm.recv_req()? {
-            Msg::StartCopy(_) => State::Copying(CopyingState {
+            Msg::WriteFs(_) => State::Copying(CopyingState {
                 fs: self.fs,
                 fs_bv: self.fs_bv,
                 mass_storage: self.mass_storage,

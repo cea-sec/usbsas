@@ -5,11 +5,10 @@ import "common.proto3";
 /* Requests */
 
 message RequestDownload {
-  string id = 1;
 };
 
 message RequestArchiveInfos {
-  string id = 1;
+  string path = 1;
 };
 
 message RequestEnd {

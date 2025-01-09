@@ -8,7 +8,7 @@ use std::{
     path,
 };
 use thiserror::Error;
-use usbsas_comm::{ComRqScsi, ProtoReqCommon, ProtoReqScsi, SendRecv, ToFromFd};
+use usbsas_comm::{ComRqScsi, ProtoReqScsi, SendRecv, ToFd};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
@@ -75,7 +75,7 @@ impl Imager {
     fn image_device(&mut self) -> Result<()> {
         // Unlock dev2scsi
         self.dev2scsi
-            .unlock_with((u64::from(self.devnum)) << 32 | u64::from(self.busnum))?;
+            .unlock_with((u64::from(self.devnum) << 32) | u64::from(self.busnum))?;
 
         let rep: proto::scsi::Response = self.dev2scsi.comm.recv()?;
         let (dev_size, block_size) =

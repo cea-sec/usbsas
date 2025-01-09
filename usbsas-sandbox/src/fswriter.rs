@@ -54,6 +54,8 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         ],
     )?;
 
+    ctx.allow_syscall(Syscall::getrandom)?;
+
     ctx.load()?;
 
     Ok(())

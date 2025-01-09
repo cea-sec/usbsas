@@ -10,7 +10,7 @@ use std::{
 use thiserror::Error;
 use usbsas_comm::{
     ComRpFiles, ComRqScsi, ProtoReqCommon, ProtoReqScsi, ProtoRespCommon, ProtoRespFiles, SendRecv,
-    ToFromFd,
+    ToFd,
 };
 use usbsas_fsrw::{ext4fs, ff, iso9660fs, ntfs, FSRead};
 use usbsas_mass_storage::MassStorageComm;
@@ -137,7 +137,7 @@ impl ChildStartedState {
 
     fn opendevice(&mut self, comm: &mut ComRpFiles, busnum: u32, devnum: u32) -> Result<()> {
         trace!("req opendevice");
-        let buf = (u64::from(devnum)) << 32 | u64::from(busnum);
+        let buf = (u64::from(devnum) << 32) | u64::from(busnum);
         // unlock dev2scsi
         self.usb_mass.comm()?.write_all(&buf.to_le_bytes())?;
         let rep: proto::scsi::Response = self.usb_mass.comm()?.recv()?;

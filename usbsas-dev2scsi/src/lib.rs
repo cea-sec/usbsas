@@ -12,7 +12,7 @@ use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
 #[cfg(not(feature = "mock"))]
 use {
     std::os::unix::io::AsRawFd,
-    usbsas_comm::ToFromFd,
+    usbsas_comm::ToFd,
     usbsas_mass_storage::{self, MassStorage},
 };
 #[cfg(feature = "mock")]

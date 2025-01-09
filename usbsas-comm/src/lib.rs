@@ -34,20 +34,18 @@ impl FromEnv for RawFd {
     }
 }
 
-pub trait ToFromFd {
+pub trait FromFd {
     fn from_fd(read: OwnedFd, write: OwnedFd) -> Self;
+}
+
+pub trait ToFd {
     fn input_fd(&self) -> RawFd;
     fn output_fd(&self) -> RawFd;
 }
 
-impl<R> ToFromFd for Comm<R> {
-    fn from_fd(read: OwnedFd, write: OwnedFd) -> Self {
-        Comm {
-            input: File::from(read),
-            output: File::from(write),
-            req: PhantomData,
-        }
-    }
+pub trait ToFromFd: FromFd + ToFd {}
+
+impl<R> ToFd for Comm<R> {
     fn input_fd(&self) -> RawFd {
         self.input.as_raw_fd()
     }
@@ -55,6 +53,18 @@ impl<R> ToFromFd for Comm<R> {
         self.output.as_raw_fd()
     }
 }
+
+impl<R> FromFd for Comm<R> {
+    fn from_fd(read: OwnedFd, write: OwnedFd) -> Self {
+        Comm {
+            input: File::from(read),
+            output: File::from(write),
+            req: PhantomData,
+        }
+    }
+}
+
+impl<R> ToFromFd for Comm<R> {}
 
 /// Struct containing input (read) and output (write) communication pipes.
 /// Comm is marked with `PhantomData` on the type of protobuf messages it will
@@ -188,6 +198,7 @@ impl<R> SendRecv for Comm<R> {}
 
 pub trait ProtoReqCommon: SendRecv {
     fn end(&mut self) -> std::io::Result<()>;
+    fn recv_status(&mut self) -> std::io::Result<usbsas_proto::common::ResponseStatus>;
 }
 
 #[macro_export]
@@ -218,6 +229,15 @@ macro_rules! protorequest {
                         _ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unexpected response"))
                     }
                 }
+                fn recv_status(&mut self) -> std::io::Result<usbsas_proto::common::ResponseStatus> {
+                    let resp: usbsas_proto::[<$proto:lower>]::Response = self.recv()?;
+                    match resp.msg {
+                        Some(usbsas_proto::[<$proto:lower>]::response::Msg::Status(status)) => Ok(status),
+                        Some(usbsas_proto::[<$proto:lower>]::response::Msg::Error(err)) => Err(std::io::Error::new(std::io::ErrorKind::Other, err.err)),
+                        _ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unexpected response"))
+                    }
+                }
+
             }
             impl [<ProtoReq$proto>] for [<ComRq$proto>] {
                 $(
@@ -305,79 +325,72 @@ macro_rules! protoresponse {
     };
 }
 
+protoresponse!(Analyzer, Analyze, Report);
 protoresponse!(CmdExec, Exec, PostCopyExec);
-protoresponse!(Fs2Dev, DevSize, StartCopy, LoadBitVec, Wipe);
-protoresponse!(Scsi, OpenDevice, Partitions, ReadSectors);
-protoresponse!(WriteFs, SetFsInfos, NewFile, WriteFile, EndFile, ImgDisk, WriteData, Close, BitVec);
-protoresponse!(WriteTar, NewFile, WriteFile, EndFile, Close);
-protoresponse!(Filter, FilterPaths);
-protoresponse!(Identificator, Id);
-protoresponse!(UsbDev, Devices);
-protoresponse!(Analyzer, Analyze);
 protoresponse!(Downloader, Download, ArchiveInfos);
-protoresponse!(Uploader, Upload);
 protoresponse!(
     Files,
-    OpenDevice,
-    Partitions,
-    OpenPartition,
     GetAttr,
+    OpenDevice,
+    OpenPartition,
+    Partitions,
     ReadDir,
     ReadFile,
     ReadSectors
+);
+protoresponse!(Fs2Dev, DevSize, WriteFs, LoadBitVec, Wipe);
+protoresponse!(Identificator, UserId);
+protoresponse!(Scsi, OpenDevice, Partitions, ReadSectors);
+protoresponse!(UsbDev, Devices);
+protoresponse!(
+    Usbsas,
+    Devices,
+    GetAttr,
+    ImgDisk,
+    InitTransfer,
+    OpenDevice,
+    OpenPartition,
+    Partitions,
+    ReadDir,
+    SelectFiles,
+    Report,
+    UserId,
+    Wipe
+);
+protoresponse!(Uploader, Upload);
+protoresponse!(WriteDst, Init, NewFile, WriteFile, EndFile, WriteRaw, WriteData, Close, BitVec);
+
+protorequest!(Analyzer, Analyze, Report);
+protorequest!(CmdExec, Exec, PostCopyExec);
+protorequest!(Downloader, Download, ArchiveInfos);
+protorequest!(
+    Files,
+    GetAttr,
+    OpenDevice,
+    OpenPartition,
+    Partitions,
+    ReadDir,
+    ReadFile,
+    ReadSectors
+);
+protorequest!(Fs2Dev, DevSize, WriteFs, Wipe, LoadBitVec);
+protorequest!(Identificator, UserId);
+protorequest!(
+    Usbsas,
+    Devices,
+    GetAttr,
+    ImgDisk,
+    InitTransfer,
+    OpenDevice,
+    OpenPartition,
+    Partitions,
+    ReadDir,
+    SelectFiles,
+    Report,
+    UserId,
+    Wipe
 );
 protorequest!(Scsi, OpenDevice, Partitions, ReadSectors);
-protorequest!(
-    Usbsas,
-    Id,
-    UsbDevices,
-    AltTargets,
-    OpenDevice,
-    Partitions,
-    OpenPartition,
-    ReadDir,
-    GetAttr,
-    PostCopyCmd,
-    Wipe,
-    ImgDisk
-);
-protorequest!(Fs2Dev, DevSize, StartCopy, Wipe, LoadBitVec);
-protorequest!(
-    Files,
-    OpenDevice,
-    Partitions,
-    OpenPartition,
-    GetAttr,
-    ReadDir,
-    ReadFile,
-    ReadSectors
-);
-protorequest!(WriteFs, SetFsInfos, NewFile, WriteFile, EndFile, Close, BitVec, ImgDisk, WriteData);
-protorequest!(Uploader, Upload);
-protorequest!(Downloader, Download, ArchiveInfos);
-protorequest!(Analyzer, Analyze);
-
-protoresponse!(
-    Usbsas,
-    Id,
-    UsbDevices,
-    AltTargets,
-    OpenDevice,
-    OpenPartition,
-    Partitions,
-    GetAttr,
-    ReadDir,
-    CopyStart,
-    CopyDone,
-    FinalCopyStatusDone,
-    NotEnoughSpace,
-    NothingToCopy,
-    Wipe,
-    ImgDisk,
-    PostCopyCmd
-);
-protorequest!(Filter, FilterPaths);
-protorequest!(Identificator, Id);
 protorequest!(UsbDev, Devices);
-protorequest!(WriteTar, NewFile, WriteFile, EndFile, Close);
-protorequest!(CmdExec, Exec, PostCopyExec);
+protorequest!(Uploader, Upload);
+protorequest!(WriteDst, Init, NewFile, WriteFile, EndFile, Close, BitVec, WriteRaw, WriteData);

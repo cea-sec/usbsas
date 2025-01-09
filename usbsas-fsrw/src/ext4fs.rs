@@ -46,7 +46,7 @@ impl<T: ReadAt> FSRead<T> for Ext4<T> {
                         _ => FileType::Other,
                     };
                     files_info.push(FileInfo {
-                        path: format!("{}/{}", path, &entry.name),
+                        path: format!("{}/{}", path.trim_end_matches('/'), &entry.name),
                         ftype: file_type.into(),
                         size: inode.stat.size,
                         timestamp: inode.stat.ctime.epoch_secs,

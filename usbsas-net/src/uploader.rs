@@ -92,15 +92,12 @@ impl RunningState {
         req: proto::uploader::RequestUpload,
     ) -> Result<()> {
         trace!("upload");
+        comm.upload(proto::uploader::ResponseUpload {})?;
         let network = req.network.ok_or(Error::BadRequest)?;
         let url = format!("{}/{}", network.url.trim_end_matches('/'), req.id);
         let mut http_client = HttpClient::new(
             #[cfg(feature = "authkrb")]
-            if !network.krb_service_name.is_empty() {
-                Some(network.krb_service_name)
-            } else {
-                None
-            },
+            network.krb_service_name,
         )?;
         let file = self
             .file
@@ -127,7 +124,7 @@ impl RunningState {
             )));
         }
 
-        comm.upload(proto::uploader::ResponseUpload {})?;
+        comm.done()?;
         Ok(())
     }
 }

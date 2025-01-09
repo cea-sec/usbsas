@@ -2,7 +2,7 @@
 
 use std::io::{Seek, Write};
 use thiserror::Error;
-use usbsas_proto::common::{FileInfo, FileType, OutFsType};
+use usbsas_proto::common::{FileInfo, FileType, FsType};
 
 pub mod ext4fs;
 pub mod ff;
@@ -61,7 +61,7 @@ pub trait FSWrite<T> {
         fs_file: T,
         sector_size: u64,
         sector_count: u64,
-        fstype: Option<OutFsType>,
+        fstype: Option<FsType>,
     ) -> Result<Self>
     where
         Self: Sized;
