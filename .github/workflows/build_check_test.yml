@@ -15,9 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+          components: rustfmt
       - name: cargo fmt
         run: cargo fmt --all --check
 
@@ -25,11 +26,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+      - name: install cargo audit
+        run: cargo install cargo-audit
       - name: cargo audit
         run: cargo audit
+
 
   docker-image:
     runs-on: ubuntu-latest
