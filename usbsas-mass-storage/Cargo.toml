@@ -6,7 +6,7 @@ license = "GPL-3.0"
 
 [dependencies]
 log = "0.4"
-lru = "0.12"
+lru = "0.13"
 positioned-io2 = "0.3"
 rusb = { version = "0.9", features = ["vendored"] }
 thiserror = "2.0"
