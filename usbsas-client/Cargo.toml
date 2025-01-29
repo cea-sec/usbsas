@@ -19,7 +19,7 @@ depends = "$auto, usbsas-server, xserver-xorg-core, x11-xserver-utils, xinit, xd
 section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
-systemd-units = { enable = false }
+systemd-units = { unit-name = "usbsas-client", enable = false }
 assets = [
   ["target/release/usbsas-client", "usr/bin/", "755"],
   ["assets/usbsas-client-xinit", "usr/bin/", "755"],
