@@ -6,7 +6,7 @@ links = "X11,Xtst"
 license = "GPL-3.0"
 
 [dependencies]
-bitfield = "0.18"
+bitfield = "0.19"
 env_logger = "0.11"
 log = "0.4"
 rusb = { version = "0.9", features = ["vendored"] }
