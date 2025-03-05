@@ -35,6 +35,8 @@ impl MockUsbDev {
                 serial: "serial".to_string(),
                 is_src: true,
                 is_dst: false,
+                block_size: None,
+                dev_size: None,
             });
         }
 
@@ -50,6 +52,8 @@ impl MockUsbDev {
                 serial: "serial".to_string(),
                 is_src: false,
                 is_dst: true,
+                block_size: None,
+                dev_size: None,
             });
         }
 

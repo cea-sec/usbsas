@@ -21,7 +21,7 @@ message RequestInitTransfer {
   uint64 source = 1;
   uint64 destination = 2;
   optional common.FsType fstype = 3;
-  optional uint64 pin = 4;
+  optional string pin = 4;
 };
 
 message RequestOpenPartition {
@@ -116,7 +116,7 @@ message ResponseSelectFiles {
 };
 
 message ResponseReport {
-  bytes report = 1;
+  common.TransferReport report = 1;
 };
 
 message ResponseImgDisk {

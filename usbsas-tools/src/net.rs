@@ -21,16 +21,6 @@ enum Error {
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("process: {0}")]
     Process(#[from] usbsas_process::Error),
-    #[error("serde_json: {0}")]
-    SerdeJson(#[from] serde_json::Error),
-    #[error("Bad Request")]
-    BadRequest,
-    #[error("upload error: {0}")]
-    Upload(String),
-    #[error("analyze error: {0}")]
-    Analyze(String),
-    #[error("download error: {0}")]
-    Download(String),
     #[error("configuration or argument error: {0}")]
     ArgConf(String),
 }
@@ -121,12 +111,10 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let report = analyzer
         .comm
         .report(proto::analyzer::RequestReport {})?
-        .report;
+        .report
+        .expect("not report returned");
 
-    log::info!(
-        "{}",
-        serde_json::to_string_pretty(&serde_json::from_str::<serde_json::Value>(&report)?)?
-    );
+    log::info!("{:?}", report);
 
     if let Err(err) = analyzer.comm.end() {
         log::error!("Couldn't end analyzer: {}", err);

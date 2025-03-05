@@ -19,6 +19,22 @@ enum FsType {
   EXFAT = 2;
 };
 
+enum Status {
+  READ_SRC = 0;
+  DL_SRC = 1;
+  UPLOAD_AV = 2;
+  ANALYZE = 3;
+  MK_FS = 4;
+  MK_ARCHIVE = 5;
+  WRITE_DST = 6;
+  UPLOAD_DST = 7;
+  EXEC_CMD = 8;
+  WIPE = 9;
+  DISK_IMG = 10;
+  ALL_DONE = 11;
+  UNKNOWN = 12;
+};
+
 message FileInfo {
   string path = 1;
   FileType ftype = 2;
@@ -86,4 +102,68 @@ message ResponseStatus {
   bool done = 1;
   uint64 current = 2;
   uint64 total = 3;
+  Status status = 4;
+};
+
+// Reports
+
+message Antivirus {
+  string version = 1;
+  string database_version = 2;
+  optional string database_timestamp = 3;
+};
+message FileStatus {
+  string status = 1;
+  optional string sha256 = 2;
+};
+
+message AnalyzeReport {
+  string id = 1;
+  string status = 2;
+  optional uint32 version = 3;
+  map <string, Antivirus> antivirus = 4;
+  map <string, FileStatus> files = 5;
+};
+
+message UsbDeviceReport {
+  uint32 vendorid = 1;
+  uint32 productid = 2;
+  string manufacturer = 3;
+  string description = 4;
+  string serial = 5;
+};
+
+message NetworkReport {
+  string title = 1;
+  string description = 2;
+};
+
+message CommandReport {
+  string title = 1;
+  string description = 2;
+};
+
+message DeviceReport {
+  oneof device {
+    UsbDeviceReport usb = 1;
+    NetworkReport network = 2;
+    CommandReport command = 3;
+  }
+}
+
+message TransferReport {
+  string title = 1;
+  string datetime = 2;
+  int64 timestamp = 3;
+  string hostname = 4;
+  string status = 5;
+  optional string user = 6;
+  string transfer_id = 7;
+  DeviceReport source = 8;
+  DeviceReport destination = 9;
+  repeated string file_names = 11;
+  repeated string error_files = 12;
+  repeated string filtered_files = 13;
+  repeated string rejected_files = 14;
+  optional AnalyzeReport analyzereport = 15;
 };

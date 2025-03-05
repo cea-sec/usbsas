@@ -29,7 +29,7 @@ message ResponseAnalyze {
 }
 
 message ResponseReport {
-  string report = 1;
+  common.AnalyzeReport report = 1;
 }
 
 message Response {

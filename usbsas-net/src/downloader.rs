@@ -5,7 +5,7 @@ use std::fs::{File, OpenOptions};
 use usbsas_comm::{ComRpDownloader, ProtoRespCommon, ProtoRespDownloader};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
-use usbsas_proto::downloader::request::Msg;
+use usbsas_proto::{common::Status, downloader::request::Msg};
 
 enum State {
     Init(InitState),
@@ -49,6 +49,7 @@ impl InitState {
                 "/var/lib/usbsas",
             ]),
             Some(&[&self.tarpath]),
+            None,
         )?;
 
         let file = OpenOptions::new()
@@ -117,6 +118,7 @@ impl RunningState {
 
         // Even if the archive is gzipped, we're expecting its uncompressed size
         // here
+        // XXX TODO check enough space local
         let size = resp
             .headers()
             .get("X-Uncompressed-Content-Length")
@@ -151,10 +153,11 @@ impl RunningState {
             file: self.file,
             filesize,
             offset: 0,
+            status: Status::DlSrc,
         };
 
         resp.copy_to(&mut filewriterprogress)?;
-        comm.status(filesize, filesize, true)?;
+        comm.status(filesize, filesize, true, Status::DlSrc)?;
         Ok(())
     }
 }

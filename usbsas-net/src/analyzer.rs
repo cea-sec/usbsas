@@ -2,19 +2,19 @@ use crate::FileReaderProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
 use reqwest::blocking::Body;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::File, thread::sleep, time::Duration};
-use usbsas_comm::{ComRpAnalyzer, ProtoRespAnalyzer, ProtoRespCommon};
+use std::{fs::File, thread::sleep, time::Duration};
+use usbsas_comm::{
+    ComRpAnalyzer, ComRqJsonParser, ProtoReqCommon, ProtoReqJsonParser, ProtoRespAnalyzer,
+    ProtoRespCommon,
+};
 use usbsas_config::{conf_parse, conf_read};
+use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
-use usbsas_proto::analyzer::request::Msg;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct JsonRes {
-    status: String,
-    id: String,
-    files: Option<HashMap<String, serde_json::Value>>,
-}
+use usbsas_proto::{
+    analyzer::request::Msg,
+    common::{AnalyzeReport, Status},
+    jsonparser::SrvResp,
+};
 
 enum State {
     Init(InitState),
@@ -43,12 +43,14 @@ struct RunningState {
     file: Option<File>,
     url: String,
     http_client: HttpClient,
+    json_parser: UsbsasChild<ComRqJsonParser>,
 }
 
 struct WaitEndState {}
 
 impl InitState {
     fn run(self, _comm: &mut ComRpAnalyzer) -> Result<State> {
+        let json_parser_path = format!("{}/{}", usbsas_utils::USBSAS_BIN_PATH, "usbsas-jsonparser");
         usbsas_sandbox::landlock(
             Some(&[
                 &self.tarpath,
@@ -57,16 +59,18 @@ impl InitState {
                 "/lib",
                 "/usr/lib/",
                 "/var/lib/usbsas",
+                &json_parser_path,
             ]),
             None,
+            Some(&[&json_parser_path]),
         )?;
 
         let file = File::open(&self.tarpath)?;
         let config = conf_parse(&conf_read(&self.config_path)?)?;
 
-        // XXX seccomp
-
         if let Some(conf) = config.analyzer {
+            let json_parser =
+                UsbsasChildSpawner::new("usbsas-jsonparser").spawn::<ComRqJsonParser>()?;
             Ok(State::Running(RunningState {
                 file: Some(file),
                 url: conf.url,
@@ -74,6 +78,7 @@ impl InitState {
                     #[cfg(feature = "authkrb")]
                     conf.krb_service_name,
                 )?,
+                json_parser,
             }))
         } else {
             log::warn!("No analyzer conf, parking");
@@ -92,12 +97,15 @@ impl RunningState {
                     Err(err) => comm.error(err)?,
                 },
                 Msg::End(_) => {
+                    self.json_parser.comm.end()?;
                     comm.end()?;
                     return Ok(State::End);
                 }
                 Msg::Report(_) => {
                     if let Some(report) = report {
-                        comm.report(proto::analyzer::ResponseReport { report })?;
+                        comm.report(proto::analyzer::ResponseReport {
+                            report: Some(report.clone()),
+                        })?;
                         break;
                     } else {
                         comm.error("Files not analyzed yet")?;
@@ -105,10 +113,11 @@ impl RunningState {
                 }
             };
         }
+        self.json_parser.comm.end()?;
         Ok(State::WaitEnd(WaitEndState {}))
     }
 
-    fn analyze(&mut self, comm: &mut ComRpAnalyzer, uid: &str) -> Result<String> {
+    fn analyze(&mut self, comm: &mut ComRpAnalyzer, uid: &str) -> Result<AnalyzeReport> {
         trace!("req analyze");
         comm.analyze(proto::analyzer::ResponseAnalyze {})?;
 
@@ -118,7 +127,9 @@ impl RunningState {
             Ok(res) => {
                 trace!("upload for scan result: {:#?}", &res);
                 if res.status == "uploaded" {
-                    self.url = format!("{}/{}", self.url.trim_end_matches('/'), res.id);
+                    // XXX TODO uploaded but not id returned
+                    let id = res.id.ok_or(Error::BadRequest)?;
+                    self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
                 }
             }
             Err(err) => {
@@ -129,11 +140,11 @@ impl RunningState {
 
         let report = self.poll_result()?;
 
-        trace!("analyzer report: {}", &report);
+        trace!("analyzer report: {:?}", &report);
         Ok(report)
     }
 
-    fn upload(&mut self, comm: &mut ComRpAnalyzer) -> Result<JsonRes> {
+    fn upload(&mut self, comm: &mut ComRpAnalyzer) -> Result<SrvResp> {
         trace!("upload");
         let file = self.file.take().ok_or(Error::BadRequest)?;
         let filesize = file.metadata()?.len();
@@ -142,6 +153,7 @@ impl RunningState {
             file,
             filesize,
             offset: 0,
+            status: Status::UploadAv,
         };
         let body = Body::sized(filereaderprogress, filesize);
         trace!("upload to {}", &self.url);
@@ -149,11 +161,19 @@ impl RunningState {
         if !resp.status().is_success() {
             return Err(Error::Remote);
         }
-        comm.done()?;
-        Ok(resp.json()?)
+        let response = self
+            .json_parser
+            .comm
+            .parseresp(proto::jsonparser::RequestParseResp {
+                data: resp.bytes()?.into(),
+            })?
+            .resp
+            .ok_or(Error::Upload("error uploading bundle for analysis".into()))?;
+        comm.done(Status::UploadAv)?;
+        Ok(response)
     }
 
-    fn poll_result(&mut self) -> Result<String> {
+    fn poll_result(&mut self) -> Result<AnalyzeReport> {
         trace!("poll result");
         // XXX TODO timeout
         loop {
@@ -162,14 +182,30 @@ impl RunningState {
             if !resp.status().is_success() {
                 return Err(Error::Remote);
             }
-            let raw_report = resp.text()?;
-            let report: JsonRes = serde_json::from_str(&raw_report)?;
-            trace!("res: {:#?}", &report);
-            match report.status.as_str() {
-                "scanned" => return Ok(raw_report),
+            let response_bytes = resp.bytes()?;
+            let response = self
+                .json_parser
+                .comm
+                .parseresp(proto::jsonparser::RequestParseResp {
+                    data: response_bytes.clone().into(),
+                })?
+                .resp
+                .ok_or(Error::Upload("error getting analysis result".into()))?;
+
+            match response.status.as_str() {
+                "scanned" => {
+                    let report = self
+                        .json_parser
+                        .comm
+                        .parsereport(proto::jsonparser::RequestParseReport {
+                            data: response_bytes.into(),
+                        })?
+                        .report
+                        .ok_or(Error::Upload("error parsing analysis result".into()))?;
+                    return Ok(report);
+                }
                 "uploaded" | "processing" => sleep(Duration::from_secs(1)),
                 _ => {
-                    log::error!("{report:?}");
                     return Err(Error::Remote);
                 }
             }

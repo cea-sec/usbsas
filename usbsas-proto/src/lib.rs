@@ -67,13 +67,6 @@ pub mod common {
             self.hash(&mut s);
             s.finish()
         }
-        pub fn to_json(&self) -> serde_json::Value {
-            match self {
-                device::Device::Usb(usb) => usb.to_json(),
-                device::Device::Network(net) => net.to_json(),
-                device::Device::Command(cmd) => cmd.to_json(),
-            }
-        }
     }
 
     impl From<device::Device> for Device {
@@ -112,37 +105,31 @@ pub mod common {
         }
     }
 
-    impl UsbDevice {
-        pub fn to_json(&self) -> serde_json::Value {
-            serde_json::json!({
-                "type": "usb",
-                "serial": self.serial,
-                "description": self.description,
-                "vendorid": self.vendorid,
-                "productid": self.productid,
-                "manufacturer": self.manufacturer,
-            })
-        }
-    }
-
-    impl Network {
-        pub fn to_json(&self) -> serde_json::Value {
-            serde_json::json!({
-                "type": "net",
-                "url": self.url,
-                "title": self.title,
-                "description": self.description
-            })
-        }
-    }
-
-    impl Command {
-        pub fn to_json(&self) -> serde_json::Value {
-            serde_json::json!({
-                "type": "command",
-                "title": self.title,
-                "description": self.description
-            })
+    impl From<&device::Device> for DeviceReport {
+        fn from(item: &device::Device) -> Self {
+            match &item {
+                device::Device::Usb(usb) => DeviceReport {
+                    device: Some(device_report::Device::Usb(UsbDeviceReport {
+                        vendorid: usb.vendorid,
+                        productid: usb.productid,
+                        manufacturer: usb.manufacturer.clone(),
+                        description: usb.description.clone(),
+                        serial: usb.serial.clone(),
+                    })),
+                },
+                device::Device::Network(net) => DeviceReport {
+                    device: Some(device_report::Device::Network(NetworkReport {
+                        title: net.title.clone(),
+                        description: net.description.clone(),
+                    })),
+                },
+                device::Device::Command(cmd) => DeviceReport {
+                    device: Some(device_report::Device::Command(CommandReport {
+                        title: cmd.title.clone(),
+                        description: cmd.description.clone(),
+                    })),
+                },
+            }
         }
     }
 }
@@ -177,4 +164,8 @@ pub mod usbsas {
 
 pub mod writedst {
     include!(concat!(env!("OUT_DIR"), "/writedst.rs"));
+}
+
+pub mod jsonparser {
+    include!(concat!(env!("OUT_DIR"), "/jsonparser.rs"));
 }

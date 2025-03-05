@@ -303,6 +303,7 @@ impl InitState {
                 "/run/udev",
             ]),
             None,
+            None,
         )?;
 
         let current_devices = Arc::new(Mutex::new(CurrentDevices::new(None)));

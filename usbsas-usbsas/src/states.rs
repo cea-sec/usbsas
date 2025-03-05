@@ -1,14 +1,11 @@
 use crate::{
     filter::{Rule, Rules},
-    Children, Devices, Error, Transfer, TransferFiles, TransferReport,
+    Children, Devices, Transfer, TransferFiles, TransferReport,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace};
 use serde_json::json;
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    env,
-};
+use std::collections::{HashMap, HashSet, VecDeque};
 use usbsas_comm::{
     ComRqFiles, ComRqWriteDst, ProtoReqAnalyzer, ProtoReqCmdExec, ProtoReqCommon,
     ProtoReqDownloader, ProtoReqFiles, ProtoReqFs2Dev, ProtoReqIdentificator, ProtoReqUploader,
@@ -18,10 +15,10 @@ use usbsas_config::Config;
 use usbsas_process::{ChildMngt, UsbsasChild};
 use usbsas_proto::{
     self as proto,
-    common::{device::Device, FileType, FsType, Network, OutFileType, UsbDevice},
+    common::{device::Device, FileType, FsType, Network, OutFileType, Status, UsbDevice},
     usbsas::request::Msg,
 };
-use usbsas_utils::{READ_FILE_MAX_SIZE, TAR_DATA_DIR};
+use usbsas_utils::READ_FILE_MAX_SIZE;
 
 pub enum State {
     Init(InitState),
@@ -137,45 +134,18 @@ pub trait RunState {
         Ok(())
     }
 
-    fn init_report(&mut self) -> Result<TransferReport> {
-        #[cfg(not(feature = "integration-tests"))]
-        let (hostname, time) = {
-            let name = match uname::Info::new() {
-                Ok(name) => name.nodename,
-                _ => "unknown-usbsas".to_string(),
-            };
-            (name, time::OffsetDateTime::now_utc())
-        };
-        // Fixed values to keep a deterministic filesystem hash
-        #[cfg(feature = "integration-tests")]
-        let (hostname, time) = (
-            "unknown-usbsas",
-            time::macros::datetime!(2020-01-01 0:00 UTC),
-        );
-        let report = json!({
-            "title": format!("usbsas_transfer_{}", time),
-            "timestamp": time.unix_timestamp(),
-            "datetime": format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-                time.year(), time.month() as u8, time.day(),
-                time.hour(),time.minute(),time.second()),
-            "hostname": hostname,
-            "transfer_id": env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string()),
-        });
-        Ok(report)
-    }
-
     fn write_report(
         &self,
         writer: &mut UsbsasChild<ComRqWriteDst>,
         report: &TransferReport,
         path: String,
     ) -> Result<()> {
-        let report_data = serde_json::to_vec_pretty(report)?;
+        let report_data = serde_json::to_vec_pretty(&json!(report))?;
         writer.comm.newfile(proto::writedst::RequestNewFile {
             path: path.clone(),
             size: report_data.len() as u64,
             ftype: FileType::Metadata.into(),
-            timestamp: report["timestamp"].as_f64().unwrap_or(0.0) as i64,
+            timestamp: report.timestamp,
         })?;
         writer.comm.writefile(proto::writedst::RequestWriteFile {
             path: path.clone(),
@@ -228,7 +198,7 @@ impl RunState for InitState {
                     .devices(comm, children, req.include_alt, &mut devices)
                     .context("listing devices")?,
                 Msg::InitTransfer(req) => {
-                    let outfstype = match self.init_checks(req, userid.clone(), &devices) {
+                    let outfstype = match self.init_checks(&req, userid.clone(), &devices) {
                         Ok(outfstype) => outfstype,
                         Err(err) => {
                             comm.error(err)?;
@@ -283,7 +253,7 @@ impl RunState for InitState {
 impl InitState {
     fn init_checks(
         &self,
-        req: proto::usbsas::RequestInitTransfer,
+        req: &proto::usbsas::RequestInitTransfer,
         userid: Option<String>,
         devices: &Devices,
     ) -> Result<Option<FsType>> {
@@ -374,7 +344,7 @@ impl InitState {
                 selected_size: None,
                 analyze,
                 files: TransferFiles::new(),
-                report: serde_json::Value::Null,
+                analyze_report: None,
             };
 
             let state = match transfer.src {
@@ -521,7 +491,7 @@ impl RunState for BrowseSrcState {
 pub struct DownloadSrcState {
     config: Config,
     transfer: Transfer,
-    pin: u64,
+    pin: String,
 }
 
 impl RunState for DownloadSrcState {
@@ -545,7 +515,12 @@ impl RunState for DownloadSrcState {
             .download(proto::downloader::RequestDownload {})?;
         loop {
             let status = children.downloader.comm.recv_status()?;
-            comm.status(status.current, status.total, status.done)?;
+            comm.status(
+                status.current,
+                status.total,
+                status.done,
+                status.status.try_into()?,
+            )?;
             if status.done {
                 break;
             }
@@ -582,13 +557,6 @@ impl RunState for FileSelectionState {
         }
         self.transfer.selected_size = Some(selected_size);
 
-        self.transfer.report = self.init_report()?;
-        self.transfer.report["file_names"] = self.transfer.files.files.clone().into();
-        self.transfer.report["filtered_files"] = self.transfer.files.filtered.clone().into();
-        self.transfer.report["user"] = serde_json::Value::String(self.transfer.userid.clone());
-        self.transfer.report["source"] = self.transfer.src.to_json();
-        self.transfer.report["destination"] = self.transfer.dst.to_json();
-
         if !matches!(self.transfer.src, Device::Network(_)) {
             comm.selectfiles(proto::usbsas::ResponseSelectFiles { selected_size })?;
             self.tar_src_files(comm, children, selected_size)?;
@@ -596,9 +564,9 @@ impl RunState for FileSelectionState {
 
         if self.transfer.files.files.is_empty() {
             comm.error("No files to copy")?;
-            self.transfer.report["status"] = "Aborted, nothing to copy".into();
+            let report = self.transfer.to_report("Aborted, nothing to copy");
             return Ok(State::End(EndState {
-                report: self.transfer.report,
+                report: Some(report),
             }));
         }
 
@@ -746,16 +714,17 @@ impl FileSelectionState {
                 self.transfer.files.errors.push(path.clone());
             };
         }
+        let report = self.transfer.to_report("success");
         self.write_report(
             &mut children.files2tar,
-            &self.transfer.report,
+            &report,
             String::from("config.json"),
         )?;
         children
             .files2tar
             .comm
             .close(proto::writedst::RequestClose {})?;
-        comm.status(current, total_size, true)?;
+        comm.status(current, total_size, true, Status::ReadSrc)?;
         Ok(())
     }
 
@@ -811,7 +780,7 @@ impl FileSelectionState {
             offset += size_todo;
             attrs.size -= size_todo;
             *current += size_todo;
-            comm.status(*current, total_size, false)?;
+            comm.status(*current, total_size, false, Status::ReadSrc)?;
         }
         children
             .files2tar
@@ -829,7 +798,6 @@ pub struct AnalyzeState {
 impl RunState for AnalyzeState {
     fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         trace!("analyze transfer");
-
         children
             .analyzer
             .comm
@@ -839,75 +807,63 @@ impl RunState for AnalyzeState {
 
         loop {
             let status = children.analyzer.comm.recv_status()?;
-            comm.status(status.current, status.total, status.done)?;
+            comm.status(
+                status.current,
+                status.total,
+                status.done,
+                status.status.try_into()?,
+            )?;
             if status.done {
                 break;
             }
         }
-
+        comm.status(0, 0, false, Status::Analyze)?;
         let report = children
             .analyzer
             .comm
             .report(proto::analyzer::RequestReport {})?
             .report;
 
-        let report_json: serde_json::Value = serde_json::from_str(&report)?;
-
-        trace!("analyzer report: {}", report_json);
-        let files_status = report_json["files"]
-            .as_object()
-            .ok_or(anyhow!("couldn't read analyzer report"))?;
-
-        match &report_json["version"].as_u64() {
-            Some(2) => self.transfer.files.files.retain(|x| {
-                if let Some(status) = files_status.get(x.trim_start_matches('/')) {
-                    match status["status"].as_str() {
-                        Some("CLEAN") => true,
-                        Some("DIRTY") => {
-                            self.transfer.files.dirty.push(x.to_string());
-                            false
+        if let Some(ref report) = report {
+            match report.version {
+                Some(2) => self.transfer.files.files.retain(|x| {
+                    if let Some(file_status) = report.files.get(x.trim_start_matches('/')) {
+                        match file_status.status.as_str() {
+                            "CLEAN" => true,
+                            "DIRTY" => {
+                                self.transfer.files.dirty.push(x.to_string());
+                                false
+                            }
+                            _ => {
+                                self.transfer.files.errors.push(x.to_string());
+                                false
+                            }
                         }
-                        _ => {
-                            self.transfer.files.errors.push(x.to_string());
-                            false
-                        }
+                    } else {
+                        false
                     }
-                } else {
-                    false
-                }
-            }),
-            _ => self.transfer.files.files.retain(|x| {
-                if let Some(status) =
-                    files_status.get(&format!("{TAR_DATA_DIR}/{}", x.trim_start_matches('/')))
-                {
-                    match status.as_str() {
-                        Some("CLEAN") => true,
-                        Some("DIRTY") => {
-                            self.transfer.files.dirty.push(x.to_string());
-                            false
-                        }
-                        _ => {
-                            self.transfer.files.errors.push(x.to_string());
-                            false
-                        }
-                    }
-                } else {
-                    false
-                }
-            }),
-        }
+                }),
+                _ => panic!("unsupported"),
+            }
+        } else {
+            comm.error("Error analyzing files")?;
+            let report = self.transfer.to_report("Error analyzing files");
+            return Ok(State::End(EndState {
+                report: Some(report),
+            }));
+        };
 
-        self.transfer.report["analyzer_report"] = report_json;
+        self.transfer.analyze_report = report;
         if self.transfer.files.files.is_empty() {
             comm.error("Nothing to copy after analyzer, aborting")?;
-            self.transfer.report["status"] = "Aborted, nothing to copy after analysis".into();
+            let report = self
+                .transfer
+                .to_report("Aborted, nothing to copy after analysis");
             return Ok(State::End(EndState {
-                report: self.transfer.report,
+                report: Some(report),
             }));
         }
-
-        comm.done()?;
-
+        comm.done(Status::Analyze)?;
         Ok(State::WriteDstFile(WriteDstFileState {
             config: self.config,
             transfer: self.transfer,
@@ -952,32 +908,38 @@ impl RunState for WriteDstFileState {
                 self.transfer.files.errors.push(path.clone());
             };
         }
-        self.transfer.report["error_files"] = self.transfer.files.errors.clone().into();
         if let Some(ref confreport) = self.config.report {
             if confreport.write_dest {
+                let report = self.transfer.to_report("sucess");
                 let (dst_writer, report_path) = match &self.transfer.dst {
                     Device::Network(_) | Device::Command(_) => {
                         (&mut children.files2cleantar, String::from("config.json"))
                     }
                     Device::Usb(_) => (
                         &mut children.files2fs,
-                        format!("/usbsas-report-{}.json", self.transfer.report["timestamp"]),
+                        format!("/usbsas-report-{}.json", report.timestamp),
                     ),
                 };
-                self.write_report(dst_writer, &self.transfer.report, report_path)?;
+                self.write_report(dst_writer, &report, report_path)?;
             }
         }
-        match &self.transfer.dst {
-            Device::Network(_) | Device::Command(_) => children
-                .files2cleantar
-                .comm
-                .close(proto::writedst::RequestClose {})?,
-            Device::Usb(_) => children
-                .files2fs
-                .comm
-                .close(proto::writedst::RequestClose {})?,
+        let status = match &self.transfer.dst {
+            Device::Network(_) | Device::Command(_) => {
+                children
+                    .files2cleantar
+                    .comm
+                    .close(proto::writedst::RequestClose {})?;
+                Status::MkArchive
+            }
+            Device::Usb(_) => {
+                children
+                    .files2fs
+                    .comm
+                    .close(proto::writedst::RequestClose {})?;
+                Status::MkFs
+            }
         };
-        comm.done()?;
+        comm.done(status)?;
         Ok(State::TransferDst(TransferDstState {
             config: self.config,
             transfer: self.transfer,
@@ -993,9 +955,11 @@ impl WriteDstFileState {
         path: &str,
         current_size: &mut u64,
     ) -> Result<()> {
-        let dst_writer = match &self.transfer.dst {
-            Device::Network(_) | Device::Command(_) => &mut children.files2cleantar,
-            Device::Usb(_) => &mut children.files2fs,
+        let (dst_writer, status) = match &self.transfer.dst {
+            Device::Network(_) | Device::Command(_) => {
+                (&mut children.files2cleantar, Status::MkArchive)
+            }
+            Device::Usb(_) => (&mut children.files2fs, Status::MkFs),
         };
         let mut attrs = children
             .tar2files
@@ -1036,6 +1000,7 @@ impl WriteDstFileState {
                 *current_size,
                 self.transfer.selected_size.unwrap_or(*current_size),
                 false,
+                status,
             )?;
         }
         dst_writer.comm.endfile(proto::writedst::RequestEndFile {
@@ -1072,11 +1037,11 @@ impl RunState for TransferDstState {
                 })?;
         }
 
-        self.transfer.report["status"] = "ok".into();
-        comm.done()?;
+        let report = self.transfer.to_report("success");
+        comm.done(Status::AllDone)?;
         info!("transfer done, waiting end");
         Ok(State::End(EndState {
-            report: self.transfer.report,
+            report: Some(report),
         }))
     }
 }
@@ -1090,7 +1055,12 @@ impl TransferDstState {
             .writefs(proto::fs2dev::RequestWriteFs {})?;
         loop {
             let status = children.fs2dev.comm.recv_status()?;
-            comm.status(status.current, status.total, status.done)?;
+            comm.status(
+                status.current,
+                status.total,
+                status.done,
+                status.status.try_into()?,
+            )?;
             if status.done {
                 break;
             }
@@ -1109,7 +1079,12 @@ impl TransferDstState {
                 })?;
             loop {
                 let status = children.uploader.comm.recv_status()?;
-                comm.status(status.current, status.total, status.done)?;
+                comm.status(
+                    status.current,
+                    status.total,
+                    status.done,
+                    status.status.try_into()?,
+                )?;
                 if status.done {
                     break;
                 }
@@ -1123,7 +1098,7 @@ impl TransferDstState {
     fn exec_cmd(&self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<()> {
         trace!("exec cmd");
         children.cmdexec.comm.exec(proto::cmdexec::RequestExec {})?;
-        comm.done()?;
+        comm.done(Status::ExecCmd)?;
         Ok(())
     }
 }
@@ -1135,7 +1110,6 @@ pub struct ImgDiskState {
 impl RunState for ImgDiskState {
     fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         info!("image disk {}", self.device);
-        let mut report = self.init_report()?;
         comm.imgdisk(proto::usbsas::ResponseImgDisk {})?;
         let rep = children
             .scsi2files
@@ -1174,16 +1148,17 @@ impl RunState for ImgDiskState {
             todo -= sector_count * block_size;
             let current = offset * block_size;
             let done = current == dev_size;
-            comm.status(current, dev_size, done)?;
+            comm.status(current, dev_size, done, Status::DiskImg)?;
             if done {
                 break;
             }
         }
-        report["action"] = "Disk image".into();
-        report["device"] = self.device.to_json();
-        report["status"] = "ok".into();
+        let report = crate::report_diskimg(self.device);
         info!("imgdisk done");
-        Ok(State::End(EndState { report }))
+        comm.done(Status::AllDone)?;
+        Ok(State::End(EndState {
+            report: Some(report),
+        }))
     }
 }
 
@@ -1205,8 +1180,6 @@ impl RunState for WipeState {
 
         comm.wipe(proto::usbsas::ResponseWipe {})?;
 
-        let mut report = self.init_report()?;
-
         // unlock fs2dev
         children
             .fs2dev
@@ -1215,13 +1188,18 @@ impl RunState for WipeState {
             children.fs2dev.comm.wipe(proto::fs2dev::RequestWipe {})?;
             loop {
                 let status = children.fs2dev.comm.recv_status()?;
-                comm.status(status.current, status.total, status.done)?;
+                comm.status(
+                    status.current,
+                    status.total,
+                    status.done,
+                    status.status.try_into()?,
+                )?;
                 if status.done {
                     break;
                 }
             }
         } else {
-            comm.done()?;
+            comm.done(Status::MkFs)?;
         }
 
         let dev_size = children
@@ -1244,22 +1222,27 @@ impl RunState for WipeState {
             .writefs(proto::fs2dev::RequestWriteFs {})?;
         loop {
             let status = children.fs2dev.comm.recv_status()?;
-            comm.status(status.current, status.total, status.done)?;
+            comm.status(
+                status.current,
+                status.total,
+                status.done,
+                status.status.try_into()?,
+            )?;
             if status.done {
                 break;
             }
         }
-
-        report["action"] = "Wipe".into();
-        report["device"] = self.device.to_json();
-        report["status"] = "ok".into();
+        let report = crate::report_wipe(self.device);
         info!("wipe done");
-        Ok(State::End(EndState { report }))
+        comm.done(Status::AllDone)?;
+        Ok(State::End(EndState {
+            report: Some(report),
+        }))
     }
 }
 
 pub struct EndState {
-    pub report: TransferReport,
+    pub report: Option<TransferReport>,
 }
 
 impl RunState for EndState {
@@ -1272,7 +1255,7 @@ impl RunState for EndState {
                     .context("listing devices")?,
                 Msg::Report(_) => {
                     comm.report(proto::usbsas::ResponseReport {
-                        report: serde_json::to_vec(&self.report)?,
+                        report: self.report.clone(),
                     })?;
                 }
                 Msg::End(_) => {

@@ -12,7 +12,7 @@ use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespUsbsas, ToFd};
 use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_usbsas::{
     children::Children,
-    states::{EndState, InitState, RunState, State},
+    states::{EndState, InitState, State},
 };
 use usbsas_utils::clap::UsbsasClap;
 
@@ -36,7 +36,6 @@ fn main_loop(
         config,
         plugged_devices: Vec::new(),
     };
-    let mut report = init_state.init_report()?;
     let mut state = State::Init(init_state);
     loop {
         state = match state.run(&mut comm, &mut children) {
@@ -45,11 +44,7 @@ fn main_loop(
             Err(err) => {
                 error!("{}, waiting end", err);
                 comm.error(&err)?;
-                report["status"] = "error".into();
-                report["reason"] = err.to_string().into();
-                State::End(EndState {
-                    report: report.clone(),
-                })
+                State::End(EndState { report: None })
             }
         }
     }

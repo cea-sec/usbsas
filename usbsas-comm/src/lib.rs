@@ -288,7 +288,7 @@ macro_rules! protoresponse {
                 fn status(&mut self, current: u64, total: u64, done: bool, status: usbsas_proto::common::Status) -> std::io::Result<()> {
                     self.send(usbsas_proto::[<$proto:lower>]::Response {
                         msg: Some(usbsas_proto::[<$proto:lower>]::response::Msg::Status(usbsas_proto::common::ResponseStatus {
-                            current, total, done
+                            current, total, done, status: status.into()
                         })),
                     })
                 }
@@ -302,10 +302,10 @@ macro_rules! protoresponse {
                         msg: Some(usbsas_proto::[<$proto:lower>]::response::Msg::End(usbsas_proto::common::ResponseEnd {})),
                     })
                 }
-                fn done(&mut self) -> std::io::Result<()> {
+                fn done(&mut self, status: usbsas_proto::common::Status) -> std::io::Result<()> {
                     self.send(usbsas_proto::[<$proto:lower>]::Response {
                         msg: Some(usbsas_proto::[<$proto:lower>]::response::Msg::Status(usbsas_proto::common::ResponseStatus {
-                            current: 0, total: 0, done: true,
+                            current: 0, total: 0, done: true, status: status.into()
                         })),
                     })
                 }
@@ -361,6 +361,7 @@ protoresponse!(
 );
 protoresponse!(Uploader, Upload);
 protoresponse!(WriteDst, Init, NewFile, WriteFile, EndFile, WriteRaw, WriteData, Close, BitVec);
+protoresponse!(JsonParser, ParseResp, ParseReport);
 
 protorequest!(Analyzer, Analyze, Report);
 protorequest!(CmdExec, Exec, PostCopyExec);
@@ -396,3 +397,4 @@ protorequest!(Scsi, OpenDevice, Partitions, ReadSectors);
 protorequest!(UsbDev, Devices);
 protorequest!(Uploader, Upload);
 protorequest!(WriteDst, Init, NewFile, WriteFile, EndFile, Close, BitVec, WriteRaw, WriteData);
+protorequest!(JsonParser, ParseResp, ParseReport);

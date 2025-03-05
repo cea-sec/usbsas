@@ -4778,6 +4778,7 @@ dependencies = [
  "thiserror 2.0.12",
  "usbsas-comm",
  "usbsas-config",
+ "usbsas-process",
  "usbsas-proto",
  "usbsas-sandbox",
  "usbsas-utils",

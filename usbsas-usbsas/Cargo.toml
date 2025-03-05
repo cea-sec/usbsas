@@ -42,6 +42,7 @@ triggers-file = "debian/triggers"
 assets = [
   ["target/release/usbsas-usbsas", "usr/libexec/", "755"],
   ["target/release/usbsas-analyzer", "usr/libexec/", "755"],
+  ["target/release/usbsas-jsonparser", "usr/libexec/", "755"],
   ["target/release/usbsas-cmdexec", "usr/libexec/", "755"],
   ["target/release/usbsas-dev2scsi", "usr/libexec/", "755"],
   ["target/release/usbsas-downloader", "usr/libexec/", "755"],

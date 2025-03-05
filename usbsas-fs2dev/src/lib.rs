@@ -11,7 +11,7 @@ use std::{
 };
 use thiserror::Error;
 use usbsas_comm::{ComRpFs2Dev, ProtoRespCommon, ProtoRespFs2Dev};
-use usbsas_proto as proto;
+use usbsas_proto::{self as proto, common::Status};
 use usbsas_utils::SECTOR_SIZE;
 #[cfg(not(feature = "mock"))]
 use {
@@ -239,9 +239,9 @@ impl CopyingState {
             )?;
 
             current_size += sector_write_size;
-            comm.status(current_size, total_size, false)?;
+            comm.status(current_size, total_size, false, Status::WriteDst)?;
         }
-        comm.status(current_size, total_size, true)?;
+        comm.status(current_size, total_size, true, Status::WriteDst)?;
         Ok(State::WaitEnd(WaitEndState))
     }
 }
@@ -276,12 +276,12 @@ impl WipingState {
             self.mass_storage
                 .scsi_write_10(&mut buffer, sector_index, sector_count)?;
             current_size += buffer.len() as u64;
-            comm.status(current_size, total_size, false)?;
+            comm.status(current_size, total_size, false, Status::Wipe)?;
 
             todo -= buffer.len() as u64;
             sector_index += sector_count;
         }
-        comm.status(current_size, total_size, true)?;
+        comm.status(current_size, total_size, true, Status::Wipe)?;
         Ok(State::DevOpened(DevOpenedState {
             fs: self.fs,
             mass_storage: self.mass_storage,

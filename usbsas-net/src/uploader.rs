@@ -5,7 +5,7 @@ use reqwest::blocking::Body;
 use std::fs::File;
 use usbsas_comm::{ComRpUploader, ProtoRespCommon, ProtoRespUploader};
 use usbsas_proto as proto;
-use usbsas_proto::uploader::request::Msg;
+use usbsas_proto::{common::Status, uploader::request::Msg};
 
 enum State {
     Init(InitState),
@@ -47,6 +47,7 @@ impl InitState {
                 "/usr/lib/",
                 "/var/lib/usbsas",
             ]),
+            None,
             None,
         )?;
 
@@ -113,6 +114,7 @@ impl RunningState {
             file,
             filesize,
             offset: 0,
+            status: Status::UploadDst,
         };
 
         let body = Body::sized(filereaderprogress, filesize);
@@ -125,7 +127,7 @@ impl RunningState {
             )));
         }
 
-        comm.done()?;
+        comm.done(Status::UploadDst)?;
         Ok(())
     }
 }
