@@ -7,7 +7,7 @@ description = "usbsas web server"
 
 [dependencies]
 actix-cors = "0.7"
-actix-web = "4.9"
+actix-web = "4.10"
 base64 = "0.22"
 clap = "4.5"
 err-derive = "0.3"
@@ -29,7 +29,7 @@ usbsas-config = { path = "../usbsas-config" }
 usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }
-uuid = { version = "1.15", features = ["v4"] }
+uuid = { version = "1.16", features = ["v4"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"
