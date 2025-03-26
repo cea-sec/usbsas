@@ -24,11 +24,9 @@ members = [
   "usbsas-net",
   "usbsas-usbdev",
   "usbsas-usbsas",
-  "usbsas-server",
   "usbsas-hid/hid-user",
   "usbsas-hid/hid-dealer",
   "usbsas-client",
-  "usbsas-server",
   "usbsas-tools"
 ]
 default-members = [
