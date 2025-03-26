@@ -315,6 +315,7 @@ impl Clamav {
         let clamav_config_path = format!("{}/clamd.conf", working_path);
         let clamav_socket_path = format!("{}/clamd.socket", working_path);
 
+        #[cfg(not(feature = "integration-tests"))]
         std::fs::write(
             &clamav_config_path,
             format!(
@@ -322,6 +323,23 @@ impl Clamav {
                 working_path, clamav_socket_path
             ),
         )?;
+
+        // Use dummy db for tests (faster loading, only detects eicar)
+        #[cfg(feature = "integration-tests")]
+        {
+            std::fs::write(
+                &clamav_config_path,
+                format!(
+                    "TemporaryDirectory {}\nLocalSocket {}\nForeground true\nDatabaseDirectory {}/db\n",
+                    working_path, clamav_socket_path, working_path,
+                ),
+            )?;
+            let _ = fs::create_dir(&format!("{}/db", working_path));
+            std::fs::write(
+                &format!("{}/db/test.ndb", working_path),
+                "Eicar-Test-Signature:0:0:58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e444152442d414e544956495255532d544553542d46494c452124482b482a\nEicar-Test-Signature-1:0:*:574456504956416c51454651577a5263554670594e54516f554634704e304e444b5464394a45564a513046534c564e555155354551564a454c55464f56456c5753564a565579315552564e550a4c555a4a544555684a45677253436f3d0a"
+            )?;
+        }
 
         log::debug!("start clamd");
         let clamav_child = process::Command::new("clamd")
