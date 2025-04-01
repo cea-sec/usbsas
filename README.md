@@ -48,7 +48,7 @@ usbsas can:
 
 Applications built on top of usbsas:
 
-- **Web client / server**: This is the main application of usbsas, for deploying
+- **Graphical User Interface**: This is the main application of usbsas, for deploying
   a secure USB to USB file transfer kiosk.
 - **[Fuse](https://en.wikipedia.org/wiki/Filesystem_in_Userspace)
   implementation**: mount USB devices (read-only) with usbsas.
@@ -72,9 +72,6 @@ translation.
 Dependencies included in this project:
 - `ntfs3g` is  GPLv2 (see ntfs3g/src/ntfs-3g/COPYING).
 - `FatFs` has a custom BSD-style license (see ff/src/ff/LICENSE.txt)
-- `fontawesome` is CC BY 4.0 (icons), SIL OFL 1.1 (fonts) and MIT (code) (see
-  client/web/static/fontawesome/LICENSE.txt)
-- `bootstrap` is MIT (see client/web/static/bs/LICENSE)
 
 usbsas is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software

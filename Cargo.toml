@@ -51,6 +51,7 @@ default-members = [
   "usbsas-tar2files",
   "usbsas-net",
   "usbsas-usbdev",
+  "usbsas-client",
   "usbsas-usbsas"
 ]
 resolver = "2"

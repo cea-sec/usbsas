@@ -1,0 +1,9 @@
+#! /bin/sh
+set -e
+
+if [ "remove" = "$1" ]; then
+    systemctl unmask getty@tty2.service
+    systemctl unmask autovt@tty2.service
+fi
+
+#DEBHELPER#

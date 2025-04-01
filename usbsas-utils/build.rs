@@ -17,15 +17,4 @@ fn main() {
     println!("cargo:rerun-if-env-changed=USBSAS_BIN_PATH");
 
     println!("cargo:rerun-if-env-changed=USBSAS_CONFIG");
-
-    let wp_manifest_path = format!("{}/../Cargo.toml", env::var("CARGO_MANIFEST_DIR").unwrap());
-    let usbsas_version =
-        toml::from_str::<toml::Table>(&std::fs::read_to_string(&wp_manifest_path).unwrap())
-            .unwrap()["workspace"]["metadata"]["version"]
-            .as_str()
-            .unwrap()
-            .to_string();
-    println!("cargo:rustc-env=USBSAS_VERSION={usbsas_version}");
-    println!("cargo:rerun-if-env-changed=USBSAS_VERSION");
-    println!("cargo:rerun-if-env-changed={wp_manifest_path}");
 }

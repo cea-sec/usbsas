@@ -17,7 +17,6 @@ pub const USBSAS_CONFIG: &str = match option_env!("USBSAS_CONFIG") {
     Some(val) => val,
     None => "/etc/usbsas/config.toml",
 };
-pub const USBSAS_VERSION: &str = env!("USBSAS_VERSION");
 
 /// formats a byte array as an hexadecimal pretty string
 #[macro_export]
