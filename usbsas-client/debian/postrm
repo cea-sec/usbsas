@@ -4,6 +4,12 @@ set -e
 if [ "remove" = "$1" ]; then
     systemctl unmask getty@tty2.service
     systemctl unmask autovt@tty2.service
+
+    set +e
+    if id usbsas-client; then
+        set -e
+        userdel -r -f usbsas-client
+    fi
 fi
 
 #DEBHELPER#

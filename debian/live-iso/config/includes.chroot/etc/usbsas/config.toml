@@ -1,5 +1,7 @@
 out_directory = "/tmp/"
 
+window_title = "live usbsas"
+
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 analyze_usb = true

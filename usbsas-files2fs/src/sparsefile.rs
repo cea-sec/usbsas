@@ -42,8 +42,7 @@ impl<T: Read + Write + Seek> Write for SparseFile<T> {
             0 => Ok(0),
             size => {
                 let sector_start = (offset / self.sector_size) as usize;
-                let sector_stop =
-                    ((offset + size as u64 + self.sector_size - 1) / self.sector_size) as usize;
+                let sector_stop = (offset + size as u64).div_ceil(self.sector_size) as usize;
                 self.bitvec[sector_start..sector_stop].fill(true);
                 Ok(size)
             }

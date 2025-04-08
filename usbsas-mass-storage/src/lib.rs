@@ -284,7 +284,7 @@ impl Read for MassStorageComm {
         let count = buf.len() as u64;
         let block_size = self.block_size as u64;
         let read_offset = self.seek % block_size;
-        let sectors_to_read = (read_offset + count + (block_size - 1)) / block_size;
+        let sectors_to_read = (read_offset + count).div_ceil(block_size);
         let offset = self.seek / block_size;
 
         let data = self.read_sectors(offset + self.partition_sector_start, sectors_to_read)?;
@@ -333,7 +333,7 @@ impl ReadAt for MassStorageComm {
         let count = buf.len() as u64;
         let block_size = self.block_size as u64;
         let read_offset = pos % block_size;
-        let sectors_to_read = (read_offset + count + (block_size - 1)) / block_size;
+        let sectors_to_read = (read_offset + count).div_ceil(block_size);
         let offset = pos / block_size;
         let data = self.read_sectors(offset + self.partition_sector_start, sectors_to_read)?;
         let data = data[(read_offset as usize)..(read_offset as usize + count as usize)].to_vec();

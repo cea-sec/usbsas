@@ -302,6 +302,8 @@ impl InitState {
             devices.remove(&req.source),
             devices.remove(&req.destination),
         ) {
+            log::info!("Init transfer from {:?} to {:?} for {:?}", src, dst, userid);
+
             // Get max size of destination
             let max_dst_size = if let Device::Usb(ref mut usbdev) = dst {
                 children

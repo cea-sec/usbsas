@@ -1,6 +1,6 @@
 [package]
 name = "usbsas-usbsas"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "GPL-3.0"
 
@@ -37,7 +37,7 @@ integration-tests = []
 
 # cargo-deb
 [package.metadata.deb]
-name = "usbsas-core"
+name = "usbsas-server"
 maintainer = "usbsas"
 copyright = "usbsas"
 revision = "1"
@@ -46,6 +46,7 @@ section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
 triggers-file = "debian/triggers"
+systemd-units = { unit-name = "usbsas-server", enable = false }
 assets = [
   ["target/release/usbsas-usbsas", "usr/libexec/", "755"],
   ["target/release/usbsas-analyzer", "usr/libexec/", "755"],
@@ -55,7 +56,6 @@ assets = [
   ["target/release/usbsas-downloader", "usr/libexec/", "755"],
   ["target/release/usbsas-files2fs", "usr/libexec/", "755"],
   ["target/release/usbsas-files2tar", "usr/libexec/", "755"],
-  ["target/release/usbsas-filter", "usr/libexec/", "755"],
   ["target/release/usbsas-fs2dev", "usr/libexec/", "755"],
   ["target/release/usbsas-identificator", "usr/libexec/", "755"],
   ["target/release/usbsas-scsi2files", "usr/libexec/", "755"],

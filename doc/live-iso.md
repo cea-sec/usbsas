@@ -18,10 +18,10 @@ regularly to have an up-to-date clamAV database.
 # Build the image
 
 The ISO image is built with [DebianLive](https://wiki.debian.org/DebianLive)
-tools and `make`.
+tools, install the `live-build` pkg and run `make`.
 
 ```shell
-$ cd client/live-iso
+$ cd debian
 $ sudo apt install live-build
 $ make
 ```

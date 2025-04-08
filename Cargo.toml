@@ -59,6 +59,3 @@ resolver = "2"
 [profile.release]
 overflow-checks = true
 strip = true
-
-[workspace.metadata]
-version = "0.2.2"

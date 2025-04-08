@@ -54,7 +54,6 @@ jobs:
         run: |
           echo "U_PKG_ASRV=$(ls usbsas-analyzer-server*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_PKG_SRV=$(ls usbsas-server*.deb)" >> "$GITHUB_OUTPUT" && \
-          echo "U_PKG_CORE=$(ls usbsas-core*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_PKG_KIOSK=$(ls usbsas-kiosk*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_PKG_HID=$(ls usbsas-hid*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_ISO=$(ls usbsas-*.hybrid.iso)" >> "$GITHUB_OUTPUT"
@@ -65,7 +64,6 @@ jobs:
           files: |
             ${{ steps.artifacts_names.outputs.U_PKG_ASRV }}
             ${{ steps.artifacts_names.outputs.U_PKG_SRV }}
-            ${{ steps.artifacts_names.outputs.U_PKG_CORE }}
             ${{ steps.artifacts_names.outputs.U_PKG_KIOSK }}
             ${{ steps.artifacts_names.outputs.U_PKG_HID }}
             ${{ steps.artifacts_names.outputs.U_ISO }}

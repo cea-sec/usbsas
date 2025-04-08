@@ -3,8 +3,8 @@ Description=usbsas-client X11 session
 After=graphical.target systemd-user-sessions.service
 
 [Service]
-User=usbsas
-WorkingDirectory=/var/lib/usbsas
+User=usbsas-client
+WorkingDirectory=/var/lib/usbsas-client
 PAMName=login
 Environment="XDG_SESSION_TYPE=x11"
 Environment="RUST_LOG=info,wgpu_hal=error,iced_winit=error,iced_wgpu=error,wgpu_core=error"
