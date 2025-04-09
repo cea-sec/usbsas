@@ -77,7 +77,7 @@ impl<'a> UsbsasChildSpawner<'a> {
         self
     }
 
-    pub fn spawn<R: usbsas_comm::ToFromFd + usbsas_comm::ProtoReqCommon>(
+    pub fn spawn<R: usbsas_comm::FromFd + usbsas_comm::ProtoReqCommon>(
         self,
     ) -> Result<UsbsasChild<R>> {
         let mut command =

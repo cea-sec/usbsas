@@ -105,7 +105,8 @@ impl RunningState {
             .ok_or_else(|| Error::Error("no file to upload".to_string()))?;
         let filesize = file.metadata()?.len();
 
-        let comm_progress = comm.try_clone()?;
+        let comm_progress =
+            ComRpUploader::new(comm.input().try_clone()?, comm.output().try_clone()?);
 
         let filereaderprogress = FileReaderProgress {
             comm: comm_progress,

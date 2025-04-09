@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use usbsas_comm::{ComRqScsi, Comm, ProtoReqScsi};
+use usbsas_comm::{ComRqScsi, ProtoReqScsi};
 use usbsas_proto as proto;
 use usbsas_scsi::ScsiUsb;
 
@@ -220,7 +220,7 @@ pub struct MassStorageComm {
     pub dev_size: u64,
     pub partition_sector_start: u64,
     // RwLock because we need to impl ReadAt which takes a non mut ref
-    pub comm: Arc<RwLock<Comm<proto::scsi::Request>>>,
+    pub comm: Arc<RwLock<ComRqScsi>>,
     // Small cache to avoid reading the same sectors multiple time
     pub cache: RwLock<lru::LruCache<(u64, u64), Vec<u8>>>,
 }
@@ -241,7 +241,7 @@ impl MassStorageComm {
         }
     }
 
-    pub fn comm(&self) -> Result<std::sync::RwLockWriteGuard<'_, Comm<proto::scsi::Request>>> {
+    pub fn comm(&self) -> Result<std::sync::RwLockWriteGuard<'_, ComRqScsi>> {
         self.comm
             .write()
             .map_err(|err| Error::Error(format!("comm lock error: {err}")))

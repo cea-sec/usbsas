@@ -136,7 +136,8 @@ impl RunningState {
     fn download(mut self, comm: &mut ComRpDownloader, filesize: u64) -> Result<()> {
         trace!("download");
         comm.download(proto::downloader::ResponseDownload {})?;
-        let comm_progress = comm.try_clone()?;
+        let comm_progress =
+            ComRpDownloader::new(comm.input().try_clone()?, comm.output().try_clone()?);
         let mut resp = self.http_client.get(&self.url)?;
         if !resp.status().is_success() {
             return Err(Error::Error(format!(

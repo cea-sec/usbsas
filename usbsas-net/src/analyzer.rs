@@ -138,7 +138,7 @@ impl RunningState {
         let file = self.file.take().ok_or(Error::BadRequest)?;
         let filesize = file.metadata()?.len();
         let filereaderprogress = FileReaderProgress {
-            comm: comm.try_clone()?,
+            comm: ComRpAnalyzer::new(comm.input().try_clone()?, comm.output().try_clone()?),
             file,
             filesize,
             offset: 0,

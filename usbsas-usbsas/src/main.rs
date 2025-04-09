@@ -1,7 +1,14 @@
 use anyhow::{Context, Result};
-use log::{error, info, trace};
-use std::{env, fs::File};
-use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespCommon, ToFd};
+use log::{error, info};
+use std::{
+    env,
+    fs::{self, File, Permissions},
+    os::{
+        fd::AsRawFd,
+        unix::{fs::PermissionsExt, net::UnixListener},
+    },
+};
+use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespUsbsas, ToFd};
 use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_usbsas::{
     children::Children,
@@ -9,8 +16,23 @@ use usbsas_usbsas::{
 };
 use usbsas_utils::clap::UsbsasClap;
 
-fn main_loop(mut comm: ComRpUsbsas, mut children: Children, config: Config) -> Result<()> {
-    let mut init_state = InitState {
+pub struct UnixSocketPath {
+    path: String,
+}
+
+impl Drop for UnixSocketPath {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+fn main_loop(
+    mut comm: impl ProtoRespUsbsas,
+    mut children: Children,
+    config: Config,
+    _socket_path: Option<UnixSocketPath>,
+) -> Result<()> {
+    let init_state = InitState {
         config,
         plugged_devices: Vec::new(),
     };
@@ -35,6 +57,11 @@ fn main_loop(mut comm: ComRpUsbsas, mut children: Children, config: Config) -> R
 }
 
 fn main() -> Result<()> {
+    let matches = usbsas_utils::clap::new_usbsas_cmd("usbsas-usbsas")
+        .add_config_arg()
+        .add_socket_arg()
+        .get_matches();
+
     // Create and set env session id if caller didn't
     let session_id = match env::var("USBSAS_SESSION_ID") {
         Ok(id) => id,
@@ -48,9 +75,6 @@ fn main() -> Result<()> {
     usbsas_utils::log::init_logger();
     info!("init {} ({})", session_id, std::process::id());
 
-    let matches = usbsas_utils::clap::new_usbsas_cmd("usbsas-usbsas")
-        .add_config_arg()
-        .get_matches();
     let config_path = matches.get_one::<String>("config").unwrap();
     let config = conf_parse(&conf_read(config_path)?)?;
 
@@ -75,14 +99,11 @@ fn main() -> Result<()> {
     let _ = File::create(&fs_path).context(format!("create {fs_path}"))?;
 
     // Spawn children
-    let comm: ComRpUsbsas = Comm::from_env()?;
     let children = Children::spawn(config_path, &tar_path, &fs_path).context("spawn children")?;
 
     // Get file descriptors to apply seccomp rules
     let mut pipes_read = vec![];
     let mut pipes_write = vec![];
-    pipes_read.push(comm.input_fd());
-    pipes_write.push(comm.output_fd());
     let comms: [&dyn ToFd; 12] = [
         &children.analyzer.comm,
         &children.identificator.comm,
@@ -101,8 +122,42 @@ fn main() -> Result<()> {
         pipes_read.push(c.input_fd());
         pipes_write.push(c.output_fd())
     });
-    trace!("enter seccomp");
-    usbsas_sandbox::usbsas::seccomp(pipes_read, pipes_write).context("seccomp")?;
 
-    main_loop(comm, children, config).context("main loop")
+    if let Some(path) = matches.get_one::<String>("socket") {
+        if let Ok(true) = std::path::Path::new(path).try_exists() {
+            log::warn!("socket already exists, probably residual, removing it");
+            fs::remove_file(path).expect("remove socket");
+        };
+        let listener = UnixListener::bind(path).context("bind")?;
+        // Set R+W for owner and group
+        fs::set_permissions(path, Permissions::from_mode(0o660)).context("set perms socket")?;
+        let stream = match listener.incoming().next() {
+            Some(Ok(stream)) => stream,
+            Some(Err(err)) => panic!("error listen incoming {err}"),
+            None => panic!("shouldn't happen"),
+        };
+        let comm = Comm::new(stream.try_clone().context("clone stream")?, stream);
+        let socket_fds = usbsas_sandbox::usbsas::SocketFds {
+            listen: listener.as_raw_fd(),
+            read: comm.input_fd(),
+            write: comm.output_fd(),
+        };
+        pipes_read.push(socket_fds.read);
+        pipes_write.push(socket_fds.write);
+        usbsas_sandbox::usbsas::seccomp(pipes_read, pipes_write, Some(socket_fds))
+            .context("seccomp")?;
+        main_loop(
+            comm,
+            children,
+            config,
+            Some(UnixSocketPath { path: path.into() }),
+        )
+        .context("main loop")
+    } else {
+        let comm: ComRpUsbsas = Comm::from_env()?;
+        pipes_read.push(comm.input_fd());
+        pipes_write.push(comm.output_fd());
+        usbsas_sandbox::usbsas::seccomp(pipes_read, pipes_write, None).context("seccomp")?;
+        main_loop(comm, children, config, None).context("main loop")
+    }
 }

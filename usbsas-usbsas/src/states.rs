@@ -10,9 +10,9 @@ use std::{
     env,
 };
 use usbsas_comm::{
-    ComRpUsbsas, ComRqFiles, ComRqWriteDst, ProtoReqAnalyzer, ProtoReqCmdExec, ProtoReqCommon,
+    ComRqFiles, ComRqWriteDst, ProtoReqAnalyzer, ProtoReqCmdExec, ProtoReqCommon,
     ProtoReqDownloader, ProtoReqFiles, ProtoReqFs2Dev, ProtoReqIdentificator, ProtoReqUploader,
-    ProtoReqUsbDev, ProtoReqWriteDst, ProtoRespCommon, ProtoRespUsbsas,
+    ProtoReqUsbDev, ProtoReqWriteDst, ProtoRespUsbsas,
 };
 use usbsas_config::Config;
 use usbsas_process::{ChildMngt, UsbsasChild};
@@ -39,7 +39,7 @@ pub enum State {
 }
 
 impl State {
-    pub fn run(self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<Self> {
+    pub fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm, children),
             State::OpenSrcUsb(s) => s.run(comm, children),
@@ -59,11 +59,11 @@ impl State {
 
 // Shared functions for states
 pub trait RunState {
-    fn run(self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State>;
+    fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State>;
 
     fn devices(
         &mut self,
-        comm: &mut ComRpUsbsas,
+        comm: &mut impl ProtoRespUsbsas,
         children: &mut Children,
         include_alt: bool,
         devices: &mut Devices,
@@ -93,7 +93,11 @@ pub trait RunState {
         Ok(())
     }
 
-    fn userid(&self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<Option<String>> {
+    fn userid(
+        &self,
+        comm: &mut impl ProtoRespUsbsas,
+        children: &mut Children,
+    ) -> Result<Option<String>> {
         trace!("handle req ID");
         let userid = children
             .identificator
@@ -191,7 +195,7 @@ pub struct InitState {
 }
 
 impl RunState for InitState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         let mut userid: Option<String> = None;
         let mut devices: Devices = HashMap::new();
 
@@ -317,7 +321,7 @@ impl InitState {
 
     fn init_transfer(
         self,
-        comm: &mut ComRpUsbsas,
+        comm: &mut impl ProtoRespUsbsas,
         children: &mut Children,
         req: proto::usbsas::RequestInitTransfer,
         userid: Option<String>,
@@ -402,7 +406,7 @@ pub struct OpenSrcUsbState {
 }
 
 impl RunState for OpenSrcUsbState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         let src_usb = match self.transfer.src {
             Device::Usb(ref mut usb) => usb,
             _ => bail!("Source is not a USB device"),
@@ -460,7 +464,7 @@ pub struct BrowseSrcState {
 }
 
 impl RunState for BrowseSrcState {
-    fn run(self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         let src_reader: &mut UsbsasChild<ComRqFiles> = match self.transfer.src {
             Device::Usb(_) => &mut children.scsi2files,
             _ => unimplemented!(),
@@ -521,7 +525,7 @@ pub struct DownloadSrcState {
 }
 
 impl RunState for DownloadSrcState {
-    fn run(self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         let remote_path = format!("{}/{}", &self.transfer.userid, self.pin);
         let archive_size = children
             .downloader
@@ -562,7 +566,7 @@ pub struct FileSelectionState {
 }
 
 impl RunState for FileSelectionState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         let max_file_size = if matches!(self.transfer.outfstype, Some(FsType::Fat)) {
             Some(0xFFFF_FFFF)
         } else {
@@ -724,7 +728,7 @@ impl FileSelectionState {
 
     fn tar_src_files(
         &mut self,
-        comm: &mut ComRpUsbsas,
+        comm: &mut impl ProtoRespUsbsas,
         children: &mut Children,
         total_size: u64,
     ) -> Result<()> {
@@ -757,7 +761,7 @@ impl FileSelectionState {
 
     fn file_to_tar(
         &self,
-        comm: &mut ComRpUsbsas,
+        comm: &mut impl ProtoRespUsbsas,
         children: &mut Children,
         path: &str,
         current: &mut u64,
@@ -823,7 +827,7 @@ pub struct AnalyzeState {
 }
 
 impl RunState for AnalyzeState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         trace!("analyze transfer");
 
         children
@@ -917,7 +921,7 @@ pub struct WriteDstFileState {
 }
 
 impl RunState for WriteDstFileState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         if let Device::Usb(ref usbdev) = self.transfer.dst {
             if let (Some(dev_size), Some(fstype)) = (usbdev.dev_size, self.transfer.outfstype) {
                 children.files2fs.comm.init(proto::writedst::RequestInit {
@@ -984,7 +988,7 @@ impl RunState for WriteDstFileState {
 impl WriteDstFileState {
     fn file_to_dst(
         &self,
-        comm: &mut ComRpUsbsas,
+        comm: &mut impl ProtoRespUsbsas,
         children: &mut Children,
         path: &str,
         current_size: &mut u64,
@@ -1047,7 +1051,7 @@ pub struct TransferDstState {
 }
 
 impl RunState for TransferDstState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         match self.transfer.dst {
             Device::Usb(_) => self.write_fs(comm, children)?,
             Device::Network(_) => self.upload(comm, children)?,
@@ -1078,7 +1082,7 @@ impl RunState for TransferDstState {
 }
 
 impl TransferDstState {
-    fn write_fs(&self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<()> {
+    fn write_fs(&self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<()> {
         self.forward_bitvec(children)?;
         children
             .fs2dev
@@ -1094,7 +1098,7 @@ impl TransferDstState {
         Ok(())
     }
 
-    fn upload(&self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<()> {
+    fn upload(&self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<()> {
         if let Device::Network(ref network) = &self.transfer.dst {
             children
                 .uploader
@@ -1116,7 +1120,7 @@ impl TransferDstState {
         Ok(())
     }
 
-    fn exec_cmd(&self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<()> {
+    fn exec_cmd(&self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<()> {
         trace!("exec cmd");
         children.cmdexec.comm.exec(proto::cmdexec::RequestExec {})?;
         comm.done()?;
@@ -1129,7 +1133,7 @@ pub struct ImgDiskState {
 }
 
 impl RunState for ImgDiskState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         info!("image disk {}", self.device);
         let mut report = self.init_report()?;
         comm.imgdisk(proto::usbsas::ResponseImgDisk {})?;
@@ -1190,7 +1194,7 @@ pub struct WipeState {
 }
 
 impl RunState for WipeState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         info!(
             "wipe device (serial: {}, fmt: {}, secure: {}",
             self.device.serial,
@@ -1259,7 +1263,7 @@ pub struct EndState {
 }
 
 impl RunState for EndState {
-    fn run(mut self, comm: &mut ComRpUsbsas, children: &mut Children) -> Result<State> {
+    fn run(mut self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         let mut devices = HashMap::new();
         loop {
             match comm.recv_req()? {

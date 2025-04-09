@@ -22,7 +22,6 @@ pub trait FromEnv: Sized {
     type Err;
     fn from_env(name: &str) -> Result<Self, Self::Err>;
 }
-
 impl FromEnv for RawFd {
     type Err = io::Error;
     fn from_env(name: &str) -> Result<Self, Self::Err> {
@@ -37,15 +36,21 @@ impl FromEnv for RawFd {
 pub trait FromFd {
     fn from_fd(read: OwnedFd, write: OwnedFd) -> Self;
 }
+impl<U, R: Read + From<OwnedFd>, W: Write + From<OwnedFd>> FromFd for Comm<U, R, W> {
+    fn from_fd(inp: OwnedFd, out: OwnedFd) -> Self {
+        Comm {
+            input: R::from(inp),
+            output: W::from(out),
+            req: PhantomData,
+        }
+    }
+}
 
 pub trait ToFd {
     fn input_fd(&self) -> RawFd;
     fn output_fd(&self) -> RawFd;
 }
-
-pub trait ToFromFd: FromFd + ToFd {}
-
-impl<R> ToFd for Comm<R> {
+impl<U, R: Read + AsRawFd, W: Write + AsRawFd> ToFd for Comm<U, R, W> {
     fn input_fd(&self) -> RawFd {
         self.input.as_raw_fd()
     }
@@ -54,29 +59,17 @@ impl<R> ToFd for Comm<R> {
     }
 }
 
-impl<R> FromFd for Comm<R> {
-    fn from_fd(read: OwnedFd, write: OwnedFd) -> Self {
-        Comm {
-            input: File::from(read),
-            output: File::from(write),
-            req: PhantomData,
-        }
-    }
-}
-
-impl<R> ToFromFd for Comm<R> {}
-
-/// Struct containing input (read) and output (write) communication pipes.
+/// Typed struct containing input (read) and output (write) communication pipes.
 /// Comm is marked with `PhantomData` on the type of protobuf messages it will
 /// send / recv.
-pub struct Comm<R> {
-    input: File,
-    output: File,
-    req: PhantomData<R>,
+pub struct Comm<U, R: Read, W: Write> {
+    input: R,
+    output: W,
+    req: PhantomData<U>,
 }
 
-impl<R> Comm<R> {
-    pub fn new(input: File, output: File) -> Self {
+impl<U, R: Read + AsRawFd + From<OwnedFd>, W: Write + AsRawFd + From<OwnedFd>> Comm<U, R, W> {
+    pub fn new(input: R, output: W) -> Self {
         Comm {
             input,
             output,
@@ -84,24 +77,25 @@ impl<R> Comm<R> {
         }
     }
 
-    pub fn try_clone(&self) -> io::Result<Self> {
-        Ok(Comm::new(self.input.try_clone()?, self.output.try_clone()?))
-    }
-
     /// Instantiate `Comm` with file descriptors from environment variables
     /// `INPUT_PIPE_FD_VAR` and `OUTPUT_PIPE_FD_VAR`.
-    pub fn from_env() -> io::Result<Self> {
-        let pipe_in = RawFd::from_env(INPUT_PIPE_FD_VAR)?;
-        let pipe_out = RawFd::from_env(OUTPUT_PIPE_FD_VAR)?;
-        Ok(Comm {
-            input: unsafe { File::from_raw_fd(pipe_in) },
-            output: unsafe { File::from_raw_fd(pipe_out) },
-            req: PhantomData,
-        })
+    pub fn from_env() -> io::Result<Comm<U, R, W>> {
+        Ok(Self::from_fd(
+            unsafe { OwnedFd::from_raw_fd(RawFd::from_env(INPUT_PIPE_FD_VAR)?) },
+            unsafe { OwnedFd::from_raw_fd(RawFd::from_env(OUTPUT_PIPE_FD_VAR)?) },
+        ))
+    }
+
+    pub fn input(&self) -> &R {
+        &self.input
+    }
+
+    pub fn output(&self) -> &W {
+        &self.output
     }
 }
 
-impl<R> Write for Comm<R> {
+impl<U, R: Read, W: Write> Write for Comm<U, R, W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.output.write(buf)
     }
@@ -111,7 +105,7 @@ impl<R> Write for Comm<R> {
     }
 }
 
-impl<R> Read for Comm<R> {
+impl<U, R: Read, W: Write> Read for Comm<U, R, W> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.input.read(buf)
     }
@@ -144,9 +138,29 @@ pub trait SendRecv: Read + Write {
     }
 }
 
-impl<R> SendRecv for Comm<R> {}
+/// Common function that requester processes must implement
+pub trait ProtoReqCommon: SendRecv {
+    fn end(&mut self) -> std::io::Result<()>;
+    fn recv_status(&mut self) -> std::io::Result<usbsas_proto::common::ResponseStatus>;
+}
 
-/// This macro defines a trait and implements it on Comm<R> to facilitate
+/// Common functions that responder processes must implement
+pub trait ProtoRespCommon: SendRecv {
+    fn status(
+        &mut self,
+        current: u64,
+        total: u64,
+        done: bool,
+        status: usbsas_proto::common::Status,
+    ) -> std::io::Result<()>;
+    fn error(&mut self, err: impl std::string::ToString) -> std::io::Result<()>;
+    fn end(&mut self) -> std::io::Result<()>;
+    fn done(&mut self, status: usbsas_proto::common::Status) -> std::io::Result<()>;
+}
+
+impl<U, R: Read, W: Write> SendRecv for Comm<U, R, W> {}
+
+/// This macro defines a trait and implements it on Comm<U> to facilitate
 /// sending a request and receiving its corresponding response.
 ///
 /// For example with usbdev:
@@ -195,24 +209,18 @@ impl<R> SendRecv for Comm<R> {}
 /// let devices = comm.devices()?.devices;
 ///
 /// ```
-
-pub trait ProtoReqCommon: SendRecv {
-    fn end(&mut self) -> std::io::Result<()>;
-    fn recv_status(&mut self) -> std::io::Result<usbsas_proto::common::ResponseStatus>;
-}
-
 #[macro_export]
 macro_rules! protorequest {
     ($proto:ident,
      $($req:ident),+) => {
         paste! {
-            pub type [<ComRq$proto>] = Comm<usbsas_proto::[<$proto:lower>]::Request>;
+            pub type [<ComRq$proto>] = Comm<usbsas_proto::[<$proto:lower>]::Request, File, File>;
             pub trait [<ProtoReq$proto>]: SendRecv + ProtoReqCommon {
                 $(
                     fn [<$req:lower>](&mut self, req: usbsas_proto::[<$proto:lower>]::[<Request$req>]) -> std::io::Result<usbsas_proto::[<$proto:lower>]::[<Response$req>]>;
                 )+
             }
-            impl ProtoReqCommon for [<ComRq$proto>] {
+            impl<R: Read, W: Write> ProtoReqCommon for Comm<usbsas_proto::[<$proto:lower>]::Request, R, W> {
                 fn end(&mut self) -> std::io::Result<()> {
                     let req_parts = usbsas_proto::[<$proto:lower>]::Request {
                         msg: Some(usbsas_proto::[<$proto:lower>]::request::Msg::End(usbsas_proto::[<$proto:lower>]::RequestEnd {})),
@@ -239,7 +247,7 @@ macro_rules! protorequest {
                 }
 
             }
-            impl [<ProtoReq$proto>] for [<ComRq$proto>] {
+            impl<R: Read, W: Write> [<ProtoReq$proto>] for Comm<usbsas_proto::[<$proto:lower>]::Request, R, W> {
                 $(
                     fn [<$req:lower>](&mut self, req: usbsas_proto::[<$proto:lower>]::[<Request$req>]) -> std::io::Result<usbsas_proto::[<$proto:lower>]::[<Response$req>]> {
                         let req_parts = usbsas_proto::[<$proto:lower>]::Request {
@@ -263,27 +271,21 @@ macro_rules! protorequest {
     };
 }
 
-pub trait ProtoRespCommon: SendRecv {
-    fn status(&mut self, current: u64, total: u64, done: bool) -> std::io::Result<()>;
-    fn error(&mut self, err: impl std::string::ToString) -> std::io::Result<()>;
-    fn end(&mut self) -> std::io::Result<()>;
-    fn done(&mut self) -> std::io::Result<()>;
-}
-
+/// Same as protorequest but for responses
 #[macro_export]
 macro_rules! protoresponse {
     ($proto:ident,
      $($resp:ident),+) => {
         paste!{
-            pub type [<ComRp$proto>] = Comm<usbsas_proto::[<$proto:lower>]::Response>;
+            pub type [<ComRp$proto>] = Comm<usbsas_proto::[<$proto:lower>]::Response, File, File>;
             pub trait [<ProtoResp$proto>]: SendRecv + ProtoRespCommon {
                 fn recv_req(&mut self) -> std::io::Result<usbsas_proto::[<$proto:lower>]::request::Msg>;
                 $(
                     fn [<$resp:lower>](&mut self, resp: usbsas_proto::[<$proto:lower>]::[<Response$resp>]) -> std::io::Result<()>;
                 )+
             }
-            impl ProtoRespCommon for [<ComRp$proto>] {
-                fn status(&mut self, current: u64, total: u64, done: bool) -> std::io::Result<()> {
+            impl<R: Read, W: Write> ProtoRespCommon for Comm<usbsas_proto::[<$proto:lower>]::Response, R, W> {
+                fn status(&mut self, current: u64, total: u64, done: bool, status: usbsas_proto::common::Status) -> std::io::Result<()> {
                     self.send(usbsas_proto::[<$proto:lower>]::Response {
                         msg: Some(usbsas_proto::[<$proto:lower>]::response::Msg::Status(usbsas_proto::common::ResponseStatus {
                             current, total, done
@@ -308,7 +310,7 @@ macro_rules! protoresponse {
                     })
                 }
             }
-            impl [<ProtoResp$proto>] for [<ComRp$proto>] {
+            impl<R: Read, W: Write> [<ProtoResp$proto>] for Comm<usbsas_proto::[<$proto:lower>]::Response, R, W> {
                 fn recv_req(&mut self) -> std::io::Result<usbsas_proto::[<$proto:lower>]::request::Msg> {
                     let req: usbsas_proto::[<$proto:lower>]::Request = self.recv()?;
                     req.msg.ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "Unhandled request"))

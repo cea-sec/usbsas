@@ -13,7 +13,12 @@ fn main() -> usbsas_cmdexec::Result<()> {
     let fs_path = matches.get_one::<String>("fs_path").unwrap().to_owned();
 
     log::info!("start ({}): {} {}", std::process::id(), tar_path, fs_path);
-    usbsas_cmdexec::CmdExec::new(usbsas_comm::Comm::from_env()?, tar_path, fs_path, config)?
-        .main_loop()
-        .map(|_| log::debug!("exit"))
+    usbsas_cmdexec::CmdExec::new(
+        usbsas_comm::ComRpCmdExec::from_env()?,
+        tar_path,
+        fs_path,
+        config,
+    )?
+    .main_loop()
+    .map(|_| log::debug!("exit"))
 }

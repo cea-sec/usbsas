@@ -1,7 +1,7 @@
 use anyhow::Result;
 use usbsas_comm::{
-    ComRpUsbsas, ComRqAnalyzer, ComRqCmdExec, ComRqDownloader, ComRqFiles, ComRqFs2Dev,
-    ComRqIdentificator, ComRqUploader, ComRqUsbDev, ComRqWriteDst, ProtoRespCommon,
+    ComRqAnalyzer, ComRqCmdExec, ComRqDownloader, ComRqFiles, ComRqFs2Dev, ComRqIdentificator,
+    ComRqUploader, ComRqUsbDev, ComRqWriteDst, ProtoRespUsbsas,
 };
 use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 
@@ -98,7 +98,7 @@ impl Children {
         ]
     }
 
-    pub fn end_wait_all(&mut self, comm: &mut ComRpUsbsas) -> Result<()> {
+    pub fn end_wait_all(&mut self, comm: &mut impl ProtoRespUsbsas) -> Result<()> {
         log::trace!("ending children");
         for child in self.as_array_mut().iter_mut() {
             child.end().ok();
