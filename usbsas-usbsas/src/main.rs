@@ -132,14 +132,15 @@ fn main() -> Result<()> {
             None => panic!("shouldn't happen"),
         };
         let comm = Comm::new(stream.try_clone().context("clone stream")?, stream);
-        let socket_fds = usbsas_sandbox::usbsas::SocketFds {
+        let socket = usbsas_sandbox::usbsas::UsbsasSocket {
             listen: listener.as_raw_fd(),
             read: comm.input_fd(),
             write: comm.output_fd(),
+            path: path.to_string(),
         };
-        pipes_read.push(socket_fds.read);
-        pipes_write.push(socket_fds.write);
-        usbsas_sandbox::usbsas::seccomp(pipes_read, pipes_write, Some(socket_fds))
+        pipes_read.push(socket.read);
+        pipes_write.push(socket.write);
+        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, Some(socket))
             .context("seccomp")?;
         main_loop(
             comm,
@@ -152,7 +153,7 @@ fn main() -> Result<()> {
         let comm: ComRpUsbsas = Comm::from_env()?;
         pipes_read.push(comm.input_fd());
         pipes_write.push(comm.output_fd());
-        usbsas_sandbox::usbsas::seccomp(pipes_read, pipes_write, None).context("seccomp")?;
+        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None).context("seccomp")?;
         main_loop(comm, children, config, None).context("main loop")
     }
 }
