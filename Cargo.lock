@@ -2426,7 +2426,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -2534,7 +2534,7 @@ version = "1.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0aeb26bf5e836cc1c341c8106051b573f1766dfa05aa87f0b98be5e51b02303"
 dependencies = [
- "nix",
+ "nix 0.29.0",
  "winapi",
 ]
 
@@ -2686,6 +2686,18 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "nix"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537bc3c4a347b87fd52ac6c03a02ab1302962cfd93373c5d7a112cdc337854cc"
+dependencies = [
+ "bitflags 2.9.0",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
 ]
 
 [[package]]
@@ -4797,7 +4809,7 @@ version = "0.1.2"
 dependencies = [
  "libc",
  "log",
- "nix",
+ "nix 0.30.0",
  "thiserror 2.0.12",
  "usbsas-comm",
  "usbsas-utils",
@@ -4864,7 +4876,7 @@ dependencies = [
  "hmac",
  "log",
  "mac_address",
- "nix",
+ "nix 0.30.0",
  "rand 0.9.0",
  "reqwest",
  "serde",
@@ -4908,7 +4920,7 @@ dependencies = [
  "indicatif",
  "libc",
  "log",
- "nix",
+ "nix 0.30.0",
  "serde_json",
  "tempfile",
  "thiserror 2.0.12",
@@ -5275,7 +5287,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
