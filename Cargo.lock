@@ -3597,6 +3597,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
+dependencies = [
+ "bitflags 2.9.0",
+ "cfg-if",
+ "cfg_aliases 0.2.1",
+ "libc",
+]
+
+[[package]]
 name = "nom"
 version = "7.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6212,7 +6224,7 @@ version = "0.2.0"
 dependencies = [
  "libc",
  "log",
- "nix",
+ "nix 0.30.1",
  "thiserror 2.0.12",
  "usbsas-comm",
  "usbsas-utils",
@@ -6293,7 +6305,7 @@ dependencies = [
  "indicatif",
  "libc",
  "log",
- "nix",
+ "nix 0.30.1",
  "serde_json",
  "tempfile",
  "thiserror 2.0.12",
@@ -6333,7 +6345,7 @@ dependencies = [
  "flate2",
  "hex-literal",
  "log",
- "nix",
+ "nix 0.30.1",
  "reqwest",
  "serde",
  "serde_json",
@@ -7500,7 +7512,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "hex",
- "nix",
+ "nix 0.29.0",
  "ordered-stream",
  "rand 0.8.5",
  "serde",
