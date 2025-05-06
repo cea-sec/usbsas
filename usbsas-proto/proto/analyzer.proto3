@@ -1,10 +1,14 @@
 syntax = "proto3";
 package analyzer;
+import "common.proto3";
 
 /* Requests */
 
 message RequestAnalyze {
   string id = 1;
+};
+
+message RequestReport {
 };
 
 message RequestEnd {
@@ -13,7 +17,8 @@ message RequestEnd {
 message Request {
   oneof msg {
     RequestAnalyze Analyze = 1;
-    RequestEnd End = 2;
+    RequestReport Report = 2;
+    RequestEnd End = 3;
   }
 };
 
@@ -21,26 +26,18 @@ message Request {
 /* Response */
 
 message ResponseAnalyze {
-  string report = 1;
 }
 
-message ResponseUploadStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
+message ResponseReport {
+  common.AnalyzeReport report = 1;
 }
-
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
 
 message Response {
   oneof msg {
     ResponseAnalyze Analyze = 1;
-    ResponseEnd End = 2;
-    ResponseError Error = 3;
-    ResponseUploadStatus UploadStatus = 4;
+    ResponseReport Report = 2;
+    common.ResponseEnd End = 3;
+    common.ResponseError Error = 4;
+    common.ResponseStatus Status = 5;
   }
 };

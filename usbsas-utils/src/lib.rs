@@ -12,11 +12,11 @@ pub const SECTOR_SIZE: u64 = 512;
 pub const TAR_BLOCK_SIZE: usize = 512;
 pub const TAR_DATA_DIR: &str = "data";
 pub const USBSAS_BIN_PATH: &str = env!("USBSAS_BIN_PATH");
+pub const SOCKET_PATH: &str = "/tmp/usbsas.sock";
 pub const USBSAS_CONFIG: &str = match option_env!("USBSAS_CONFIG") {
     Some(val) => val,
     None => "/etc/usbsas/config.toml",
 };
-pub const USBSAS_VERSION: &str = env!("USBSAS_VERSION");
 
 /// formats a byte array as an hexadecimal pretty string
 #[macro_export]

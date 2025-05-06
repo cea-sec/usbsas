@@ -15,13 +15,13 @@ use std::{
     os::unix::io::AsRawFd,
 };
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpWriteDst, ProtoRespCommon, ProtoRespWriteDst, ToFd};
 use usbsas_fsrw::{ff, ntfs, FSWrite};
 use usbsas_mbr::SECTOR_START;
 use usbsas_proto as proto;
 use usbsas_proto::{
-    common::{FileType, OutFsType},
-    writefs::request::Msg,
+    common::{FileType, FsType},
+    writedst::request::Msg,
 };
 use usbsas_utils::SECTOR_SIZE;
 
@@ -49,41 +49,26 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommWritefs,
-    writefs,
-    setfsinfos = SetFsInfos[ResponseSetFsInfos],
-    newfile = NewFile[ResponseNewFile],
-    writefile = WriteFile[ResponseWriteFile],
-    endfile = EndFile[ResponseEndFile],
-    imgdisk = ImgDisk[ResponseImgDisk],
-    writedata = WriteData[ResponseWriteData],
-    close = Close[ResponseClose],
-    bitvec = BitVec[ResponseBitVec],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
-
 enum State {
     Init(InitState),
     WaitFsInfos(WaitFsInfosState),
     WaitNewFile(WaitNewFileState),
     WritingFile(WritingFileState),
-    ImgDisk(ImgDiskState),
+    WriteRaw(WriteRawState),
     ForwardBitVec(ForwardBitVecState),
     WaitEnd(WaitEndState),
     End,
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::writefs::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::WaitFsInfos(s) => s.run(comm),
             State::WaitNewFile(s) => s.run(comm),
             State::WritingFile(s) => s.run(comm),
             State::WaitEnd(s) => s.run(comm),
-            State::ImgDisk(s) => s.run(comm),
+            State::WriteRaw(s) => s.run(comm),
             State::ForwardBitVec(s) => s.run(comm),
             State::End => Err(Error::State),
         }
@@ -108,7 +93,7 @@ struct WritingFileState {
     timestamp: i64,
 }
 
-struct ImgDiskState {
+struct WriteRawState {
     fs: File,
 }
 
@@ -119,7 +104,7 @@ struct ForwardBitVecState {
 struct WaitEndState;
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::writefs::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         let fs = fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -130,29 +115,24 @@ impl InitState {
 }
 
 impl WaitFsInfosState {
-    fn run(self, comm: &mut Comm<proto::writefs::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         trace!("wait fs infos");
-        let req: proto::writefs::Request = comm.recv()?;
-        let newstate = match req.msg.ok_or(Error::BadRequest)? {
-            Msg::SetFsInfos(fsinfos) => match self.mkfs(comm, fsinfos.dev_size, fsinfos.fstype) {
+        let newstate = match comm.recv_req()? {
+            Msg::Init(fsinfos) => match self.mkfs(comm, fsinfos.dev_size, fsinfos.fstype) {
                 Ok(fs) => State::WaitNewFile(WaitNewFileState { fs }),
                 Err(err) => {
-                    comm.error(proto::writefs::ResponseError {
-                        err: format!("Error mkfs: {err}"),
-                    })?;
+                    comm.error(format!("Error mkfs: {err}"))?;
                     State::WaitEnd(WaitEndState {})
                 }
             },
-            Msg::ImgDisk(_) => return Ok(State::ImgDisk(ImgDiskState { fs: self.fs })),
+            Msg::WriteRaw(_) => return Ok(State::WriteRaw(WriteRawState { fs: self.fs })),
             Msg::End(_) => {
-                comm.end(proto::writefs::ResponseEnd {})?;
+                comm.end()?;
                 State::End
             }
             _ => {
                 error!("bad request");
-                comm.error(proto::writefs::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
                 return Err(Error::State);
             }
         };
@@ -161,12 +141,12 @@ impl WaitFsInfosState {
 
     fn mkfs(
         self,
-        comm: &mut Comm<proto::writefs::Request>,
+        comm: &mut ComRpWriteDst,
         dev_size: u64,
         fstype: i32,
     ) -> Result<Box<dyn FSWrite<StreamSlice<SparseFile<File>>>>> {
         let out_fs_type =
-            OutFsType::try_from(fstype).map_err(|err| Error::FSError(format!("{err}")))?;
+            FsType::try_from(fstype).map_err(|err| Error::FSError(format!("{err}")))?;
 
         log::debug!("mkfs dev_size: {}", dev_size);
 
@@ -191,7 +171,7 @@ impl WaitFsInfosState {
             SparseFile::new(self.fs, SECTOR_SIZE, (SECTOR_START + sector_count) as usize)?;
 
         let fs: Box<dyn FSWrite<StreamSlice<SparseFile<File>>>> = match out_fs_type {
-            OutFsType::Fat | OutFsType::Exfat => {
+            FsType::Fat | FsType::Exfat => {
                 // ff handles writing mbr but still wrap in StreamSlice so we have the same type as ntfs below
                 let file_slice =
                     StreamSlice::new(sparse_file, 0, (SECTOR_START + sector_count) * SECTOR_SIZE)?;
@@ -203,7 +183,7 @@ impl WaitFsInfosState {
                     Some(out_fs_type),
                 )?)
             }
-            OutFsType::Ntfs => {
+            FsType::Ntfs => {
                 // Write mbr before mkfs
                 sparse_file.seek(SeekFrom::Start(446))?;
                 let partition = usbsas_mbr::MbrPartitionEntry {
@@ -237,36 +217,33 @@ impl WaitFsInfosState {
             }
         };
 
-        comm.setfsinfos(proto::writefs::ResponseSetFsInfos {})?;
+        comm.init(proto::writedst::ResponseInit {})?;
         Ok(fs)
     }
 }
 
 impl WaitNewFileState {
-    fn run(self, comm: &mut Comm<proto::writefs::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         trace!("wait new file state");
-        let req: proto::writefs::Request = comm.recv()?;
-        let newstate = match req.msg.ok_or(Error::BadRequest)? {
+        let newstate = match comm.recv_req()? {
             Msg::NewFile(msg) => self.newfile(comm, msg.path, msg.timestamp, msg.ftype)?,
             Msg::Close(_) => {
                 let bitvec = self.fs.unmount_fs()?.into_inner().get_bitvec()?;
-                comm.close(proto::writefs::ResponseClose {})?;
+                comm.close(proto::writedst::ResponseClose {})?;
                 State::ForwardBitVec(ForwardBitVecState { bitvec })
             }
             Msg::EndFile(_) => {
-                comm.endfile(proto::writefs::ResponseEndFile {})?;
+                comm.endfile(proto::writedst::ResponseEndFile {})?;
                 State::WaitNewFile(self)
             }
             Msg::End(_) => {
                 let _ = self.fs.unmount_fs()?;
-                comm.end(proto::writefs::ResponseEnd {})?;
+                comm.end()?;
                 State::End
             }
             _ => {
                 error!("bad request");
-                comm.error(proto::writefs::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
                 return Err(Error::State);
             }
         };
@@ -275,34 +252,30 @@ impl WaitNewFileState {
 
     fn newfile(
         mut self,
-        comm: &mut Comm<proto::writefs::Request>,
+        comm: &mut ComRpWriteDst,
         path: String,
         timestamp: i64,
         ftype: i32,
     ) -> Result<State> {
         debug!("New file: \"{}\"", &path);
         let newstate: State = match FileType::try_from(ftype) {
-            Ok(FileType::Regular) => State::WritingFile(WritingFileState {
+            Ok(FileType::Regular | FileType::Metadata) => State::WritingFile(WritingFileState {
                 fs: self.fs,
                 path,
                 timestamp,
             }),
             Ok(FileType::Directory) => {
                 match self.fs.newdir(&path, timestamp) {
-                    Ok(_) => comm.newfile(proto::writefs::ResponseNewFile {})?,
+                    Ok(_) => comm.newfile(proto::writedst::ResponseNewFile {})?,
                     Err(err) => {
                         warn!("{}", err);
-                        comm.error(proto::writefs::ResponseError {
-                            err: format!("{err}"),
-                        })?;
+                        comm.error(err)?;
                     }
                 }
                 State::WaitNewFile(self)
             }
             _ => {
-                comm.error(proto::writefs::ResponseError {
-                    err: "bad file type".into(),
-                })?;
+                comm.error("bad file type")?;
                 return Err(Error::FSError("bad file type".into()));
             }
         };
@@ -311,12 +284,10 @@ impl WaitNewFileState {
 }
 
 impl WritingFileState {
-    fn run(mut self, comm: &mut Comm<proto::writefs::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpWriteDst) -> Result<State> {
         if let Err(err) = self.write_file(comm) {
             error!("Error writing file: {}", err);
-            comm.error(proto::writefs::ResponseError {
-                err: format!("{err}"),
-            })?;
+            comm.error(&err)?;
             if let Error::State = err {
                 return Ok(State::WaitEnd(WaitEndState {}));
             }
@@ -325,13 +296,12 @@ impl WritingFileState {
         Ok(State::WaitNewFile(WaitNewFileState { fs: self.fs }))
     }
 
-    fn write_file(&mut self, comm: &mut Comm<proto::writefs::Request>) -> Result<()> {
+    fn write_file(&mut self, comm: &mut ComRpWriteDst) -> Result<()> {
         trace!("writing file state");
         let mut file = self.fs.newfile(&self.path, self.timestamp)?;
-        comm.newfile(proto::writefs::ResponseNewFile {})?;
+        comm.newfile(proto::writedst::ResponseNewFile {})?;
         loop {
-            let req: proto::writefs::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::WriteFile(msg) => {
                     if file.seek(SeekFrom::End(0))? != msg.offset {
                         error!("sparse write not supported");
@@ -347,12 +317,12 @@ impl WritingFileState {
                         self.fs.removefile(&self.path)?;
                         return Err(Error::FSError("err writing file".into()));
                     }
-                    comm.writefile(proto::writefs::ResponseWriteFile {})?;
+                    comm.writefile(proto::writedst::ResponseWriteFile {})?;
                 }
                 Msg::EndFile(_) => {
                     drop(file);
                     self.fs.settimestamp(&self.path, self.timestamp)?;
-                    comm.endfile(proto::writefs::ResponseEndFile {})?;
+                    comm.endfile(proto::writedst::ResponseEndFile {})?;
                     break;
                 }
                 _ => {
@@ -365,67 +335,57 @@ impl WritingFileState {
     }
 }
 
-impl ImgDiskState {
-    fn run(mut self, comm: &mut Comm<proto::writefs::Request>) -> Result<State> {
-        comm.imgdisk(proto::writefs::ResponseImgDisk {})?;
+impl WriteRawState {
+    fn run(mut self, comm: &mut ComRpWriteDst) -> Result<State> {
+        comm.writeraw(proto::writedst::ResponseWriteRaw {})?;
         loop {
-            let req: proto::writefs::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::WriteData(req) => self.write_data(comm, req.data)?,
                 Msg::End(_) => {
                     drop(self.fs);
-                    comm.end(proto::writefs::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
                     error!("bad request");
-                    comm.error(proto::writefs::ResponseError {
-                        err: "bad request".into(),
-                    })?;
+                    comm.error("bad request")?;
                     return Err(Error::State);
                 }
             }
         }
         Ok(State::End)
     }
-    fn write_data(
-        &mut self,
-        comm: &mut Comm<proto::writefs::Request>,
-        data: Vec<u8>,
-    ) -> Result<()> {
+    fn write_data(&mut self, comm: &mut ComRpWriteDst, data: Vec<u8>) -> Result<()> {
         self.fs.write_all(&data)?;
-        comm.writedata(proto::writefs::ResponseWriteData {})?;
+        comm.writedata(proto::writedst::ResponseWriteData {})?;
         Ok(())
     }
 }
 
 impl ForwardBitVecState {
-    fn run(self, comm: &mut Comm<proto::writefs::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         trace!("forward bitvec state");
         let mut last = false;
         let mut chunks = self.bitvec.chunks(10 * 1024 * 1024).peekable(); // limit protobuf messages to 10Mb
         let newstate = loop {
-            let req: proto::writefs::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::BitVec(_) => {
                     let chunk = chunks.next().unwrap().to_bitvec().into_vec();
                     if chunks.peek().is_none() {
                         last = true;
                     }
-                    comm.bitvec(proto::writefs::ResponseBitVec { chunk, last })?;
+                    comm.bitvec(proto::writedst::ResponseBitVec { chunk, last })?;
                     if last {
                         break State::WaitEnd(WaitEndState);
                     }
                 }
                 Msg::End(_) => {
-                    comm.end(proto::writefs::ResponseEnd {})?;
+                    comm.end()?;
                     break State::End;
                 }
                 _ => {
                     error!("bad request");
-                    comm.error(proto::writefs::ResponseError {
-                        err: "bad request".into(),
-                    })?;
+                    comm.error("bad request")?;
                     return Err(Error::State);
                 }
             }
@@ -435,18 +395,15 @@ impl ForwardBitVecState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::writefs::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         trace!("wait end state");
-        let req: proto::writefs::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
-                comm.end(proto::writefs::ResponseEnd {})?;
+                comm.end()?;
             }
             _ => {
                 error!("bad request");
-                comm.error(proto::writefs::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
             }
         }
         Ok(State::End)
@@ -454,12 +411,12 @@ impl WaitEndState {
 }
 
 pub struct Files2Fs {
-    comm: Comm<proto::writefs::Request>,
+    comm: ComRpWriteDst,
     state: State,
 }
 
 impl Files2Fs {
-    pub fn new(comm: Comm<proto::writefs::Request>, fs_fname: String) -> Result<Self> {
+    pub fn new(comm: ComRpWriteDst, fs_fname: String) -> Result<Self> {
         let state = State::Init(InitState { fs_fname });
         Ok(Files2Fs { comm, state })
     }
@@ -472,9 +429,7 @@ impl Files2Fs {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}", err);
-                    comm.error(proto::writefs::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             };

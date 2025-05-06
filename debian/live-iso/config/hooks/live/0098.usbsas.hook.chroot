@@ -1,0 +1,29 @@
+#! /bin/sh
+
+set -e
+
+apt install -y --no-install-recommends -o Dpkg::Options::="--force-confold" \
+    /usbsas-server_*_amd64.deb \
+    /usbsas-analyzer-server_*_amd64.deb \
+    /usbsas-kiosk_*_amd64.deb \
+    /usbsas-hid_*_amd64.deb
+
+freshclam
+
+usermod -a -G video usbsas-client
+
+systemctl enable usbsas-analyzer-server
+systemctl enable usbsas-client
+systemctl enable usbsas-server
+systemctl disable clamav-daemon
+systemctl disable clamav-clamonacc
+systemctl disable clamav-freshclam
+systemctl disable getty@tty1.service
+systemctl disable systemd-networkd
+systemctl disable networking
+
+# ISO won't boot without usb modules, remove them once booted
+rm /etc/modprobe.d/usbsas.conf
+sed -i '/^\[Unit\]$/a Requires=usbsas-rmmod.service' /usr/lib/systemd/system/usbsas-server.service
+
+rm /usbsas-*.deb

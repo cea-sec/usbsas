@@ -15,7 +15,7 @@ Debian specific instructions.
 Most dependencies are managed by `cargo` but before building usbsas, the
 following packages must also be installed (the names may change depending on the
 Linux distribution): `rust`, `cargo`, `pkgconf`, `clang`, `cmake`, `protobuf`,
-`libseccomp`, `libusb`, `libudev`, `libkrb5 `, `libwebkit2gtk`.
+`libseccomp`, `libusb`, `libudev`, `libkrb5 `.
 
 Optional dependencies to build the analyzer-server, the tools and the HID
 manager: `libclamav`, `libdbus`, `libxtst`, `libx11`, `libfuse3`
@@ -45,10 +45,9 @@ Usbsas core:
 $ cargo build --release
 ```
 
-Client / server / analyzer server:
+Client & analyzer server:
 ```shell
 $ cargo build --release -p usbsas-client
-$ cargo build --release -p usbsas-server
 $ cargo build --release -p usbsas-analyzer-server
 ```
 
@@ -66,8 +65,8 @@ $ cargo build --release --manifest-path=usbsas-hid/hid-dealer/Cargo.toml
 ## Tests
 ### Integration tests
 
-Integration tests are written for the `usbsas-server` crate, they test the WEB
-API, USB to USB transfer, USB to NET transfer, device wipe etc.
+Integration tests are written for the `usbsas-usbsas` crate, they test various
+transfers: USB to USB transfer, USB to NET transfer, device wipe etc.
 
 A `mock` feature is available to test the usbsas without real USB devices.
 
@@ -123,19 +122,18 @@ an interface with the class mass storage (0x80), SCSI command set (0x06) and
 Bulk transport mode (0x50).
 
 
-### Web client / server
+### Native client
 
-After building, start usbsas-server, usbsas-analyzer-server and the web client:
+After building, start usbsas-server-analyzer
 
-```shell
-$ ./target/release/usbsas-server
-```
 ```shell
 $ ./target/release/usbsas-analyzer-server
 ```
 
+then start the client
+
 ```shell
-$ ./target/release/usbsas-client usbsas-client/web
+$ ./target/release/usbsas-client
 ```
 
 The antivirus analysis with the analyzer server is optional. To disable it,
@@ -234,5 +232,4 @@ $ export USBSAS_MOCK_IN_DEV=/tmp/mock_input_dev.img
 $ export USBSAS_MOCK_OUT_DEV=/tmp/mock_output_dev.img
 ```
 
-Then usbsas can be used as usual with the web server / client or the python
-module.
+Then usbsas can be used as usual with the client or the python module.

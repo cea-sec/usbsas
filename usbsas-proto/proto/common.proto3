@@ -5,6 +5,7 @@ enum FileType {
   OTHER = 0;
   REGULAR = 1;
   DIRECTORY = 2;
+  METADATA = 3;
 };
 
 enum OutFileType {
@@ -12,10 +13,26 @@ enum OutFileType {
   FS = 1;
 };
 
-enum OutFsType {
+enum FsType {
   NTFS = 0;
   FAT = 1;
   EXFAT = 2;
+};
+
+enum Status {
+  READ_SRC = 0;
+  DL_SRC = 1;
+  UPLOAD_AV = 2;
+  ANALYZE = 3;
+  MK_FS = 4;
+  MK_ARCHIVE = 5;
+  WRITE_DST = 6;
+  UPLOAD_DST = 7;
+  EXEC_CMD = 8;
+  WIPE = 9;
+  DISK_IMG = 10;
+  ALL_DONE = 11;
+  UNKNOWN = 12;
 };
 
 message FileInfo {
@@ -25,28 +42,7 @@ message FileInfo {
   int64 timestamp = 4;
 };
 
-message Network {
-  string url = 1;
-  string krb_service_name = 2;
-};
-
-message Command {
-  string bin = 1;
-  repeated string args = 2;
-};
-
-message AltTarget {
-  oneof target {
-    Network network = 1;
-    Command command = 2;
-  }
-  string descr = 3;
-  string long_descr = 4;
-  bool is_src = 5;
-  bool is_dst = 6;
-};
-
-message USBDevice {
+message UsbDevice {
   uint32 busnum = 1;
   uint32 devnum = 2;
   uint32 vendorid = 3;
@@ -54,8 +50,37 @@ message USBDevice {
   string manufacturer = 5;
   string description = 6;
   string serial = 7;
-  bool is_src = 8;
-  bool is_dst = 9;
+  optional uint64 dev_size = 8;
+  optional uint64 block_size = 9;
+  bool is_src = 10;
+  bool is_dst = 11;
+};
+
+message Network {
+  string url = 1;
+  optional string krb_service_name = 2;
+  string title = 3;
+  string description = 4;
+  bool is_src = 5;
+  bool is_dst = 6;
+};
+
+message Command {
+  string bin = 1;
+  repeated string args = 2;
+  string title = 3;
+  string description = 4;
+  bool is_src = 5;
+  bool is_dst = 6;
+};
+
+message Device {
+  oneof device {
+    Network network = 1;
+    Command command = 2;
+    UsbDevice usb = 3;
+  }
+  uint64 id = 4;
 };
 
 message PartitionInfo {
@@ -65,3 +90,80 @@ message PartitionInfo {
   string name_str = 4;
   string type_str = 5;
 }
+
+message ResponseEnd {
+};
+
+message ResponseError {
+  string err = 1;
+};
+
+message ResponseStatus {
+  bool done = 1;
+  uint64 current = 2;
+  uint64 total = 3;
+  Status status = 4;
+};
+
+// Reports
+
+message Antivirus {
+  string version = 1;
+  string database_version = 2;
+  optional string database_timestamp = 3;
+};
+message FileStatus {
+  string status = 1;
+  optional string sha256 = 2;
+};
+
+message AnalyzeReport {
+  string id = 1;
+  string status = 2;
+  optional uint32 version = 3;
+  map <string, Antivirus> antivirus = 4;
+  map <string, FileStatus> files = 5;
+};
+
+message UsbDeviceReport {
+  uint32 vendorid = 1;
+  uint32 productid = 2;
+  string manufacturer = 3;
+  string description = 4;
+  string serial = 5;
+};
+
+message NetworkReport {
+  string title = 1;
+  string description = 2;
+};
+
+message CommandReport {
+  string title = 1;
+  string description = 2;
+};
+
+message DeviceReport {
+  oneof device {
+    UsbDeviceReport usb = 1;
+    NetworkReport network = 2;
+    CommandReport command = 3;
+  }
+}
+
+message TransferReport {
+  string title = 1;
+  string datetime = 2;
+  int64 timestamp = 3;
+  string hostname = 4;
+  string status = 5;
+  optional string user = 6;
+  string transfer_id = 7;
+  DeviceReport source = 8;
+  DeviceReport destination = 9;
+  repeated string file_names = 11;
+  repeated string error_files = 12;
+  repeated string filtered_files = 13;
+  repeated string rejected_files = 14;
+  optional AnalyzeReport analyzereport = 15;
+};

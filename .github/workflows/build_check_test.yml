@@ -88,7 +88,7 @@ jobs:
           docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
           --env CARGO_HOME=/SRC/target/.cargo \
           usbsas-builder:debian \
-          cargo test --release --all --exclude usbsas-server
+          cargo test --release --all --exclude usbsas-usbsas
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -112,5 +112,5 @@ jobs:
           docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
           --env CARGO_HOME=/SRC/target/.cargo \
           usbsas-builder:debian \
-          cargo test --release -p usbsas-server --features integration-tests
+          cargo test --release -p usbsas-usbsas --features integration-tests
 

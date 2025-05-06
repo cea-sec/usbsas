@@ -1,0 +1,49 @@
+syntax = "proto3";
+package jsonparser;
+import public "common.proto3";
+
+message SrvResp {
+  string status = 1;
+  optional string id = 2;
+};
+
+// Requests
+
+message RequestParseResp {
+  bytes data = 1;
+};
+
+message RequestParseReport {
+  bytes data = 1;
+};
+
+message RequestEnd {
+};
+
+message Request {
+  oneof msg {
+    RequestParseResp ParseResp = 1;
+    RequestParseReport ParseReport = 2;
+    RequestEnd End = 3;
+  }
+};
+
+// Responses
+
+message ResponseParseResp {
+  SrvResp resp = 1;
+};
+
+message ResponseParseReport {
+  common.AnalyzeReport report = 1;
+};
+
+message Response {
+  oneof msg {
+    ResponseParseResp ParseResp = 1;
+    ResponseParseReport ParseReport = 2;
+    common.ResponseStatus Status = 3;
+    common.ResponseEnd End = 4;
+    common.ResponseError Error = 5;
+  }
+};

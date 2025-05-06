@@ -1,6 +1,6 @@
 [package]
 name = "usbsas-proto"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2021"
 license = "GPL-3.0"
 
@@ -9,3 +9,5 @@ prost-build = "0.13"
 
 [dependencies]
 prost = "0.13"
+serde = { version = "1.0", features = ["derive"] }
+usbsas-config = { path = "../usbsas-config" }

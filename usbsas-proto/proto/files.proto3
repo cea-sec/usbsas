@@ -61,14 +61,6 @@ message Request {
 
 
 /* Responses */
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
-
 message ResponseOpenDevice {
   uint64 block_size = 1;
   uint64 dev_size = 2;
@@ -101,8 +93,8 @@ message ResponseReadSectors {
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
     ResponseOpenDevice OpenDevice = 3;
     ResponseOpenPartition OpenPartition = 4;
     ResponsePartitions Partitions = 5;
@@ -110,5 +102,6 @@ message Response {
     ResponseReadDir ReadDir = 7;
     ResponseReadFile ReadFile = 8;
     ResponseReadSectors ReadSectors = 9;
+    common.ResponseStatus Status = 10;
   }
 };

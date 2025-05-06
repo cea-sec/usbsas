@@ -18,7 +18,6 @@ RUN set -eux; \
     libdbus-1-dev \
     libudev-dev \
     libseccomp-dev \
-    libwebkit2gtk-4.1-dev \
     live-build \
     dpkg-dev \
     clamav-daemon \

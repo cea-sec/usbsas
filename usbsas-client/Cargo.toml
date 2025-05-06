@@ -1,13 +1,24 @@
 [package]
 name = "usbsas-client"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
+license = "GPL-3.0"
+description = "Graphical User Interface for usbsas"
 
 [dependencies]
+bytesize = "1.3"
 clap = "4.5"
-tao = "0.32"
-usbsas-sandbox = { path = "../usbsas-sandbox" }
-wry = { version = "0.50", default-features = false, features = ["os-webview", "fullscreen"] }
+env_logger = "0.11"
+iced = { version = "0.13", features = ["advanced", "image", "smol", "svg"] }
+log = "0.4"
+serde_json = "1.0"
+sysinfo = "0.33"
+time = "0.3"
+usbsas-comm = { path = "../usbsas-comm" }
+usbsas-config = { path = "../usbsas-config" }
+usbsas-proto = { path = "../usbsas-proto" }
+usbsas-utils = { path = "../usbsas-utils" }
+uuid = { version = "1.16", features = ["v4"] }
 
 # cargo-deb
 [package.metadata.deb]
@@ -15,7 +26,7 @@ name = "usbsas-kiosk"
 maintainer = "usbsas"
 copyright = "usbsas"
 revision = "1"
-depends = "$auto, usbsas-server, xserver-xorg-core, x11-xserver-utils, xinit, xdotool, unclutter, fonts-noto-color-emoji, fonts-lato"
+depends = "$auto, usbsas-server, xserver-xorg-core, x11-xserver-utils, libxkbcommon-x11-0, xinit, xdotool, unclutter, fonts-noto-color-emoji"
 section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
@@ -23,19 +34,4 @@ systemd-units = { unit-name = "usbsas-client", enable = false }
 assets = [
   ["target/release/usbsas-client", "usr/bin/", "755"],
   ["assets/usbsas-client-xinit", "usr/bin/", "755"],
-  ["web/*", "usr/share/usbsas/web/", "644"],
-  ["web/static/css/*", "usr/share/usbsas/web/static/css/", "644"],
-  ["web/static/js/*", "usr/share/usbsas/web/static/js/", "644"],
-  ["web/static/i18n/*", "usr/share/usbsas/web/static/i18n/", "644"],
-  ["web/static/img/*", "usr/share/usbsas/web/static/img/", "644"],
-  ["web/static/bs/css/*", "usr/share/usbsas/web/static/bs/css/", "644"],
-  ["web/static/bs/js/*", "usr/share/usbsas/web/static/bs/js/", "644"],
-  ["web/static/fontawesome/*", "usr/share/usbsas/web/static/fontawesome/", "644"],
-  ["web/static/fontawesome/css/*", "usr/share/usbsas/web/static/fontawesome/css/", "644"],
-  ["web/static/fontawesome/js/*", "usr/share/usbsas/web/static/fontawesome/js/", "644"],
-  ["web/static/fontawesome/less/*", "usr/share/usbsas/web/static/fontawesome/less/", "644"],
-  ["web/static/fontawesome/metadata/*", "usr/share/usbsas/web/static/fontawesome/metadata/*", "644"],
-  ["web/static/fontawesome/scss/*", "usr/share/usbsas/web/static/fontawesome/scss/", "644"],
-  ["web/static/fontawesome/sprites/*", "usr/share/usbsas/web/static/fontawesome/sprites/", "644"],
-  ["web/static/fontawesome/webfonts/*", "usr/share/usbsas/web/static/fontawesome/webfonts/", "644"],
 ]

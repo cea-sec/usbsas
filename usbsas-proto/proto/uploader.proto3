@@ -22,26 +22,14 @@ message Request {
 
 /* Response */
 
-message ResponseUploadStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
-}
-
 message ResponseUpload {
 }
-
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
 
 message Response {
   oneof msg {
     ResponseUpload Upload = 1;
-    ResponseUploadStatus UploadStatus = 2;
-    ResponseEnd End = 3;
-    ResponseError Error = 4;
+    common.ResponseStatus Status = 2;
+    common.ResponseEnd End = 3;
+    common.ResponseError Error = 4;
   }
 };

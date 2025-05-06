@@ -2,32 +2,26 @@ syntax = "proto3";
 package usbsas;
 import public "common.proto3";
 
-/*
-operations:
- - get id
- - list/select device
- - list/select partitions
- - getattr
- - readdir
- - copy
-*/
-
-
 /* Requests */
 
 message RequestEnd {
 };
 
-message RequestId {
+message RequestUserId {
 };
 
-message RequestUSBDevices {
-};
-
-message RequestAltTargets {
+message RequestDevices {
+  bool include_alt = 1;
 };
 
 message RequestPartitions {
+};
+
+message RequestInitTransfer {
+  uint64 source = 1;
+  uint64 destination = 2;
+  optional common.FsType fstype = 3;
+  optional string pin = 4;
 };
 
 message RequestOpenPartition {
@@ -35,7 +29,7 @@ message RequestOpenPartition {
 };
 
 message RequestOpenDevice {
-  common.USBDevice device = 1;
+  common.UsbDevice device = 1;
 };
 
 message RequestGetAttr {
@@ -46,87 +40,53 @@ message RequestReadDir {
   string path = 1;
 };
 
-message DestUSB {
-  uint32 busnum = 1;
-  uint32 devnum = 2;
-  common.OutFsType fstype = 3;
-};
-
-message DestCmd {
-};
-
-message SrcUSB {
-};
-
-message SrcNet {
-  uint64 pin = 1;
-};
-
-message RequestPostCopyCmd {
-  common.OutFileType outfiletype = 1;
-};
-
-message RequestCopyStart {
-  oneof destination {
-    DestUSB usb = 1;
-    common.Network net = 2;
-    DestCmd cmd = 3;
-  };
-  oneof source {
-    SrcUSB src_usb = 5;
-    SrcNet src_net = 6;
-  };
+message RequestSelectFiles {
   repeated string selected = 4;
 };
 
+message RequestReport {
+};
+
 message RequestWipe {
-  uint32 busnum = 1;
-  uint32 devnum = 2;
-  common.OutFsType fstype = 3;
-  bool quick = 4;
+  uint64 id = 1;
+  bool quick = 2;
+  common.FsType fstype = 3;
 };
 
 message RequestImgDisk {
-  common.USBDevice device = 1;
+  uint64 id = 1;
 };
 
 message Request {
   oneof msg {
-    RequestEnd End = 1;
-    RequestId Id = 2;
-    RequestUSBDevices USBDevices = 3;
+    RequestDevices Devices = 1;
+    RequestUserId UserId = 2;
+    RequestInitTransfer InitTransfer = 3;
     RequestOpenDevice OpenDevice = 4;
     RequestPartitions Partitions = 5;
     RequestOpenPartition OpenPartition = 6;
-    RequestGetAttr GetAttr = 7;
-    RequestReadDir ReadDir = 8;
-    RequestCopyStart CopyStart = 9;
-    RequestWipe Wipe = 10;
-    RequestPostCopyCmd PostCopyCmd = 11;
-    RequestImgDisk ImgDisk = 12;
-    RequestAltTargets AltTargets = 13;
+    RequestReadDir ReadDir = 7;
+    RequestGetAttr GetAttr = 8;
+    RequestSelectFiles SelectFiles = 9;
+    RequestReport Report = 10;
+    RequestImgDisk ImgDisk = 11;
+    RequestWipe Wipe = 12;
+    RequestEnd End = 13;
   }
 };
 
 
 /* Responses */
-message ResponseEnd {
+
+message ResponseDevices {
+  repeated common.Device devices = 1;
 };
 
-message ResponseError {
-  string err = 1;
+message ResponseUserId {
+  string userid = 1;
 };
 
-message ResponseId {
-  string id = 1;
-};
-
-message ResponseUSBDevices {
-  repeated common.USBDevice devices = 1;
-};
-
-message ResponseAltTargets {
-  repeated common.AltTarget alt_targets = 1;
+message ResponseInitTransfer {
 };
 
 message ResponseOpenDevice {
@@ -134,11 +94,15 @@ message ResponseOpenDevice {
   uint64 dev_size = 2;
 };
 
+message ResponsePartitions {
+  repeated common.PartitionInfo partitions = 1;
+};
+
 message ResponseOpenPartition {
 };
 
-message ResponsePartitions {
-  repeated common.PartitionInfo partitions = 1;
+message ResponseReadDir {
+  repeated common.FileInfo filesinfo = 1;
 };
 
 message ResponseGetAttr {
@@ -147,82 +111,36 @@ message ResponseGetAttr {
   int64 timestamp = 3;
 };
 
-message ResponseReadDir {
-  repeated common.FileInfo filesinfo = 1;
+message ResponseSelectFiles {
+  uint64 selected_size = 1;
 };
 
-message ResponseCopyStart {
-  uint64 total_files_size = 1;
-};
-
-message ResponseCopyDone {
-  bytes report = 1;
-};
-
-message ResponseCopyStatus {
-  uint64 current_size = 1;
-};
-
-message ResponseCopyStatusDone {
-};
-
-message ResponseAnalyzeStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
-};
-
-message ResponseAnalyzeDone {
-};
-
-message ResponseFinalCopyStatus {
-  uint64 current_size = 1;
-  uint64 total_size = 2;
-};
-
-message ResponseFinalCopyStatusDone {
-};
-
-message ResponseNotEnoughSpace {
-  uint64 max_size = 1;
-};
-
-message ResponseNothingToCopy {
-  bytes report = 1;
-};
-
-message ResponseWipe {
+message ResponseReport {
+  common.TransferReport report = 1;
 };
 
 message ResponseImgDisk {
 };
 
-message ResponsePostCopyCmd {
+message ResponseWipe {
 };
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
-    ResponseId Id = 3;
-    ResponseUSBDevices USBDevices = 4;
-    ResponseOpenDevice OpenDevice = 5;
+    ResponseDevices Devices = 1;
+    ResponseUserId UserId = 2;
+    ResponseInitTransfer InitTransfer = 3;
+    ResponseOpenDevice OpenDevice = 4;
+    ResponsePartitions Partitions = 5;
     ResponseOpenPartition OpenPartition = 6;
-    ResponsePartitions Partitions = 7;
+    ResponseReadDir ReadDir = 7;
     ResponseGetAttr GetAttr = 8;
-    ResponseReadDir ReadDir = 9;
-    ResponseCopyStart CopyStart = 10;
-    ResponseCopyStatus CopyStatus = 11;
-    ResponseFinalCopyStatus FinalCopyStatus = 12;
-    ResponseNotEnoughSpace NotEnoughSpace = 13;
-    ResponseWipe Wipe = 14;
-    ResponsePostCopyCmd PostCopyCmd = 15;
-    ResponseAnalyzeStatus AnalyzeStatus = 16;
-    ResponseAnalyzeDone AnalyzeDone = 17;
-    ResponseCopyStatusDone CopyStatusDone = 18;
-    ResponseFinalCopyStatusDone FinalCopyStatusDone = 19;
-    ResponseImgDisk ImgDisk = 20;
-    ResponseCopyDone CopyDone = 21;
-    ResponseNothingToCopy NothingToCopy = 22;
-    ResponseAltTargets AltTargets = 23;
+    ResponseSelectFiles SelectFiles = 9;
+    ResponseReport Report = 10;
+    ResponseImgDisk ImgDisk = 11;
+    ResponseWipe Wipe = 12;
+    common.ResponseEnd End = 13;
+    common.ResponseError Error = 14;
+    common.ResponseStatus Status = 15;
   }
 };

@@ -4,7 +4,7 @@ use std::{
     convert::TryFrom,
     io::{Read, Seek, Write},
 };
-use usbsas_proto::common::{FileInfo, FileType, OutFsType};
+use usbsas_proto::common::{FileInfo, FileType, FsType};
 
 pub struct FatFsReader<T> {
     fs: ff::FatFs<T>,
@@ -18,6 +18,10 @@ impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
 
     fn get_attr(&mut self, path: &str) -> Result<(FileType, u64, i64)> {
         log::trace!("get attr {}", path);
+        if path.is_empty() || path == "/" {
+            // can't stat root dir
+            return Ok((FileType::Directory, 0, 0));
+        }
         let file_info = self
             .fs
             .get_attr(path)
@@ -73,18 +77,13 @@ pub struct FatFsWriter<T> {
 }
 
 impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
-    fn mkfs(
-        writer: T,
-        sector_size: u64,
-        sector_count: u64,
-        fstype: Option<OutFsType>,
-    ) -> Result<Self>
+    fn mkfs(writer: T, sector_size: u64, sector_count: u64, fstype: Option<FsType>) -> Result<Self>
     where
         Self: Sized,
     {
         let fstype = match fstype {
-            Some(OutFsType::Exfat) => ff::FM_EXFAT as u8,
-            Some(OutFsType::Fat) => ff::FM_FAT32 as u8,
+            Some(FsType::Exfat) => ff::FM_EXFAT as u8,
+            Some(FsType::Fat) => ff::FM_FAT32 as u8,
             _ => return Err(Error::FSError("ff unsupported fstype".into())),
         };
         Ok(FatFsWriter {

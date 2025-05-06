@@ -21,13 +21,13 @@ $ sudo apt install -y --no-install-recommends \
       cmake \
       git \
       curl \
+      dpkg-dev \
       libssl-dev \
       libkrb5-dev \
       libseccomp-dev \
       libudev-dev \
       libusb-1.0-0-dev \
       protobuf-compiler \
-      libwebkit2gtk-4.1-dev \
       libdbus-1-dev \
       libxtst-dev \
       libx11-dev
@@ -47,7 +47,6 @@ $ git clone https://github.com/cea-sec/usbsas
 $ cd usbsas
 $ export USBSAS_BIN_PATH="/usr/libexec"
 $ cargo build --release
-$ cargo build --release -p usbsas-server
 $ cargo build --release -p usbsas-client
 $ cargo build --release -p usbsas-analyzer-server
 $ cargo build --release --manifest-path=usbsas-hid/hid-user/Cargo.toml
@@ -57,7 +56,6 @@ $ cargo build --release --manifest-path=usbsas-hid/hid-dealer/Cargo.toml
 Build packages:
 ```shell
 $ cargo-deb --manifest-path=usbsas-usbsas/Cargo.toml --no-build
-$ cargo-deb --manifest-path=usbsas-server/Cargo.toml --no-build
 $ cargo-deb --manifest-path=usbsas-client/Cargo.toml --no-build
 $ cargo-deb --manifest-path=usbsas-analyzer-server/Cargo.toml --no-build
 $ cargo-deb --manifest-path=usbsas-hid/hid-dealer/Cargo.toml --no-build
@@ -68,11 +66,9 @@ The `usbsas-core` package contains usbsas processes. It will add a new user
 `usb_storage` kernel modules are prevented from loading with a modprobe
 configuration file.
 
-The `usbsas-server` package contains the web server.
-
-The `usbsas-kiosk` (usbsas-client) package contains the web client and a script
-meant to be started by xinit at boot. It will add a `usbsas-client` user. The
-systemd service, when enabled, will automatically start the application at boot.
+The `usbsas-kiosk` (usbsas-client) package contains the GUI client and a script
+meant to be started by xinit at boot. The systemd service, when enabled, will
+automatically start the application at boot.
 
 The `usbsas-analyzer-server` package contains the analyzer server. It will
 install clamav-daemon and clamav-freshclam as dependencies.
@@ -88,7 +84,6 @@ manager. The installation of `usbsas-hid` is recommended but not mandatory.
 Built packages are located in `target/debian`
 ```shell
 $ sudo apt install ./usbsas-core_X.Y.Z_amd64.deb \
-                   ./usbsas-server_X.Y.Z_amd64.deb \
                    ./usbsas-analyzer-server_X.Y.Z_amd64.deb \
                    ./usbsas-kiosk_X.Y.Z_amd64.deb \
                    ./usbsas-hid_X.Y.Z_amd64.deb
@@ -112,7 +107,7 @@ sudo systemctl enable usbsas-client.service
 sudo reboot
 ```
 
-web client:
+usbsas native client:
 
 <p align="center"><img src="./client_screenshot.png" width="100%"/></p>
 

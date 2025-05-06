@@ -1,9 +1,9 @@
 use log::{error, trace};
 use std::env;
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev};
 use usbsas_proto as proto;
-use usbsas_proto::common::UsbDevice;
+use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -14,50 +14,46 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommUsbdev,
-    usbdev,
-    devices = Devices[ResponseDevices],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
-
 pub struct MockUsbDev {
-    comm: Comm<proto::usbdev::Request>,
+    comm: ComRpUsbDev,
     devices: Vec<UsbDevice>,
 }
 
 impl MockUsbDev {
-    pub fn new(comm: Comm<proto::usbdev::Request>, _: String) -> Result<Self> {
+    pub fn new(comm: ComRpUsbDev, _: String) -> Result<Self> {
         let mut devices = Vec::new();
 
-        // Fake input device
+        // Mock input device
         if env::var("USBSAS_MOCK_IN_DEV").is_ok() {
             devices.push(UsbDevice {
                 busnum: 1,
                 devnum: 1, // 1 = INPUT
                 vendorid: 1,
                 productid: 1,
-                manufacturer: "dd".to_string(),
-                description: "fake input dev".to_string(),
-                serial: "plop".to_string(),
+                manufacturer: "manufacturer".to_string(),
+                description: "mock input dev".to_string(),
+                serial: "serial".to_string(),
                 is_src: true,
                 is_dst: false,
+                block_size: None,
+                dev_size: None,
             });
         }
 
-        // Fake output device
+        // Mock output device
         if env::var("USBSAS_MOCK_OUT_DEV").is_ok() {
             devices.push(UsbDevice {
                 busnum: 1,
                 devnum: 2, // 2 = OUTPUT
                 vendorid: 1,
                 productid: 1,
-                manufacturer: "dd".to_string(),
-                description: "fake output dev".to_string(),
-                serial: "plop".to_string(),
+                manufacturer: "manufacturer".to_string(),
+                description: "mock output dev".to_string(),
+                serial: "serial".to_string(),
                 is_src: false,
                 is_dst: true,
+                block_size: None,
+                dev_size: None,
             });
         }
 
@@ -75,21 +71,17 @@ impl MockUsbDev {
     pub fn main_loop(&mut self) -> Result<()> {
         trace!("main loop");
         loop {
-            let req: proto::usbdev::Request = self.comm.recv()?;
-            let res = match req.msg {
-                Some(proto::usbdev::request::Msg::Devices(_)) => self.handle_req_devices(),
-                Some(proto::usbdev::request::Msg::End(_)) => {
-                    self.comm.end(proto::usbdev::ResponseEnd {})?;
+            let res = match self.comm.recv_req()? {
+                Msg::Devices(_) => self.handle_req_devices(),
+                Msg::End(_) => {
+                    self.comm.end()?;
                     break;
                 }
-                None => Err(Error::BadRequest),
             };
             match res {
                 Ok(_) => continue,
                 Err(err) => {
-                    self.comm.error(proto::usbdev::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    self.comm.error(err)?;
                 }
             }
         }

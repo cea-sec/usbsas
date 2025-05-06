@@ -66,7 +66,7 @@ pub struct Config {
     pub out_directory: String,
     pub report: Option<Report>,
     pub message: Option<String>,
-    pub web_title: Option<String>,
+    pub window_title: Option<String>,
     pub command: Option<Command>,
     pub networks: Option<Vec<Network>>,
     pub source_network: Option<Network>,
@@ -74,6 +74,8 @@ pub struct Config {
     pub post_copy: Option<PostCopy>,
     pub analyzer: Option<Analyzer>,
     pub usb_port_accesses: Option<UsbPortAccesses>,
+    pub lang: Option<String>,
+    pub menu_img: Option<String>,
 }
 
 pub fn conf_read(config_path: &str) -> io::Result<String> {

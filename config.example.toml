@@ -1,20 +1,16 @@
 # usbsas configuration file
 
-
 # Directory where temp tar and fs will be stored. (Mandatory)
 out_directory = "/tmp/"
 
-# Environment variables to keep when forking children processes. (Optional)
-# (These are kept by default if none are specified)
-#env_vars = ["TERM",
-#            "LANG",
-#            "KRB5CCNAME",
-#            "PATH",
-#            "RUST_LOG",
-#            "RUST_BACKTRACE",
-#            "USBSAS_MOCK_IN_DEV",
-#            "USBSAS_MOCK_OUT_DEV"]
+# GUI window title (Optional)
+window_title = "USBSAS"
 
+# Default lang of GUI (en or fr)
+lang = "en"
+
+# Logo/image displayed next to hostname in upper right corner of GUI
+#menu_img = "/path/to/image"
 
 # Destination "network". (Optional)
 # Upload copied files (in a tar) to a remote network.
@@ -65,12 +61,12 @@ command_args = [
 # Like for network destination below, kerberos authentication can be enabled.
 # An analyzer report can optionally be written on the destination device.
 # Analyzing files can be enabled/disabled based on destination (usb, net (upload)
-# or cmd (command)).
+# or cmd (command), analysis only happens if source is usb.
 [analyzer]
 url = "http://127.0.0.1:8042/api/scanbundle"
 #krb_service_name = "HTTP@your.domain"
 analyze_usb = true
-analyze_net = true
+analyze_net = false
 analyze_cmd = true
 
 
@@ -104,12 +100,7 @@ analyze_cmd = true
 write_dest = true
 #write_local = "/var/lib/usbsas/reports"
 
-# Message to show on web page if using web client/server. (Optional)
-# Message can be in HTML.
-#message="<strong>Under maintenance</strong>"
 
-# Web page title
-#web_title="USBSAS"
 
 # Filename filters. (Optional)
 # They should be written in lower case as their are tested case insensitive.

@@ -2,6 +2,7 @@ pub trait UsbsasClap {
     fn add_config_arg(self) -> Self;
     fn add_fs_path_arg(self) -> Self;
     fn add_tar_path_arg(self) -> Self;
+    fn add_socket_arg(self) -> Self;
 }
 
 impl UsbsasClap for clap::Command {
@@ -10,6 +11,7 @@ impl UsbsasClap for clap::Command {
             clap::Arg::new("config")
                 .short('c')
                 .long("config")
+                .value_name("CONFIG_PATH")
                 .help("Path of the configuration file")
                 .num_args(1)
                 .default_value(crate::USBSAS_CONFIG)
@@ -34,6 +36,19 @@ impl UsbsasClap for clap::Command {
                 .help("Output fs filename")
                 .num_args(1)
                 .required(true),
+        )
+    }
+
+    fn add_socket_arg(self) -> Self {
+        self.arg(
+            clap::Arg::new("socket")
+                .short('s')
+                .long("socket")
+                .value_name("SOCKET_PATH")
+                .help("Unix domain socket path used to communicate (instead of pipes)")
+                .num_args(0..=1)
+                .default_missing_value(crate::SOCKET_PATH)
+                .required(false),
         )
     }
 }

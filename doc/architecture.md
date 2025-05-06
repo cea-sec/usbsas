@@ -122,16 +122,6 @@ Requests: `OpenDevice`, `ReadSectors`, `ReadPartitions`, `OpenPartition`,
 
 syscalls: common syscalls; `getrandom()`
 
-#### filter
-
-filter can prevent the copy of certain files based on their names (for example
-".DS_STORE", "AUTORUN.INF" etc.). Filters can be specified in the configuration
-file.
-
-Requests: `FilterPaths`
-
-syscalls: common syscalls; `getrandom()`
-
 #### files2tar
 
 files2tar writes files in a tar archive. It can be started in two modes

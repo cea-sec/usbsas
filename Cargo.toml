@@ -17,7 +17,6 @@ members = [
   "usbsas-dev2scsi",
   "usbsas-files2fs",
   "usbsas-files2tar",
-  "usbsas-filter",
   "usbsas-fs2dev",
   "usbsas-identificator",
   "usbsas-scsi2files",
@@ -25,11 +24,9 @@ members = [
   "usbsas-net",
   "usbsas-usbdev",
   "usbsas-usbsas",
-  "usbsas-server",
   "usbsas-hid/hid-user",
   "usbsas-hid/hid-dealer",
   "usbsas-client",
-  "usbsas-server",
   "usbsas-tools"
 ]
 default-members = [
@@ -48,13 +45,13 @@ default-members = [
   "usbsas-dev2scsi",
   "usbsas-files2fs",
   "usbsas-files2tar",
-  "usbsas-filter",
   "usbsas-fs2dev",
   "usbsas-identificator",
   "usbsas-scsi2files",
   "usbsas-tar2files",
   "usbsas-net",
   "usbsas-usbdev",
+  "usbsas-client",
   "usbsas-usbsas"
 ]
 resolver = "2"
@@ -62,6 +59,3 @@ resolver = "2"
 [profile.release]
 overflow-checks = true
 strip = true
-
-[workspace.metadata]
-version = "0.2.2"

@@ -1,13 +1,14 @@
 #! /bin/sh
-set -e
 
 # Create usbsas user, update initramfs and reload udev rules
 
 if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
+    set +e
     if [ -z "$(id -u usbsas 2>/dev/null)" ]; then
+        set -e
         echo "adding usbsas user"
-        adduser --system  --home /var/lib/usbsas --gecos "usbsas" \
-            --disabled-password --quiet usbsas
+        adduser --system --group --home /var/lib/usbsas \
+            --comment "usbsas" --disabled-password --quiet usbsas
     fi
 
     echo "reloading udev rules"

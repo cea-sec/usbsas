@@ -3,12 +3,12 @@
 pub mod dev2scsi;
 pub mod files2fs;
 pub mod files2tar;
-pub mod filter;
 pub mod fs2dev;
 pub mod fswriter;
 pub mod hiduser;
 pub mod identificator;
 pub mod imager;
+pub mod jsonparser;
 pub mod scsi2files;
 pub mod tar2files;
 pub mod usbdev;
@@ -51,7 +51,11 @@ extern "C" {
     pub fn usbdevfs_reset() -> u64;
 }
 
-pub fn landlock(paths_ro: Option<&[&str]>, paths_rw: Option<&[&str]>) -> Result<()> {
+pub fn landlock(
+    paths_ro: Option<&[&str]>,
+    paths_rw: Option<&[&str]>,
+    paths_x: Option<&[&str]>,
+) -> Result<()> {
     let mut ruleset = Ruleset::default()
         .handle_access(AccessFs::from_all(crate::LLABI))?
         .create()?
@@ -64,6 +68,10 @@ pub fn landlock(paths_ro: Option<&[&str]>, paths_rw: Option<&[&str]>) -> Result<
 
     if let Some(paths) = paths_rw {
         ruleset = ruleset.add_rules(path_beneath_rules(paths, AccessFs::from_all(crate::LLABI)))?;
+    }
+
+    if let Some(paths) = paths_x {
+        ruleset = ruleset.add_rules(path_beneath_rules(paths, AccessFs::Execute))?;
     }
 
     let status = ruleset.restrict_self()?;

@@ -1,11 +1,8 @@
 [package]
 name = "usbsas-utils"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 license = "GPL-3.0"
-
-[build-dependencies]
-toml = "0.8"
 
 [dependencies]
 clap = "4.5"

@@ -4,17 +4,19 @@
 use bitvec::prelude::*;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{debug, error, trace};
+use proto::fs2dev::{self, request::Msg};
 use std::{
     fs::File,
     io::{prelude::*, SeekFrom},
 };
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
-use usbsas_proto as proto;
+use usbsas_comm::{ComRpFs2Dev, ProtoRespCommon, ProtoRespFs2Dev};
+use usbsas_proto::{self as proto, common::Status};
 use usbsas_utils::SECTOR_SIZE;
 #[cfg(not(feature = "mock"))]
 use {
     std::os::unix::io::AsRawFd,
+    usbsas_comm::ToFd,
     usbsas_mass_storage::{self, MassStorage},
 };
 #[cfg(feature = "mock")]
@@ -42,19 +44,6 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommFs2Dev,
-    fs2dev,
-    end = End[ResponseEnd],
-    error = Error[ResponseError],
-    devsize = DevSize[ResponseDevSize],
-    startcopy = StartCopy[ResponseStartCopy],
-    copystatus = CopyStatus[ResponseCopyStatus],
-    copystatusdone = CopyStatusDone[ResponseCopyStatusDone],
-    loadbitvec = LoadBitVec[ResponseLoadBitVec],
-    wipe = Wipe[ResponseWipe]
-);
-
 // Some usb keys don't support bigger buffers
 // (Linux writes 240 sectors per scsi write(10) requests)
 const MAX_WRITE_SECTORS: usize = 240;
@@ -71,7 +60,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpFs2Dev) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::DevOpened(s) => s.run(comm),
@@ -154,7 +143,7 @@ impl Iterator for BitVecIterOnes {
 }
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
         let busnum = comm.read_u32::<LittleEndian>()?;
         let devnum = comm.read_u32::<LittleEndian>()?;
 
@@ -182,9 +171,7 @@ impl InitState {
                 }
                 Err(err) => {
                     error!("Error opening device file: {}", err);
-                    comm.error(proto::fs2dev::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    comm.error(err)?;
                     return Ok(State::WaitEnd(WaitEndState {}));
                 }
             }
@@ -211,9 +198,9 @@ impl InitState {
 }
 
 impl CopyingState {
-    fn run(mut self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("copying state");
-        comm.startcopy(proto::fs2dev::ResponseStartCopy {})?;
+        comm.writefs(proto::fs2dev::ResponseWriteFs {})?;
 
         let fs_size = self.fs.seek(SeekFrom::End(0))?;
         self.fs.rewind()?;
@@ -252,19 +239,15 @@ impl CopyingState {
             )?;
 
             current_size += sector_write_size;
-            comm.copystatus(proto::fs2dev::ResponseCopyStatus {
-                current_size,
-                total_size,
-            })?;
+            comm.status(current_size, total_size, false, Status::WriteDst)?;
         }
-
-        comm.copystatusdone(proto::fs2dev::ResponseCopyStatusDone {})?;
+        comm.status(current_size, total_size, true, Status::WriteDst)?;
         Ok(State::WaitEnd(WaitEndState))
     }
 }
 
 impl WipingState {
-    fn run(mut self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("wiping state");
         comm.wipe(proto::fs2dev::ResponseWipe {})?;
         let mut buffer = vec![0u8; BUFFER_MAX_WRITE_SIZE as usize];
@@ -293,15 +276,12 @@ impl WipingState {
             self.mass_storage
                 .scsi_write_10(&mut buffer, sector_index, sector_count)?;
             current_size += buffer.len() as u64;
-            comm.copystatus(proto::fs2dev::ResponseCopyStatus {
-                current_size,
-                total_size,
-            })?;
+            comm.status(current_size, total_size, false, Status::Wipe)?;
 
             todo -= buffer.len() as u64;
             sector_index += sector_count;
         }
-        comm.copystatusdone(proto::fs2dev::ResponseCopyStatusDone {})?;
+        comm.status(current_size, total_size, true, Status::Wipe)?;
         Ok(State::DevOpened(DevOpenedState {
             fs: self.fs,
             mass_storage: self.mass_storage,
@@ -310,13 +290,9 @@ impl WipingState {
 }
 
 impl DevOpenedState {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("dev opened state");
-        use proto::fs2dev;
-        use proto::fs2dev::request::Msg;
-
-        let req: fs2dev::Request = comm.recv()?;
-        Ok(match req.msg.ok_or(Error::BadRequest)? {
+        Ok(match comm.recv_req()? {
             Msg::DevSize(_) => {
                 comm.devsize(fs2dev::ResponseDevSize {
                     size: self.mass_storage.dev_size,
@@ -329,33 +305,24 @@ impl DevOpenedState {
                 mass_storage: self.mass_storage,
             }),
             Msg::End(_) => {
-                comm.end(fs2dev::ResponseEnd {})?;
+                comm.end()?;
                 State::End
             }
             _ => {
                 error!("bad request");
-                comm.error(fs2dev::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
                 return Err(Error::State);
             }
         })
     }
 
-    fn load_bitvec(
-        self,
-        comm: &mut Comm<proto::fs2dev::Request>,
-        chunk: &mut Vec<u8>,
-        last: bool,
-    ) -> Result<State> {
-        use proto::fs2dev::{self, request::Msg};
+    fn load_bitvec(self, comm: &mut ComRpFs2Dev, chunk: &mut Vec<u8>, last: bool) -> Result<State> {
         let mut fs_bv_buf = Vec::new();
         fs_bv_buf.append(chunk);
         comm.loadbitvec(fs2dev::ResponseLoadBitVec {})?;
         if !last {
             loop {
-                let req: fs2dev::Request = comm.recv()?;
-                match req.msg.ok_or(Error::BadRequest)? {
+                match comm.recv_req()? {
                     Msg::LoadBitVec(ref mut msg) => {
                         fs_bv_buf.append(&mut msg.chunk);
                         comm.loadbitvec(fs2dev::ResponseLoadBitVec {})?;
@@ -365,9 +332,7 @@ impl DevOpenedState {
                     }
                     _ => {
                         error!("bad request");
-                        comm.error(fs2dev::ResponseError {
-                            err: "bad request".into(),
-                        })?;
+                        comm.error("bad request")?;
                         return Err(Error::State);
                     }
                 }
@@ -383,25 +348,21 @@ impl DevOpenedState {
 }
 
 impl BitVecLoadedState {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
         trace!("bitvec loaded state");
-        use proto::fs2dev::{self, request::Msg};
-        let req: fs2dev::Request = comm.recv()?;
-        Ok(match req.msg.ok_or(Error::BadRequest)? {
-            Msg::StartCopy(_) => State::Copying(CopyingState {
+        Ok(match comm.recv_req()? {
+            Msg::WriteFs(_) => State::Copying(CopyingState {
                 fs: self.fs,
                 fs_bv: self.fs_bv,
                 mass_storage: self.mass_storage,
             }),
             Msg::End(_) => {
-                comm.end(fs2dev::ResponseEnd {})?;
+                comm.end()?;
                 State::End
             }
             _ => {
                 error!("bad request");
-                comm.error(fs2dev::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
                 return Err(Error::State);
             }
         })
@@ -409,21 +370,14 @@ impl BitVecLoadedState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::fs2dev::Request>) -> Result<State> {
-        use proto::fs2dev;
-        use proto::fs2dev::request::Msg;
-
-        let req: fs2dev::Request = comm.recv()?;
-
-        match req.msg.ok_or(Error::BadRequest)? {
+    fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
+        match comm.recv_req()? {
             Msg::End(_) => {
-                comm.end(fs2dev::ResponseEnd {})?;
+                comm.end()?;
             }
             _ => {
                 error!("bad request");
-                comm.error(fs2dev::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
             }
         }
         Ok(State::End)
@@ -431,12 +385,12 @@ impl WaitEndState {
 }
 
 pub struct Fs2Dev {
-    comm: Comm<proto::fs2dev::Request>,
+    comm: ComRpFs2Dev,
     state: State,
 }
 
 impl Fs2Dev {
-    pub fn new(comm: Comm<proto::fs2dev::Request>, fs_fname: String) -> Result<Self> {
+    pub fn new(comm: ComRpFs2Dev, fs_fname: String) -> Result<Self> {
         let state = State::Init(InitState { fs_fname });
         Ok(Fs2Dev { comm, state })
     }
@@ -449,9 +403,7 @@ impl Fs2Dev {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}, waiting end", err);
-                    comm.error(proto::fs2dev::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error("bad request")?;
                     State::WaitEnd(WaitEndState {})
                 }
             };

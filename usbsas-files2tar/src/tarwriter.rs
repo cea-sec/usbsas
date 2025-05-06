@@ -1,6 +1,6 @@
 use crate::ArchiveWriter;
 use crate::{Error, Result};
-use std::{io::Write, path::Path, time::SystemTime};
+use std::{io::Write, path::Path};
 use usbsas_proto::common::FileType;
 use usbsas_utils::{TAR_BLOCK_SIZE, TAR_DATA_DIR};
 
@@ -36,7 +36,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
     fn newfile(&mut self, path: &str, ftype: FileType, size: u64, timestamp: i64) -> Result<()> {
         let mut header = tar::Header::new_ustar();
         match ftype {
-            FileType::Regular => {
+            FileType::Regular | FileType::Metadata => {
                 header.set_size(size);
                 header.set_entry_type(tar::EntryType::Regular);
                 header.set_mode(0o644);
@@ -51,7 +51,9 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
         header.set_mtime(timestamp as u64);
         let mut path_string: String = path.trim_start_matches('/').into();
         self.files.push(path_string.clone());
-        path_string.insert_str(0, &self.data_dir);
+        if !matches!(ftype, FileType::Metadata) {
+            path_string.insert_str(0, &self.data_dir);
+        }
         self.builder
             .append_data(&mut header, Path::new(&path_string), std::io::empty())?;
         Ok(())
@@ -72,20 +74,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
         Ok(())
     }
 
-    fn finish(mut self: Box<Self>, infos: &[u8]) -> Result<()> {
-        let mut header = tar::Header::new_ustar();
-        header.set_size(infos.len() as u64);
-        header.set_entry_type(tar::EntryType::Regular);
-        header.set_mode(0o644);
-        header.set_path("config.json")?;
-        header.set_mtime(
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)?
-                .as_secs_f64() as u64,
-        );
-        header.set_cksum();
-        self.builder.append(&header, infos)?;
-
+    fn finish(self: Box<Self>) -> Result<()> {
         // Make sure everything is flushed and closed
         let mut inner = self.builder.into_inner()?;
         inner.flush()?;

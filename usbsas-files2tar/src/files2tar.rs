@@ -2,20 +2,9 @@ use crate::{tarwriter::TarWriter, ArchiveWriter};
 use crate::{Error, Result};
 use log::{error, trace};
 use std::{fs, os::unix::io::AsRawFd};
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpWriteDst, ProtoRespCommon, ProtoRespWriteDst, ToFd};
 use usbsas_proto as proto;
-use usbsas_proto::{common::FileType, writetar::request::Msg};
-
-protoresponse!(
-    CommWritefs,
-    writetar,
-    newfile = NewFile[ResponseNewFile],
-    writefile = WriteFile[ResponseWriteFile],
-    endfile = EndFile[ResponseEndFile],
-    close = Close[ResponseClose],
-    error = Error[ResponseError],
-    end = End[ResponseEnd]
-);
+use usbsas_proto::{common::FileType, writedst::request::Msg};
 
 enum State {
     Init(InitState),
@@ -26,7 +15,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::writetar::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::WaitNewFile(s) => s.run(comm),
@@ -42,7 +31,7 @@ struct InitState {
 }
 
 impl InitState {
-    fn run(self, comm: &mut Comm<proto::writetar::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         let archive_file = fs::OpenOptions::new()
             .read(false)
             .write(true)
@@ -63,9 +52,8 @@ struct WaitNewFileState {
 }
 
 impl WaitNewFileState {
-    fn run(mut self, comm: &mut Comm<proto::writetar::Request>) -> Result<State> {
-        let req: proto::writetar::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+    fn run(mut self, comm: &mut ComRpWriteDst) -> Result<State> {
+        match comm.recv_req()? {
             Msg::NewFile(req) => {
                 let fstype =
                     FileType::try_from(req.ftype).map_err(|err| Error::Error(format!("{err}")))?;
@@ -74,7 +62,7 @@ impl WaitNewFileState {
                     .newfile(&req.path, fstype, req.size, req.timestamp)
                 {
                     Ok(_) => {
-                        comm.newfile(proto::writetar::ResponseNewFile {})?;
+                        comm.newfile(proto::writedst::ResponseNewFile {})?;
                         Ok(State::WritingFile(WritingFileState {
                             archive: self.archive,
                             total_size: req.size as usize,
@@ -83,20 +71,18 @@ impl WaitNewFileState {
                     }
                     Err(err) => {
                         error!("Couldn't add file \"{}\": {}", &req.path, err);
-                        comm.error(proto::writetar::ResponseError {
-                            err: format!("{err}"),
-                        })?;
+                        comm.error(err)?;
                         Ok(State::WaitNewFile(self))
                     }
                 }
             }
-            Msg::Close(req) => {
-                self.archive.finish(&req.infos)?;
-                comm.close(proto::writetar::ResponseClose {})?;
+            Msg::Close(_) => {
+                self.archive.finish()?;
+                comm.close(proto::writedst::ResponseClose {})?;
                 Ok(State::WaitEnd(WaitEndState {}))
             }
             Msg::End(_) => {
-                comm.end(proto::writetar::ResponseEnd {})?;
+                comm.end()?;
                 Ok(State::End)
             }
             _ => {
@@ -114,10 +100,9 @@ struct WritingFileState {
 }
 
 impl WritingFileState {
-    fn run(mut self, comm: &mut Comm<proto::writetar::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpWriteDst) -> Result<State> {
         loop {
-            let req: proto::writetar::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::WriteFile(req) => {
                     self.len_written += req.data.len();
                     if self.len_written > self.total_size {
@@ -128,14 +113,14 @@ impl WritingFileState {
                     if let Err(err) = self.archive.writefile(&req.data) {
                         return Err(Error::Error(format!("{err}")));
                     } else {
-                        comm.writefile(proto::writetar::ResponseWriteFile {})?;
+                        comm.writefile(proto::writedst::ResponseWriteFile {})?;
                     }
                 }
                 Msg::EndFile(_) => {
                     if let Err(err) = self.archive.endfile(self.len_written) {
                         return Err(Error::Error(format!("{err}")));
                     };
-                    comm.endfile(proto::writetar::ResponseEndFile {})?;
+                    comm.endfile(proto::writedst::ResponseEndFile {})?;
                     return Ok(State::WaitNewFile(WaitNewFileState {
                         archive: self.archive,
                     }));
@@ -152,18 +137,15 @@ impl WritingFileState {
 struct WaitEndState {}
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::writetar::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         trace!("wait end state");
-        let req: proto::writetar::Request = comm.recv()?;
-        match req.msg.ok_or(Error::BadRequest)? {
+        match comm.recv_req()? {
             Msg::End(_) => {
-                comm.end(proto::writetar::ResponseEnd {})?;
+                comm.end()?;
             }
             _ => {
                 error!("unexpected req");
-                comm.error(proto::writetar::ResponseError {
-                    err: "bad request".into(),
-                })?;
+                comm.error("bad request")?;
             }
         }
         Ok(State::End)
@@ -171,16 +153,16 @@ impl WaitEndState {
 }
 
 pub struct Files2Tar {
-    comm: Comm<proto::writetar::Request>,
+    comm: ComRpWriteDst,
     state: State,
 }
 
 impl Files2Tar {
-    pub fn new(comm: Comm<proto::writetar::Request>, archive_path: String) -> Result<Self> {
+    pub fn new(comm: ComRpWriteDst, archive_path: String) -> Result<Self> {
         let state = State::Init(InitState { archive_path });
         Ok(Files2Tar { comm, state })
     }
-    pub fn new_end(comm: Comm<proto::writetar::Request>) -> Result<Self> {
+    pub fn new_end(comm: ComRpWriteDst) -> Result<Self> {
         let state = State::WaitEnd(WaitEndState {});
         Ok(Files2Tar { comm, state })
     }
@@ -193,9 +175,7 @@ impl Files2Tar {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}", err);
-                    comm.error(proto::writetar::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             }

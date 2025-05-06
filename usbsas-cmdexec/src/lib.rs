@@ -3,11 +3,11 @@
 //! This process will execute the target command specified in the configuration
 //! file with the output of the transfer as argument.
 
-use byteorder::ReadBytesExt;
+use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, info, trace};
 use std::process::{Command, Stdio};
 use thiserror::Error;
-use usbsas_comm::{protoresponse, Comm};
+use usbsas_comm::{ComRpCmdExec, ProtoRespCmdExec, ProtoRespCommon};
 use usbsas_config::{conf_parse, conf_read, Command as CmdConf, PostCopy};
 use usbsas_proto as proto;
 use usbsas_proto::{cmdexec::request::Msg, common::OutFileType};
@@ -29,16 +29,6 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-protoresponse!(
-    CommCmdExec,
-    cmdexec,
-    exec = Exec[ResponseExec],
-    postcopyexec = PostCopyExec[ResponsePostCopyExec],
-    execstatus = ExecStatus[ResponseExecStatus],
-    end = End[ResponseEnd],
-    error = Error[ResponseError]
-);
-
 fn replace_arg_source(args: &[String], out_fname: &str) -> Vec<String> {
     args.iter()
         .map(|arg| match arg.as_ref() {
@@ -56,7 +46,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut Comm<proto::cmdexec::Request>) -> Result<Self> {
+    fn run(self, comm: &mut ComRpCmdExec) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::Running(s) => s.run(comm),
@@ -82,10 +72,10 @@ struct RunningState {
 struct WaitEndState {}
 
 impl InitState {
-    fn run(mut self, comm: &mut Comm<proto::cmdexec::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpCmdExec) -> Result<State> {
         let config = conf_parse(&conf_read(&self.config_path)?)?;
 
-        match comm.read_u8()? {
+        match comm.read_u64::<LittleEndian>()? {
             // Nothing to do, exit
             0 => return Ok(State::WaitEnd(WaitEndState {})),
             // Use provided tar path
@@ -110,14 +100,13 @@ impl InitState {
 }
 
 impl RunningState {
-    fn run(mut self, comm: &mut Comm<proto::cmdexec::Request>) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpCmdExec) -> Result<State> {
         loop {
-            let req: proto::cmdexec::Request = comm.recv()?;
-            let res = match req.msg.ok_or(Error::BadRequest)? {
+            let res = match comm.recv_req()? {
                 Msg::Exec(_) => self.exec(comm),
                 Msg::PostCopyExec(req) => self.post_copy(comm, req.outfiletype),
                 Msg::End(_) => {
-                    comm.end(proto::cmdexec::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
             };
@@ -125,16 +114,14 @@ impl RunningState {
                 Ok(_) => continue,
                 Err(err) => {
                     error!("{}", err);
-                    comm.error(proto::cmdexec::ResponseError {
-                        err: format!("{err}"),
-                    })?;
+                    comm.error(err)?;
                 }
             }
         }
         Ok(State::End)
     }
 
-    fn exec(&mut self, comm: &mut Comm<proto::cmdexec::Request>) -> Result<()> {
+    fn exec(&mut self, comm: &mut ComRpCmdExec) -> Result<()> {
         let cmd = self
             .cmd
             .take()
@@ -145,7 +132,7 @@ impl RunningState {
         Ok(())
     }
 
-    fn post_copy(&mut self, comm: &mut Comm<proto::cmdexec::Request>, outft: i32) -> Result<()> {
+    fn post_copy(&mut self, comm: &mut ComRpCmdExec, outft: i32) -> Result<()> {
         let cmd = self.post_copy_cmd.take().ok_or(Error::NoCmdConf)?;
         let outft = OutFileType::try_from(outft).map_err(|_| Error::BadRequest)?;
         let args = match outft {
@@ -187,20 +174,17 @@ impl RunningState {
 }
 
 impl WaitEndState {
-    fn run(self, comm: &mut Comm<proto::cmdexec::Request>) -> Result<State> {
+    fn run(self, comm: &mut ComRpCmdExec) -> Result<State> {
         trace!("wait end state");
         loop {
-            let req: proto::cmdexec::Request = comm.recv()?;
-            match req.msg.ok_or(Error::BadRequest)? {
+            match comm.recv_req()? {
                 Msg::End(_) => {
-                    comm.end(proto::cmdexec::ResponseEnd {})?;
+                    comm.end()?;
                     break;
                 }
                 _ => {
                     error!("bad request");
-                    comm.error(proto::cmdexec::ResponseError {
-                        err: "bad req, waiting end".into(),
-                    })?;
+                    comm.error("bad req, waiting end")?;
                 }
             }
         }
@@ -209,13 +193,13 @@ impl WaitEndState {
 }
 
 pub struct CmdExec {
-    comm: Comm<proto::cmdexec::Request>,
+    comm: ComRpCmdExec,
     state: State,
 }
 
 impl CmdExec {
     pub fn new(
-        comm: Comm<proto::cmdexec::Request>,
+        comm: ComRpCmdExec,
         out_tar: String,
         out_fs: String,
         config_path: String,
@@ -238,9 +222,7 @@ impl CmdExec {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {}", err);
-                    comm.error(proto::cmdexec::ResponseError {
-                        err: format!("run error: {err}"),
-                    })?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             };

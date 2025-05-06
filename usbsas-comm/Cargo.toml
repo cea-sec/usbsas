@@ -1,10 +1,12 @@
 [package]
 name = "usbsas-comm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
 byteorder = "1.5"
+paste = "1.0"
 prost = "0.13"
 usbsas-utils = { path = "../usbsas-utils" }
+usbsas-proto = { path = "../usbsas-proto" }

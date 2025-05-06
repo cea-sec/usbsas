@@ -8,8 +8,8 @@ use std::{
     os::unix::io::AsRawFd,
 };
 use thiserror::Error;
-use usbsas_comm::{protorequest, Comm};
-use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
+use usbsas_comm::{ComRqFs2Dev, ProtoReqFs2Dev, SendRecv, ToFd};
+use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
 use usbsas_utils::SECTOR_SIZE;
 
@@ -32,18 +32,8 @@ enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
-protorequest!(
-    CommFs2dev,
-    fs2dev,
-    size = DevSize[RequestDevSize, ResponseDevSize],
-    startcopy = StartCopy[RequestStartCopy, ResponseStartCopy],
-    wipe = Wipe[RequestWipe, ResponseWipe],
-    loadbitvec = LoadBitVec[RequestLoadBitVec, ResponseLoadBitVec],
-    end = End[RequestEnd, ResponseEnd]
-);
-
 struct FsWriter {
-    fs2dev: UsbsasChild<proto::fs2dev::Request>,
+    fs2dev: UsbsasChild<ComRqFs2Dev>,
     fs: File,
 }
 
@@ -53,7 +43,7 @@ impl FsWriter {
         let mut fs2dev = UsbsasChildSpawner::new("usbsas-fs2dev")
             .arg(&fs_path)
             .wait_on_startup()
-            .spawn::<proto::fs2dev::Request>()?;
+            .spawn::<ComRqFs2Dev>()?;
 
         usbsas_sandbox::fswriter::seccomp(
             fs.as_raw_fd(),
@@ -62,7 +52,7 @@ impl FsWriter {
         )?;
 
         // unlock fs2dev with busnum / devnum
-        fs2dev.unlock_with(&(((u64::from(devnum)) << 32) | (u64::from(busnum))).to_ne_bytes())?;
+        fs2dev.unlock_with((u64::from(devnum) << 32) | u64::from(busnum))?;
 
         log::info!(
             "Writing fs '{}' on device BUS {} DEV {}",
@@ -86,7 +76,7 @@ impl FsWriter {
         let dev_size = self
             .fs2dev
             .comm
-            .size(proto::fs2dev::RequestDevSize {})?
+            .devsize(proto::fs2dev::RequestDevSize {})?
             .size;
         if fs_size > dev_size {
             return Err(Error::Write(format!(
@@ -111,9 +101,7 @@ impl FsWriter {
 
         // start copy with shiny progress bar
         use proto::fs2dev::response::Msg;
-        self.fs2dev
-            .comm
-            .startcopy(proto::fs2dev::RequestStartCopy {})?;
+        self.fs2dev.comm.writefs(proto::fs2dev::RequestWriteFs {})?;
         let pb = indicatif::ProgressBar::new(fs_size);
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
@@ -124,12 +112,11 @@ impl FsWriter {
         loop {
             let rep: proto::fs2dev::Response = self.fs2dev.comm.recv()?;
             match rep.msg.ok_or(Error::BadRequest)? {
-                Msg::CopyStatus(status) => {
-                    pb.set_position(status.current_size);
-                }
-                Msg::CopyStatusDone(_) => {
-                    pb.set_position(fs_size);
-                    break;
+                Msg::Status(status) => {
+                    pb.set_position(status.current);
+                    if status.done {
+                        break;
+                    }
                 }
                 Msg::Error(msg) => return Err(Error::Write(msg.err)),
                 _ => return Err(Error::Write("bad resp from fs2dev".to_string())),
@@ -144,16 +131,7 @@ impl FsWriter {
 
 impl Drop for FsWriter {
     fn drop(&mut self) {
-        if self.fs2dev.locked {
-            self.fs2dev
-                .comm
-                .write_all(&(0_u64).to_ne_bytes())
-                .expect("couldn't unlock fs2dev");
-        }
-        self.fs2dev
-            .comm
-            .end(proto::fs2dev::RequestEnd {})
-            .expect("couldn't end fs2dev");
+        self.fs2dev.end().expect("couldn't end fs2dev");
     }
 }
 

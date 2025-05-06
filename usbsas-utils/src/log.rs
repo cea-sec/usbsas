@@ -1,34 +1,8 @@
 #[cfg(feature = "log-json")]
 use {
     env_logger::{Builder, Env},
-    std::{
-        io::Write,
-        sync::{Arc, RwLock},
-    },
+    std::io::Write,
 };
-
-#[cfg(feature = "log-json")]
-pub fn init_server_logger(session_id: Arc<RwLock<String>>) {
-    let mut builder = Builder::from_env(Env::default().filter_or("RUST_LOG", "info,http=error"));
-    builder.format(move |buf, record| {
-        write!(buf, "{{")?;
-        write!(
-            buf,
-            "\"ts\":\"{}\",",
-            time::OffsetDateTime::now_utc()
-                .format(&time::format_description::well_known::Rfc3339)
-                .unwrap()
-        )?;
-        write!(buf, " \"level\":\"{}\",", record.level())?;
-        write!(buf, " \"target\":\"{}\",", record.target())?;
-        write!(buf, " \"msg\":{},", serde_json::to_string(&record.args())?)?;
-        write!(buf, " \"transfer_id\":\"{}\"", session_id.read().unwrap())?;
-        writeln!(buf, "}}")?;
-
-        Ok(())
-    });
-    builder.init();
-}
 
 #[cfg(feature = "log-json")]
 pub fn init_logger() {

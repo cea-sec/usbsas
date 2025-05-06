@@ -2,11 +2,18 @@
 set -e
 
 if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
+
+    set +e
     if [ -z "$(id -u usbsas-client 2>/dev/null)" ]; then
+        set -e
         echo "adding usbsas-client user"
-        adduser --home /var/lib/usbsas-client --gecos "usbsas-client" \
+        adduser --home /var/lib/usbsas-client --comment "usbsas-client" \
             --disabled-password --quiet usbsas-client
+        adduser usbsas-client usbsas
+        mkdir -p /var/lib/usbsas/reports
+        chown usbsas-client:usbsas /var/lib/usbsas/reports
     fi
+
     systemctl mask getty@tty2.service
     systemctl mask autovt@tty2.service
 fi

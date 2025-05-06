@@ -104,6 +104,7 @@ pub(crate) fn new_context_with_common_rules(
     )?;
 
     // Allow more syscalls
+    ctx.allow_syscall(Syscall::rt_sigprocmask)?;
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::munmap)?;
     ctx.allow_syscall(Syscall::exit_group)?;
@@ -113,6 +114,7 @@ pub(crate) fn new_context_with_common_rules(
     #[cfg(target_arch = "arm")]
     ctx.allow_syscall(Syscall::clock_gettime64)?;
     ctx.allow_syscall(Syscall::rt_sigreturn)?;
+    ctx.allow_syscall(Syscall::rt_sigprocmask)?;
 
     //  fcntl only needed in debug mode
     #[cfg(debug_assertions)]

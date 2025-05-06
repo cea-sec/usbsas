@@ -1,5 +1,6 @@
 syntax = "proto3";
 package identificator;
+import "common.proto3";
 
 
 /* Requests */
@@ -7,32 +8,26 @@ package identificator;
 message RequestEnd {
 };
 
-message RequestId {
+message RequestUserId {
 };
 
 message Request {
   oneof msg {
     RequestEnd End = 1;
-    RequestId Id = 2;
+    RequestUserId UserId = 2;
   }
 };
 
 /* Responses */
-message ResponseEnd {
-};
-
-message ResponseError {
-  string err = 1;
-};
-
-message ResponseId {
-  string id = 1;
+message ResponseUserId {
+  string userid = 1;
 };
 
 message Response {
   oneof msg {
-    ResponseEnd End = 1;
-    ResponseError Error = 2;
-    ResponseId Id = 3;
+    common.ResponseEnd End = 1;
+    common.ResponseError Error = 2;
+    ResponseUserId UserId = 3;
+    common.ResponseStatus Status = 4;
   }
 };

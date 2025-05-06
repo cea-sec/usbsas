@@ -6,12 +6,11 @@ use nix::{
     unistd,
 };
 use std::{
-    io::{self, Write},
+    io,
     os::unix::io::{AsRawFd, RawFd},
     path, process,
 };
 use thiserror::Error;
-use usbsas_comm::Comm;
 use usbsas_utils::{INPUT_PIPE_FD_VAR, OUTPUT_PIPE_FD_VAR, USBSAS_BIN_PATH};
 
 #[derive(Error, Debug)]
@@ -78,7 +77,9 @@ impl<'a> UsbsasChildSpawner<'a> {
         self
     }
 
-    pub fn spawn<R>(self) -> Result<UsbsasChild<R>> {
+    pub fn spawn<R: usbsas_comm::FromFd + usbsas_comm::ProtoReqCommon>(
+        self,
+    ) -> Result<UsbsasChild<R>> {
         let mut command =
             process::Command::new(path::Path::new(USBSAS_BIN_PATH).join(self.bin_path));
 
@@ -115,30 +116,42 @@ impl<'a> UsbsasChildSpawner<'a> {
 
         Ok(UsbsasChild {
             child,
-            comm: Comm::from_fd(child_to_parent_rd, parent_to_child_wr),
+            comm: R::from_fd(child_to_parent_rd, parent_to_child_wr),
             locked: self.wait_on_startup,
         })
     }
 }
 
-pub struct UsbsasChild<R> {
+pub struct UsbsasChild<R: usbsas_comm::ProtoReqCommon> {
     pub child: process::Child,
-    pub comm: Comm<R>,
+    pub comm: R,
     pub locked: bool,
 }
 
-impl<R> UsbsasChild<R> {
-    pub fn wait(&mut self) -> Result<std::process::ExitStatus> {
+pub trait ChildMngt {
+    fn wait(&mut self) -> Result<std::process::ExitStatus>;
+    fn unlock_with(&mut self, value: u64) -> Result<()>;
+    fn end(&mut self) -> Result<()>;
+}
+
+impl<R: usbsas_comm::ProtoReqCommon> ChildMngt for UsbsasChild<R> {
+    fn wait(&mut self) -> Result<std::process::ExitStatus> {
         Ok(self.child.wait()?)
     }
-
-    pub fn unlock_with(&mut self, buf: &[u8]) -> Result<()> {
+    fn unlock_with(&mut self, value: u64) -> Result<()> {
         if !self.locked {
             return Err(Error::Error("not locked".into()));
         }
-        self.comm.write_all(buf)?;
+        self.comm.write_all(&value.to_le_bytes())?;
         self.locked = false;
         Ok(())
+    }
+    fn end(&mut self) -> Result<()> {
+        if self.locked {
+            self.unlock_with(0)?;
+            self.locked = false;
+        }
+        Ok(self.comm.end()?)
     }
 }
 

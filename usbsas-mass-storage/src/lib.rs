@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use usbsas_comm::{protorequest, Comm};
+use usbsas_comm::{ComRqScsi, ProtoReqScsi};
 use usbsas_proto as proto;
 use usbsas_scsi::ScsiUsb;
 
@@ -24,15 +24,6 @@ pub enum Error {
     Error(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
-
-protorequest!(
-    CommScsi,
-    scsi,
-    partitions = Partitions[RequestPartitions, ResponsePartitions],
-    readsectors = ReadSectors[RequestReadSectors, ResponseReadSectors],
-    end = End[RequestEnd, ResponseEnd],
-    opendev = OpenDevice[RequestOpenDevice, ResponseOpenDevice]
-);
 
 pub const MAX_SECTORS_COUNT_CACHE: u64 = 8;
 const MSC_SUBCLASS_RBC: u8 = 0x1; // Reduced Block Commands
@@ -229,13 +220,13 @@ pub struct MassStorageComm {
     pub dev_size: u64,
     pub partition_sector_start: u64,
     // RwLock because we need to impl ReadAt which takes a non mut ref
-    pub comm: Arc<RwLock<Comm<proto::scsi::Request>>>,
+    pub comm: Arc<RwLock<ComRqScsi>>,
     // Small cache to avoid reading the same sectors multiple time
     pub cache: RwLock<lru::LruCache<(u64, u64), Vec<u8>>>,
 }
 
 impl MassStorageComm {
-    pub fn new(comm: Comm<proto::scsi::Request>) -> Self {
+    pub fn new(comm: ComRqScsi) -> Self {
         MassStorageComm {
             block_size: 0,
             seek: 0,
@@ -250,7 +241,7 @@ impl MassStorageComm {
         }
     }
 
-    pub fn comm(&self) -> Result<std::sync::RwLockWriteGuard<'_, Comm<proto::scsi::Request>>> {
+    pub fn comm(&self) -> Result<std::sync::RwLockWriteGuard<'_, ComRqScsi>> {
         self.comm
             .write()
             .map_err(|err| Error::Error(format!("comm lock error: {err}")))
@@ -293,7 +284,7 @@ impl Read for MassStorageComm {
         let count = buf.len() as u64;
         let block_size = self.block_size as u64;
         let read_offset = self.seek % block_size;
-        let sectors_to_read = (read_offset + count + (block_size - 1)) / block_size;
+        let sectors_to_read = (read_offset + count).div_ceil(block_size);
         let offset = self.seek / block_size;
 
         let data = self.read_sectors(offset + self.partition_sector_start, sectors_to_read)?;
@@ -342,7 +333,7 @@ impl ReadAt for MassStorageComm {
         let count = buf.len() as u64;
         let block_size = self.block_size as u64;
         let read_offset = pos % block_size;
-        let sectors_to_read = (read_offset + count + (block_size - 1)) / block_size;
+        let sectors_to_read = (read_offset + count).div_ceil(block_size);
         let offset = pos / block_size;
         let data = self.read_sectors(offset + self.partition_sector_start, sectors_to_read)?;
         let data = data[(read_offset as usize)..(read_offset as usize + count as usize)].to_vec();
