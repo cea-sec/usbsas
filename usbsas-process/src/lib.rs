@@ -7,7 +7,7 @@ use nix::{
 };
 use std::{
     io,
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::{AsFd, AsRawFd},
     path, process,
 };
 use thiserror::Error;
@@ -89,8 +89,8 @@ impl<'a> UsbsasChildSpawner<'a> {
 
         let (child_to_parent_rd, child_to_parent_wr) = unistd::pipe()?;
         let (parent_to_child_rd, parent_to_child_wr) = unistd::pipe()?;
-        set_cloexec(child_to_parent_rd.as_raw_fd())?;
-        set_cloexec(parent_to_child_wr.as_raw_fd())?;
+        set_cloexec(&child_to_parent_rd)?;
+        set_cloexec(&parent_to_child_wr)?;
 
         command.env_clear();
         command.env(
@@ -155,12 +155,8 @@ impl<R: usbsas_comm::ProtoReqCommon> ChildMngt for UsbsasChild<R> {
     }
 }
 
-fn fcntl(fd: RawFd, arg: FcntlArg) -> io::Result<libc::c_int> {
-    Ok(nix::fcntl::fcntl(fd, arg)?)
-}
-
-pub fn set_cloexec(fd: RawFd) -> io::Result<libc::c_int> {
-    let mut flags = FdFlag::from_bits(fcntl(fd, FcntlArg::F_GETFD)?).unwrap();
+pub fn set_cloexec<Fd: AsFd>(fd: Fd) -> io::Result<libc::c_int> {
+    let mut flags = FdFlag::from_bits(nix::fcntl::fcntl(&fd, FcntlArg::F_GETFD)?).unwrap();
     flags.insert(FdFlag::FD_CLOEXEC);
-    fcntl(fd, FcntlArg::F_SETFD(flags))
+    Ok(nix::fcntl::fcntl(fd, FcntlArg::F_SETFD(flags))?)
 }
