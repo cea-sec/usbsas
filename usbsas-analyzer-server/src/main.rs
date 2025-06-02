@@ -374,10 +374,7 @@ impl Clamav {
 
         if response.trim() != "PONG" {
             log::error!("{:#?}", response);
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Couldn't connect to clamd socket",
-            ));
+            return Err(io::Error::other("Couldn't connect to clamd socket"));
         }
 
         log::debug!("clamd ping pong ok");

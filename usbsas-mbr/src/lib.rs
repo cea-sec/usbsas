@@ -2,7 +2,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use std::io::{self, ErrorKind};
+use std::io;
 
 /// mbr standard magic number
 /// # Value
@@ -78,7 +78,7 @@ impl MbrPartitionEntry {
 /// parse an mbr partition table
 pub fn parse_partition_table(buffer: &[u8]) -> Result<Vec<MbrPartitionEntry>, io::Error> {
     if buffer[510..512] != MBR_SIGNATURE {
-        return Err(io::Error::new(ErrorKind::Other, "Bad mbr signature"));
+        return Err(io::Error::other("Bad mbr signature"));
     }
     let mut partition_table = Vec::new();
     for i in 0..4 {

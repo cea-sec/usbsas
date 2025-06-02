@@ -114,7 +114,7 @@ impl MassStorage {
         let ret = self
             .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
+            .map_err(|err| io::Error::other(format!("lock error: {err}")))?
             .scsi_write_10(buffer, offset, count)?;
         // Read last sector of what we've just written and verify it's ok.
         // XXX TODO FIXME Apparently, some devices requires reads between writes
@@ -124,7 +124,7 @@ impl MassStorage {
         let mut buf_check = vec![0; self.block_size as usize];
         self.scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
+            .map_err(|err| io::Error::other(format!("lock error: {err}")))?
             .scsi_read_10(&mut buf_check, offset + count - 1, 1)?;
         if buf_check != buffer[(buffer.len() - buf_check.len())..] {
             return Err(Error::Error("write check failed".into()));
@@ -152,7 +152,7 @@ impl Read for MassStorage {
         let data = self
             .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
+            .map_err(|err| io::Error::other(format!("lock error: {err}")))?
             .read_sectors(offset, sectors, self.block_size as usize)?;
 
         self.pos += buf.len() as u64;
@@ -202,7 +202,7 @@ impl ReadAt for MassStorage {
         let data = self
             .scsiusb
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("lock error: {err}")))?
+            .map_err(|err| io::Error::other(format!("lock error: {err}")))?
             .read_sectors(offset, sectors, self.block_size as usize)?;
 
         for (i, c) in data.iter().enumerate() {
@@ -254,9 +254,7 @@ impl MassStorageComm {
             if let Some(data) = self
                 .cache
                 .write()
-                .map_err(|err| {
-                    io::Error::new(ErrorKind::Other, format!("cache lock error: {err}"))
-                })?
+                .map_err(|err| io::Error::other(format!("cache lock error: {err}")))?
                 .get(&(offset, count))
             {
                 return Ok(data.clone());
@@ -265,14 +263,12 @@ impl MassStorageComm {
         let rep = self
             .comm
             .write()
-            .map_err(|err| io::Error::new(ErrorKind::Other, format!("comm lock error: {err}")))?
+            .map_err(|err| io::Error::other(format!("comm lock error: {err}")))?
             .readsectors(proto::scsi::RequestReadSectors { offset, count })?;
         if count <= MAX_SECTORS_COUNT_CACHE {
             self.cache
                 .write()
-                .map_err(|err| {
-                    io::Error::new(ErrorKind::Other, format!("cache lock error: {err}"))
-                })?
+                .map_err(|err| io::Error::other(format!("cache lock error: {err}")))?
                 .put((offset, count), rep.data.clone());
         }
         Ok(rep.data)

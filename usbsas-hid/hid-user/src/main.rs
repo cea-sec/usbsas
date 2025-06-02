@@ -6,12 +6,7 @@ use rusb::{
     UsbContext,
 };
 use std::{
-    collections::HashMap,
-    env,
-    io::{Error, ErrorKind},
-    os::unix::io::AsRawFd,
-    ptr::null_mut,
-    time::Duration,
+    collections::HashMap, env, io::Error, os::unix::io::AsRawFd, ptr::null_mut, time::Duration,
 };
 use x11::{
     xlib::{
@@ -122,7 +117,7 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
                 Ok(value as u32)
             }
 
-            None => Err(Error::new(ErrorKind::Other, "Buffer too short")),
+            None => Err(Error::other("Buffer too short")),
         },
         2 => match (buffer.pop(), buffer.pop()) {
             (Some(value_l), Some(value_h)) => {
@@ -131,7 +126,7 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
                 Ok(value as u32)
             }
 
-            _ => Err(Error::new(ErrorKind::Other, "Buffer too short")),
+            _ => Err(Error::other("Buffer too short")),
         },
         3 => match (buffer.pop(), buffer.pop(), buffer.pop(), buffer.pop()) {
             (Some(value_b0), Some(value_b1), Some(value_b2), Some(value_b3)) => {
@@ -143,7 +138,7 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
                 Ok(value)
             }
 
-            _ => Err(Error::new(ErrorKind::Other, "Buffer too short")),
+            _ => Err(Error::other("Buffer too short")),
         },
         _ => {
             todo!("bsize {:?}", size);
@@ -159,7 +154,7 @@ fn get_item_value_i32(size: u8, buffer: &mut Vec<u8>) -> Result<i32, Error> {
                 Ok(value as i32)
             }
 
-            None => Err(Error::new(ErrorKind::Other, "Buffer too short")),
+            None => Err(Error::other("Buffer too short")),
         },
         2 => match (buffer.pop(), buffer.pop()) {
             (Some(value_l), Some(value_h)) => {
@@ -168,7 +163,7 @@ fn get_item_value_i32(size: u8, buffer: &mut Vec<u8>) -> Result<i32, Error> {
                 Ok(value as i32)
             }
 
-            _ => Err(Error::new(ErrorKind::Other, "Buffer too short")),
+            _ => Err(Error::other("Buffer too short")),
         },
         3 => match (buffer.pop(), buffer.pop(), buffer.pop(), buffer.pop()) {
             (Some(value_b0), Some(value_b1), Some(value_b2), Some(value_b3)) => {
@@ -179,7 +174,7 @@ fn get_item_value_i32(size: u8, buffer: &mut Vec<u8>) -> Result<i32, Error> {
                 let value: i32 = value as i32;
                 Ok(value)
             }
-            _ => Err(Error::new(ErrorKind::Other, "Buffer too short")),
+            _ => Err(Error::other("Buffer too short")),
         },
         _ => {
             todo!("bsize {:?}", size);
@@ -497,10 +492,7 @@ impl HidItem {
                     size.into(),
                 )
                 .map(|value| value as i32),
-                _ => Err(Error::new(
-                    ErrorKind::Other,
-                    format!("Unsupported size for {self:?}"),
-                )),
+                _ => Err(Error::other(format!("Unsupported size for {self:?}"))),
             }
         } else {
             match self.size {
@@ -518,10 +510,7 @@ impl HidItem {
                     size.into(),
                 )
                 .map(|value| value as i32),
-                _ => Err(Error::new(
-                    ErrorKind::Other,
-                    format!("Unsupported size for {self:?}"),
-                )),
+                _ => Err(Error::other(format!("Unsupported size for {self:?}"))),
             }
         }
     }
@@ -559,31 +548,27 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         match (local_report_count, local_report_size) {
                             (Some(report_count), Some(report_size)) => {
                                 if report_count > MAX_REPORT_COUNT {
-                                    return Err(Error::new(
-                                        ErrorKind::Other,
-                                        format!("Strange report count {report_count:?}"),
-                                    ));
+                                    return Err(Error::other(format!(
+                                        "Strange report count {report_count:?}"
+                                    )));
                                 }
                                 if report_size > 32 {
-                                    return Err(Error::new(
-                                        ErrorKind::Other,
-                                        format!("Strange report size {report_size:?}"),
-                                    ));
+                                    return Err(Error::other(format!(
+                                        "Strange report size {report_size:?}"
+                                    )));
                                 }
 
                                 //assert!(report_count == usages.len());
                                 let item = HidItem {
                                     offset: total_report_size,
-                                    usage_page: usage_page.clone().take().ok_or_else(|| {
-                                        Error::new(ErrorKind::Other, "No usage page")
-                                    })?,
+                                    usage_page: usage_page
+                                        .clone()
+                                        .ok_or_else(|| Error::other("No usage page"))?,
                                     usage: usages.clone(),
-                                    logical_min: logical_min.clone().take().ok_or_else(|| {
-                                        Error::new(ErrorKind::Other, "No logical min")
-                                    })?,
-                                    logical_max: logical_max.clone().take().ok_or_else(|| {
-                                        Error::new(ErrorKind::Other, "No logical max")
-                                    })?,
+                                    logical_min: logical_min
+                                        .ok_or_else(|| Error::other("No logical min"))?,
+                                    logical_max: logical_max
+                                        .ok_or_else(|| Error::other("No logical max"))?,
                                     coordinatestate,
                                     count: report_count as u8,
                                     size: report_size as u8,
@@ -596,10 +581,9 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                 usages.clear();
                             }
                             report => {
-                                return Err(Error::new(
-                                    ErrorKind::Other,
-                                    format!("Report size or Report count not set {report:?}"),
-                                ));
+                                return Err(Error::other(format!(
+                                    "Report size or Report count not set {report:?}"
+                                )));
                             }
                         }
                     }
@@ -640,31 +624,27 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         match (local_report_count, local_report_size) {
                             (Some(report_count), Some(report_size)) => {
                                 if report_count > MAX_REPORT_COUNT {
-                                    return Err(Error::new(
-                                        ErrorKind::Other,
-                                        format!("Strange report count {report_count:?}"),
-                                    ));
+                                    return Err(Error::other(format!(
+                                        "Strange report count {report_count:?}"
+                                    )));
                                 }
                                 if report_size > 32 {
-                                    return Err(Error::new(
-                                        ErrorKind::Other,
-                                        format!("Strange report size {report_size:?}"),
-                                    ));
+                                    return Err(Error::other(format!(
+                                        "Strange report size {report_size:?}"
+                                    )));
                                 }
 
                                 //assert!(report_count == usages.len());
                                 let item = HidItem {
                                     offset: total_report_size,
-                                    usage_page: usage_page.clone().take().ok_or_else(|| {
-                                        Error::new(ErrorKind::Other, "No usage page")
-                                    })?,
+                                    usage_page: usage_page
+                                        .clone()
+                                        .ok_or_else(|| Error::other("No usage page"))?,
                                     usage: usages.clone(),
-                                    logical_min: logical_min.clone().take().ok_or_else(|| {
-                                        Error::new(ErrorKind::Other, "No logical min")
-                                    })?,
-                                    logical_max: logical_max.clone().take().ok_or_else(|| {
-                                        Error::new(ErrorKind::Other, "No logical max")
-                                    })?,
+                                    logical_min: logical_min
+                                        .ok_or_else(|| Error::other("No logical min"))?,
+                                    logical_max: logical_max
+                                        .ok_or_else(|| Error::other("No logical max"))?,
                                     coordinatestate,
                                     count: report_count as u8,
                                     size: report_size as u8,
@@ -677,10 +657,9 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                 usages.clear();
                             }
                             report => {
-                                return Err(Error::new(
-                                    ErrorKind::Other,
-                                    format!("Report size or Report count not set {report:?}"),
-                                ));
+                                return Err(Error::other(format!(
+                                    "Report size or Report count not set {report:?}"
+                                )));
                             }
                         }
                     }
@@ -688,10 +667,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                     0b1100 => {
                         // END_COLLECTION
                         if item.bsize() != 0 {
-                            return Err(Error::new(
-                                ErrorKind::Other,
-                                "END_COLLECTION size must be 0",
-                            ));
+                            return Err(Error::other("END_COLLECTION size must be 0"));
                         };
                         indent -= 1;
                         log::debug!("{}END_COLLECTION()", gen_space(indent));
@@ -932,7 +908,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
     if !items.is_empty() && controller_ok {
         reports.insert(report_id, (items, total_report_size));
         if total_report_size % 8 != 0 {
-            return Err(Error::new(ErrorKind::Other, "Size report is not % 8"));
+            return Err(Error::other("Size report is not % 8"));
         }
     }
 
@@ -953,16 +929,16 @@ fn get_u8(
     length: u32,
 ) -> Result<u8, Error> {
     if length == 0 {
-        return Err(Error::new(ErrorKind::Other, "bad len"));
+        return Err(Error::other("bad len"));
     }
 
     if length > 8 {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
 
     // Ensure that we stay within the vector
     if (buffer.len() as u32 * 8) < byte_offset * 8 + bit_offset + length {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
 
     byte_offset += bit_offset / 8;
@@ -1005,16 +981,16 @@ fn get_i8(
     length: u32,
 ) -> Result<i8, Error> {
     if length == 0 {
-        return Err(Error::new(ErrorKind::Other, "bad len"));
+        return Err(Error::other("bad len"));
     }
 
     if length > 8 {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
 
     // Ensure that we stay within the vector
     if (buffer.len() as u32 * 8) < byte_offset * 8 + bit_offset + length {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
 
     byte_offset += bit_offset / 8;
@@ -1053,16 +1029,16 @@ fn get_i16(
     length: u32,
 ) -> Result<i16, Error> {
     if length == 0 {
-        return Err(Error::new(ErrorKind::Other, "bad len"));
+        return Err(Error::other("bad len"));
     };
 
     if length > 16 {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
 
     // Ensure that we stay within the vector
     if (buffer.len() as u32 * 8) < byte_offset * 8 + bit_offset + length {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
 
     byte_offset += bit_offset / 8;
@@ -1116,15 +1092,15 @@ fn get_u16(
     length: u32,
 ) -> Result<u16, Error> {
     if length == 0 {
-        return Err(Error::new(ErrorKind::Other, "bad len"));
+        return Err(Error::other("bad len"));
     };
 
     if length > 16 {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
     // Ensure that we stay within the vector
     if (buffer.len() as u32 * 8) < byte_offset * 8 + bit_offset + length {
-        return Err(Error::new(ErrorKind::Other, "out of range"));
+        return Err(Error::other("out of range"));
     }
 
     byte_offset += bit_offset / 8;
@@ -1173,10 +1149,7 @@ fn get_screen_display() -> Result<ScreenInfo, Error> {
     /* X11 */
     let display = unsafe { XOpenDisplay(null_mut()) };
     if display.is_null() {
-        return Err(Error::new(
-            ErrorKind::Other,
-            "Error in XOpenDisplay".to_string(),
-        ));
+        return Err(Error::other("Error in XOpenDisplay".to_string()));
     }
     log::debug!("Display: {:?}", display);
     let rootwindow = unsafe { XRootWindow(display, 0) };
@@ -1215,14 +1188,9 @@ fn get_hid_descriptor(device: &UsbDevice) -> Result<Vec<u8>, Error> {
             &mut buffer,
             Duration::from_secs(5),
         )
-        .map_err(|err| {
-            Error::new(
-                ErrorKind::Other,
-                format!("Error in get HID descriptor {err:?}"),
-            )
-        })?;
+        .map_err(|err| Error::other(format!("Error in get HID descriptor {err:?}")))?;
     if len >= buffer.len() {
-        return Err(Error::new(ErrorKind::Other, "Response too big"));
+        return Err(Error::other("Response too big"));
     }
     buffer.truncate(len);
     log::debug!("{}, {:?}", len, buffer);
@@ -1238,14 +1206,12 @@ fn get_associated_report<'a>(
     let index = if reports.len() == 1 {
         0u32
     } else {
-        *buffer
-            .first()
-            .ok_or_else(|| Error::new(ErrorKind::Other, "Empty buffer"))? as u32
+        *buffer.first().ok_or_else(|| Error::other("Empty buffer"))? as u32
     };
 
     reports
         .get(&index)
-        .ok_or_else(|| Error::new(ErrorKind::Other, "No default report"))
+        .ok_or_else(|| Error::other("No default report"))
 }
 
 struct DisplayContext {
@@ -1457,31 +1423,25 @@ fn main() -> Result<(), Error> {
         .init();
 
     let busnum = env::var("BUSNUM")
-        .map_err(|err| Error::new(ErrorKind::Other, format!("Cannot get BUSNUM env: {err:?}")))?;
+        .map_err(|err| Error::other(format!("Cannot get BUSNUM env: {err:?}")))?;
 
     let devnum = env::var("DEVNUM")
-        .map_err(|err| Error::new(ErrorKind::Other, format!("Cannot get DEVNUM env: {err:?}")))?;
+        .map_err(|err| Error::other(format!("Cannot get DEVNUM env: {err:?}")))?;
 
-    let busnum = busnum.parse::<u8>().map_err(|err| {
-        Error::new(
-            ErrorKind::Other,
-            format!("BUSNUM is not an integer: {err:?}"),
-        )
-    })?;
+    let busnum = busnum
+        .parse::<u8>()
+        .map_err(|err| Error::other(format!("BUSNUM is not an integer: {err:?}")))?;
 
-    let devnum = devnum.parse::<u8>().map_err(|err| {
-        Error::new(
-            ErrorKind::Other,
-            format!("DEVNUM is not an integer: {err:?}"),
-        )
-    })?;
+    let devnum = devnum
+        .parse::<u8>()
+        .map_err(|err| Error::other(format!("DEVNUM is not an integer: {err:?}")))?;
 
     assert!(rusb::supports_detach_kernel_driver());
 
     log::info!("Busnum: {} Devnum: {}", busnum, devnum);
 
     let device = open_device(busnum, devnum)
-        .map_err(|err| Error::new(ErrorKind::Other, format!("Usb device error: {err:?}")))?;
+        .map_err(|err| Error::other(format!("Usb device error: {err:?}")))?;
 
     let buffer = get_hid_descriptor(&device)?;
     let reports = parse_report(buffer)?;
@@ -1493,12 +1453,8 @@ fn main() -> Result<(), Error> {
 
     // ConnectionNumber returns the socket fd (see libx11's Xlib.h)
     let socket_fd = unsafe { x11::xlib::XConnectionNumber(screen.display) };
-    usbsas_sandbox::hiduser::seccomp(device.dev_file.as_raw_fd(), socket_fd).map_err(|err| {
-        Error::new(
-            ErrorKind::Other,
-            format!("Error applying seccomp filter: {}", err),
-        )
-    })?;
+    usbsas_sandbox::hiduser::seccomp(device.dev_file.as_raw_fd(), socket_fd)
+        .map_err(|err| Error::other(format!("Error applying seccomp filter: {}", err)))?;
 
     let mut context = DisplayContext::new(screen);
     context.updt_cursor();
