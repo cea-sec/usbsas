@@ -84,10 +84,10 @@ impl<T: UsbContext> ScsiUsb<T> {
         cbw[12] = dir;
         cbw[13] = self
             .lun
-            .ok_or_else(|| io::Error::new(ErrorKind::Other, "lun must be set"))?;
+            .ok_or_else(|| io::Error::other("lun must be set"))?;
         cbw[14] = self
             .command_to_size(command_data[0])
-            .ok_or_else(|| io::Error::new(ErrorKind::Other, "cbw error"))?;
+            .ok_or_else(|| io::Error::other("cbw error"))?;
         cbw[15..31].copy_from_slice(&command_data);
         Ok(cbw)
     }
@@ -102,20 +102,16 @@ impl<T: UsbContext> ScsiUsb<T> {
             if let rusb::Error::Timeout = err {
                 tried += 1;
                 if tried == ACK_TRYCOUNT {
-                    return Err(io::Error::new(
-                        ErrorKind::Other,
-                        format!("Usb ack error: {err} ({tried} times)"),
-                    ));
+                    return Err(io::Error::other(format!(
+                        "Usb ack error: {err} ({tried} times)"
+                    )));
                 } else {
                     log::warn!("usb ack timed out, retrying");
                     csw = [0; 13];
                     continue;
                 }
             } else {
-                return Err(io::Error::new(
-                    ErrorKind::Other,
-                    format!("Usb ack error: {err}"),
-                ));
+                return Err(io::Error::other(format!("Usb ack error: {err}")));
             }
         }
         self.tag += 1;
@@ -131,23 +127,14 @@ impl<T: UsbContext> ScsiUsb<T> {
             {
                 Ok(size) => {
                     if size == 0 {
-                        return Err(io::Error::new(
-                            ErrorKind::Other,
-                            "usb read_bulk returned null size",
-                        ));
+                        return Err(io::Error::other("usb read_bulk returned null size"));
                     } else if size > buffer.len() {
-                        return Err(io::Error::new(
-                            ErrorKind::Other,
-                            "usb read_bulk returned invalid size",
-                        ));
+                        return Err(io::Error::other("usb read_bulk returned invalid size"));
                     }
                     size
                 }
                 Err(err) => {
-                    return Err(io::Error::new(
-                        ErrorKind::Other,
-                        format!("Usb read_bulk error: {err}"),
-                    ));
+                    return Err(io::Error::other(format!("Usb read_bulk error: {err}")));
                 }
             };
             buffer = &mut buffer[size..];
@@ -164,23 +151,14 @@ impl<T: UsbContext> ScsiUsb<T> {
             {
                 Ok(size) => {
                     if size == 0 {
-                        return Err(io::Error::new(
-                            ErrorKind::Other,
-                            "usb write_bulk returned null size",
-                        ));
+                        return Err(io::Error::other("usb write_bulk returned null size"));
                     } else if size > buffer.len() {
-                        return Err(io::Error::new(
-                            ErrorKind::Other,
-                            "usb write_bulk returned invalid size",
-                        ));
+                        return Err(io::Error::other("usb write_bulk returned invalid size"));
                     }
                     size
                 }
                 Err(err) => {
-                    return Err(io::Error::new(
-                        ErrorKind::Other,
-                        format!("Usb write_bulk error: {err}"),
-                    ));
+                    return Err(io::Error::other(format!("Usb write_bulk error: {err}")));
                 }
             };
             buffer = &buffer[size..];
@@ -465,7 +443,7 @@ impl<T: UsbContext> ScsiUsb<T> {
                         }
                     }
                     Err(_) => {
-                        return Err(io::Error::new(ErrorKind::Other, "Test usb key fail"));
+                        return Err(io::Error::other("Test usb key fail"));
                     }
                 }
                 if is_ok {
@@ -476,14 +454,14 @@ impl<T: UsbContext> ScsiUsb<T> {
 
         if !is_ok {
             error!("No lun found!");
-            return Err(io::Error::new(ErrorKind::Other, "Cannot find lun"));
+            return Err(io::Error::other("Cannot find lun"));
         }
 
         let mut buffer: [u8; 8] = [0; 8];
         match self.scsi_read_capacity_10(&mut buffer) {
             Ok(_) => {}
             Err(_) => {
-                return Err(io::Error::new(ErrorKind::Other, "Cannot read capacity"));
+                return Err(io::Error::other("Cannot read capacity"));
             }
         }
 

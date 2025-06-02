@@ -9,7 +9,7 @@
 //! when `T` is `Read` + `Write` + `Seek`.
 
 use std::{
-    io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
+    io::{self, Read, Seek, SeekFrom, Write},
     marker::PhantomData,
     os::raw::c_void,
 };
@@ -76,7 +76,7 @@ impl<T: Read + Seek> FatFs<T> {
         let drive = str_to_utf16(DRIVE);
 
         if unsafe { ff_c::f_mount(&mut *fs, drive.as_ptr(), 1) } != ff_c::FRESULT_FR_OK {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_mount error"));
+            return Err(io::Error::other("ff f_mount error"));
         }
         Ok(FatFs {
             inner: fs,
@@ -101,7 +101,7 @@ impl<T: Read + Seek> FatFs<T> {
         let path_u16 = str_to_utf16(path);
         let mut fno = ff_c::FILINFO::new();
         if unsafe { ff_c::f_stat(path_u16.as_ptr(), &mut fno) } != ff_c::FRESULT_FR_OK {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_atrib error"));
+            return Err(io::Error::other("ff f_atrib error"));
         }
 
         let timestamp = fno_to_timestamp(&fno);
@@ -126,14 +126,14 @@ impl<T: Read + Seek> FatFs<T> {
         let path_u16 = str_to_utf16(path);
 
         if unsafe { ff_c::f_opendir(&mut dir, path_u16.as_ptr()) } != ff_c::FRESULT_FR_OK {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_opendir error"));
+            return Err(io::Error::other("ff f_opendir error"));
         }
 
         loop {
             let mut fno = ff_c::FILINFO::new();
 
             if unsafe { ff_c::f_readdir(&mut dir, &mut fno) } != ff_c::FRESULT_FR_OK {
-                return Err(io::Error::new(ErrorKind::Other, "ff f_readir error"));
+                return Err(io::Error::other("ff f_readir error"));
             }
 
             if fno.fname[0] == 0 {
@@ -148,7 +148,7 @@ impl<T: Read + Seek> FatFs<T> {
                 .unwrap_or(fno.fname.len() - 1);
             let name = match String::from_utf16(&fno.fname[0..idx_end]) {
                 Ok(name) => name,
-                Err(_) => return Err(io::Error::new(ErrorKind::Other, "ff from_utf16 error")),
+                Err(_) => return Err(io::Error::other("ff from_utf16 error")),
             };
 
             let ftype = if (u32::from(fno.fattrib) & ff_c::AM_DIR) > 0 {
@@ -185,10 +185,10 @@ impl<T: Read + Seek> FatFs<T> {
         if unsafe { ff_c::f_open(&mut fp, path_u16.as_ptr(), ff_c::FA_READ as u8) }
             != ff_c::FRESULT_FR_OK
         {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_open error"));
+            return Err(io::Error::other("ff f_open error"));
         }
         if unsafe { ff_c::f_lseek(&mut fp, offset) } != ff_c::FRESULT_FR_OK {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_lseek error"));
+            return Err(io::Error::other("ff f_lseek error"));
         }
         if unsafe {
             ff_c::f_read(
@@ -199,7 +199,7 @@ impl<T: Read + Seek> FatFs<T> {
             )
         } != ff_c::FRESULT_FR_OK
         {
-            Err(io::Error::new(ErrorKind::Other, "ff f_read error"))
+            Err(io::Error::other("ff f_read error"))
         } else {
             Ok(bytes_read as u64)
         }
@@ -239,11 +239,11 @@ impl<T: Read + Write + Seek> FatFs<T> {
             )
         } != ff_c::FRESULT_FR_OK
         {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_mkfs error"));
+            return Err(io::Error::other("ff f_mkfs error"));
         }
 
         if unsafe { ff_c::f_mount(&mut *fs, drive.as_ptr(), 1) } != ff_c::FRESULT_FR_OK {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_mount error"));
+            return Err(io::Error::other("ff f_mount error"));
         }
 
         Ok(FatFs {
@@ -277,7 +277,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
             )
         } != ff_c::FRESULT_FR_OK
         {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_open error"));
+            return Err(io::Error::other("ff f_open error"));
         }
         Ok(file)
     }
@@ -287,7 +287,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
         let dname = str_to_utf16(path);
         match unsafe { ff_c::f_mkdir(dname.as_ptr()) } {
             ff_c::FRESULT_FR_OK | ff_c::FRESULT_FR_EXIST => Ok(()),
-            _ => Err(io::Error::new(ErrorKind::Other, "ff f_mkdir error")),
+            _ => Err(io::Error::other("ff f_mkdir error")),
         }
     }
 
@@ -295,7 +295,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
     pub fn remove_file(&mut self, path: &str) -> Result<(), io::Error> {
         let fname = str_to_utf16(path);
         if unsafe { ff_c::f_unlink(fname.as_ptr()) } != ff_c::FRESULT_FR_OK {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_mkdir error"));
+            return Err(io::Error::other("ff f_mkdir error"));
         }
         Ok(())
     }
@@ -314,7 +314,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
         fno.ftime =
             ((dt.hour() as u16) << 11) | ((dt.minute() as u16) << 5) | (dt.second() as u16 / 2);
         if unsafe { ff_c::f_utime(fname.as_ptr(), &fno) } != ff_c::FRESULT_FR_OK {
-            return Err(io::Error::new(ErrorKind::Other, "ff f_utime error"));
+            return Err(io::Error::other("ff f_utime error"));
         }
         Ok(())
     }
@@ -368,7 +368,7 @@ impl<T: Write + Seek> Write for FatFile<'_, T> {
             )
         } != ff_c::FRESULT_FR_OK
         {
-            Err(io::Error::new(io::ErrorKind::Other, "ff write error"))
+            Err(io::Error::other("ff write error"))
         } else {
             Ok(bw as usize)
         }
@@ -376,7 +376,7 @@ impl<T: Write + Seek> Write for FatFile<'_, T> {
 
     fn flush(&mut self) -> io::Result<()> {
         if unsafe { ff_c::f_sync(&mut self.inner) } != ff_c::FRESULT_FR_OK {
-            Err(io::Error::new(io::ErrorKind::Other, "ff sync error"))
+            Err(io::Error::other("ff sync error"))
         } else {
             Ok(())
         }
@@ -391,7 +391,7 @@ impl<T: Write + Seek> Seek for FatFile<'_, T> {
             SeekFrom::Current(current) => self.inner.fptr + current as u64,
         };
         if unsafe { ff_c::f_lseek(&mut self.inner, offset) } != ff_c::FRESULT_FR_OK {
-            Err(io::Error::new(io::ErrorKind::Other, "ff seek error"))
+            Err(io::Error::other("ff seek error"))
         } else {
             Ok(offset)
         }

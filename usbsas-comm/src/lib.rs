@@ -26,10 +26,8 @@ impl FromEnv for RawFd {
     type Err = io::Error;
     fn from_env(name: &str) -> Result<Self, Self::Err> {
         env::var(name)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
-            .and_then(|value| {
-                RawFd::from_str(&value).map_err(|err| io::Error::new(io::ErrorKind::Other, err))
-            })
+            .map_err(io::Error::other)
+            .and_then(|value| RawFd::from_str(&value).map_err(io::Error::other))
     }
 }
 
@@ -232,17 +230,17 @@ macro_rules! protorequest {
                             Ok(())
                         }
                         Some(usbsas_proto::[<$proto:lower>]::response::Msg::Error(e)) => {
-                            Err(std::io::Error::new(std::io::ErrorKind::Other, e.err))
+                            Err(std::io::Error::other(e.err))
                         }
-                        _ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unexpected response"))
+                        _ => Err(std::io::Error::other("Unexpected response"))
                     }
                 }
                 fn recv_status(&mut self) -> std::io::Result<usbsas_proto::common::ResponseStatus> {
                     let resp: usbsas_proto::[<$proto:lower>]::Response = self.recv()?;
                     match resp.msg {
                         Some(usbsas_proto::[<$proto:lower>]::response::Msg::Status(status)) => Ok(status),
-                        Some(usbsas_proto::[<$proto:lower>]::response::Msg::Error(err)) => Err(std::io::Error::new(std::io::ErrorKind::Other, err.err)),
-                        _ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unexpected response"))
+                        Some(usbsas_proto::[<$proto:lower>]::response::Msg::Error(err)) => Err(std::io::Error::other(err.err)),
+                        _ => Err(std::io::Error::other("Unexpected response"))
                     }
                 }
 
@@ -260,9 +258,9 @@ macro_rules! protorequest {
                                 Ok(info)
                             }
                             Some(usbsas_proto::[<$proto:lower>]::response::Msg::Error(e)) => {
-                                Err(std::io::Error::new(std::io::ErrorKind::Other, e.err))
+                                Err(std::io::Error::other(e.err))
                             }
-                            _ => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unexpected response"))
+                            _ => Err(std::io::Error::other("Unexpected response"))
                         }
                     }
                 )+
