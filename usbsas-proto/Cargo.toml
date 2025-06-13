@@ -8,6 +8,6 @@ license = "GPL-3.0"
 prost-build = "0.13"
 
 [dependencies]
-prost = "0.13"
+prost = "0.14"
 serde = { version = "1.0", features = ["derive"] }
 usbsas-config = { path = "../usbsas-config" }
