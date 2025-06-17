@@ -8,7 +8,7 @@ license = "GPL-3.0"
 base64 = { version = "0.22", optional = true }
 byteorder = "1.5"
 env_logger = "0.11"
-libgssapi = { version = "0.8", optional = true }
+libgssapi = { version = "0.9", optional = true }
 log = "0.4"
 reqwest = { version = "0.12", features = ["blocking", "json", "gzip"] }
 serde = { version = "1.0", features = ["derive"] }
