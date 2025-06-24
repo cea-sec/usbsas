@@ -25,37 +25,31 @@ fn main() {
     ]);
 
     // Impl serde::Serialize / Deserialize
-    prost_build.message_attribute("common.Network", "#[derive(Hash, serde::Serialize)]");
-    prost_build.message_attribute("common.UsbDevice", "#[derive(Hash, serde::Serialize)]");
-    prost_build.message_attribute("common.Command", "#[derive(Hash, serde::Serialize)]");
-    prost_build.message_attribute("common.TransferReport", "#[derive(Hash, serde::Serialize)]");
-    prost_build.message_attribute("common.DeviceReport", "#[derive(Hash, serde::Serialize)]");
+    prost_build.message_attribute("common.Network", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.UsbDevice", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.Command", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.TransferReport", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.DeviceReport", "#[derive(serde::Serialize)]");
     prost_build.message_attribute(
         "common.AnalyzeReport",
-        "#[derive(Hash, serde::Serialize, serde::Deserialize)]",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
     );
-    prost_build.message_attribute("common.NetworkReport", "#[derive(Hash, serde::Serialize)]");
-    prost_build.message_attribute("common.CommandReport", "#[derive(Hash, serde::Serialize)]");
-    prost_build.enum_attribute(
-        "common.DeviceReport.device",
-        "#[derive(Hash, serde::Serialize)]",
-    );
-    prost_build.message_attribute("common.PartitionInfo", "#[derive(Hash, serde::Serialize)]");
-    prost_build.enum_attribute("common.Device.device", "#[derive(Hash, serde::Serialize)]");
+    prost_build.message_attribute("common.NetworkReport", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.CommandReport", "#[derive(serde::Serialize)]");
+    prost_build.enum_attribute("common.DeviceReport.device", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.PartitionInfo", "#[derive(serde::Serialize)]");
+    prost_build.enum_attribute("common.Device.device", "#[derive(serde::Serialize)]");
 
     prost_build.message_attribute(
         "common.FileStatus",
-        "#[derive(Hash, serde::Serialize, serde::Deserialize)]",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
     );
     prost_build.message_attribute(
         "common.Antivirus",
-        "#[derive(Hash, serde::Serialize, serde::Deserialize)]",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
     );
-    prost_build.message_attribute("jsonparser.SrvResp", "#[derive(Hash, serde::Deserialize)]");
-    prost_build.message_attribute(
-        "common.UsbDeviceReport",
-        "#[derive(Hash, serde::Serialize)]",
-    );
+    prost_build.message_attribute("jsonparser.SrvResp", "#[derive(serde::Deserialize)]");
+    prost_build.message_attribute("common.UsbDeviceReport", "#[derive(serde::Serialize)]");
 
     // Skip serializing if None
     prost_build.field_attribute(

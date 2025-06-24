@@ -5,9 +5,9 @@ edition = "2021"
 license = "GPL-3.0"
 
 [build-dependencies]
-prost-build = "0.13"
+prost-build = "0.14"
 
 [dependencies]
-prost = "0.13"
+prost = "0.14"
 serde = { version = "1.0", features = ["derive"] }
 usbsas-config = { path = "../usbsas-config" }
