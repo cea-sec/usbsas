@@ -21,15 +21,11 @@ pub struct Ntfs3g<T> {
     inner_type: PhantomData<T>,
 }
 
-fn split_path_parent(path: &str) -> Result<(String, String)> {
-    let (mut parent_dir, filename) = match path.rsplit_once('/') {
-        Some((parent, filename)) => (parent.to_owned(), filename.to_owned()),
-        None => return Err(Error::other("ntfs3g bad filename")),
-    };
-    if parent_dir.is_empty() {
-        parent_dir = String::from("/");
+fn split_path_parent(path: &str) -> (&str, &str) {
+    match path.rsplit_once('/') {
+        Some((parent, file)) => (parent, file),
+        None => ("/", path),
     }
-    Ok((parent_dir, filename))
 }
 
 fn str2ntfsunicode(string: &str) -> Result<Vec<u16>> {
@@ -131,9 +127,9 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
 
     /// Create a new file and returns an NtfsAttr (that impl Write and Seek)
     pub fn new_file<'a>(&'a mut self, path: &str, timestamp: i64) -> Result<NtfsAttr<'a, T>> {
-        let (parent_dir, filename) = split_path_parent(path)?;
-        let p_ni = self.inode_from_path(&parent_dir)?;
-        let path_u16 = str2ntfsunicode(&filename)?;
+        let (parent_dir, filename) = split_path_parent(path);
+        let p_ni = self.inode_from_path(parent_dir)?;
+        let path_u16 = str2ntfsunicode(filename)?;
 
         let file_ni = unsafe {
             n3g_c::ntfs_create(
@@ -181,9 +177,9 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
     }
 
     pub fn new_dir(&mut self, path: &str, timestamp: i64) -> Result<()> {
-        let (parent_dir, filename) = split_path_parent(path)?;
-        let p_ni = self.inode_from_path(&parent_dir)?;
-        let path_u16 = str2ntfsunicode(&filename)?;
+        let (parent_dir, filename) = split_path_parent(path);
+        let p_ni = self.inode_from_path(parent_dir)?;
+        let path_u16 = str2ntfsunicode(filename)?;
 
         let dir_ni = unsafe {
             n3g_c::ntfs_create(
@@ -221,10 +217,10 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
     }
 
     pub fn remove_file(&mut self, path: &str) -> Result<()> {
-        let (parent_dir, filename) = split_path_parent(path)?;
-        let p_ni = self.inode_from_path(&parent_dir)?;
+        let (parent_dir, filename) = split_path_parent(path);
+        let p_ni = self.inode_from_path(parent_dir)?;
         let ni = self.inode_from_path(path)?;
-        let path_u16 = str2ntfsunicode(&filename)?;
+        let path_u16 = str2ntfsunicode(filename)?;
         let path_c = CString::new(filename)
             .map_err(|err| Error::other(format!("ntfs cstring error ({err})")))?;
 
