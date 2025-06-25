@@ -625,7 +625,7 @@ impl FileSelectionState {
         }
         .into_lowercase();
         while let Some(entry) = self.selected.pop_front() {
-            if (matches!(self.transfer.src, Device::Network(_)) && entry == "config.json")
+            if (matches!(self.transfer.src, Device::Network(_)) && entry == "/config.json")
                 || all_entries.contains(&entry)
             {
                 continue;
@@ -676,9 +676,10 @@ impl FileSelectionState {
                         path: entry.clone(),
                     }) {
                         Ok(rep) => {
-                            rep.filesinfo
-                                .iter()
-                                .for_each(|file| self.selected.push_back(file.path.clone()));
+                            rep.filesinfo.iter().for_each(|file| {
+                                self.selected
+                                    .push_back(format!("/{}", file.path.trim_start_matches('/')));
+                            });
                         }
                         Err(err) => {
                             error!("get attr '{}' err '{}'", &entry, err);
