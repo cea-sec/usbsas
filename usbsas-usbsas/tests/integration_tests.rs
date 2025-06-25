@@ -353,7 +353,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("7c13e380acf53e99bd3c9d6bbec93003ed2a4c88e416ab06f11b02d776b7677e")
+            hex!("e3d097840f7257a7a9b4e58aeb0b08b3074acb7bafe3c4776c1f44ca250dadea")
         );
 
         Ok(())

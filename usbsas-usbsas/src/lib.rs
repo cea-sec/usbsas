@@ -8,6 +8,7 @@ use usbsas_proto::common::{device::Device, AnalyzeReport, FsType, TransferReport
 
 type Devices = HashMap<u64, Device>;
 
+#[derive(Debug)]
 struct TransferFiles {
     files: Vec<String>,
     directories: Vec<String>,
@@ -28,6 +29,7 @@ impl TransferFiles {
     }
 }
 
+#[derive(Debug)]
 struct Transfer {
     src: Device,
     dst: Device,
