@@ -7,3 +7,4 @@ xserver-xorg-video-amdgpu
 xserver-xorg-video-ati
 xserver-xorg-video-vesa
 xserver-xorg-video-nouveau
+xserver-xorg-input-evdev

@@ -12,8 +12,7 @@ Since it runs from RAM, a machine with at least 4GB is recommended. Half of it
 will be dedicated to /tmp (tmpfs) and 3 times the size of a transfer is needed
 in /tmp for each transfer.
 
-This live-iso should only be used for testing usbsas, unless it is rebuilt
-regularly to have an up-to-date clamAV database.
+This live-iso should only be used to try usbsas.
 
 # Build the image
 
@@ -31,5 +30,4 @@ The resulting image will be `usbsas-X.Y.Z-amd64.hybrid.iso`.
 # How to use
 
 `dd` the image to a USB drive or burn it on a cdrom. Once booted, the bootable
-medium can be removed. Since the userland HID manager is used, only basic mouses
-and touch screen are supported.
+medium can be removed.
