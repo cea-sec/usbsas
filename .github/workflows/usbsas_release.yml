@@ -36,7 +36,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: usbsas-live-iso
-          path: ./live-iso/usbsas-*.iso
+          path: ./debian/live-iso/usbsas-*.iso
   release:
     name: Github release draft
     needs: [build-all]
