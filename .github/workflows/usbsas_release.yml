@@ -13,7 +13,7 @@ jobs:
   build-all:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -41,6 +41,8 @@ jobs:
     name: Github release draft
     needs: [build-all]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download usbsas deb packages
         uses: actions/download-artifact@v4
@@ -59,7 +61,7 @@ jobs:
           echo "U_PKG_HID=$(ls usbsas-hid*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_ISO=$(ls usbsas-*.hybrid.iso)" >> "$GITHUB_OUTPUT"
       - name: Create draft release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: |
