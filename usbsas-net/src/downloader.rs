@@ -80,7 +80,7 @@ impl RunningState {
                     match self.archive_infos(comm, &req.path) {
                         Ok(size) => filesize = Some(size),
                         Err(err) => {
-                            error!("download error: {}", err);
+                            error!("download error: {err}");
                             comm.error(err)?;
                         }
                     };
@@ -88,7 +88,7 @@ impl RunningState {
                 Msg::Download(_) => {
                     if let Some(size) = filesize {
                         if let Err(err) = self.download(comm, size) {
-                            error!("download error: {}", err);
+                            error!("download error: {err}");
                             comm.error(err)?;
                         };
                         return Ok(State::WaitEnd(WaitEndState {}));
@@ -128,7 +128,7 @@ impl RunningState {
             .parse::<u64>()
             .map_err(|_| Error::BadResponse)?;
 
-        trace!("files size: {}", size);
+        trace!("files size: {size}");
 
         comm.archiveinfos(proto::downloader::ResponseArchiveInfos { size })?;
 
@@ -206,7 +206,7 @@ impl Downloader {
                     State::WaitEnd(WaitEndState {})
                 }
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

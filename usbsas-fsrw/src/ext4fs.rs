@@ -84,7 +84,7 @@ impl<T: ReadAt> FSRead<T> for Ext4<T> {
                     }
                 }
                 Err(err) => {
-                    log::error!("read error: {}", err);
+                    log::error!("read error: {err}");
                     return Err(Error::IO(err));
                 }
             }

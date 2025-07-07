@@ -32,12 +32,12 @@ fn recv(comm: Arc<Mutex<ComRqUsbsas>>) -> impl Stream<Item = Status> {
                     }
                     Err(err) => {
                         done = true;
-                        Status::Error(format!("{}", err))
+                        Status::Error(format!("{err}"))
                     }
                 },
                 Err(err) => {
                     done = true;
-                    Status::Error(format!("{}", err))
+                    Status::Error(format!("{err}"))
                 }
             };
             let _ = output.send(status).await;

@@ -52,7 +52,7 @@ impl<T: Read + Seek> FSRead<T> for Iso9660<T> {
     }
 
     fn get_attr(&mut self, path: &str) -> Result<(FileType, u64, i64)> {
-        log::trace!("get_attr: '{}'", path);
+        log::trace!("get_attr: '{path}'");
         let (ftype, size, ts) = match isobject_from_path(&self.fs, path)? {
             DirectoryEntry::Directory(dir) => (FileType::Directory, 0, dir.time()),
             DirectoryEntry::File(file) => (FileType::Regular, file.size() as u64, file.time()),
@@ -61,7 +61,7 @@ impl<T: Read + Seek> FSRead<T> for Iso9660<T> {
     }
 
     fn read_dir(&mut self, path: &str) -> Result<Vec<FileInfo>> {
-        log::trace!("read_dir: '{}'", path);
+        log::trace!("read_dir: '{path}'");
         let dir = isodir_from_path(&self.fs, path)?;
         let mut entries: Vec<FileInfo> = Vec::new();
         for entry in dir.contents() {
@@ -87,7 +87,7 @@ impl<T: Read + Seek> FSRead<T> for Iso9660<T> {
         offset: u64,
         bytes_to_read: u64,
     ) -> Result<u64> {
-        log::trace!("read_file: '{}'", path);
+        log::trace!("read_file: '{path}'");
         let file = isofile_from_path(&self.fs, path)?;
         let mut file_reader = file.read();
         file_reader.seek(SeekFrom::Start(offset))?;
@@ -104,7 +104,7 @@ impl<T: Read + Seek> FSRead<T> for Iso9660<T> {
                     }
                 }
                 Err(err) => {
-                    log::error!("read error: {}", err);
+                    log::error!("read error: {err}");
                     return Err(err.into());
                 }
             }

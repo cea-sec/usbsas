@@ -77,7 +77,7 @@ fn handle_udev_events(
     let mut cur_dev = current_devices.lock()?;
     cur_dev.usb_port_accesses = config.usb_port_accesses;
     if let Some(usb_ports) = &cur_dev.usb_port_accesses {
-        log::debug!("usb_port_accesses: {:?}", usb_ports);
+        log::debug!("usb_port_accesses: {usb_ports:?}");
     };
 
     for dev in enumerator.scan_devices()? {
@@ -87,7 +87,7 @@ fn handle_udev_events(
                 || value.to_string_lossy().contains(":080250:")
             {
                 if let Err(err) = cur_dev.add_device(&dev) {
-                    log::error!("Couldn't add dev {:?} ({})", dev, err);
+                    log::error!("Couldn't add dev {dev:?} ({err})");
                 }
             }
         }
@@ -339,7 +339,7 @@ impl RunningState {
             match res {
                 Ok(_) => continue,
                 Err(err) => {
-                    error!("{}", err);
+                    error!("{err}");
                     comm.error(err)?;
                 }
             }
@@ -387,7 +387,7 @@ impl UsbDev {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

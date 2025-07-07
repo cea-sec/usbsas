@@ -296,7 +296,7 @@ impl GUI {
                                         if let Err(err) =
                                             serde_json::to_writer_pretty(&mut file, report)
                                         {
-                                            log::error!("Error writing report: {}", err);
+                                            log::error!("Error writing report: {err}");
                                         };
                                     };
                                 };

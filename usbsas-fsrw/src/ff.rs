@@ -17,7 +17,7 @@ impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
     }
 
     fn get_attr(&mut self, path: &str) -> Result<(FileType, u64, i64)> {
-        log::trace!("get attr {}", path);
+        log::trace!("get attr {path}");
         if path.is_empty() || path == "/" {
             // can't stat root dir
             return Ok((FileType::Directory, 0, 0));
@@ -34,7 +34,7 @@ impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
     }
 
     fn read_dir(&mut self, path: &str) -> Result<Vec<FileInfo>> {
-        log::trace!("readdir {}", path);
+        log::trace!("readdir {path}");
         Ok(self
             .fs
             .read_dir(path)
@@ -60,7 +60,7 @@ impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
         offset: u64,
         bytes_to_read: u64,
     ) -> Result<u64> {
-        log::trace!("read_file {}", path);
+        log::trace!("read_file {path}");
         self.fs
             .read_file(path, buf, offset, bytes_to_read)
             .map_err(|err| err.into())
@@ -97,14 +97,14 @@ impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
     }
 
     fn newfile(&mut self, path: &str, _timestamp: i64) -> Result<Box<dyn WriteSeek + '_>> {
-        log::trace!("new file {}", path);
+        log::trace!("new file {path}");
         Ok(Box::new(self.fs.new_file(path).map_err(|err| {
             Error::FSError(format!("Couldn't create file {path}: {err}"))
         })?))
     }
 
     fn newdir(&mut self, path: &str, timestamp: i64) -> Result<()> {
-        log::trace!("new dir: {}", path);
+        log::trace!("new dir: {path}");
         self.fs
             .new_dir(path)
             .map_err(|err| Error::FSError(format!("Couldn't create dir {path}: {err}")))?;
@@ -113,7 +113,7 @@ impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
     }
 
     fn removefile(&mut self, path: &str) -> Result<()> {
-        log::trace!("rm file {}", path);
+        log::trace!("rm file {path}");
         self.fs
             .remove_file(path)
             .map_err(|err| Error::FSError(format!("Couldn't rm file {path}: {err}")))?;

@@ -113,7 +113,7 @@ impl RunningState {
             match res {
                 Ok(_) => continue,
                 Err(err) => {
-                    error!("{}", err);
+                    error!("{err}");
                     comm.error(err)?;
                 }
             }
@@ -145,7 +145,7 @@ impl RunningState {
     }
 
     fn exec_cmd(&self, binpath: String, args: Vec<String>) -> Result<()> {
-        info!("executing {} {:?}", binpath, args);
+        info!("executing {binpath} {args:?}");
         match Command::new(binpath)
             .args(args)
             .stdout(Stdio::piped())
@@ -157,10 +157,10 @@ impl RunningState {
                     if !output.status.success() {
                         error!("cmd failed");
                         if let Ok(out_result) = String::from_utf8(output.stdout) {
-                            error!("cmd stdout: {}", out_result);
+                            error!("cmd stdout: {out_result}");
                         }
                         if let Ok(err_result) = String::from_utf8(output.stderr) {
-                            error!("cmd stderr: {}", err_result);
+                            error!("cmd stderr: {err_result}");
                         }
                         return Err(Error::Exec("Cmd failed".into()));
                     }
@@ -221,7 +221,7 @@ impl CmdExec {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}", err);
+                    error!("state run error: {err}");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
