@@ -106,7 +106,7 @@ impl MassStorage {
         Ok(self
             .scsiusb
             .write()
-            .map_err(|err| Error::Error(format!("write lock error: {}", err)))?
+            .map_err(|err| Error::Error(format!("write lock error: {err}")))?
             .read_sectors(offset, count, block_size)?)
     }
 

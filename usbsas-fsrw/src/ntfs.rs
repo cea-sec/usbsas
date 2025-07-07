@@ -27,7 +27,7 @@ impl<T: Read + Write + Seek> FSWrite<T> for NTFS3G<T> {
     }
 
     fn newfile(&mut self, path: &str, timestamp: i64) -> Result<Box<dyn WriteSeek + '_>> {
-        log::trace!("new file {}", path);
+        log::trace!("new file {path}");
         let file: Box<dyn WriteSeek> = Box::new(
             self.volume
                 .new_file(path, timestamp)
@@ -37,14 +37,14 @@ impl<T: Read + Write + Seek> FSWrite<T> for NTFS3G<T> {
     }
 
     fn newdir(&mut self, path: &str, timestamp: i64) -> Result<()> {
-        log::trace!("new dir {}", path);
+        log::trace!("new dir {path}");
         self.volume
             .new_dir(path, timestamp)
             .map_err(|err| Error::FSError(format!("Couldn't create dir {path}: {err}")))
     }
 
     fn removefile(&mut self, path: &str) -> Result<()> {
-        log::trace!("remove file {}", path);
+        log::trace!("remove file {path}");
         self.volume
             .remove_file(path)
             .map_err(|err| Error::FSError(format!("Couldn't remove file {path}: {err}")))
@@ -180,7 +180,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
     }
 
     fn get_attr(&mut self, path: &str) -> Result<(FileType, u64, i64)> {
-        log::trace!("get attr: {}", path);
+        log::trace!("get attr: {path}");
         let ntfs_file =
             ntfs_file_from_path(&self.fs, &mut self.reader, path, &mut self.file_cache)?;
         let file_type = if ntfs_file.is_directory() {
@@ -196,7 +196,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
     }
 
     fn read_dir(&mut self, path: &str) -> Result<Vec<FileInfo>> {
-        log::trace!("readdir {}", path);
+        log::trace!("readdir {path}");
         let ntfs_dir = ntfs_file_from_path(&self.fs, &mut self.reader, path, &mut self.file_cache)?;
         let mut ntfs_entries: BTreeMap<u64, FileInfo> = BTreeMap::new();
 
@@ -271,7 +271,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
                     }
                 }
                 Err(err) => {
-                    log::error!("read error: {}", err);
+                    log::error!("read error: {err}");
                     return Err(err.into());
                 }
             }

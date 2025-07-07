@@ -148,7 +148,7 @@ impl WaitFsInfosState {
         let out_fs_type =
             FsType::try_from(fstype).map_err(|err| Error::FSError(format!("{err}")))?;
 
-        log::debug!("mkfs dev_size: {}", dev_size);
+        log::debug!("mkfs dev_size: {dev_size}");
 
         let fs_size = dev_size - (SECTOR_START * SECTOR_SIZE);
         if fs_size % SECTOR_SIZE != 0 {
@@ -268,7 +268,7 @@ impl WaitNewFileState {
                 match self.fs.newdir(&path, timestamp) {
                     Ok(_) => comm.newfile(proto::writedst::ResponseNewFile {})?,
                     Err(err) => {
-                        warn!("{}", err);
+                        warn!("{err}");
                         comm.error(err)?;
                     }
                 }
@@ -286,7 +286,7 @@ impl WaitNewFileState {
 impl WritingFileState {
     fn run(mut self, comm: &mut ComRpWriteDst) -> Result<State> {
         if let Err(err) = self.write_file(comm) {
-            error!("Error writing file: {}", err);
+            error!("Error writing file: {err}");
             comm.error(&err)?;
             if let Error::State = err {
                 return Ok(State::WaitEnd(WaitEndState {}));
@@ -311,7 +311,7 @@ impl WritingFileState {
                         return Err(Error::FSError("sparse write not supported".into()));
                     }
                     if let Err(err) = file.write_all(&msg.data) {
-                        error!("Error writing file: {}, deleting file", err);
+                        error!("Error writing file: {err}, deleting file");
                         // drop to close file
                         drop(file);
                         self.fs.removefile(&self.path)?;
@@ -428,7 +428,7 @@ impl Files2Fs {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}", err);
+                    error!("state run error: {err}");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

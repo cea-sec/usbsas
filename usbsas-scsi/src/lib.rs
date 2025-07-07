@@ -323,7 +323,7 @@ impl<T: UsbContext> ScsiUsb<T> {
 
     pub fn init_mass_storage(&mut self) -> Result<(u32, u32, u64), io::Error> {
         let max_lun = self.get_max_lun();
-        debug!("init mass storage. Luns: {}", max_lun);
+        debug!("init mass storage. Luns: {max_lun}");
         // Store luns which Direct access device set
         let mut lun_dad = vec![];
         for lun in 0..=max_lun {
@@ -331,7 +331,7 @@ impl<T: UsbContext> ScsiUsb<T> {
             let mut buffer: [u8; 36] = [0; 36];
             self.scsi_inquiry(&mut buffer)?;
             let device_type = buffer[0] & 0x1f;
-            debug!("Lun {} of type {}", lun, device_type);
+            debug!("Lun {lun} of type {device_type}");
             if device_type == SCSI_DEV_TYPE_DIRECT_ACCESS_BLOCK_DEVICE
                 || device_type == SCSI_DEV_TYPE_CD_DVD
             {
@@ -339,13 +339,13 @@ impl<T: UsbContext> ScsiUsb<T> {
             }
         }
 
-        debug!("Direct access devices luns: {:?}", lun_dad);
+        debug!("Direct access devices luns: {lun_dad:?}");
 
         /* For each lun, test if ready or not present, stop at first lun ready  */
 
         let mut is_ok = false;
         'outer: for lun in lun_dad.iter() {
-            debug!("Test lun {}", lun);
+            debug!("Test lun {lun}");
             self.lun = Some(*lun);
             let mut buffer: [u8; 36] = [0; 36];
             self.scsi_inquiry(&mut buffer)?;
@@ -360,8 +360,8 @@ impl<T: UsbContext> ScsiUsb<T> {
                         break 'outer;
                     }
                     Ok(ret) => {
-                        debug!("Test unit response {}", ret);
-                        debug!("Test unit buffer {:?}", buffer);
+                        debug!("Test unit response {ret}");
+                        debug!("Test unit buffer {buffer:?}");
 
                         let mut buffer: [u8; 18] = [0; 18];
                         /*
@@ -370,8 +370,8 @@ impl<T: UsbContext> ScsiUsb<T> {
                          */
                         match self.scsi_request_sense(&mut buffer) {
                             Ok(ret) => {
-                                debug!("Request Sense {}", ret);
-                                debug!("Request Sense buffer {:?}", buffer);
+                                debug!("Request Sense {ret}");
+                                debug!("Request Sense buffer {buffer:?}");
                                 if buffer[0] & 0x70 == 0x70 {
                                     /* Sense response error code */
                                     match buffer[2] & 0xF {

@@ -302,7 +302,7 @@ impl InitState {
             devices.remove(&req.source),
             devices.remove(&req.destination),
         ) {
-            log::info!("Init transfer from {:?} to {:?} for {:?}", src, dst, userid);
+            log::info!("Init transfer from {src:?} to {dst:?} for {userid:?}");
 
             // Get max size of destination
             let max_dst_size = if let Device::Usb(ref mut usbdev) = dst {
@@ -647,7 +647,7 @@ impl FileSelectionState {
             }) {
                 Ok(rep) => rep,
                 Err(err) => {
-                    error!("get attr '{}' err '{}'", entry, err);
+                    error!("get attr '{entry}' err '{err}'");
                     self.transfer.files.errors.push(entry);
                     continue;
                 }
@@ -713,7 +713,7 @@ impl FileSelectionState {
             .chain(self.transfer.files.files.iter())
         {
             if let Err(err) = self.file_to_tar(comm, children, path, &mut current, total_size) {
-                error!("Couldn't copy file '{}': {}", path, err);
+                error!("Couldn't copy file '{path}': {err}");
                 self.transfer.files.errors.push(path.clone());
             };
         }
@@ -1266,7 +1266,7 @@ impl RunState for EndState {
                     break;
                 }
                 unxp => {
-                    comm.error(format!("Unexpected request: {:?}", unxp))?;
+                    comm.error(format!("Unexpected request: {unxp:?}"))?;
                     continue;
                 }
             };

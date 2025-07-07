@@ -51,7 +51,7 @@ impl RunningState {
                             })?;
                         }
                         Err(err) => {
-                            error!("couldn't parse resp: {}", err);
+                            error!("couldn't parse resp: {err}");
                             comm.error("couldn't parse response from server")?;
                         }
                     };
@@ -64,7 +64,7 @@ impl RunningState {
                             })?;
                         }
                         Err(err) => {
-                            error!("couldn't parse resp: {}", err);
+                            error!("couldn't parse resp: {err}");
                             comm.error("couldn't parse analyze report from server")?;
                         }
                     }
@@ -117,7 +117,7 @@ impl JsonParser {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

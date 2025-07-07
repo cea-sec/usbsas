@@ -114,7 +114,7 @@ impl ChildStartedState {
         match comm.recv_req()? {
             Msg::OpenDevice(req) => {
                 if let Err(err) = self.opendevice(comm, req.busnum, req.devnum) {
-                    error!("err open device: {}, waiting end", err);
+                    error!("err open device: {err}, waiting end");
                     comm.error(err)?;
                     return Ok(State::WaitEnd(WaitEndState {
                         child_comm: Some(self.usb_mass.comm.clone()),
@@ -234,13 +234,13 @@ impl PartitionsListedState {
         comm: &mut ComRpFiles,
         index: u32,
     ) -> Result<Box<dyn FSRead<MassStorageComm>>> {
-        trace!("req open partition {}", index);
+        trace!("req open partition {index}");
         let part_infos = if let Some(infos) = self.partitions_infos.get(index as usize) {
             infos
         } else {
             return Err(Error::Partition("Partition not found".into()));
         };
-        log::info!("Reading partition: {:?}", part_infos);
+        log::info!("Reading partition: {part_infos:?}");
         self.usb_mass.partition_sector_start = part_infos.start;
         let sector_size = self.usb_mass.block_size;
         let fs: Box<dyn FSRead<MassStorageComm>> = match part_infos.type_str.as_str() {
@@ -276,7 +276,7 @@ impl PartitionOpenedState {
     }
 
     fn getattr(&mut self, comm: &mut ComRpFiles, path: String) -> Result<()> {
-        trace!("req getattr {}", path);
+        trace!("req getattr {path}");
         let (ftype, size, timestamp) = self.fs.get_attr(&path)?;
         comm.getattr(proto::files::ResponseGetAttr {
             ftype: ftype.into(),
@@ -287,7 +287,7 @@ impl PartitionOpenedState {
     }
 
     fn readdir(&mut self, comm: &mut ComRpFiles, path: String) -> Result<()> {
-        trace!("req readdir {}", path);
+        trace!("req readdir {path}");
         comm.readdir(proto::files::ResponseReadDir {
             filesinfo: self.fs.read_dir(&path)?,
         })?;
@@ -353,7 +353,7 @@ impl Scsi2Files {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState { child_comm: None })
                 }

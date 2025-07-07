@@ -147,7 +147,7 @@ impl InitState {
         let busnum = comm.read_u32::<LittleEndian>()?;
         let devnum = comm.read_u32::<LittleEndian>()?;
 
-        debug!("unlocked with busnum={} devnum={}", busnum, devnum);
+        debug!("unlocked with busnum={busnum} devnum={devnum}");
 
         if busnum == 0 && devnum == 0 {
             #[cfg(not(feature = "mock"))]
@@ -159,7 +159,7 @@ impl InitState {
 
         #[cfg(not(feature = "mock"))]
         let (device_file, device_fd) = {
-            let device_path = format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum);
+            let device_path = format!("/dev/bus/usb/{busnum:03}/{devnum:03}");
             match std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -170,7 +170,7 @@ impl InitState {
                     (file, file_fd)
                 }
                 Err(err) => {
-                    error!("Error opening device file: {}", err);
+                    error!("Error opening device file: {err}");
                     comm.error(err)?;
                     return Ok(State::WaitEnd(WaitEndState {}));
                 }
@@ -207,7 +207,7 @@ impl CopyingState {
 
         let total_size = self.fs_bv.count_ones() as u64 * SECTOR_SIZE;
 
-        trace!("state=copying: size={} ", total_size);
+        trace!("state=copying: size={total_size} ");
 
         let mut current_size = 0u64;
         let mut buffer = vec![0; BUFFER_MAX_WRITE_SIZE as usize];
@@ -263,12 +263,7 @@ impl WipingState {
         );
 
         while todo > 0 {
-            trace!(
-                "wipe cur size: {}, sector index: {}, todo: {}",
-                current_size,
-                sector_index,
-                todo
-            );
+            trace!("wipe cur size: {current_size}, sector index: {sector_index}, todo: {todo}",);
             if todo < buffer.len() as u64 {
                 sector_count = todo / SECTOR_SIZE;
                 buffer.truncate(todo as usize);
@@ -402,7 +397,7 @@ impl Fs2Dev {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error("bad request")?;
                     State::WaitEnd(WaitEndState {})
                 }

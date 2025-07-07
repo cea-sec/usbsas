@@ -230,11 +230,11 @@ impl GUI {
                     Ok(true) => (),
                     Ok(false) => {
                         if let Err(err) = fs::create_dir(path) {
-                            panic!("Can't create report directory \"{}\" ({})", path, err);
+                            panic!("Can't create report directory \"{path}\" ({err})");
                         }
                     }
                     Err(err) => {
-                        panic!("Can't check existence of \"{}\": {}", path, err);
+                        panic!("Can't check existence of \"{path}\": {err}");
                     }
                 }
             };

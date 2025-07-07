@@ -138,7 +138,7 @@ impl LoadMetadataState {
                     },
                 );
             } else {
-                log::debug!("file '{}' not in '{}' dir, ignoring", path_name, data_dir);
+                log::debug!("file '{path_name}' not in '{data_dir}' dir, ignoring");
             }
         }
 
@@ -169,7 +169,7 @@ impl MainLoopState {
             match res {
                 Ok(_) => continue,
                 Err(err) => {
-                    error!("{}", err);
+                    error!("{err}");
                     comm.error(err)?;
                 }
             }
@@ -184,7 +184,7 @@ impl MainLoopState {
     }
 
     fn getattr(&mut self, comm: &mut ComRpFiles, path: &str) -> Result<()> {
-        trace!("req_getattr: {}", path);
+        trace!("req_getattr: {path}");
         let entry = self.get_entry(path)?;
         Ok(comm.getattr(proto::files::ResponseGetAttr {
             ftype: entry.ftype.into(),
@@ -200,7 +200,7 @@ impl MainLoopState {
         file_offset: u64,
         size: usize,
     ) -> Result<()> {
-        debug!("req_readfile {}", path);
+        debug!("req_readfile {path}");
 
         if size as u64 > READ_FILE_MAX_SIZE {
             return Err(Error::Error("max read size exceeded".to_string()));
@@ -217,7 +217,7 @@ impl MainLoopState {
     }
 
     fn readdir(&mut self, comm: &mut ComRpFiles, path: &str) -> Result<()> {
-        debug!("req read_dir {}", path);
+        debug!("req read_dir {path}");
         let path = path.trim_start_matches('/');
         let filesinfo = self
             .metadata
@@ -277,7 +277,7 @@ impl Tar2Files {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}", err);
+                    error!("state run error: {err}");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

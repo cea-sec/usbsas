@@ -133,7 +133,7 @@ impl RunningState {
                 }
             }
             Err(err) => {
-                error!("upload for scan err: {}", err);
+                error!("upload for scan err: {err}");
                 return Err(err);
             }
         }
@@ -253,7 +253,7 @@ impl Analyzer {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

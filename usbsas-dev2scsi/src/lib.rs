@@ -89,7 +89,7 @@ impl InitState {
         let busnum = LittleEndian::read_u32(&buf[0..4]);
         let devnum = LittleEndian::read_u32(&buf[4..8]);
 
-        debug!("unlocked, busnum: {} devnum: {}", busnum, devnum);
+        debug!("unlocked, busnum: {busnum} devnum: {devnum}");
 
         // If the process is unlocked with 0-0, usbsas is resetting, go directly to the EndState
         if busnum == 0 && devnum == 0 {
@@ -100,7 +100,7 @@ impl InitState {
 
         #[cfg(not(feature = "mock"))]
         let (device_file, device_fd) = {
-            let device_path = format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum);
+            let device_path = format!("/dev/bus/usb/{busnum:03}/{devnum:03}");
             match std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -111,7 +111,7 @@ impl InitState {
                     (file, file_fd)
                 }
                 Err(err) => {
-                    error!("Error opening device file: {}", err);
+                    error!("Error opening device file: {err}");
                     comm.error(err)?;
                     return Ok(State::WaitEnd(WaitEndState {}));
                 }
@@ -127,7 +127,7 @@ impl InitState {
         let usb_mass_storage = match MassStorage::from_opened_file(device_file) {
             Ok(ums) => ums,
             Err(err) => {
-                error!("Init mass storage error: {}, waiting end", err);
+                error!("Init mass storage error: {err}, waiting end");
                 comm.error(err)?;
                 return Ok(State::WaitEnd(WaitEndState {}));
             }
@@ -152,7 +152,7 @@ impl DevOpenedState {
                 Msg::Partitions(_) => match self.partitions(comm) {
                     Ok(_) => break,
                     Err(err) => {
-                        error!("{}", err);
+                        error!("{err}");
                         comm.error(err)?;
                     }
                 },
@@ -164,7 +164,7 @@ impl DevOpenedState {
                     ) {
                         Ok(data) => comm.readsectors(proto::scsi::ResponseReadSectors { data })?,
                         Err(err) => {
-                            error!("{}", err);
+                            error!("{err}");
                             comm.error(err)?;
                         }
                     }
@@ -225,7 +225,7 @@ impl DevOpenedState {
                                 0x83  // Linux
                                     => *type_code as u32,
                                 _ => {
-                                    warn!("Unsupported partition type: {}", type_code);
+                                    warn!("Unsupported partition type: {type_code}");
                                     0
                                 }
                             };
@@ -241,7 +241,7 @@ impl DevOpenedState {
                 }
             }
             Err(err) => {
-                warn!("error listing partitions (maybe no mbr ?): {}", err);
+                warn!("error listing partitions (maybe no mbr ?): {err}");
             }
         };
 
@@ -377,7 +377,7 @@ impl PartitionsListedState {
                     ) {
                         Ok(data) => comm.readsectors(proto::scsi::ResponseReadSectors { data })?,
                         Err(err) => {
-                            error!("{}", err);
+                            error!("{err}");
                             comm.error(err)?;
                         }
                     }
@@ -430,7 +430,7 @@ impl Dev2Scsi {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

@@ -207,7 +207,7 @@ impl HttpClient {
                         resp_ret = Some(resp);
                     }
                     Err(err) => {
-                        log::error!("{}", err);
+                        log::error!("{err}");
                         return Err(Error::Nego);
                     }
                 }

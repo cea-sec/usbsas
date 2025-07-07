@@ -684,7 +684,7 @@ impl GUI {
                 }
                 if let Status::Error(err) = status {
                     col_messages = col_messages.push(
-                        text(format!("❌ {}", err))
+                        text(format!("❌ {err}"))
                             .size(TXT_SIZE)
                             .shaping(text::Shaping::Advanced),
                     );
@@ -898,7 +898,7 @@ impl GUI {
             button_row = button_row
                 .push(Space::new(Length::Fixed(10.0), Length::Fixed(OPT_SIZE)))
                 .push(
-                    text(format!("👤 {}", id))
+                    text(format!("👤 {id}"))
                         .shaping(text::Shaping::Advanced)
                         .size(HEADER_SIZE)
                         .align_y(Alignment::Center),

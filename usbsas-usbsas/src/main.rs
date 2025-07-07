@@ -42,7 +42,7 @@ fn main_loop(
             Ok(State::Exit) => break,
             Ok(state) => state,
             Err(err) => {
-                error!("{}, waiting end", err);
+                error!("{err}, waiting end");
                 comm.error(&err)?;
                 State::End(EndState { report: None })
             }
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
     };
 
     usbsas_utils::log::init_logger();
-    info!("init {} ({})", session_id, std::process::id());
+    info!("init {session_id} ({})", std::process::id());
 
     let config_path = matches.get_one::<String>("config").unwrap();
     let config = conf_parse(&conf_read(config_path)?)?;

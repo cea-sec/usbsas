@@ -87,7 +87,7 @@ fn report(
         Vec::new()
     };
     TransferReport {
-        title: format!("{}_{}_{}", title, datetime, transfer_id),
+        title: format!("{title}_{datetime}_{transfer_id}"),
         datetime,
         hostname,
         timestamp: time.unix_timestamp(),

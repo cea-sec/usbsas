@@ -79,7 +79,7 @@ pub struct Config {
 }
 
 pub fn conf_read(config_path: &str) -> io::Result<String> {
-    log::debug!("read config file: {}", config_path);
+    log::debug!("read config file: {config_path}");
     fs::read_to_string(config_path)
 }
 

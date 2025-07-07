@@ -75,7 +75,7 @@ impl RunningState {
         match comm.recv_req()? {
             Msg::Upload(req) => {
                 if let Err(err) = self.upload(comm, req) {
-                    error!("upload error: {}", err);
+                    error!("upload error: {err}");
                     comm.error(err)?;
                 };
                 Ok(State::WaitEnd(WaitEndState {}))
@@ -169,7 +169,7 @@ impl Uploader {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}, waiting end", err);
+                    error!("state run error: {err}, waiting end");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }

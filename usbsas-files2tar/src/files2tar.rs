@@ -174,7 +174,7 @@ impl Files2Tar {
                 Ok(State::End) => break,
                 Ok(state) => state,
                 Err(err) => {
-                    error!("state run error: {}", err);
+                    error!("state run error: {err}");
                     comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
