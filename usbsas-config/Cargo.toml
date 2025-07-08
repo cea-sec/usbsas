@@ -7,4 +7,4 @@ license = "GPL-3.0"
 [dependencies]
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
+toml = "0.9"
