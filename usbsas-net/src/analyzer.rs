@@ -52,15 +52,15 @@ impl InitState {
     fn run(self, _comm: &mut ComRpAnalyzer) -> Result<State> {
         let json_parser_path = format!("{}/{}", usbsas_utils::USBSAS_BIN_PATH, "usbsas-jsonparser");
         usbsas_sandbox::landlock(
-            Some(&[
-                &self.tarpath,
-                &self.config_path,
-                "/etc",
-                "/lib",
-                "/usr/lib/",
-                "/var/lib/usbsas",
-                &json_parser_path,
-            ]),
+            Some(
+                &[
+                    crate::NET_PATHS_RO,
+                    #[cfg(feature = "authkrb")]
+                    crate::KRB5_PATHS_RO,
+                    &[&self.tarpath, &self.config_path, &json_parser_path],
+                ]
+                .concat(),
+            ),
             None,
             Some(&[&json_parser_path]),
         )?;

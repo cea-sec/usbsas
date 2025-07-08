@@ -41,13 +41,15 @@ struct WaitEndState {}
 impl InitState {
     fn run(self, _comm: &mut ComRpDownloader) -> Result<State> {
         usbsas_sandbox::landlock(
-            Some(&[
-                &self.config_path,
-                "/etc",
-                "/lib",
-                "/usr/lib/",
-                "/var/lib/usbsas",
-            ]),
+            Some(
+                &[
+                    crate::NET_PATHS_RO,
+                    #[cfg(feature = "authkrb")]
+                    crate::KRB5_PATHS_RO,
+                    &[&self.config_path],
+                ]
+                .concat(),
+            ),
             Some(&[&self.tarpath]),
             None,
         )?;

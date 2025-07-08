@@ -39,14 +39,15 @@ impl InitState {
     fn run(mut self, comm: &mut ComRpUploader) -> Result<State> {
         let cleantarpath = format!("{}_clean.tar", self.tarpath.trim_end_matches(".tar"));
         usbsas_sandbox::landlock(
-            Some(&[
-                &self.tarpath,
-                &cleantarpath,
-                "/etc",
-                "/lib",
-                "/usr/lib/",
-                "/var/lib/usbsas",
-            ]),
+            Some(
+                &[
+                    crate::NET_PATHS_RO,
+                    #[cfg(feature = "authkrb")]
+                    crate::KRB5_PATHS_RO,
+                    &[&self.tarpath, &cleantarpath],
+                ]
+                .concat(),
+            ),
             None,
             None,
         )?;
