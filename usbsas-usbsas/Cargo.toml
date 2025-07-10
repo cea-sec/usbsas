@@ -29,7 +29,7 @@ nix = { version = "0.30", features = ["process", "signal"] }
 reqwest = { version = "0.12", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
-toml = "0.8"
+toml = "0.9"
 
 [features]
 mock = []
