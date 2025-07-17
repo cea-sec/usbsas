@@ -33,6 +33,25 @@ use usbsas_proto::common::Status;
 
 use thiserror::Error;
 
+const NET_PATHS_RO: &'static [&'static str] = &[
+    "/etc/host.conf",
+    "/etc/hosts",
+    "/etc/localtime",
+    "/etc/ssl",
+    "/etc/openssl",
+    "/etc/resolv.conf",
+    "/usr/lib/",
+    "/lib/",
+    "/var/lib/usbsas",
+];
+#[cfg(feature = "authkrb")]
+const KRB5_PATHS_RO: &'static [&'static str] = &[
+    "/etc/gss",
+    "/etc/krb5",
+    "/etc/krb5.conf",
+    "/etc/krb5.conf.d",
+];
+
 struct FileReaderProgress<T> {
     comm: T,
     file: File,
