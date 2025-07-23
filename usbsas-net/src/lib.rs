@@ -33,7 +33,7 @@ use usbsas_proto::common::Status;
 
 use thiserror::Error;
 
-const NET_PATHS_RO: &'static [&'static str] = &[
+const NET_PATHS_RO: &[&str] = &[
     "/etc/host.conf",
     "/etc/hosts",
     "/etc/localtime",
@@ -45,7 +45,7 @@ const NET_PATHS_RO: &'static [&'static str] = &[
     "/var/lib/usbsas",
 ];
 #[cfg(feature = "authkrb")]
-const KRB5_PATHS_RO: &'static [&'static str] = &[
+const KRB5_PATHS_RO: &[&str] = &[
     "/etc/gss",
     "/etc/krb5",
     "/etc/krb5.conf",

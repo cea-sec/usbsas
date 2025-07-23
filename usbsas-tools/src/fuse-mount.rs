@@ -74,7 +74,7 @@ struct UsbsasFS {
 
 impl UsbsasFS {
     fn new(busnum: u32, devnum: u32, partnum: u32) -> Result<Self> {
-        log::debug!("Opening device {} {}", busnum, devnum);
+        log::debug!("Opening device {busnum} {devnum}");
         let mut scsi2files = UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<ComRqFiles>()?;
         let _ = scsi2files
             .comm
@@ -83,10 +83,10 @@ impl UsbsasFS {
             .comm
             .partitions(proto::files::RequestPartitions {})?;
         if partnum as usize >= parts.partitions.len() {
-            log::error!("Couldn't open part number {}", partnum);
+            log::error!("Couldn't open part number {partnum}");
             return Err(Error::Partition("Partition not found".into()));
         }
-        log::debug!("Opening partition {}", partnum);
+        log::debug!("Opening partition {partnum}");
         if let Err(err) = scsi2files
             .comm
             .openpartition(proto::files::RequestOpenPartition { index: partnum })
@@ -104,14 +104,14 @@ impl UsbsasFS {
 impl Drop for UsbsasFS {
     fn drop(&mut self) {
         if let Err(err) = self.scsi2files.get_mut().unwrap().comm.end() {
-            log::error!("Couldn't end scsi2files: {}", err);
+            log::error!("Couldn't end scsi2files: {err}");
         };
     }
 }
 
 impl fuse_mt::FilesystemMT for UsbsasFS {
     fn getattr(&self, _req: RequestInfo, path: &Path, _fh: Option<u64>) -> ResultEntry {
-        log::trace!("getattr: {:?}", path);
+        log::trace!("getattr: {path:?}");
         let path_str = path.to_string_lossy().to_string();
 
         if path_str == "/" {
@@ -131,7 +131,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
         {
             Ok(rep) => rep,
             Err(err) => {
-                log::error!("getattr err: {:?} {}", &path, err);
+                log::error!("getattr err: {:?} {err}", &path);
                 return Err(libc::ENOENT);
             }
         };
@@ -156,7 +156,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
         size: u32,
         callback: impl FnOnce(ResultSlice<'_>) -> CallbackResult,
     ) -> CallbackResult {
-        log::debug!("read: {:?} ({}/{})", &path, offset, size);
+        log::debug!("read: {:?} ({offset}/{size})", &path);
 
         match self
             .scsi2files
@@ -170,19 +170,19 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
             }) {
             Ok(rep) => callback(Ok(&rep.data)),
             Err(err) => {
-                log::error!("read error {:?} ({}/{}): {:?}", &path, offset, size, err);
+                log::error!("read error {:?} ({offset}/{size}): {:?}", &path, err);
                 callback(Err(libc::EIO))
             }
         }
     }
 
     fn opendir(&self, _req: RequestInfo, path: &Path, _flags: u32) -> ResultOpen {
-        log::trace!("opendir: {:?}", path);
+        log::trace!("opendir: {path:?}");
         Ok((0, 0))
     }
 
     fn readdir(&self, _req: RequestInfo, path: &Path, _fh: u64) -> ResultReaddir {
-        log::trace!("readdir: {:?}", path);
+        log::trace!("readdir: {path:?}");
         let mut dir_str = path.to_string_lossy().to_string();
 
         if dir_str == "/" {

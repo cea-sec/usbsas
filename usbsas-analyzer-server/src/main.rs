@@ -270,9 +270,9 @@ async fn head_bundle_size(
         let mut buf = vec![0; 4];
         f.read_exact(&mut buf).unwrap();
         size = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as u64;
-        log::debug!("filename: {}, uncompressed size: {}", bundle_path, size);
+        log::debug!("filename: {bundle_path}, uncompressed size: {size}");
     }
-    log::debug!("filename: {}, size: {}", bundle_path, size);
+    log::debug!("filename: {bundle_path}, size: {size}");
 
     Ok(HttpResponse::Ok()
         .insert_header(("X-Uncompressed-Content-Length", size))
@@ -312,15 +312,14 @@ struct Clamav {
 
 impl Clamav {
     fn new(working_path: &str) -> io::Result<Self> {
-        let clamav_config_path = format!("{}/clamd.conf", working_path);
-        let clamav_socket_path = format!("{}/clamd.socket", working_path);
+        let clamav_config_path = format!("{working_path}/clamd.conf");
+        let clamav_socket_path = format!("{working_path}/clamd.socket");
 
         #[cfg(not(feature = "integration-tests"))]
         std::fs::write(
             &clamav_config_path,
             format!(
-                "TemporaryDirectory {}\nLocalSocket {}\nForeground true\n",
-                working_path, clamav_socket_path
+                "TemporaryDirectory {working_path}\nLocalSocket {clamav_socket_path}\nForeground true\n",
             ),
         )?;
 
@@ -330,13 +329,12 @@ impl Clamav {
             std::fs::write(
                 &clamav_config_path,
                 format!(
-                    "TemporaryDirectory {}\nLocalSocket {}\nForeground true\nDatabaseDirectory {}/db\n",
-                    working_path, clamav_socket_path, working_path,
+                    "TemporaryDirectory {working_path}\nLocalSocket {clamav_socket_path}\nForeground true\nDatabaseDirectory {working_path}/db\n",
                 ),
             )?;
-            let _ = fs::create_dir(&format!("{}/db", working_path));
+            let _ = fs::create_dir(&format!("{working_path}/db"));
             std::fs::write(
-                &format!("{}/db/test.ndb", working_path),
+                &format!("{working_path}/db/test.ndb"),
                 "Eicar-Test-Signature:0:0:58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e444152442d414e544956495255532d544553542d46494c452124482b482a\nEicar-Test-Signature-1:0:*:574456504956416c51454651577a5263554670594e54516f554634704e304e444b5464394a45564a513046534c564e555155354551564a454c55464f56456c5753564a565579315552564e550a4c555a4a544555684a45677253436f3d0a"
             )?;
         }
@@ -373,7 +371,7 @@ impl Clamav {
         clamav_socket.read_to_string(&mut response)?;
 
         if response.trim() != "PONG" {
-            log::error!("{:#?}", response);
+            log::error!("{response:#?}");
             return Err(io::Error::other("Couldn't connect to clamd socket"));
         }
 
@@ -406,7 +404,7 @@ impl Clamav {
     }
 
     fn analyze(&mut self, path: &str) -> io::Result<Vec<String>> {
-        let response = self.cmd(&format!("CONTSCAN {}", path))?;
+        let response = self.cmd(&format!("CONTSCAN {path}"))?;
         log::debug!("{response:#?}");
         let mut dirty = Vec::new();
         if response.ends_with("OK\n") {

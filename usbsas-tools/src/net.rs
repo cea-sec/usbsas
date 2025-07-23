@@ -58,9 +58,9 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
                             log::error!("Index out of range");
                         }
                     }
-                    Err(err) => log::error!("Couldn't parse input: {}", err),
+                    Err(err) => log::error!("Couldn't parse input: {err}"),
                 },
-                Err(err) => log::error!("Couldn't read input: {}", err),
+                Err(err) => log::error!("Couldn't read input: {err}"),
             }
         };
         &networks[n]
@@ -82,7 +82,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     }
 
     if let Err(err) = uploader.comm.end() {
-        log::error!("Couldn't end uploader: {}", err);
+        log::error!("Couldn't end uploader: {err}");
     };
 
     log::info!("Bundle successfully uploaded");
@@ -114,10 +114,10 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
         .report
         .expect("not report returned");
 
-    log::info!("{:?}", report);
+    log::info!("{report:?}");
 
     if let Err(err) = analyzer.comm.end() {
-        log::error!("Couldn't end analyzer: {}", err);
+        log::error!("Couldn't end analyzer: {err}");
     };
 
     Ok(())
@@ -132,7 +132,7 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let _ = downloader
         .comm
         .archiveinfos(proto::downloader::RequestArchiveInfos {
-            path: format!("{}/{}", id, bundle_path),
+            path: format!("{id}/{bundle_path}"),
         })?
         .size;
 
@@ -150,7 +150,7 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     }
 
     if let Err(err) = downloader.comm.end() {
-        log::error!("Couldn't end downloader: {}", err);
+        log::error!("Couldn't end downloader: {err}");
     };
 
     log::info!("Bundle successfully downloaded");
