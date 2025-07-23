@@ -55,10 +55,8 @@ impl FsWriter {
         fs2dev.unlock_with((u64::from(devnum) << 32) | u64::from(busnum))?;
 
         log::info!(
-            "Writing fs '{}' on device BUS {} DEV {}",
+            "Writing fs '{}' on device BUS {busnum} DEV {devnum}",
             &fs_path,
-            busnum,
-            devnum
         );
 
         Ok(Self { fs2dev, fs })

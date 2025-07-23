@@ -71,7 +71,7 @@ fn main() -> Result<()> {
     info!("init {session_id} ({})", std::process::id());
 
     let config_path = matches.get_one::<String>("config").unwrap();
-    let config = conf_parse(&conf_read(config_path)?)?;
+    let mut config = conf_parse(&conf_read(config_path)?)?;
 
     // Create temp files
     let tar_path = format!(
@@ -117,6 +117,10 @@ fn main() -> Result<()> {
         pipes_read.push(c.input_fd());
         pipes_write.push(c.output_fd())
     });
+
+    let fs_stats = nix::sys::statvfs::statvfs(config.out_directory.as_str())?;
+    let available = fs_stats.block_size() * fs_stats.blocks_available();
+    config.available_space = Some(available);
 
     if let Some(path) = matches.get_one::<String>("socket") {
         if let Ok(true) = std::path::Path::new(path).try_exists() {

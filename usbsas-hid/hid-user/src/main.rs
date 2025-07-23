@@ -60,9 +60,9 @@ fn open_device(busnum: u8, devnum: u8) -> Result<UsbDevice, rusb::Error> {
     rusb::disable_device_discovery()?;
     let libusb_ctx = Context::new()?;
 
-    log::trace!("init dev {} {}", busnum, devnum);
+    log::trace!("init dev {busnum} {devnum}");
 
-    let device_path = format!("/dev/bus/usb/{:03}/{:03}", busnum, devnum);
+    let device_path = format!("/dev/bus/usb/{busnum:03}/{devnum:03}");
     let dev_file = match std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -141,7 +141,7 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
             _ => Err(Error::other("Buffer too short")),
         },
         _ => {
-            todo!("bsize {:?}", size);
+            todo!("bsize {size:?}");
         }
     }
 }
@@ -177,7 +177,7 @@ fn get_item_value_i32(size: u8, buffer: &mut Vec<u8>) -> Result<i32, Error> {
             _ => Err(Error::other("Buffer too short")),
         },
         _ => {
-            todo!("bsize {:?}", size);
+            todo!("bsize {size:?}");
         }
     }
 }
@@ -543,7 +543,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
                         let specs = parse_items_attr_to_str(value);
                         let (coordinatestate,) = parse_items_attr(value);
-                        log::debug!("{}INPUT({}) ({})", gen_space(indent), value, specs);
+                        log::debug!("{}INPUT({value}) ({specs})", gen_space(indent));
                         log::debug!("");
                         match (local_report_count, local_report_size) {
                             (Some(report_count), Some(report_size)) => {
@@ -618,7 +618,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                         let value = get_item_value_u32(item.bsize(), &mut buffer)?;
                         let specs = parse_items_attr_to_str(value);
                         let (coordinatestate,) = parse_items_attr(value);
-                        log::debug!("{}Feature({:?}) ({})", gen_space(indent), value, specs);
+                        log::debug!("{}Feature({value:?}) ({specs})", gen_space(indent));
                         log::debug!("{}", gen_space(indent));
 
                         match (local_report_count, local_report_size) {
@@ -874,7 +874,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                             }
                             Some(HidUsagePage::Vendor) => HidUsage::Unknown(value as u16),
                             _ => {
-                                log::debug!("Unknown usage: {:?}", value);
+                                log::debug!("Unknown usage: {value:?}");
                                 HidUsage::Unknown(value as u16)
                             }
                         };
@@ -914,9 +914,9 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
 
     log::debug!("Items: ");
     for (report_id, report) in reports.iter() {
-        log::debug!("Report {} size: {}", report_id, report.1 / 8);
+        log::debug!("Report {report_id} size: {}", report.1 / 8);
         for item in report.0.iter() {
-            log::debug!("    {:?}", item);
+            log::debug!("    {item:?}");
         }
     }
     Ok(reports)
@@ -1151,9 +1151,9 @@ fn get_screen_display() -> Result<ScreenInfo, Error> {
     if display.is_null() {
         return Err(Error::other("Error in XOpenDisplay".to_string()));
     }
-    log::debug!("Display: {:?}", display);
+    log::debug!("Display: {display:?}");
     let rootwindow = unsafe { XRootWindow(display, 0) };
-    log::debug!("Root windows: {:?}", rootwindow);
+    log::debug!("Root windows: {rootwindow:?}");
     unsafe { XSelectInput(display, rootwindow, KeyReleaseMask) };
 
     /* Get screen size */
@@ -1193,7 +1193,7 @@ fn get_hid_descriptor(device: &UsbDevice) -> Result<Vec<u8>, Error> {
         return Err(Error::other("Response too big"));
     }
     buffer.truncate(len);
-    log::debug!("{}, {:?}", len, buffer);
+    log::debug!("{len}, {buffer:?}");
 
     buffer.reverse();
     Ok(buffer)
@@ -1270,7 +1270,7 @@ fn parse_generic_desktop_control(
 
         match usage {
             HidUsage::GenericDesktop(HidUsageGenericDesktop::X) => {
-                log::trace!("value x {}", value);
+                log::trace!("value x {value}");
                 match item.coordinatestate {
                     CoordinateState::Abs => {
                         if context.finger_touch {
@@ -1284,7 +1284,7 @@ fn parse_generic_desktop_control(
                 }
             }
             HidUsage::GenericDesktop(HidUsageGenericDesktop::Y) => {
-                log::trace!("value y {}", value);
+                log::trace!("value y {value}");
                 match item.coordinatestate {
                     CoordinateState::Abs => {
                         if context.finger_touch {
@@ -1307,7 +1307,7 @@ fn parse_generic_desktop_control(
                 // TODO
             }
             usage => {
-                log::debug!("Unsupported item {:?}", usage);
+                log::debug!("Unsupported item {usage:?}");
             }
         };
     }
@@ -1319,20 +1319,20 @@ fn parse_digitizer(
     item: &HidItem,
     buffer: &[u8],
 ) -> Result<(), Error> {
-    log::trace!("item {:?}", item);
+    log::trace!("item {item:?}");
     if item.count as usize != item.usage.len() {
         return Ok(());
     }
     for index in 0..item.count as usize {
         let usage = &item.usage[index];
-        log::trace!("item usage {:?}", usage);
+        log::trace!("item usage {usage:?}");
         match usage {
             HidUsage::Digitizer(HidUsageDigitizer::TipSwitch) => {
                 if item.size != 1 {
                     continue;
                 }
                 let button_value = item.get_value(index, buffer)?;
-                log::trace!("button {} {}", index, button_value);
+                log::trace!("button {index} {button_value}");
                 if button_value != 0 {
                     context.finger_touch = true;
                     context.surface_touched = true;
@@ -1342,7 +1342,7 @@ fn parse_digitizer(
                 context.change_surface = true;
             }
             usage => {
-                log::debug!("Unsupported item {:?}", usage);
+                log::debug!("Unsupported item {usage:?}");
             }
         }
     }
@@ -1385,7 +1385,7 @@ fn request_reports(device: &UsbDevice, reports: &HashMap<u32, (Vec<HidItem>, usi
             &mut buffer,
             Duration::from_millis(1000),
         );
-        log::debug!("Get report id: {:?} {:?}, {:?}", report_id, result, buffer);
+        log::debug!("Get report id: {report_id:?} {result:?}, {buffer:?}");
 
         if !items.iter().all(|item| item.r#type == HidItemType::Feature) {
             continue;
@@ -1411,7 +1411,7 @@ fn request_reports(device: &UsbDevice, reports: &HashMap<u32, (Vec<HidItem>, usi
                     &buffer,
                     Duration::from_millis(1000),
                 );
-                log::debug!("Set report {:?} {:?}, {:?}", report_id, result, buffer);
+                log::debug!("Set report {report_id:?} {result:?}, {buffer:?}");
             }
         }
     }
@@ -1438,7 +1438,7 @@ fn main() -> Result<(), Error> {
 
     assert!(rusb::supports_detach_kernel_driver());
 
-    log::info!("Busnum: {} Devnum: {}", busnum, devnum);
+    log::info!("Busnum: {busnum} Devnum: {devnum}");
 
     let device = open_device(busnum, devnum)
         .map_err(|err| Error::other(format!("Usb device error: {err:?}")))?;
@@ -1454,7 +1454,7 @@ fn main() -> Result<(), Error> {
     // ConnectionNumber returns the socket fd (see libx11's Xlib.h)
     let socket_fd = unsafe { x11::xlib::XConnectionNumber(screen.display) };
     usbsas_sandbox::hiduser::seccomp(device.dev_file.as_raw_fd(), socket_fd)
-        .map_err(|err| Error::other(format!("Error applying seccomp filter: {}", err)))?;
+        .map_err(|err| Error::other(format!("Error applying seccomp filter: {err}")))?;
 
     let mut context = DisplayContext::new(screen);
     context.updt_cursor();
@@ -1470,7 +1470,7 @@ fn main() -> Result<(), Error> {
                 context.button_num = 0;
                 context.finger_touch = false;
 
-                log::debug!("Read: {:?}", buffer);
+                log::debug!("Read: {buffer:?}");
                 let report = get_associated_report(&buffer, &reports)?;
                 for item in report.0.iter() {
                     match &item.usage_page {
@@ -1487,7 +1487,7 @@ fn main() -> Result<(), Error> {
                             parse_digitizer(&mut context, item, &buffer)?;
                         }
                         value => {
-                            log::debug!("Unknown: {:?}", value);
+                            log::debug!("Unknown: {value:?}");
                         }
                     }
                 }
@@ -1517,7 +1517,7 @@ fn main() -> Result<(), Error> {
                 // skip
             }
             Err(err) => {
-                log::error!("Err {:?}, exiting", err);
+                log::error!("Err {err:?}, exiting");
                 break;
             }
         }

@@ -135,8 +135,8 @@ fn report_wipe(device: UsbDevice) -> TransferReport {
 fn report_infos() -> (String, time::OffsetDateTime, String) {
     #[cfg(not(feature = "integration-tests"))]
     let (hostname, time) = {
-        let name = match uname::Info::new() {
-            Ok(name) => name.nodename,
+        let name = match nix::sys::utsname::uname() {
+            Ok(utsname) => utsname.nodename().to_string_lossy().to_string(),
             _ => "unknown-usbsas".into(),
         };
         (name, time::OffsetDateTime::now_utc())

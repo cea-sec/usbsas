@@ -197,7 +197,7 @@ fn main() -> Result<()> {
         match fs::File::create(path) {
             Ok(file) => Some(file),
             Err(err) => {
-                log::error!("Couldn't create file {}: {}", path, err);
+                log::error!("Couldn't create file {path}: {err}");
                 return Err(err.into());
             }
         }

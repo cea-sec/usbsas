@@ -44,14 +44,14 @@ fn update_entry(
     _: &mut Device,
     (busnum, devnum): (u8, u8),
 ) -> Result<(), dbus_crossroads::MethodErr> {
-    log::debug!("Incoming update for {} {}", busnum, devnum);
+    log::debug!("Incoming update for {busnum} {devnum}");
     let mut sons = HM_SONS.lock().unwrap();
     let key = (busnum, devnum);
     if let Some(mut child) = sons.remove(&key) {
-        log::info!("killing client for {} {}", busnum, devnum);
+        log::info!("killing client for {busnum} {devnum}");
         child.kill().expect("Cannot kill son");
         let result = child.wait();
-        log::debug!("wait: {:?}", result);
+        log::debug!("wait: {result:?}");
     }
 
     match run_son(busnum, devnum) {
@@ -70,17 +70,17 @@ fn remove_entry(
     _: &mut Device,
     (busnum, devnum): (u8, u8),
 ) -> Result<(), dbus_crossroads::MethodErr> {
-    log::debug!("Incoming remove for {} {}!", busnum, devnum);
+    log::debug!("Incoming remove for {busnum} {devnum}!");
 
     let mut sons = HM_SONS.lock().unwrap();
     let key = (busnum, devnum);
     if let Some(mut child) = sons.remove(&key) {
-        log::info!("killing client for {} {}", busnum, devnum);
+        log::info!("killing client for {busnum} {devnum}");
         child.kill().expect("Cannot kill son");
         let result = child.wait();
-        log::debug!("wait: {:?}", result);
+        log::debug!("wait: {result:?}");
     } else {
-        log::error!("Unknown client {} {}", busnum, devnum)
+        log::error!("Unknown client {busnum} {devnum}");
     }
 
     Ok(())
@@ -92,12 +92,12 @@ fn wait_sons() -> ! {
             let mut sons = HM_SONS.lock().unwrap();
             sons.retain(|&_, child| match child.try_wait() {
                 Ok(Some(status)) => {
-                    log::info!("Son {:?} ended with status {}", child.id(), status);
+                    log::info!("Son {:?} ended with status {status}", child.id());
                     false
                 }
                 Ok(None) => true,
                 Err(err) => {
-                    log::error!("Wait son {:?} error {:?}", child.id(), err);
+                    log::error!("Wait son {:?} error {err:?}", child.id());
                     false
                 }
             })

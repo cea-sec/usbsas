@@ -557,6 +557,16 @@ impl RunState for FileSelectionState {
         {
             bail!("Selected files size is larger than destination size, aborting transfer");
         }
+
+        if let Some(space) = self.config.available_space {
+            if ((self.transfer.analyze || matches!(self.transfer.dst, Device::Usb(_)))
+                && 2 * selected_size > space)
+                || selected_size > space
+            {
+                bail!("Not enough space");
+            }
+        };
+
         self.transfer.selected_size = Some(selected_size);
 
         if !matches!(self.transfer.src, Device::Network(_)) {
