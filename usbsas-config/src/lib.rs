@@ -76,6 +76,8 @@ pub struct Config {
     pub usb_port_accesses: Option<UsbPortAccesses>,
     pub lang: Option<String>,
     pub menu_img: Option<String>,
+    // filled by usbsas process
+    pub available_space: Option<u64>,
 }
 
 pub fn conf_read(config_path: &str) -> io::Result<String> {
