@@ -18,7 +18,7 @@ usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-utils = { path = "../usbsas-utils" }
-uuid = { version = "1.17", features = ["v4"] }
+uuid = { version = "1.18", features = ["v4"] }
 
 # cargo-deb
 [package.metadata.deb]
