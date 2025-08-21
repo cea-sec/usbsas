@@ -1280,6 +1280,7 @@ fn parse_generic_desktop_control(
                     CoordinateState::Rel => {
                         let logical_center_x = (item.logical_max + item.logical_min) / 2;
                         context.cursor_x += value - logical_center_x;
+                        context.cursor_x = context.cursor_x.clamp(0, context.screen.width);
                     }
                 }
             }
@@ -1294,6 +1295,7 @@ fn parse_generic_desktop_control(
                     CoordinateState::Rel => {
                         let logical_center_y = (item.logical_max + item.logical_min) / 2;
                         context.cursor_y += value - logical_center_y;
+                        context.cursor_y = context.cursor_y.clamp(0, context.screen.height);
                     }
                 }
             }
