@@ -52,7 +52,7 @@ pub(crate) fn new_context_with_common_rules(
         &[Comparator::new(0, Cmp::Eq, 2, None)],
     )?;
 
-    // Allow ioctl(2, TCGETS, ..), needed by env_logger >= 0.11
+    // Allow ioctl TCGETS & TCGETS2 on stderr needed by env_logger >= 0.11
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::ioctl,
@@ -62,6 +62,17 @@ pub(crate) fn new_context_with_common_rules(
             Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
             #[cfg(not(target_env = "musl"))]
             Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, 2, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS2 as u64, None),
+            #[cfg(not(target_env = "musl"))]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS2, None),
         ],
     )?;
 
