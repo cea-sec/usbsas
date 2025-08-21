@@ -55,6 +55,8 @@
     "disk_img": "Lecture du périphérique",
     "diskimg": "Image disque",
     "diskimg_desc": "Sauvegarder une image disque du périphérique (pour analyse, débugging, etc.)",
+    "sysinfo": "Informations sur le système",
+    "sys": "Système",
     "tools": "Outils",
     "usbsas": "sasusb",
     "loading": "Chargement"

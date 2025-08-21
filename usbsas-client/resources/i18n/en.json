@@ -54,6 +54,8 @@
     "disk_img": "Reading device",
     "diskimg": "Disk image",
     "diskimg_desc": "Save an image disk of the device (for debugging, analysis etc.)",
+    "sysinfo": "System informations",
+    "sys": "System",
     "tools": "Tools",
     "usbsas": "usbsas",
     "loading": "Loading"

@@ -13,7 +13,7 @@ iced = { version = "0.13", features = ["advanced", "image", "smol", "svg"] }
 log = "0.4"
 serde_json = "1.0"
 sysinfo = "0.37"
-time = "0.3"
+time = { version = "0.3", features = ["local-offset"] }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-proto = { path = "../usbsas-proto" }
