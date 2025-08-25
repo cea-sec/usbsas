@@ -86,6 +86,7 @@ enum State {
     DownloadPin,
     Tools,
     Faq,
+    SysInfo,
     Reload,
     Error(String),
 }
@@ -99,6 +100,7 @@ pub enum Message {
     Nok,
     Devices,
     UserID,
+    SysInfo,
     SrcSelect(u64),
     DstSelect(u64),
     PartSelect(u32),
@@ -198,7 +200,6 @@ pub struct GUI {
     lang: LANG,
     fstype: FsType,
     session_id: String,
-    hostname: String,
     fullscreen: bool,
     socket_path: String,
 }
@@ -274,7 +275,6 @@ impl GUI {
                 lang,
                 fstype: FsType::Ntfs,
                 session_id,
-                hostname: sysinfo::System::host_name().unwrap_or("unknown".into()),
                 fullscreen: *matches.get_one::<bool>("fullscreen").unwrap_or(&false),
                 socket_path,
             },

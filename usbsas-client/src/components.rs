@@ -5,32 +5,6 @@ use iced::{
     Border, Color, Length, Renderer, Shadow, Theme,
 };
 
-//use iced::widget::{container, Container, Space};
-//pub fn space<'a>(
-//    width: impl Into<Length>,
-//    height: impl Into<Length>,
-//) -> Container<'a, Message, Theme, Renderer> {
-//    let bg = iced::Background::Color(iced::Color {
-//        r: 0.5,
-//        g: 0.0,
-//        b: 0.0,
-//        a: 1.0,
-//    });
-//    Container::new(Space::new(width, height)).style(move |_| container::background(bg))
-//}
-//pub fn space2<'a>(
-//    width: impl Into<Length>,
-//    height: impl Into<Length>,
-//) -> Container<'a, Message, Theme, Renderer> {
-//    let bg = iced::Background::Color(iced::Color {
-//        r: 0.0,
-//        g: 0.5,
-//        b: 0.0,
-//        a: 1.0,
-//    });
-//    Container::new(Space::new(width, height)).style(move |_| container::background(bg))
-//}
-
 pub const MENU_SIZE: f32 = 30.0;
 pub const HEADER_SIZE: f32 = 20.0;
 pub const TXT_SIZE: f32 = 16.0;

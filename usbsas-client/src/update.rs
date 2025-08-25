@@ -49,6 +49,7 @@ impl GUI {
             }
             Message::Faq => self.state = State::Faq,
             Message::Tools => self.state = State::Tools,
+            Message::SysInfo => self.state = State::SysInfo,
             Message::LangSelect(lang) => self.lang = lang,
             Message::FsTypeSelect(fstype) => self.fstype = fstype,
             Message::Devices => {
