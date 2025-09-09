@@ -365,7 +365,9 @@ impl GUI {
                     col = col.push({
                         let mut row =
                             Row::new().push(text(name.to_string()).width(Length::FillPortion(1)));
-                        for ip in data.ip_networks() {
+                        let mut nets = data.ip_networks().to_vec();
+                        nets.sort();
+                        for ip in nets {
                             row = row.push(
                                 text(format!("{}/{}", ip.addr, ip.prefix))
                                     .width(Length::FillPortion(3)),
