@@ -112,6 +112,10 @@ impl LoadMetadataState {
         for entry in archive.entries()? {
             let entry = entry?;
             let path_name = entry.path()?.to_path_buf().to_string_lossy().to_string();
+            if path_name.contains("/../") {
+                log::debug!("ignoring file '{path_name}'");
+                continue;
+            }
             let ftype = match entry.header().entry_type() {
                 tar::EntryType::Directory => FileType::Directory,
                 tar::EntryType::Regular => FileType::Regular,
