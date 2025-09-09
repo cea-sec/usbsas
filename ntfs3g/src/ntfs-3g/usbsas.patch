@@ -1,26 +1,25 @@
-From 8ccbac8f9f7ea7c0ee371283b19512662a1e0d5e Mon Sep 17 00:00:00 2001
-Date: Tue, 3 Jan 2023 16:14:27 +0100
-Subject: [PATCH] Modifications for usbsas
+From 954166aba7ec6535f267866ea823290a8102787f Mon Sep 17 00:00:00 2001
+Subject: [PATCH] usbsas
 
 ---
  mft.c      |   6 +-
- mkntfs.c   | 402 +++--------------------------------------------------
+ mkntfs.c   | 439 ++---------------------------------------------------
  mkntfs.h   |  30 ++++
  security.c |   2 +-
- unix_io.c  | 163 +++-------------------
- unix_io.h  |   8 ++
+ unix_io.c  | 163 ++------------------
+ unix_io.h  |   8 +
  utils.c    |   2 +-
  volume.c   |   4 +-
  volume.h   |   9 +-
- 9 files changed, 86 insertions(+), 540 deletions(-)
+ 9 files changed, 78 insertions(+), 585 deletions(-)
  create mode 100644 mkntfs.h
  create mode 100644 unix_io.h
 
 diff --git a/mft.c b/mft.c
-index aefbb5f..9ea7894 100644
+index cd2b415..657408d 100644
 --- a/mft.c
 +++ b/mft.c
-@@ -1925,9 +1925,9 @@ found_free_rec:
+@@ -1928,9 +1928,9 @@ found_free_rec:
  	/* Initialize time, allocated and data size in ntfs_inode struct. */
  	ni->data_size = ni->allocated_size = 0;
  	ni->flags = const_cpu_to_le32(0);
@@ -34,22 +33,12 @@ index aefbb5f..9ea7894 100644
  	if (!base_ni)
  		vol->mft_data_pos = bit + 1;
 diff --git a/mkntfs.c b/mkntfs.c
-index 3e127a3..ac8e1c4 100644
+index 5c3a367..5ce581b 100644
 --- a/mkntfs.c
 +++ b/mkntfs.c
-@@ -130,7 +130,6 @@
- #include "mft.h"
- #include "mst.h"
- #include "runlist.h"
--#include "utils.h"
- #include "ntfstime.h"
- #include "sd.h"
- #include "boot.h"
-@@ -139,7 +138,9 @@
- #include "logging.h"
+@@ -140,6 +140,7 @@
  #include "support.h"
  #include "unistr.h"
-+#include "utils.h"
  #include "misc.h"
 +#include "mkntfs.h"
  
@@ -157,7 +146,7 @@ index 3e127a3..ac8e1c4 100644
  
  /*
   *  crc64, adapted from http://rpm5.org/docs/api/digest_8c-source.html
-@@ -514,259 +429,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
+@@ -514,258 +429,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
  	}
  }
  
@@ -413,11 +402,10 @@ index 3e127a3..ac8e1c4 100644
 -	return (err ? 1 : (help || ver || lic ? 0 : -1));
 -}
 -
--
+ 
  /**
   * mkntfs_time
-  */
-@@ -3453,7 +3115,7 @@ static void mkntfs_cleanup(void)
+@@ -3465,18 +3128,16 @@ static void mkntfs_cleanup(void)
  /**
   * mkntfs_open_partition -
   */
@@ -426,7 +414,10 @@ index 3e127a3..ac8e1c4 100644
  {
  	BOOL result = FALSE;
  	int i;
-@@ -3464,7 +3126,7 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
+-	struct stat sbuf;
+-	unsigned long mnt_flags;
+ 
+ 	/*
  	 * Allocate and initialize an ntfs device structure and attach it to
  	 * the volume.
  	 */
@@ -435,35 +426,69 @@ index 3e127a3..ac8e1c4 100644
  	if (!vol->dev) {
  		ntfs_log_perror("Could not create device");
  		goto done;
-@@ -3484,18 +3146,19 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
+@@ -3496,61 +3157,7 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
  			ntfs_log_perror("Could not open %s", vol->dev->d_name);
  		goto done;
  	}
-+
- 	/* Verify we are dealing with a block device. */
+-	/* Verify we are dealing with a block device. */
 -	if (vol->dev->d_ops->stat(vol->dev, &sbuf)) {
 -		ntfs_log_perror("Error getting information about %s", vol->dev->d_name);
 -		goto done;
 -	}
-+	/* if (vol->dev->d_ops->stat(vol->dev, &sbuf)) { */
-+	/* 	ntfs_log_perror("Error getting information about %s", vol->dev->d_name); */
-+	/* 	goto done; */
-+	/* } */
  
- 	if (!S_ISBLK(sbuf.st_mode)) {
- 		ntfs_log_error("%s is not a block device.\n", vol->dev->d_name);
+-	if (!S_ISBLK(sbuf.st_mode)) {
+-		ntfs_log_error("%s is not a block device.\n", vol->dev->d_name);
 -		if (!opts.force) {
 -			ntfs_log_error("Refusing to make a filesystem here!\n");
 -			goto done;
 -		}
-+		/* if (!opts.force) { */
-+		/* 	ntfs_log_error("Refusing to make a filesystem here!\n"); */
-+		/* 	goto done; */
-+		/* } */
- 		if (!opts.num_sectors) {
- 			if (!sbuf.st_size && !sbuf.st_blocks) {
- 				ntfs_log_error("You must specify the number of sectors.\n");
-@@ -4962,7 +4625,7 @@ static BOOL mkntfs_create_root_structures(void)
+-		if (!opts.num_sectors) {
+-			if (!sbuf.st_size && !sbuf.st_blocks) {
+-				ntfs_log_error("You must specify the number of sectors.\n");
+-				goto done;
+-			}
+-			if (opts.sector_size) {
+-				if (sbuf.st_size)
+-					opts.num_sectors = sbuf.st_size / opts.sector_size;
+-				else
+-					opts.num_sectors = ((s64)sbuf.st_blocks << 9) / opts.sector_size;
+-			} else {
+-				if (sbuf.st_size)
+-					opts.num_sectors = sbuf.st_size / 512;
+-				else
+-					opts.num_sectors = sbuf.st_blocks;
+-				opts.sector_size = 512;
+-			}
+-		}
+-		ntfs_log_warning("mkntfs forced anyway.\n");
+-#ifdef HAVE_LINUX_MAJOR_H
+-	} else if ((IDE_DISK_MAJOR(MAJOR(sbuf.st_rdev)) &&
+-			MINOR(sbuf.st_rdev) % 64 == 0) ||
+-			(SCSI_DISK_MAJOR(MAJOR(sbuf.st_rdev)) &&
+-			MINOR(sbuf.st_rdev) % 16 == 0)) {
+-		ntfs_log_error("%s is entire device, not just one partition.\n", vol->dev->d_name);
+-		if (!opts.force) {
+-			ntfs_log_error("Refusing to make a filesystem here!\n");
+-			goto done;
+-		}
+-		ntfs_log_warning("mkntfs forced anyway.\n");
+-#endif
+-	}
+-	/* Make sure the file system is not mounted. */
+-	if (ntfs_check_if_mounted(vol->dev->d_name, &mnt_flags)) {
+-		ntfs_log_perror("Failed to determine whether %s is mounted", vol->dev->d_name);
+-	} else if (mnt_flags & NTFS_MF_MOUNTED) {
+-		ntfs_log_error("%s is mounted.\n", vol->dev->d_name);
+-		if (!opts.force) {
+-			ntfs_log_error("Refusing to make a filesystem here!\n");
+-			goto done;
+-		}
+-		ntfs_log_warning("mkntfs forced anyway. Hope /etc/mtab is incorrect.\n");
+-	}
+ 	result = TRUE;
+ done:
+ 	return result;
+@@ -4974,7 +4581,7 @@ static BOOL mkntfs_create_root_structures(void)
  /**
   * mkntfs_redirect
   */
@@ -472,20 +497,22 @@ index 3e127a3..ac8e1c4 100644
  {
  	u64 upcase_crc;
  	int result = 1;
-@@ -4972,6 +4635,12 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+@@ -4984,6 +4591,14 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
  	MFT_RECORD *m;
  	int i, err;
  
-+	/* ntfs_log_set_handler(ntfs_log_handler_outerr); */
-+	/* ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET | */
-+	/* 		NTFS_LOG_LEVEL_VERBOSE | */
-+	/* 		NTFS_LOG_LEVEL_PROGRESS); */
-+
++	/* Uncomment to debug */
++	/*
++	ntfs_log_set_handler(ntfs_log_handler_outerr);
++	ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET
++			| NTFS_LOG_LEVEL_VERBOSE
++			| NTFS_LOG_LEVEL_PROGRESS);
++	*/
 +
  	if (!opts2) {
  		ntfs_log_error("Internal error: invalid parameters to mkntfs_options.\n");
  		goto done;
-@@ -5021,7 +4690,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+@@ -5033,7 +4648,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
  			sizeof(attrdef_ntfs3x_array));
  	g_vol->attrdef_len = sizeof(attrdef_ntfs3x_array);
  	/* Open the partition. */
@@ -494,11 +521,10 @@ index 3e127a3..ac8e1c4 100644
  		goto done;
  	/*
  	 * Decide on the sector size, cluster size, mft record and index record
-@@ -5164,30 +4833,3 @@ done:
- 	mkntfs_cleanup();	/* Device is unlocked and closed here */
+@@ -5177,29 +4792,3 @@ done:
  	return result;
  }
--
+ 
 -
 -/**
 - * main - Begin here
@@ -906,5 +932,5 @@ index 42800a2..600d648 100644
  
  extern int ntfs_version_is_supported(ntfs_volume *vol);
 -- 
-2.39.0
+2.51.0
 
