@@ -648,7 +648,7 @@ impl GUI {
                 for file in files {
                     let datetime = match OffsetDateTime::from_unix_timestamp(file.timestamp) {
                         Ok(dt) => format!(
-                            "{}/{}/{} {}:{}",
+                            "{:02}/{:02}/{:4} {:02}:{:02}",
                             dt.day(),
                             u8::from(dt.month()),
                             dt.year(),
