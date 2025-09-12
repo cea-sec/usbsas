@@ -34,6 +34,10 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
     }
 
     fn newfile(&mut self, path: &str, ftype: FileType, size: u64, timestamp: i64) -> Result<()> {
+        let mut path_string: String = path.trim_start_matches('/').into();
+        if path_string.starts_with("../") || path_string.contains("/../") {
+            return Err(Error::Error("Bad file name".to_string()));
+        }
         let mut header = tar::Header::new_ustar();
         match ftype {
             FileType::Regular | FileType::Metadata => {
@@ -49,7 +53,6 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
             _ => return Err(Error::Error("Bad file type".to_string())),
         }
         header.set_mtime(timestamp as u64);
-        let mut path_string: String = path.trim_start_matches('/').into();
         self.files.push(path_string.clone());
         if !matches!(ftype, FileType::Metadata) {
             path_string.insert_str(0, &self.data_dir);

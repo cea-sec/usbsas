@@ -3674,7 +3674,7 @@ dependencies = [
 
 [[package]]
 name = "ntfs3g"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bindgen 0.72.0",
  "cc",
@@ -6196,7 +6196,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-files2tar"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "env_logger",
  "log",
@@ -6372,7 +6372,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-tar2files"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "byteorder",
  "env_logger",
