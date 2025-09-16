@@ -4,7 +4,7 @@
 use actix_files::NamedFile;
 use actix_web::{get, head, http::header, post, web, App, HttpResponse, HttpServer, Responder};
 use clap::{Arg, Command};
-use futures::StreamExt;
+use futures::TryStreamExt;
 use serde_json::json;
 use std::{
     collections::HashMap,
@@ -18,6 +18,7 @@ use std::{
 };
 use tar::{Archive, EntryType};
 use tempfile::TempDir;
+use tokio::io::AsyncWriteExt;
 
 const TAR_DATA_DIR: &str = "data/";
 
@@ -42,7 +43,7 @@ impl AppState {
         let mut entries_paths = Vec::new();
 
         for entry in archive.entries()? {
-            let mut entry = entry.unwrap();
+            let mut entry = entry?;
             let path = entry
                 .path()?
                 .to_path_buf()
@@ -114,13 +115,12 @@ impl AppState {
         #[cfg(feature = "integration-tests")]
         let bundle_id = "bundle_test".into();
         let out_file_name = format!("{}/{}.tar", self.working_dir.lock().unwrap(), bundle_id);
-        let mut out_file = fs::File::create(out_file_name.clone()).unwrap();
+        let mut out_file = tokio::fs::File::create(&out_file_name).await?;
 
-        while let Some(bytes) = body.next().await {
-            let bytes = bytes?;
-            out_file.write_all(&bytes).unwrap();
+        while let Some(bytes) = body.try_next().await? {
+            out_file.write_all(&bytes).await?;
         }
-        out_file.flush().unwrap();
+        out_file.flush().await?;
         Ok((bundle_id, out_file_name))
     }
 }
@@ -195,8 +195,7 @@ async fn scan_result(
                 "{}/{}.tar",
                 data.working_dir.lock().unwrap(),
                 bundle_id
-            ))
-            .unwrap();
+            ))?;
             #[cfg(feature = "integration-tests")]
             let bundle_id = "0";
             let files_status: HashMap<String, serde_json::Value> = entry
@@ -266,9 +265,9 @@ async fn head_bundle_size(
     // %4GB), but good enough for this integration tests server
     if bundle_path.ends_with("gz") {
         let mut f = fs::File::open(&bundle_path)?;
-        f.seek(io::SeekFrom::End(-4)).unwrap();
+        f.seek(io::SeekFrom::End(-4))?;
         let mut buf = vec![0; 4];
-        f.read_exact(&mut buf).unwrap();
+        f.read_exact(&mut buf)?;
         size = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as u64;
         log::debug!("filename: {bundle_path}, uncompressed size: {size}");
     }

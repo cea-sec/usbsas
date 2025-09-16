@@ -6104,6 +6104,7 @@ dependencies = [
  "serde_json",
  "tar",
  "tempfile",
+ "tokio",
  "uuid",
 ]
 
