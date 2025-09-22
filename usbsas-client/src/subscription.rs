@@ -5,10 +5,8 @@ use iced::{
     time::{self, Duration},
     Subscription,
 };
-use std::{
-    hash::Hash,
-    sync::{Arc, Mutex},
-};
+use std::{hash::Hash, sync::Arc};
+use tokio::sync::Mutex;
 use usbsas_comm::ProtoReqCommon;
 
 pub fn status<I: 'static + Hash + Copy + Send + Sync>(
@@ -22,19 +20,14 @@ fn recv(comm: Arc<Mutex<ComRqUsbsas>>) -> impl Stream<Item = Status> {
     channel(0, move |mut output| async move {
         let mut done = false;
         while !done {
-            let status = match comm.lock() {
-                Ok(mut guard) => match guard.recv_status() {
-                    Ok(resp) => {
-                        if let Ok(usbsas_proto::common::Status::AllDone) = resp.status.try_into() {
-                            done = true;
-                        }
-                        Status::Progress(resp)
-                    }
-                    Err(err) => {
+            let mut guard = comm.lock().await;
+            let status = match guard.recv_status() {
+                Ok(resp) => {
+                    if let Ok(usbsas_proto::common::Status::AllDone) = resp.status.try_into() {
                         done = true;
-                        Status::Error(format!("{err}"))
                     }
-                },
+                    Status::Progress(resp)
+                }
                 Err(err) => {
                     done = true;
                     Status::Error(format!("{err}"))

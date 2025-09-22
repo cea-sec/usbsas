@@ -6120,6 +6120,7 @@ dependencies = [
  "serde_json",
  "sysinfo",
  "time",
+ "tokio",
  "usbsas-comm",
  "usbsas-config",
  "usbsas-proto",
