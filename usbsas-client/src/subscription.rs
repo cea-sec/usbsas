@@ -46,15 +46,9 @@ impl GUI {
             | State::Wipe(_)
             | State::DiskImg
             | State::Done
-            | State::SysInfo => time::every(Duration::from_secs(1)).map(Message::Tick),
-            State::UserID => time::every(Duration::from_secs(1)).map(Message::Tick),
+            | State::SysInfo
+            | State::UserID => time::every(Duration::from_secs(1)).map(Message::Tick),
             State::Status(_) => status(1, self.comm.as_ref().unwrap().clone()).map(Message::Status),
-            State::Reload => Subscription::run_with_id(
-                2,
-                channel(1, move |mut output| async move {
-                    let _ = output.send(Message::Reset).await;
-                }),
-            ),
             _ => Subscription::none(),
         };
 
