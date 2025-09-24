@@ -1,42 +1,8 @@
-use crate::{ComRqUsbsas, Message, State, Status, GUI};
+use crate::{Message, State, GUI};
 use iced::{
-    futures::{SinkExt, Stream, StreamExt},
-    stream::channel,
     time::{self, Duration},
     Subscription,
 };
-use std::{hash::Hash, sync::Arc};
-use tokio::sync::Mutex;
-use usbsas_comm::ProtoReqCommon;
-
-pub fn status<I: 'static + Hash + Copy + Send + Sync>(
-    id: I,
-    comm: Arc<Mutex<ComRqUsbsas>>,
-) -> iced::Subscription<(I, Status)> {
-    Subscription::run_with_id(id, recv(comm).map(move |progress| (id, progress)))
-}
-
-fn recv(comm: Arc<Mutex<ComRqUsbsas>>) -> impl Stream<Item = Status> {
-    channel(0, move |mut output| async move {
-        let mut done = false;
-        while !done {
-            let mut guard = comm.lock().await;
-            let status = match guard.recv_status() {
-                Ok(resp) => {
-                    if let Ok(usbsas_proto::common::Status::AllDone) = resp.status.try_into() {
-                        done = true;
-                    }
-                    Status::Progress(resp)
-                }
-                Err(err) => {
-                    done = true;
-                    Status::Error(format!("{err}"))
-                }
-            };
-            let _ = output.send(status).await;
-        }
-    })
-}
 
 impl GUI {
     pub fn subscription(&self) -> Subscription<Message> {
@@ -48,7 +14,6 @@ impl GUI {
             | State::Done
             | State::SysInfo
             | State::UserID => time::every(Duration::from_secs(1)).map(Message::Tick),
-            State::Status(_) => status(1, self.comm.as_ref().unwrap().clone()).map(Message::Status),
             _ => Subscription::none(),
         };
 
