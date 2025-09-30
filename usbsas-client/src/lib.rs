@@ -298,9 +298,11 @@ impl GUI {
 
     fn reset(&mut self) -> Task<Message> {
         if let Some(comm) = self.comm.take() {
-            if comm.blocking_lock().end().is_err() {
+            let mut guard = comm.blocking_lock();
+            if guard.end().is_err() {
                 log::error!("couldn't end usbsas properly");
             }
+            let _ = guard.input().shutdown(std::net::Shutdown::Both);
         };
 
         // Delete out & temp files if empty
