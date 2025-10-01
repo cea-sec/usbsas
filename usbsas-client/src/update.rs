@@ -199,19 +199,8 @@ impl GUI {
                     }
                 }
                 State::Done => {
-                    if self
-                        .devices
-                        .iter()
-                        .filter(|(id, dev)| {
-                            matches!(dev, Device::Usb(_))
-                                && (self.src_id == Some(*(*id)) || self.dst_id == Some(*(*id)))
-                        })
-                        .count()
-                        == 0
-                    {
-                        self.state = State::Reload;
-                        return Task::done(Message::Reset);
-                    };
+                    self.state = State::Reload;
+                    return Task::done(Message::Reset);
                 }
                 _ => (),
             },
