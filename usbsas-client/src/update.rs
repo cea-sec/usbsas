@@ -1,7 +1,13 @@
 use crate::{Message, State, Status, GUI};
-use iced::window::{self, Mode};
-use std::{fs, path};
-use usbsas_comm::ProtoReqUsbsas;
+use iced::{
+    futures::Stream,
+    window::{self, Mode},
+    Task,
+};
+use std::{fs, path, thread};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use usbsas_comm::{ProtoReqCommon, ProtoReqUsbsas};
 use usbsas_proto::{self as proto, common::device::Device};
 
 macro_rules! ok_or_err {
@@ -11,7 +17,7 @@ macro_rules! ok_or_err {
             Err(err) => {
                 log::error!("{err}");
                 $s.state = State::Error(format!("{err}"));
-                return iced::Task::none();
+                return Task::none();
             }
         }
     };
@@ -20,33 +26,51 @@ macro_rules! ok_or_err {
 macro_rules! comm_req {
     ($s: ident, $req: ident, $arg: expr) => {
         if let Some(comm) = &$s.comm {
-            match comm.lock() {
-                Ok(mut guard) => guard.$req($arg),
-                Err(err) => {
-                    log::error!("{err}");
-                    $s.state = State::Error(format!("comm error: {err}"));
-                    return iced::Task::none();
-                }
-            }
+            comm.blocking_lock().$req($arg)
         } else {
             log::error!("not connected");
             $s.state = State::Error("not connected".into());
-            return iced::Task::none();
+            return Task::none();
         }
     };
 }
 
 impl GUI {
-    pub fn update(&mut self, message: Message) -> iced::Task<Message> {
+    fn recv_status(&mut self) -> impl Stream<Item = Status> {
+        let comm = self.comm.as_ref().unwrap().clone();
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let recv_stream = UnboundedReceiverStream::new(receiver);
+        thread::spawn(move || {
+            let mut done = false;
+            while !done {
+                let status = match comm.blocking_lock().recv_status() {
+                    Ok(resp) => {
+                        if let Ok(usbsas_proto::common::Status::AllDone) = resp.status.try_into() {
+                            done = true;
+                        }
+                        Status::Progress(resp)
+                    }
+                    Err(err) => {
+                        done = true;
+                        Status::Error(format!("{err}"))
+                    }
+                };
+                let _ = sender.send(status);
+            }
+        });
+        recv_stream
+    }
+
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         macro_rules! comm {
             ($req: ident, $arg: expr) => {
                 ok_or_err!(self, comm_req!(self, $req, $arg))
             };
         }
+        if matches!(message, Message::Status(_)) && !matches!(self.state, State::Status(_)) {
+            return Task::none();
+        };
         match message {
-            Message::Init => {
-                self.try_connect();
-            }
             Message::Faq => self.state = State::Faq,
             Message::Tools => self.state = State::Tools,
             Message::SysInfo => self.state = State::SysInfo,
@@ -80,9 +104,9 @@ impl GUI {
                 if let Ok(resp) = ret {
                     self.userid = Some(resp.userid);
                     self.state = State::DevSelect;
-                    return self.update(Message::Ok);
+                    return Task::done(Message::Ok);
                 } else {
-                    return iced::Task::none();
+                    return Task::none();
                 };
             }
             Message::UserInput(input) => {
@@ -106,14 +130,14 @@ impl GUI {
                             self.userid = Some(resp.userid);
                         } else {
                             self.state = State::UserID;
-                            return iced::Task::none();
+                            return Task::none();
                         }
                     }
                     if let (Some(src_id), Some(dst_id)) = (self.src_id, self.dst_id) {
                         if let Some(Device::Network(_)) = self.devices.get(&src_id) {
                             if self.download_pin.is_none() {
                                 self.state = State::DownloadPin;
-                                return iced::Task::none();
+                                return Task::none();
                             }
                         };
                         comm!(
@@ -130,13 +154,14 @@ impl GUI {
                                 comm!(partitions, proto::usbsas::RequestPartitions {}).partitions;
 
                             if partitions.len() == 1 {
-                                return self.update(Message::PartSelect(0));
+                                return Task::done(Message::PartSelect(0));
                             } else {
                                 self.state = State::PartSelect(partitions);
                             }
                         };
                         if let Some(Device::Network(_)) = self.devices.get(&src_id) {
                             self.state = State::Status(Status::init());
+                            return Task::stream(self.recv_status()).map(Message::Status);
                         };
                     };
                 }
@@ -148,6 +173,7 @@ impl GUI {
                         }
                     );
                     self.state = State::Status(Status::init());
+                    return Task::stream(self.recv_status()).map(Message::Status);
                 }
                 State::Wipe(quick) => {
                     if let Some(dst_id) = self.dst_id {
@@ -161,6 +187,7 @@ impl GUI {
                             }
                         );
                         self.state = State::Status(Status::init());
+                        return Task::stream(self.recv_status()).map(Message::Status);
                     }
                 }
                 State::DiskImg => {
@@ -168,21 +195,12 @@ impl GUI {
                         comm!(imgdisk, proto::usbsas::RequestImgDisk { id: src_id });
                         self.status_title = Some("diskimg".into());
                         self.state = State::Status(Status::init());
+                        return Task::stream(self.recv_status()).map(Message::Status);
                     }
                 }
                 State::Done => {
-                    if self
-                        .devices
-                        .iter()
-                        .filter(|(id, dev)| {
-                            matches!(dev, Device::Usb(_))
-                                && (self.src_id == Some(*(*id)) || self.dst_id == Some(*(*id)))
-                        })
-                        .count()
-                        == 0
-                    {
-                        self.state = State::Reload;
-                    };
+                    self.state = State::Reload;
+                    return Task::done(Message::Reset);
                 }
                 _ => (),
             },
@@ -196,6 +214,7 @@ impl GUI {
                 }
                 _ => {
                     self.state = State::Reload;
+                    return Task::done(Message::Reset);
                 }
             },
             Message::Wipe(quick) => {
@@ -229,7 +248,7 @@ impl GUI {
             }
             Message::PartSelect(index) => {
                 let _ = comm!(openpartition, proto::usbsas::RequestOpenPartition { index });
-                return self.update(Message::ReadDir("/".into()));
+                return Task::done(Message::ReadDir("/".into()));
             }
             Message::ReadDir(path) => {
                 let rep = comm!(
@@ -252,7 +271,7 @@ impl GUI {
                         self.current_dir = "/".into();
                     };
                 };
-                return self.update(Message::ReadDir(self.current_dir.clone()));
+                return Task::done(Message::ReadDir(self.current_dir.clone()));
             }
             Message::SelectFile(path) => {
                 self.selected.insert(path);
@@ -270,7 +289,7 @@ impl GUI {
                     let _ = self.selected.remove(file);
                 });
             }
-            Message::Status((_, status)) => {
+            Message::Status(status) => {
                 if let Status::Progress(status) = status {
                     self.seen_status.insert(
                         status
@@ -308,16 +327,12 @@ impl GUI {
                 }
             }
             Message::Tick(_) => match self.state {
+                State::Connect => self.try_connect(),
                 State::Init | State::DevSelect | State::Wipe(_) | State::DiskImg | State::Done => {
-                    self.try_connect();
-                    if self.comm.is_some() {
-                        return self.update(Message::Devices);
-                    }
+                    return Task::done(Message::Devices);
                 }
                 State::UserID => {
-                    if self.comm.is_some() {
-                        return self.update(Message::UserID);
-                    }
+                    return Task::done(Message::UserID);
                 }
                 _ => (),
             },
@@ -330,12 +345,12 @@ impl GUI {
                     if mode != Mode::Fullscreen {
                         window::change_mode(window, Mode::Fullscreen)
                     } else {
-                        iced::Task::none()
+                        Task::none()
                     }
                 })
             })
         } else {
-            iced::Task::none()
+            Task::none()
         }
     }
 }

@@ -5,7 +5,7 @@ set -eu
 MIRROR="https://deb.debian.org"
 
 lb config noauto \
-	--distribution bookworm \
+	--distribution trixie \
 	--architecture amd64 \
 	--image-name "usbsas-${USBSAS_ISO_VER}" \
 	--apt-recommends false \

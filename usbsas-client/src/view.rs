@@ -88,7 +88,7 @@ impl GUI {
         .style(container::rounded_box);
 
         let main = match &self.state {
-            State::Init | State::Reload => {
+            State::Connect | State::Init | State::Reload => {
                 let (txt, opacity) = if self.comm.is_some() {
                     (self.i18n_txt("init"), 1.0)
                 } else {
@@ -1053,18 +1053,7 @@ impl GUI {
                 button_nok = button_nok.on_press(Message::Nok);
             }
             State::Done => {
-                if self
-                    .devices
-                    .iter()
-                    .filter(|(id, dev)| {
-                        matches!(dev, Device::Usb(_))
-                            && (self.src_id == Some(*(*id)) || self.dst_id == Some(*(*id)))
-                    })
-                    .count()
-                    == 0
-                {
-                    button_ok = button_ok.on_press(Message::Ok);
-                }
+                button_ok = button_ok.on_press(Message::Ok);
             }
             State::Reload => (),
             State::Error(_) => {
@@ -1095,7 +1084,7 @@ impl GUI {
                 .push(Space::new(Length::Fixed(40.0), Length::Shrink))
                 .align_y(Alignment::Center),
         );
-        let button_bar = Container::new(if matches!(self.state, State::Init) {
+        let button_bar = Container::new(if matches!(self.state, State::Init | State::Connect) {
             Row::new()
         } else {
             button_row

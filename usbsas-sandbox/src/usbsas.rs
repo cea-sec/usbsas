@@ -37,7 +37,7 @@ pub fn sandbox(
         )?;
         ctx.set_rule_for_syscall(
             Action::Allow,
-            Syscall::recvfrom,
+            Syscall::sendto,
             &[Comparator::new(0, Cmp::Eq, sock.write as u64, None)],
         )?;
 

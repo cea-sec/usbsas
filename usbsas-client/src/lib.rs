@@ -1,11 +1,12 @@
-use iced::time::Instant;
+use iced::{time::Instant, Task};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     os::unix::net::UnixStream,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
+use tokio::sync::Mutex;
 use usbsas_comm::{Comm, ProtoReqCommon};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto::{
@@ -74,6 +75,7 @@ impl Status {
 
 #[derive(Debug)]
 enum State {
+    Connect,
     Init,
     DevSelect,
     UserID,
@@ -93,7 +95,6 @@ enum State {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Init,
     Faq,
     Tools,
     Ok,
@@ -110,7 +111,7 @@ pub enum Message {
     UnSelectFile(String),
     SelectAll(Vec<String>),
     EmptySelect(Vec<String>),
-    Status((usize, Status)),
+    Status(Status),
     Wipe(bool),
     DiskImg,
     LangSelect(LANG),
@@ -124,13 +125,8 @@ pub enum Message {
 impl Drop for GUI {
     fn drop(&mut self) {
         if let Some(comm) = &self.comm {
-            match comm.lock() {
-                Ok(mut guard) => {
-                    if guard.end().is_err() {
-                        log::error!("couldn't end usbsas");
-                    }
-                }
-                Err(_) => log::error!("couldn't end usbsas"),
+            if comm.blocking_lock().end().is_err() {
+                log::error!("couldn't end usbsas properly");
             }
         };
     }
@@ -204,7 +200,6 @@ pub struct GUI {
     socket_path: String,
 }
 
-use iced::Task;
 //impl Default for GUI {
 impl GUI {
     pub fn new() -> (Self, Task<Message>) {
@@ -257,7 +252,7 @@ impl GUI {
         (
             Self {
                 comm: None,
-                state: State::Init,
+                state: State::Connect,
                 devices: BTreeMap::new(),
                 src_id: None,
                 dst_id: None,
@@ -278,7 +273,7 @@ impl GUI {
                 fullscreen: *matches.get_one::<bool>("fullscreen").unwrap_or(&false),
                 socket_path,
             },
-            Task::done(Message::Init),
+            Task::none(),
         )
     }
 }
@@ -291,26 +286,27 @@ impl GUI {
                     self.comm = Some(Arc::new(Mutex::new(Comm::new(
                         stream.try_clone().unwrap(),
                         stream,
-                    ))))
+                    ))));
+                    self.state = State::Init;
                 }
                 Err(err) => {
                     log::error!("couldn't connect: {err} {:?}", self.state);
-                    std::thread::sleep(std::time::Duration::from_millis(500));
                 }
             };
+        } else {
+            self.state = State::Init;
         }
     }
 
     fn reset(&mut self) -> Task<Message> {
         if let Some(comm) = self.comm.take() {
-            match comm.lock() {
-                Ok(mut guard) => {
-                    if guard.end().is_err() {
-                        log::error!("couldn't end usbsas properly");
-                    }
-                }
-                Err(_) => log::error!("couldn't end usbsas properly"),
+            let mut guard = comm.blocking_lock();
+            if let Err(err) = guard.end() {
+                log::error!("couldn't end usbsas properly: {}", err);
             }
+            if let Err(err) = guard.input().shutdown(std::net::Shutdown::Both) {
+                log::error!("couldn't shutdown socket: {}", err);
+            };
         };
 
         // Delete out & temp files if empty

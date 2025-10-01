@@ -151,11 +151,11 @@ impl WaitFsInfosState {
         log::debug!("mkfs dev_size: {dev_size}");
 
         let fs_size = dev_size - (SECTOR_START * SECTOR_SIZE);
-        if fs_size % SECTOR_SIZE != 0 {
+        if !fs_size.is_multiple_of(SECTOR_SIZE) {
             return Err(Error::FSError("fs size not multiple of sector size".into()));
         }
 
-        if dev_size % SECTOR_SIZE != 0 {
+        if !dev_size.is_multiple_of(SECTOR_SIZE) {
             return Err(Error::FSError(
                 "dev size not multiple of sector size".into(),
             ));
