@@ -67,10 +67,10 @@ impl GUI {
                 ok_or_err!(self, comm_req!(self, $req, $arg))
             };
         }
+        if matches!(message, Message::Status(_)) && !matches!(self.state, State::Status(_)) {
+            return Task::none();
+        };
         match message {
-            Message::Init => {
-                self.try_connect();
-            }
             Message::Faq => self.state = State::Faq,
             Message::Tools => self.state = State::Tools,
             Message::SysInfo => self.state = State::SysInfo,
@@ -338,16 +338,12 @@ impl GUI {
                 }
             }
             Message::Tick(_) => match self.state {
+                State::Connect => self.try_connect(),
                 State::Init | State::DevSelect | State::Wipe(_) | State::DiskImg | State::Done => {
-                    self.try_connect();
-                    if self.comm.is_some() {
-                        return Task::done(Message::Devices);
-                    }
+                    return Task::done(Message::Devices);
                 }
                 State::UserID => {
-                    if self.comm.is_some() {
-                        return Task::done(Message::UserID);
-                    }
+                    return Task::done(Message::UserID);
                 }
                 _ => (),
             },
