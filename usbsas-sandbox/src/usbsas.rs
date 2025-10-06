@@ -1,7 +1,4 @@
 use crate::{seccomp, Result};
-use landlock::{
-    Access, AccessFs, PathBeneath, PathFd, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus,
-};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
@@ -47,29 +44,7 @@ pub fn sandbox(
         #[cfg(target_arch = "aarch64")]
         ctx.allow_syscall(Syscall::unlinkat)?;
 
-        let status = Ruleset::default()
-            .handle_access(AccessFs::from_all(crate::LLABI))?
-            .create()?
-            .set_no_new_privs(true)
-            .add_rule(PathBeneath::new(
-                PathFd::new(sock.path).unwrap(),
-                AccessFs::from_file(crate::LLABI),
-            ))?
-            .restrict_self()?;
-
-        match status.ruleset {
-            RulesetStatus::FullyEnforced => (),
-            RulesetStatus::PartiallyEnforced | RulesetStatus::NotEnforced => {
-                #[cfg(feature = "landlock-enforce")]
-                return Err(crate::Error::Error(
-                    "Couldn't fully enforce landlock".into(),
-                ));
-                #[cfg(not(feature = "landlock-enforce"))]
-                {
-                    log::warn!("landlock not enforced !");
-                }
-            }
-        }
+        crate::landlock(None, Some(&[&sock.path]), None, None)?;
     };
 
     ctx.load()?;

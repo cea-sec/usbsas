@@ -9,6 +9,7 @@ pub mod hiduser;
 pub mod identificator;
 pub mod imager;
 pub mod jsonparser;
+pub mod net;
 pub mod scsi2files;
 pub mod tar2files;
 pub mod usbdev;
@@ -17,7 +18,8 @@ pub mod usbsas;
 pub(crate) mod seccomp;
 
 use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus,
+    path_beneath_rules, Access, AccessFs, AccessNet, CompatLevel, Compatible, NetPort, Ruleset,
+    RulesetAttr, RulesetCreatedAttr, RulesetStatus,
 };
 use thiserror::Error;
 
@@ -33,8 +35,6 @@ pub enum Error {
     Error(String),
 }
 type Result<T> = std::result::Result<T, Error>;
-
-const LLABI: landlock::ABI = landlock::ABI::V1;
 
 /* XXX: Functions returning constants we need and can't (yet) get from bindgen
  * because it cannot develop macro.
@@ -55,39 +55,52 @@ pub fn landlock(
     paths_ro: Option<&[&str]>,
     paths_rw: Option<&[&str]>,
     paths_x: Option<&[&str]>,
+    connect_ports: Option<&[u16]>,
 ) -> Result<()> {
-    let mut ruleset = Ruleset::default()
-        .handle_access(AccessFs::from_all(crate::LLABI))?
-        .create()?
-        .set_no_new_privs(true);
+    #[cfg(not(feature = "landlock-enforce"))]
+    let ruleset = Ruleset::default().set_compatibility(CompatLevel::BestEffort);
+
+    #[cfg(feature = "landlock-enforce")]
+    let ruleset = Ruleset::default().set_compatibility(CompatLevel::HardRequirement);
+
+    let mut ruleset = ruleset
+        .handle_access(AccessFs::from_all(landlock::ABI::V2))?
+        .handle_access(AccessNet::from_all(landlock::ABI::V4))?
+        .create()?;
 
     if let Some(paths) = paths_ro {
-        ruleset =
-            ruleset.add_rules(path_beneath_rules(paths, AccessFs::from_read(crate::LLABI)))?;
+        ruleset = ruleset.add_rules(path_beneath_rules(
+            paths,
+            AccessFs::from_read(landlock::ABI::V2),
+        ))?;
     }
 
     if let Some(paths) = paths_rw {
-        ruleset = ruleset.add_rules(path_beneath_rules(paths, AccessFs::from_all(crate::LLABI)))?;
+        ruleset = ruleset.add_rules(path_beneath_rules(
+            paths,
+            AccessFs::from_all(landlock::ABI::V2),
+        ))?;
     }
 
     if let Some(paths) = paths_x {
         ruleset = ruleset.add_rules(path_beneath_rules(paths, AccessFs::Execute))?;
     }
 
+    if let Some(ports) = connect_ports {
+        for port in ports {
+            ruleset = ruleset.add_rule(NetPort::new(*port, AccessNet::ConnectTcp))?;
+        }
+    };
+
     let status = ruleset.restrict_self()?;
 
     match status.ruleset {
-        RulesetStatus::FullyEnforced => Ok(()),
+        RulesetStatus::FullyEnforced => {
+            log::debug!("landlock enforced");
+        }
         RulesetStatus::PartiallyEnforced | RulesetStatus::NotEnforced => {
-            #[cfg(feature = "landlock-enforce")]
-            return Err(crate::Error::Error(
-                "Couldn't fully enforce landlock".into(),
-            ));
-            #[cfg(not(feature = "landlock-enforce"))]
-            {
-                log::warn!("landlock not enforced !");
-                Ok(())
-            }
+            log::warn!("landlock not fully enforced: {:?}", status.ruleset);
         }
     }
+    Ok(())
 }

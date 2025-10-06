@@ -58,6 +58,7 @@ impl Children {
             .spawn::<ComRqFiles>()?;
         let uploader = UsbsasChildSpawner::new("usbsas-uploader")
             .arg(tar_path)
+            .args(&["-c", config_path])
             .wait_on_startup()
             .spawn::<ComRqUploader>()?;
         let analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
