@@ -75,6 +75,7 @@ impl Status {
 
 #[derive(Debug)]
 enum State {
+    Connect,
     Init,
     DevSelect,
     UserID,
@@ -94,7 +95,6 @@ enum State {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Init,
     Faq,
     Tools,
     Ok,
@@ -252,7 +252,7 @@ impl GUI {
         (
             Self {
                 comm: None,
-                state: State::Init,
+                state: State::Connect,
                 devices: BTreeMap::new(),
                 src_id: None,
                 dst_id: None,
@@ -273,7 +273,7 @@ impl GUI {
                 fullscreen: *matches.get_one::<bool>("fullscreen").unwrap_or(&false),
                 socket_path,
             },
-            Task::done(Message::Init),
+            Task::none(),
         )
     }
 }
@@ -286,21 +286,27 @@ impl GUI {
                     self.comm = Some(Arc::new(Mutex::new(Comm::new(
                         stream.try_clone().unwrap(),
                         stream,
-                    ))))
+                    ))));
+                    self.state = State::Init;
                 }
                 Err(err) => {
                     log::error!("couldn't connect: {err} {:?}", self.state);
-                    std::thread::sleep(std::time::Duration::from_millis(500));
                 }
             };
+        } else {
+            self.state = State::Init;
         }
     }
 
     fn reset(&mut self) -> Task<Message> {
         if let Some(comm) = self.comm.take() {
-            if comm.blocking_lock().end().is_err() {
-                log::error!("couldn't end usbsas properly");
+            let mut guard = comm.blocking_lock();
+            if let Err(err) = guard.end() {
+                log::error!("couldn't end usbsas properly: {}", err);
             }
+            if let Err(err) = guard.input().shutdown(std::net::Shutdown::Both) {
+                log::error!("couldn't shutdown socket: {}", err);
+            };
         };
 
         // Delete out & temp files if empty

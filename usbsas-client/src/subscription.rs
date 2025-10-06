@@ -7,7 +7,8 @@ use iced::{
 impl GUI {
     pub fn subscription(&self) -> Subscription<Message> {
         let subs = match self.state {
-            State::Init
+            State::Connect
+            | State::Init
             | State::DevSelect
             | State::Wipe(_)
             | State::DiskImg
