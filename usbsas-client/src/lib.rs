@@ -1,4 +1,4 @@
-use iced::time::Instant;
+use iced::{time::Instant, Task};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
@@ -111,7 +111,7 @@ pub enum Message {
     UnSelectFile(String),
     SelectAll(Vec<String>),
     EmptySelect(Vec<String>),
-    Status((usize, Status)),
+    Status(Status),
     Wipe(bool),
     DiskImg,
     LangSelect(LANG),
@@ -200,7 +200,6 @@ pub struct GUI {
     socket_path: String,
 }
 
-use iced::Task;
 //impl Default for GUI {
 impl GUI {
     pub fn new() -> (Self, Task<Message>) {

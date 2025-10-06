@@ -1,10 +1,13 @@
 use crate::{Message, State, Status, GUI};
 use iced::{
+    futures::Stream,
     window::{self, Mode},
     Task,
 };
-use std::{fs, path};
-use usbsas_comm::ProtoReqUsbsas;
+use std::{fs, path, thread};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use usbsas_comm::{ProtoReqCommon, ProtoReqUsbsas};
 use usbsas_proto::{self as proto, common::device::Device};
 
 macro_rules! ok_or_err {
@@ -33,6 +36,31 @@ macro_rules! comm_req {
 }
 
 impl GUI {
+    fn recv_status(&mut self) -> impl Stream<Item = Status> {
+        let comm = self.comm.as_ref().unwrap().clone();
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let recv_stream = UnboundedReceiverStream::new(receiver);
+        thread::spawn(move || {
+            let mut done = false;
+            while !done {
+                let status = match comm.blocking_lock().recv_status() {
+                    Ok(resp) => {
+                        if let Ok(usbsas_proto::common::Status::AllDone) = resp.status.try_into() {
+                            done = true;
+                        }
+                        Status::Progress(resp)
+                    }
+                    Err(err) => {
+                        done = true;
+                        Status::Error(format!("{err}"))
+                    }
+                };
+                let _ = sender.send(status);
+            }
+        });
+        recv_stream
+    }
+
     pub fn update(&mut self, message: Message) -> Task<Message> {
         macro_rules! comm {
             ($req: ident, $arg: expr) => {
@@ -133,6 +161,7 @@ impl GUI {
                         };
                         if let Some(Device::Network(_)) = self.devices.get(&src_id) {
                             self.state = State::Status(Status::init());
+                            return Task::stream(self.recv_status()).map(Message::Status);
                         };
                     };
                 }
@@ -144,6 +173,7 @@ impl GUI {
                         }
                     );
                     self.state = State::Status(Status::init());
+                    return Task::stream(self.recv_status()).map(Message::Status);
                 }
                 State::Wipe(quick) => {
                     if let Some(dst_id) = self.dst_id {
@@ -157,6 +187,7 @@ impl GUI {
                             }
                         );
                         self.state = State::Status(Status::init());
+                        return Task::stream(self.recv_status()).map(Message::Status);
                     }
                 }
                 State::DiskImg => {
@@ -164,6 +195,7 @@ impl GUI {
                         comm!(imgdisk, proto::usbsas::RequestImgDisk { id: src_id });
                         self.status_title = Some("diskimg".into());
                         self.state = State::Status(Status::init());
+                        return Task::stream(self.recv_status()).map(Message::Status);
                     }
                 }
                 State::Done => {
@@ -268,7 +300,7 @@ impl GUI {
                     let _ = self.selected.remove(file);
                 });
             }
-            Message::Status((_, status)) => {
+            Message::Status(status) => {
                 if let Status::Progress(status) = status {
                     self.seen_status.insert(
                         status
