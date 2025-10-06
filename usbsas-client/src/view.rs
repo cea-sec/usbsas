@@ -1053,18 +1053,7 @@ impl GUI {
                 button_nok = button_nok.on_press(Message::Nok);
             }
             State::Done => {
-                if self
-                    .devices
-                    .iter()
-                    .filter(|(id, dev)| {
-                        matches!(dev, Device::Usb(_))
-                            && (self.src_id == Some(*(*id)) || self.dst_id == Some(*(*id)))
-                    })
-                    .count()
-                    == 0
-                {
-                    button_ok = button_ok.on_press(Message::Ok);
-                }
+                button_ok = button_ok.on_press(Message::Ok);
             }
             State::Reload => (),
             State::Error(_) => {
