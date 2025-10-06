@@ -88,7 +88,7 @@ impl GUI {
         .style(container::rounded_box);
 
         let main = match &self.state {
-            State::Init | State::Reload => {
+            State::Connect | State::Init | State::Reload => {
                 let (txt, opacity) = if self.comm.is_some() {
                     (self.i18n_txt("init"), 1.0)
                 } else {
@@ -1095,7 +1095,7 @@ impl GUI {
                 .push(Space::new(Length::Fixed(40.0), Length::Shrink))
                 .align_y(Alignment::Center),
         );
-        let button_bar = Container::new(if matches!(self.state, State::Init) {
+        let button_bar = Container::new(if matches!(self.state, State::Init | State::Connect) {
             Row::new()
         } else {
             button_row
