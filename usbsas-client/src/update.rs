@@ -20,14 +20,7 @@ macro_rules! ok_or_err {
 macro_rules! comm_req {
     ($s: ident, $req: ident, $arg: expr) => {
         if let Some(comm) = &$s.comm {
-            match comm.lock() {
-                Ok(mut guard) => guard.$req($arg),
-                Err(err) => {
-                    log::error!("{err}");
-                    $s.state = State::Error(format!("comm error: {err}"));
-                    return iced::Task::none();
-                }
-            }
+            comm.blocking_lock().$req($arg)
         } else {
             log::error!("not connected");
             $s.state = State::Error("not connected".into());
