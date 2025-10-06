@@ -1,5 +1,8 @@
 use crate::{Message, State, Status, GUI};
-use iced::window::{self, Mode};
+use iced::{
+    window::{self, Mode},
+    Task,
+};
 use std::{fs, path};
 use usbsas_comm::ProtoReqUsbsas;
 use usbsas_proto::{self as proto, common::device::Device};
@@ -11,7 +14,7 @@ macro_rules! ok_or_err {
             Err(err) => {
                 log::error!("{err}");
                 $s.state = State::Error(format!("{err}"));
-                return iced::Task::none();
+                return Task::none();
             }
         }
     };
@@ -24,13 +27,13 @@ macro_rules! comm_req {
         } else {
             log::error!("not connected");
             $s.state = State::Error("not connected".into());
-            return iced::Task::none();
+            return Task::none();
         }
     };
 }
 
 impl GUI {
-    pub fn update(&mut self, message: Message) -> iced::Task<Message> {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         macro_rules! comm {
             ($req: ident, $arg: expr) => {
                 ok_or_err!(self, comm_req!(self, $req, $arg))
@@ -73,9 +76,9 @@ impl GUI {
                 if let Ok(resp) = ret {
                     self.userid = Some(resp.userid);
                     self.state = State::DevSelect;
-                    return self.update(Message::Ok);
+                    return Task::done(Message::Ok);
                 } else {
-                    return iced::Task::none();
+                    return Task::none();
                 };
             }
             Message::UserInput(input) => {
@@ -99,14 +102,14 @@ impl GUI {
                             self.userid = Some(resp.userid);
                         } else {
                             self.state = State::UserID;
-                            return iced::Task::none();
+                            return Task::none();
                         }
                     }
                     if let (Some(src_id), Some(dst_id)) = (self.src_id, self.dst_id) {
                         if let Some(Device::Network(_)) = self.devices.get(&src_id) {
                             if self.download_pin.is_none() {
                                 self.state = State::DownloadPin;
-                                return iced::Task::none();
+                                return Task::none();
                             }
                         };
                         comm!(
@@ -123,7 +126,7 @@ impl GUI {
                                 comm!(partitions, proto::usbsas::RequestPartitions {}).partitions;
 
                             if partitions.len() == 1 {
-                                return self.update(Message::PartSelect(0));
+                                return Task::done(Message::PartSelect(0));
                             } else {
                                 self.state = State::PartSelect(partitions);
                             }
@@ -222,7 +225,7 @@ impl GUI {
             }
             Message::PartSelect(index) => {
                 let _ = comm!(openpartition, proto::usbsas::RequestOpenPartition { index });
-                return self.update(Message::ReadDir("/".into()));
+                return Task::done(Message::ReadDir("/".into()));
             }
             Message::ReadDir(path) => {
                 let rep = comm!(
@@ -245,7 +248,7 @@ impl GUI {
                         self.current_dir = "/".into();
                     };
                 };
-                return self.update(Message::ReadDir(self.current_dir.clone()));
+                return Task::done(Message::ReadDir(self.current_dir.clone()));
             }
             Message::SelectFile(path) => {
                 self.selected.insert(path);
@@ -304,12 +307,12 @@ impl GUI {
                 State::Init | State::DevSelect | State::Wipe(_) | State::DiskImg | State::Done => {
                     self.try_connect();
                     if self.comm.is_some() {
-                        return self.update(Message::Devices);
+                        return Task::done(Message::Devices);
                     }
                 }
                 State::UserID => {
                     if self.comm.is_some() {
-                        return self.update(Message::UserID);
+                        return Task::done(Message::UserID);
                     }
                 }
                 _ => (),
@@ -323,12 +326,12 @@ impl GUI {
                     if mode != Mode::Fullscreen {
                         window::change_mode(window, Mode::Fullscreen)
                     } else {
-                        iced::Task::none()
+                        Task::none()
                     }
                 })
             })
         } else {
-            iced::Task::none()
+            Task::none()
         }
     }
 }
