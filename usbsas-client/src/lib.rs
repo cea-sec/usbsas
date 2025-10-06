@@ -1,11 +1,12 @@
-use iced::time::Instant;
+use iced::{time::Instant, Task};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     os::unix::net::UnixStream,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
+use tokio::sync::Mutex;
 use usbsas_comm::{Comm, ProtoReqCommon};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto::{
@@ -110,7 +111,7 @@ pub enum Message {
     UnSelectFile(String),
     SelectAll(Vec<String>),
     EmptySelect(Vec<String>),
-    Status((usize, Status)),
+    Status(Status),
     Wipe(bool),
     DiskImg,
     LangSelect(LANG),
@@ -124,13 +125,8 @@ pub enum Message {
 impl Drop for GUI {
     fn drop(&mut self) {
         if let Some(comm) = &self.comm {
-            match comm.lock() {
-                Ok(mut guard) => {
-                    if guard.end().is_err() {
-                        log::error!("couldn't end usbsas");
-                    }
-                }
-                Err(_) => log::error!("couldn't end usbsas"),
+            if comm.blocking_lock().end().is_err() {
+                log::error!("couldn't end usbsas properly");
             }
         };
     }
@@ -204,7 +200,6 @@ pub struct GUI {
     socket_path: String,
 }
 
-use iced::Task;
 //impl Default for GUI {
 impl GUI {
     pub fn new() -> (Self, Task<Message>) {
@@ -303,13 +298,8 @@ impl GUI {
 
     fn reset(&mut self) -> Task<Message> {
         if let Some(comm) = self.comm.take() {
-            match comm.lock() {
-                Ok(mut guard) => {
-                    if guard.end().is_err() {
-                        log::error!("couldn't end usbsas properly");
-                    }
-                }
-                Err(_) => log::error!("couldn't end usbsas properly"),
+            if comm.blocking_lock().end().is_err() {
+                log::error!("couldn't end usbsas properly");
             }
         };
 
