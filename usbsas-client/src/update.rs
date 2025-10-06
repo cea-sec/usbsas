@@ -178,6 +178,7 @@ impl GUI {
                         == 0
                     {
                         self.state = State::Reload;
+                        return Task::done(Message::Reset);
                     };
                 }
                 _ => (),
@@ -192,6 +193,7 @@ impl GUI {
                 }
                 _ => {
                     self.state = State::Reload;
+                    return Task::done(Message::Reset);
                 }
             },
             Message::Wipe(quick) => {
