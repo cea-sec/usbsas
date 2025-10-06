@@ -4,7 +4,7 @@ use usbsas_client::{client_clap, GUI};
 fn main() {
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or(
-            "info,wgpu_hal=error,iced_winit=error,iced_wgpu=error,wgpu_core=error",
+            "info,wgpu_hal=error,iced_winit=error,iced_wgpu=error,wgpu_core=error,cosmic_text=error,wgpu_hal=error,zbus=error,winit=error,naga=error,sctk=error,tracing=error",
         ),
     )
     .init();
