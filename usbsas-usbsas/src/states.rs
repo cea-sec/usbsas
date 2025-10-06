@@ -134,6 +134,26 @@ pub trait RunState {
         Ok(())
     }
 
+    fn forward_status(
+        &self,
+        comm: &mut impl ProtoRespUsbsas,
+        child_comm: &mut impl ProtoReqCommon,
+    ) -> Result<()> {
+        loop {
+            let status = child_comm.recv_status()?;
+            comm.status(
+                status.current,
+                status.total,
+                status.done,
+                status.status.try_into()?,
+            )?;
+            if status.done {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     fn write_report(
         &self,
         writer: &mut UsbsasChild<ComRqWriteDst>,
@@ -515,18 +535,7 @@ impl RunState for DownloadSrcState {
             .downloader
             .comm
             .download(proto::downloader::RequestDownload {})?;
-        loop {
-            let status = children.downloader.comm.recv_status()?;
-            comm.status(
-                status.current,
-                status.total,
-                status.done,
-                status.status.try_into()?,
-            )?;
-            if status.done {
-                break;
-            }
-        }
+        self.forward_status(comm, &mut children.downloader.comm)?;
         let selected = VecDeque::from(vec![String::from("/")]);
         Ok(State::FileSelection(FileSelectionState {
             config: self.config,
@@ -817,19 +826,7 @@ impl RunState for AnalyzeState {
             .analyze(proto::analyzer::RequestAnalyze {
                 id: self.transfer.userid.clone(),
             })?;
-
-        loop {
-            let status = children.analyzer.comm.recv_status()?;
-            comm.status(
-                status.current,
-                status.total,
-                status.done,
-                status.status.try_into()?,
-            )?;
-            if status.done {
-                break;
-            }
-        }
+        self.forward_status(comm, &mut children.analyzer.comm)?;
         comm.status(0, 0, false, Status::Analyze)?;
         let report = children
             .analyzer
@@ -1066,18 +1063,7 @@ impl TransferDstState {
             .fs2dev
             .comm
             .writefs(proto::fs2dev::RequestWriteFs {})?;
-        loop {
-            let status = children.fs2dev.comm.recv_status()?;
-            comm.status(
-                status.current,
-                status.total,
-                status.done,
-                status.status.try_into()?,
-            )?;
-            if status.done {
-                break;
-            }
-        }
+        self.forward_status(comm, &mut children.fs2dev.comm)?;
         Ok(())
     }
 
@@ -1090,18 +1076,7 @@ impl TransferDstState {
                     id: self.transfer.userid.clone(),
                     network: Some(network.clone()),
                 })?;
-            loop {
-                let status = children.uploader.comm.recv_status()?;
-                comm.status(
-                    status.current,
-                    status.total,
-                    status.done,
-                    status.status.try_into()?,
-                )?;
-                if status.done {
-                    break;
-                }
-            }
+            self.forward_status(comm, &mut children.uploader.comm)?;
         } else {
             bail!("Destination isn't a network")
         }
@@ -1199,18 +1174,7 @@ impl RunState for WipeState {
             .unlock_with((u64::from(self.device.devnum) << 32) | u64::from(self.device.busnum))?;
         if !self.quick {
             children.fs2dev.comm.wipe(proto::fs2dev::RequestWipe {})?;
-            loop {
-                let status = children.fs2dev.comm.recv_status()?;
-                comm.status(
-                    status.current,
-                    status.total,
-                    status.done,
-                    status.status.try_into()?,
-                )?;
-                if status.done {
-                    break;
-                }
-            }
+            self.forward_status(comm, &mut children.fs2dev.comm)?;
         } else {
             comm.done(Status::MkFs)?;
         }
@@ -1233,18 +1197,7 @@ impl RunState for WipeState {
             .fs2dev
             .comm
             .writefs(proto::fs2dev::RequestWriteFs {})?;
-        loop {
-            let status = children.fs2dev.comm.recv_status()?;
-            comm.status(
-                status.current,
-                status.total,
-                status.done,
-                status.status.try_into()?,
-            )?;
-            if status.done {
-                break;
-            }
-        }
+        self.forward_status(comm, &mut children.fs2dev.comm)?;
         let report = crate::report_wipe(self.device);
         info!("wipe done");
         comm.done(Status::AllDone)?;
