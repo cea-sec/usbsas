@@ -159,7 +159,7 @@ impl RunningState {
         };
 
         resp.copy_to(&mut filewriterprogress)?;
-        comm.status(filesize, filesize, true, Status::DlSrc)?;
+        comm.done(Status::DlSrc)?;
         Ok(())
     }
 }

@@ -241,7 +241,7 @@ impl CopyingState {
             current_size += sector_write_size;
             comm.status(current_size, total_size, false, Status::WriteDst)?;
         }
-        comm.status(current_size, total_size, true, Status::WriteDst)?;
+        comm.done(Status::WriteDst)?;
         Ok(State::WaitEnd(WaitEndState))
     }
 }
@@ -276,7 +276,7 @@ impl WipingState {
             todo -= buffer.len() as u64;
             sector_index += sector_count;
         }
-        comm.status(current_size, total_size, true, Status::Wipe)?;
+        comm.done(Status::Wipe)?;
         Ok(State::DevOpened(DevOpenedState {
             fs: self.fs,
             mass_storage: self.mass_storage,
