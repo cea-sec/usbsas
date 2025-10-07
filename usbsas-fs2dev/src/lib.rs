@@ -211,6 +211,7 @@ impl CopyingState {
 
         let mut current_size = 0u64;
         let mut buffer = vec![0; BUFFER_MAX_WRITE_SIZE as usize];
+        let mut status_counter: u64 = 0;
 
         for (sector_start, sector_stop) in self.fs_bv {
             let sector_start_pos = sector_start * SECTOR_SIZE;
@@ -239,9 +240,12 @@ impl CopyingState {
             )?;
 
             current_size += sector_write_size;
-            comm.status(current_size, total_size, false, Status::WriteDst)?;
+            status_counter += 1;
+            if status_counter.is_multiple_of(10) {
+                comm.status(current_size, total_size, false, Status::WriteDst)?;
+            }
         }
-        comm.status(current_size, total_size, true, Status::WriteDst)?;
+        comm.done(Status::WriteDst)?;
         Ok(State::WaitEnd(WaitEndState))
     }
 }
@@ -256,6 +260,7 @@ impl WipingState {
         let mut sector_index = 0;
         let mut sector_count = buffer.len() as u64 / SECTOR_SIZE;
         let mut current_size = 0;
+        let mut status_counter: u64 = 0;
         trace!(
             "wipe device; size: {} total sectors: {}",
             total_size,
@@ -271,12 +276,16 @@ impl WipingState {
             self.mass_storage
                 .scsi_write_10(&mut buffer, sector_index, sector_count)?;
             current_size += buffer.len() as u64;
-            comm.status(current_size, total_size, false, Status::Wipe)?;
 
             todo -= buffer.len() as u64;
             sector_index += sector_count;
+
+            status_counter += 1;
+            if status_counter.is_multiple_of(10) {
+                comm.status(current_size, total_size, false, Status::Wipe)?;
+            }
         }
-        comm.status(current_size, total_size, true, Status::Wipe)?;
+        comm.done(Status::Wipe)?;
         Ok(State::DevOpened(DevOpenedState {
             fs: self.fs,
             mass_storage: self.mass_storage,

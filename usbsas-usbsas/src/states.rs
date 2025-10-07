@@ -746,7 +746,7 @@ impl FileSelectionState {
             .files2tar
             .comm
             .close(proto::writedst::RequestClose {})?;
-        comm.status(current, total_size, true, Status::ReadSrc)?;
+        comm.done(Status::ReadSrc)?;
         Ok(())
     }
 
