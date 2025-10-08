@@ -601,10 +601,17 @@ impl RunState for FileSelectionState {
         } else {
             children.cmdexec.unlock_with(1)?;
             children.uploader.unlock_with(1)?;
-            Ok(State::WriteDstFile(WriteDstFileState {
-                config: self.config,
-                transfer: self.transfer,
-            }))
+            if matches!(self.transfer.dst, Device::Network(_) | Device::Command(_)) {
+                Ok(State::TransferDst(TransferDstState {
+                    config: self.config,
+                    transfer: self.transfer,
+                }))
+            } else {
+                Ok(State::WriteDstFile(WriteDstFileState {
+                    config: self.config,
+                    transfer: self.transfer,
+                }))
+            }
         }
     }
 }
