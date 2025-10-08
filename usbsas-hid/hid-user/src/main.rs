@@ -907,7 +907,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
 
     if !items.is_empty() && controller_ok {
         reports.insert(report_id, (items, total_report_size));
-        if total_report_size % 8 != 0 {
+        if !total_report_size.is_multiple_of(8) {
             return Err(Error::other("Size report is not % 8"));
         }
     }
