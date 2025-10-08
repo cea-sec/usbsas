@@ -42,7 +42,10 @@ pub fn sandbox(
         )?;
 
         // Allow unlink syscall but restrict it to socket path with landlock
+        #[cfg(not(target_arch = "aarch64"))]
         ctx.allow_syscall(Syscall::unlink)?;
+        #[cfg(target_arch = "aarch64")]
+        ctx.allow_syscall(Syscall::unlinkat)?;
 
         let status = Ruleset::default()
             .handle_access(AccessFs::from_all(crate::LLABI))?
