@@ -88,7 +88,7 @@ impl GUI {
         .style(container::rounded_box);
 
         let main = match &self.state {
-            State::Connect | State::Init | State::Reload => {
+            State::Sandbox | State::Connect | State::Init | State::Reload => {
                 let (txt, opacity) = if self.comm.is_some() {
                     (self.i18n_txt("init"), 1.0)
                 } else {
