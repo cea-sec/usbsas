@@ -50,13 +50,13 @@ impl MockMassStorage {
 
 impl Read for MockMassStorage {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.pos % (self.block_size as u64) != 0 {
+        if !self.pos.is_multiple_of(self.block_size as u64) {
             return Err(io::Error::new(
                 ErrorKind::InvalidInput,
                 "Read on non sector aligned",
             ));
         }
-        if (buf.len() % (self.block_size as usize)) != 0 {
+        if !buf.len().is_multiple_of(self.block_size as usize) {
             return Err(io::Error::new(
                 ErrorKind::InvalidInput,
                 "Read on non sector size",
@@ -88,13 +88,13 @@ impl Seek for MockMassStorage {
 
 impl ReadAt for MockMassStorage {
     fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
-        if self.pos % (self.block_size as u64) != 0 {
+        if !self.pos.is_multiple_of(self.block_size as u64) {
             return Err(io::Error::new(
                 ErrorKind::InvalidInput,
                 "Read on non sector aligned",
             ));
         }
-        if (buf.len() % (self.block_size as usize)) != 0 {
+        if !buf.len().is_multiple_of(self.block_size as usize) {
             return Err(io::Error::new(
                 ErrorKind::InvalidInput,
                 "Read on non sector size",
@@ -104,13 +104,13 @@ impl ReadAt for MockMassStorage {
     }
 
     fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<()> {
-        if self.pos % (self.block_size as u64) != 0 {
+        if !self.pos.is_multiple_of(self.block_size as u64) {
             return Err(io::Error::new(
                 ErrorKind::InvalidInput,
                 "Read on non sector aligned",
             ));
         }
-        if (buf.len() % (self.block_size as usize)) != 0 {
+        if !buf.len().is_multiple_of(self.block_size as usize) {
             return Err(io::Error::new(
                 ErrorKind::InvalidInput,
                 "Read on non sector size",

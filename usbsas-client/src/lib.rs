@@ -75,6 +75,7 @@ impl Status {
 
 #[derive(Debug)]
 enum State {
+    Sandbox,
     Connect,
     Init,
     DevSelect,
@@ -174,6 +175,16 @@ pub fn client_clap() -> clap::Command {
                 .default_value(usbsas_utils::SOCKET_PATH)
                 .required(false),
         )
+        .arg(
+            clap::Arg::new("nosandbox")
+                .short('n')
+                .long("nosandbox")
+                .value_name("NO_SANDBOX")
+                .help("Disable sandboxing the client")
+                .num_args(0)
+                .action(clap::ArgAction::SetTrue)
+                .required(false),
+        )
 }
 
 pub struct GUI {
@@ -252,7 +263,11 @@ impl GUI {
         (
             Self {
                 comm: None,
-                state: State::Connect,
+                state: if *matches.get_one::<bool>("nosandbox").unwrap_or(&false) {
+                    State::Connect
+                } else {
+                    State::Sandbox
+                },
                 devices: BTreeMap::new(),
                 src_id: None,
                 dst_id: None,
@@ -279,7 +294,34 @@ impl GUI {
 }
 
 impl GUI {
-    pub fn try_connect(&mut self) {
+    fn sandbox(&mut self) {
+        let mut paths_rw = vec!["/dev/dri", &self.socket_path];
+        if let Some(report_conf) = &self.config.report {
+            if let Some(path) = &report_conf.write_local {
+                paths_rw.push(path);
+            }
+        };
+        usbsas_sandbox::client::sandbox(
+            Some(&[
+                "/proc/cpuinfo",
+                "/proc/uptime",
+                "/proc/stat",
+                "/proc/meminfo",
+                "/proc/loadavg",
+                "/proc/mounts",
+                "/proc/diskstats",
+                "/sys/class/net",
+                "/etc/localtime",
+            ]),
+            Some(&paths_rw),
+            None,
+            None,
+        )
+        .expect("Unable to sandbox client");
+        self.state = State::Connect;
+    }
+
+    fn try_connect(&mut self) {
         if self.comm.is_none() {
             match UnixStream::connect(&self.socket_path) {
                 Ok(stream) => {
@@ -327,23 +369,39 @@ impl GUI {
         );
         if let Ok(metadata) = fs::metadata(&fs_path) {
             if metadata.len() == 0 {
-                let _ = fs::remove_file(Path::new(&fs_path)).ok();
+                if let Err(err) = fs::remove_file(Path::new(&fs_path)) {
+                    log::error!("couldn't rm file {}: {err}", &fs_path);
+                };
             }
         };
 
         for path in &[&tar_path, &clean_tar_path] {
             if let Ok(metadata) = fs::metadata(path) {
                 if metadata.len() == USBSAS_EMPTY_TAR {
-                    let _ = fs::remove_file(Path::new(&path)).ok();
+                    if let Err(err) = fs::remove_file(Path::new(&path)) {
+                        log::error!("couldn't rm file {}: {err}", path);
+                    };
                 }
             };
         }
 
-        let lang = self.lang.clone();
-        let (new, task) = Self::new();
-        *self = new;
-        self.lang = lang;
-        task
+        self.state = State::Connect;
+        self.devices = BTreeMap::new();
+        self.src_id = None;
+        self.dst_id = None;
+        self.userid = None;
+        self.download_pin = None;
+        self.current_dir = "".into();
+        self.current_files = Vec::new();
+        self.selected = HashSet::new();
+        self.seen_status = BTreeSet::new();
+        self.report = None;
+        self.status_title = None;
+        self.fstype = FsType::Ntfs;
+        self.session_id = uuid::Uuid::new_v4().simple().to_string();
+        std::env::set_var("USBSAS_SESSION_ID", &self.session_id);
+
+        Task::none()
     }
 
     fn soft_reset(&mut self) {
