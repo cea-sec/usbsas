@@ -310,15 +310,18 @@ impl GUI {
                                         "usbsas_report_{}_{}.json",
                                         report.datetime, report.transfer_id
                                     );
-                                    if let Ok(mut file) =
-                                        fs::File::create(path::Path::new(path).join(filename))
-                                    {
-                                        if let Err(err) =
-                                            serde_json::to_writer_pretty(&mut file, report)
-                                        {
-                                            log::error!("Error writing report: {err}");
-                                        };
-                                    };
+                                    match fs::File::create(path::Path::new(path).join(filename)) {
+                                        Ok(mut file) => {
+                                            if let Err(err) =
+                                                serde_json::to_writer_pretty(&mut file, report)
+                                            {
+                                                log::error!("Error writing report: {err}");
+                                            };
+                                        }
+                                        Err(err) => {
+                                            log::error!("couldn't write report: {err}");
+                                        }
+                                    }
                                 };
                             };
                         };
@@ -327,6 +330,7 @@ impl GUI {
                 }
             }
             Message::Tick(_) => match self.state {
+                State::Sandbox => self.sandbox(),
                 State::Connect => self.try_connect(),
                 State::Init | State::DevSelect | State::Wipe(_) | State::DiskImg | State::Done => {
                     return Task::done(Message::Devices);

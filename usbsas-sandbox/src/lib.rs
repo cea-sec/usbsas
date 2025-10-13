@@ -1,5 +1,6 @@
 //! Sandboxing helpers for usbsas processes.
 
+pub mod client;
 pub mod dev2scsi;
 pub mod files2fs;
 pub mod files2tar;

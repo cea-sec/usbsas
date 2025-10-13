@@ -6163,6 +6163,7 @@ dependencies = [
  "clap",
  "env_logger",
  "iced",
+ "libc",
  "log",
  "serde_json",
  "sysinfo",
@@ -6172,6 +6173,7 @@ dependencies = [
  "usbsas-comm",
  "usbsas-config",
  "usbsas-proto",
+ "usbsas-sandbox",
  "usbsas-utils",
  "uuid",
 ]
