@@ -340,6 +340,7 @@ impl Clamav {
 
         log::debug!("start clamd");
         let clamav_child = process::Command::new("clamd")
+            .env("PATH", "/bin:/sbin:/usr/bin:/usr/sbin")
             .args(["--config", &clamav_config_path])
             .spawn()?;
 
