@@ -49,7 +49,7 @@ impl State {
             State::Wipe(s) => s.run(comm, children),
             State::ImgDisk(s) => s.run(comm, children),
             State::End(s) => s.run(comm, children),
-            State::Exit => return Ok(State::Exit),
+            State::Exit => Ok(State::Exit),
         }
     }
 }

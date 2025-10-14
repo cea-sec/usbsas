@@ -1,9 +1,10 @@
 use crate::{Error, FileReaderProgress, HttpClient, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, trace};
-use reqwest::blocking::Body;
+use reqwest::{blocking::Body, Url};
 use std::fs::File;
 use usbsas_comm::{ComRpUploader, ProtoRespCommon, ProtoRespUploader};
+use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{common::Status, uploader::request::Msg};
 
@@ -27,6 +28,7 @@ impl State {
 
 struct InitState {
     tarpath: String,
+    config_path: String,
 }
 
 struct RunningState {
@@ -38,7 +40,19 @@ struct WaitEndState {}
 impl InitState {
     fn run(mut self, comm: &mut ComRpUploader) -> Result<State> {
         let cleantarpath = format!("{}_clean.tar", self.tarpath.trim_end_matches(".tar"));
-        usbsas_sandbox::landlock(
+        let config_str = conf_read(&self.config_path)?;
+        let config = conf_parse(&config_str)?;
+        let mut connect_ports = Vec::new();
+        if let Some(networks) = config.networks {
+            for network in networks {
+                connect_ports.push(
+                    Url::parse(&network.url)?
+                        .port_or_known_default()
+                        .ok_or(url::ParseError::InvalidPort)?,
+                );
+            }
+        }
+        usbsas_sandbox::net::sandbox(
             Some(
                 &[
                     crate::NET_PATHS_RO,
@@ -50,6 +64,11 @@ impl InitState {
             ),
             None,
             None,
+            if !connect_ports.is_empty() {
+                Some(&connect_ports)
+            } else {
+                None
+            },
         )?;
 
         match comm.read_u64::<LittleEndian>()? {
@@ -158,8 +177,11 @@ pub struct Uploader {
 }
 
 impl Uploader {
-    pub fn new(comm: ComRpUploader, tarpath: String) -> Result<Self> {
-        let state = State::Init(InitState { tarpath });
+    pub fn new(comm: ComRpUploader, tarpath: String, config_path: String) -> Result<Self> {
+        let state = State::Init(InitState {
+            tarpath,
+            config_path,
+        });
         Ok(Uploader { comm, state })
     }
 

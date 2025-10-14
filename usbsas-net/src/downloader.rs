@@ -1,6 +1,7 @@
 use crate::FileWriterProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
+use reqwest::Url;
 use std::fs::{File, OpenOptions};
 use usbsas_comm::{ComRpDownloader, ProtoRespCommon, ProtoRespDownloader};
 use usbsas_config::{conf_parse, conf_read};
@@ -40,7 +41,13 @@ struct WaitEndState {}
 
 impl InitState {
     fn run(self, _comm: &mut ComRpDownloader) -> Result<State> {
-        usbsas_sandbox::landlock(
+        let config = conf_parse(&conf_read(&self.config_path)?)?;
+        let net_conf = config.source_network.ok_or(Error::NoConf)?;
+        let port = Url::parse(&net_conf.url)?
+            .port_or_known_default()
+            .ok_or(url::ParseError::InvalidPort)?;
+
+        usbsas_sandbox::net::sandbox(
             Some(
                 &[
                     crate::NET_PATHS_RO,
@@ -52,15 +59,13 @@ impl InitState {
             ),
             Some(&[&self.tarpath]),
             None,
+            Some(&[port]),
         )?;
 
         let file = OpenOptions::new()
             .write(true)
             .read(false)
             .open(&self.tarpath)?;
-        let config_str = conf_read(&self.config_path)?;
-        let config = conf_parse(&config_str)?;
-        let net_conf = config.source_network.ok_or(Error::NoConf)?;
 
         Ok(State::Running(RunningState {
             file,

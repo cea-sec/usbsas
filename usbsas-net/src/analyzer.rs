@@ -1,7 +1,7 @@
 use crate::FileReaderProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
-use reqwest::blocking::Body;
+use reqwest::{blocking::Body, Url};
 use std::{fs::File, thread::sleep, time::Duration};
 use usbsas_comm::{
     ComRpAnalyzer, ComRqJsonParser, ProtoReqCommon, ProtoReqJsonParser, ProtoRespAnalyzer,
@@ -50,8 +50,19 @@ struct WaitEndState {}
 
 impl InitState {
     fn run(self, _comm: &mut ComRpAnalyzer) -> Result<State> {
+        let conf = if let Some(config) = conf_parse(&conf_read(&self.config_path)?)?.analyzer {
+            config
+        } else {
+            log::warn!("No analyzer conf, parking");
+            return Ok(State::WaitEnd(WaitEndState {}));
+        };
+        let port = Url::parse(&conf.url)?
+            .port_or_known_default()
+            .ok_or(url::ParseError::InvalidPort)?;
         let json_parser_path = format!("{}/{}", usbsas_utils::USBSAS_BIN_PATH, "usbsas-jsonparser");
-        usbsas_sandbox::landlock(
+        let json_parser =
+            UsbsasChildSpawner::new("usbsas-jsonparser").spawn::<ComRqJsonParser>()?;
+        usbsas_sandbox::net::sandbox(
             Some(
                 &[
                     crate::NET_PATHS_RO,
@@ -63,27 +74,18 @@ impl InitState {
             ),
             None,
             Some(&[&json_parser_path]),
+            Some(&[port]),
         )?;
-
         let file = File::open(&self.tarpath)?;
-        let config = conf_parse(&conf_read(&self.config_path)?)?;
-
-        if let Some(conf) = config.analyzer {
-            let json_parser =
-                UsbsasChildSpawner::new("usbsas-jsonparser").spawn::<ComRqJsonParser>()?;
-            Ok(State::Running(RunningState {
-                file: Some(file),
-                url: conf.url,
-                http_client: HttpClient::new(
-                    #[cfg(feature = "authkrb")]
-                    conf.krb_service_name,
-                )?,
-                json_parser,
-            }))
-        } else {
-            log::warn!("No analyzer conf, parking");
-            Ok(State::WaitEnd(WaitEndState {}))
-        }
+        Ok(State::Running(RunningState {
+            file: Some(file),
+            url: conf.url,
+            http_client: HttpClient::new(
+                #[cfg(feature = "authkrb")]
+                conf.krb_service_name,
+            )?,
+            json_parser,
+        }))
     }
 }
 

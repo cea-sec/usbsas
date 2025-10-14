@@ -127,6 +127,8 @@ pub enum Error {
     Process(#[from] usbsas_process::Error),
     #[error("json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
+    #[error("url parse error: {0}")]
+    UrlParse(#[from] url::ParseError),
     #[error("Bad Request")]
     BadRequest,
     #[error("No conf")]
@@ -137,6 +139,7 @@ pub enum Error {
     Remote,
     #[error("State error")]
     State,
+
     #[error("{0}")]
     Upload(String),
 }

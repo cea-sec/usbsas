@@ -8,6 +8,7 @@ impl GUI {
     pub fn subscription(&self) -> Subscription<Message> {
         let subs = match self.state {
             State::Connect
+            | State::Sandbox
             | State::Init
             | State::DevSelect
             | State::Wipe(_)
