@@ -111,7 +111,7 @@ pub enum Message {
     SelectFile(String),
     UnSelectFile(String),
     SelectAll(Vec<String>),
-    EmptySelect(Vec<String>),
+    UnselectAll(Vec<String>),
     Status(Status),
     Wipe(bool),
     DiskImg,
