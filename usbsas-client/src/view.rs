@@ -621,7 +621,7 @@ impl GUI {
                                             .collect::<Vec<String>>(),
                                     )
                                 } else {
-                                    Message::EmptySelect(
+                                    Message::UnselectAll(
                                         files
                                             .iter()
                                             .map(|x| x.path.clone())
@@ -737,9 +737,8 @@ impl GUI {
                 let mut selected_list = Column::new().width(Length::Fill);
                 for file in &self.selected {
                     selected_list = selected_list.push(
-                        text(file.trim_start_matches('/'))
-                            .shaping(text::Shaping::Advanced)
-                            .size(TXT_SIZE),
+                        // text(file.trim_start_matches('/'))
+                        text(file).shaping(text::Shaping::Advanced).size(TXT_SIZE),
                     );
                 }
                 selected_col = selected_col.push(scrollable(selected_list).anchor_bottom());

@@ -61,6 +61,22 @@ impl GUI {
         recv_stream
     }
 
+    fn unselect_path(&mut self, path: &str, unselect_children: bool) {
+        self.selected.remove(path);
+        if unselect_children {
+            self.selected
+                .retain(|x| !x.starts_with(&format!("{}/", path)));
+        }
+        // remove parent(s)
+        if let Some((parent, _)) = path.rsplit_once('/') {
+            if !parent.is_empty() {
+                self.unselect_path(parent, false);
+            } else {
+                self.selected.remove("/");
+            }
+        };
+    }
+
     pub fn update(&mut self, message: Message) -> Task<Message> {
         macro_rules! comm {
             ($req: ident, $arg: expr) => {
@@ -260,6 +276,18 @@ impl GUI {
                 rep.filesinfo
                     .iter()
                     .for_each(|x| self.current_files.push(x.path.clone()));
+                // if parent selected, select children
+                if self.selected.contains(&self.current_dir) {
+                    rep.filesinfo.iter().for_each(|x| {
+                        self.selected.insert(x.path.clone());
+                    });
+                }
+                // if all children selected, select parents
+                if !self.current_files.is_empty()
+                    && self.current_files.iter().all(|x| self.selected.contains(x))
+                {
+                    self.selected.insert(self.current_dir.clone());
+                }
                 self.state = State::ReadDir(rep.filesinfo);
             }
             Message::PreviousDir => {
@@ -275,19 +303,26 @@ impl GUI {
             }
             Message::SelectFile(path) => {
                 self.selected.insert(path);
+                if !self.current_files.is_empty()
+                    && self.current_files.iter().all(|x| self.selected.contains(x))
+                {
+                    self.selected.insert(self.current_dir.clone());
+                }
             }
             Message::UnSelectFile(path) => {
-                self.selected.remove(&path);
+                self.unselect_path(&path, true);
             }
             Message::SelectAll(mut files) => {
                 while let Some(file) = files.pop() {
                     let _ = self.selected.insert(file);
                 }
+                self.selected.insert(self.current_dir.clone());
             }
-            Message::EmptySelect(files) => {
-                files.iter().for_each(|file| {
-                    let _ = self.selected.remove(file);
+            Message::UnselectAll(paths) => {
+                paths.iter().for_each(|path| {
+                    self.unselect_path(path, true);
                 });
+                self.selected.remove(&self.current_dir);
             }
             Message::Status(status) => {
                 if let Status::Progress(status) = status {
