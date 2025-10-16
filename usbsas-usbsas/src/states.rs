@@ -437,8 +437,8 @@ impl RunState for OpenSrcUsbState {
                     children.end_wait_all(comm)?;
                     return Ok(State::Exit);
                 }
-                _ => {
-                    comm.error("Unexpected request")?;
+                unxp => {
+                    comm.error(format!("Unexpected request: {unxp:?}"))?;
                     continue;
                 }
             };
@@ -496,8 +496,8 @@ impl RunState for BrowseSrcState {
                     children.end_wait_all(comm)?;
                     return Ok(State::Exit);
                 }
-                _ => {
-                    comm.error("Unexpected request")?;
+                unxp => {
+                    comm.error(format!("Unexpected request: {unxp:?}"))?;
                     continue;
                 }
             }
