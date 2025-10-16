@@ -737,8 +737,14 @@ impl GUI {
                 let mut selected_list = Column::new().width(Length::Fill);
                 for file in &self.selected {
                     selected_list = selected_list.push(
-                        // text(file.trim_start_matches('/'))
-                        text(file).shaping(text::Shaping::Advanced).size(TXT_SIZE),
+                        Row::new()
+                            .push(text(file).shaping(text::Shaping::Advanced).size(TXT_SIZE))
+                            .push(Space::new(Length::Fill, Length::Fixed(2.0)))
+                            .push(
+                                button(text("🗑").shaping(text::Shaping::Advanced).size(TXT_SIZE))
+                                    .style(button::text)
+                                    .on_press(Message::UnSelectFile(file.clone())),
+                            ),
                     );
                 }
                 selected_col = selected_col.push(scrollable(selected_list).anchor_bottom());
