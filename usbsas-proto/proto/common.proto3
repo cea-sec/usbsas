@@ -151,6 +151,12 @@ message DeviceReport {
   }
 }
 
+message FileInfoReport {
+  uint64 size = 1;
+  int64 timestamp = 2;
+  optional string sha256 = 3;
+}
+
 message TransferReport {
   string title = 1;
   string datetime = 2;
@@ -161,9 +167,9 @@ message TransferReport {
   string transfer_id = 7;
   DeviceReport source = 8;
   DeviceReport destination = 9;
-  repeated string file_names = 11;
-  repeated string error_files = 12;
-  repeated string filtered_files = 13;
-  repeated string rejected_files = 14;
+  map <string, FileInfoReport> files = 11;
+  repeated string errors = 12;
+  repeated string filtered = 13;
+  repeated string rejected = 14;
   optional AnalyzeReport analyzereport = 15;
 };

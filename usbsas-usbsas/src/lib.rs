@@ -8,7 +8,7 @@ use std::{
     env,
 };
 use usbsas_proto::common::{
-    device::Device, AnalyzeReport, FileType, FsType, TransferReport, UsbDevice,
+    device::Device, AnalyzeReport, FileInfoReport, FileType, FsType, TransferReport, UsbDevice,
 };
 
 type Devices = HashMap<u64, Device>;
@@ -56,6 +56,7 @@ pub struct FileInfo {
     ftype: FileType,
     timestamp: i64,
     status: FileStatus,
+    cksum: Option<String>,
 }
 
 impl From<&usbsas_proto::common::FileInfo> for FileInfo {
@@ -65,6 +66,7 @@ impl From<&usbsas_proto::common::FileInfo> for FileInfo {
             timestamp: fi.timestamp,
             status: FileStatus::Unknown,
             ftype: FileType::try_from(fi.ftype).unwrap_or(FileType::Other),
+            cksum: None,
         }
     }
 }
@@ -76,6 +78,7 @@ impl From<&usbsas_proto::files::ResponseGetAttr> for FileInfo {
             timestamp: attrs.timestamp,
             status: FileStatus::Unknown,
             ftype: FileType::try_from(attrs.ftype).unwrap_or(FileType::Other),
+            cksum: None,
         }
     }
 }
@@ -126,38 +129,57 @@ fn report(
 ) -> TransferReport {
     let (hostname, time, datetime) = report_infos();
     let transfer_id = env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string());
-    let (file_names, error_files, filtered_files, rejected_files) =
-        if let Some(tfiles) = transfer_files {
-            (
-                tfiles
-                    .files
-                    .iter()
-                    .filter(|(_, fi)| fi.ftype == FileType::Regular)
-                    .filter_map(|(path, fi)| {
-                        if fi.status == FileStatus::Dirty {
-                            None
-                        } else {
-                            Some(path.into())
-                        }
-                    })
-                    .collect(),
-                tfiles.errors.clone(),
-                tfiles.filtered.clone(),
-                tfiles
-                    .files
-                    .iter()
-                    .filter_map(|(path, fi)| {
-                        if fi.status == FileStatus::Dirty {
-                            Some(path.trim_start_matches('/').into())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-            )
-        } else {
-            (vec![], vec![], vec![], vec![])
-        };
+    let mut files: BTreeMap<String, FileInfoReport> = BTreeMap::new();
+    let (errors, filtered, rejected) = if let Some(tfiles) = transfer_files {
+        tfiles
+            .files
+            .iter()
+            .filter(|(_, fi)| {
+                fi.ftype == FileType::Regular
+                    && (fi.status != FileStatus::Dirty && fi.status != FileStatus::Error)
+            })
+            .for_each(|(path, fi)| {
+                let _ = files.insert(
+                    path.to_string(),
+                    FileInfoReport {
+                        size: fi.size,
+                        timestamp: fi.timestamp,
+                        sha256: fi.cksum.clone(),
+                    },
+                );
+            });
+        let mut errors = tfiles.errors.clone();
+        errors.extend_from_slice(
+            &tfiles
+                .files
+                .iter()
+                .filter_map(|(path, fi)| {
+                    if fi.status == FileStatus::Error {
+                        Some(path.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<String>>(),
+        );
+        (
+            errors,
+            tfiles.filtered.clone(),
+            tfiles
+                .files
+                .iter()
+                .filter_map(|(path, fi)| {
+                    if fi.status == FileStatus::Dirty {
+                        Some(path.trim_start_matches('/').into())
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        )
+    } else {
+        (vec![], vec![], vec![])
+    };
     TransferReport {
         title: format!("{title}_{datetime}_{transfer_id}"),
         datetime,
@@ -168,10 +190,10 @@ fn report(
         user,
         source: source.map(|x| x.into()),
         destination: destination.map(|x| x.into()),
-        file_names,
-        error_files,
-        filtered_files,
-        rejected_files,
+        files,
+        errors,
+        filtered,
+        rejected,
         analyzereport,
     }
 }

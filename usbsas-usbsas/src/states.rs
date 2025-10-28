@@ -5,6 +5,7 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
 use usbsas_comm::{
     ComRqFiles, ComRqWriteDst, ProtoReqAnalyzer, ProtoReqCmdExec, ProtoReqCommon,
@@ -829,6 +830,15 @@ impl FileSelectionState {
                 timestamp: fileinfo.timestamp,
             })?;
 
+        if matches!(fileinfo.ftype, FileType::Directory) {
+            children
+                .files2tar
+                .comm
+                .endfile(proto::writedst::RequestEndFile { path: path.into() })?;
+            return Ok(());
+        }
+
+        let mut hasher = Sha256::new();
         let mut offset: u64 = 0;
         while size > 0 {
             let size_todo = if size < READ_FILE_MAX_SIZE {
@@ -841,6 +851,7 @@ impl FileSelectionState {
                 offset,
                 size: size_todo,
             })?;
+            hasher.update(&rep.data);
             children
                 .files2tar
                 .comm
@@ -858,6 +869,7 @@ impl FileSelectionState {
             .files2tar
             .comm
             .endfile(proto::writedst::RequestEndFile { path: path.into() })?;
+        fileinfo.cksum = Some(format!("{:x}", hasher.finalize()));
         Ok(())
     }
 }

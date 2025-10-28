@@ -22,6 +22,7 @@ fn main() {
     prost_build.btree_map([
         "common.AnalyzeReport.antivirus",
         "common.AnalyzeReport.files",
+        "common.TransferReport.files",
     ]);
 
     // Impl serde::Serialize / Deserialize
@@ -50,6 +51,10 @@ fn main() {
     );
     prost_build.message_attribute("jsonparser.SrvResp", "#[derive(serde::Deserialize)]");
     prost_build.message_attribute("common.UsbDeviceReport", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute(
+        "common.FileInfoReport",
+        "#[derive(serde::Serialize, serde::Deserialize)]",
+    );
 
     // Skip serializing if None
     prost_build.field_attribute(
@@ -65,19 +70,19 @@ fn main() {
         "#[serde(skip_serializing_if = \"Option::is_none\")]",
     );
     prost_build.field_attribute(
-        "common.TransferReport.file_names",
+        "common.TransferReport.files",
+        "#[serde(skip_serializing_if = \"BTreeMap::is_empty\")]",
+    );
+    prost_build.field_attribute(
+        "common.TransferReport.errors",
         "#[serde(skip_serializing_if = \"Vec::is_empty\")]",
     );
     prost_build.field_attribute(
-        "common.TransferReport.error_files",
+        "common.TransferReport.filtered",
         "#[serde(skip_serializing_if = \"Vec::is_empty\")]",
     );
     prost_build.field_attribute(
-        "common.TransferReport.filtered_files",
-        "#[serde(skip_serializing_if = \"Vec::is_empty\")]",
-    );
-    prost_build.field_attribute(
-        "common.TransferReport.rejected_files",
+        "common.TransferReport.rejected",
         "#[serde(skip_serializing_if = \"Vec::is_empty\")]",
     );
     prost_build.field_attribute(
@@ -86,6 +91,10 @@ fn main() {
     );
     prost_build.field_attribute(
         "common.FileStatus.sha256",
+        "#[serde(skip_serializing_if = \"Option::is_none\")]",
+    );
+    prost_build.field_attribute(
+        "common.FileInfoReport.sha256",
         "#[serde(skip_serializing_if = \"Option::is_none\")]",
     );
 
