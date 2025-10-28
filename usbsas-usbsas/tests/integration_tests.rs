@@ -217,7 +217,11 @@ impl IntegrationTester {
             .unwrap();
 
         assert_eq!(
-            report.file_names,
+            report
+                .files
+                .keys()
+                .map(|x| x.as_str())
+                .collect::<Vec<&str>>(),
             [
                 "/chicken.pdf",
                 "/quiche/lorem ipsum.txt",
@@ -227,14 +231,14 @@ impl IntegrationTester {
             ]
         );
         assert_eq!(
-            report.filtered_files,
+            report.filtered,
             ["/AUTORUN.INF", "/Micro$oft.lnk", "/quiche/.DS_STORE"]
         );
-        assert_eq!(report.rejected_files, ["infected/eicar.com"]);
+        assert_eq!(report.rejected, ["infected/eicar.com"]);
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("b30da3e804be4369fe4f9df96e3f5519ba63716e793b79cc60eea6b7942c9f72")
+            hex!("c59ec7d41232f5df72ff9def7d20f8c837dfd07cd69960800955fe5f4989f200")
         );
         Ok(())
     }
@@ -300,7 +304,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&format!("{}/bundle_test.tar", self.av_dir))?,
-            hex!("da86a33fd27fb99e8060dfa204451d1d657592d72c0abd0cab8c50d221349189")
+            hex!("ea65ce0332be473dd79a3225d78e3806708e782d25c252f8163e82d9e869d7ff")
         );
 
         Ok(())
@@ -353,7 +357,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("e3d097840f7257a7a9b4e58aeb0b08b3074acb7bafe3c4776c1f44ca250dadea")
+            hex!("943e462051cf676a1c7c5f8e130d9ada46f0858db7c6aa45039b9facd81284f0")
         );
 
         Ok(())
@@ -419,7 +423,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&format!("{}/quiche.tar", self.wdir))?,
-            hex!("e85ebe71b4c006c371d2c797787b983d3dd160310331a5b034c32878aefd207d")
+            hex!("c2b335bda88a3d189c402142a07f774004a1a91a2b39dc8a2c7f3624f580128d")
         );
 
         Ok(())

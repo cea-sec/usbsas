@@ -1,11 +1,12 @@
 use crate::{
     filter::{Rule, Rules},
-    Children, Devices, Transfer, TransferFiles, TransferReport,
+    Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace};
 use serde_json::json;
-use std::collections::{HashMap, HashSet, VecDeque};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, VecDeque};
 use usbsas_comm::{
     ComRqFiles, ComRqWriteDst, ProtoReqAnalyzer, ProtoReqCmdExec, ProtoReqCommon,
     ProtoReqDownloader, ProtoReqFiles, ProtoReqFs2Dev, ProtoReqIdentificator, ProtoReqUploader,
@@ -633,8 +634,6 @@ impl FileSelectionState {
             _ => unimplemented!(),
         };
         let mut files_size = 0;
-        // Read filter rules from config
-        let mut all_entries = HashSet::new();
         let rules = Rules {
             rules: self
                 .config
@@ -650,31 +649,26 @@ impl FileSelectionState {
                 .collect(),
         }
         .into_lowercase();
+
         while let Some(entry) = self.selected.pop_front() {
             if (matches!(self.transfer.src, Device::Network(_)) && entry == "/config.json")
-                || all_entries.contains(&entry)
+                || self.transfer.files.contains(&entry)
             {
                 continue;
             }
-            // First add parent(s) of a file if not selected
-            let mut parts = entry.trim_start_matches('/').split('/');
-            // Remove last (file basename)
-            let _ = parts.next_back();
-            let mut parent = String::from("");
-            for dir in parts {
-                parent.push('/');
-                parent.push_str(dir);
-                if !self.transfer.files.directories.contains(&parent) {
-                    self.transfer.files.directories.push(parent.clone());
-                }
+
+            if rules.match_all(&entry) {
+                self.transfer.files.filtered.push(entry.clone());
+                continue;
             }
+
             let rep = match src_reader.comm.getattr(proto::files::RequestGetAttr {
                 path: entry.clone(),
             }) {
                 Ok(rep) => rep,
                 Err(err) => {
                     error!("get attr '{entry}' err '{err}'");
-                    self.transfer.files.errors.push(entry);
+                    self.transfer.files.errors.push(entry.clone());
                     continue;
                 }
             };
@@ -683,21 +677,13 @@ impl FileSelectionState {
                     if max_file_size.is_some_and(|size| rep.size > size) {
                         error!("{} too large ({}B)", entry, rep.size);
                         self.transfer.files.errors.push(entry.clone());
-                    } else if rules.match_all(&entry) {
-                        self.transfer.files.filtered.push(entry.clone())
                     } else {
-                        self.transfer.files.files.push(entry.clone());
+                        self.transfer.files.add(&entry, FileInfo::from(&rep));
                         files_size += rep.size;
                     }
-                    all_entries.insert(entry.clone());
                 }
                 Ok(FileType::Directory) => {
-                    if !entry.is_empty() && !rules.match_all(&entry) {
-                        self.transfer.files.directories.push(entry.clone());
-                    } else {
-                        self.transfer.files.filtered.push(entry.clone());
-                    }
-                    all_entries.insert(entry.clone());
+                    self.transfer.files.add(&entry, FileInfo::from(&rep));
                     match src_reader.comm.readdir(proto::files::RequestReadDir {
                         path: entry.clone(),
                     }) {
@@ -709,17 +695,42 @@ impl FileSelectionState {
                         }
                         Err(err) => {
                             error!("get attr '{}' err '{}'", &entry, err);
-                            self.transfer.files.errors.push(entry);
+                            self.transfer.files.errors.push(entry.clone());
                             continue;
                         }
                     }
                 }
-                _ => self.transfer.files.errors.push(entry),
+                _ => self.transfer.files.errors.push(entry.clone()),
             }
         }
-        self.transfer.files.files.sort();
-        self.transfer.files.directories.sort();
-        self.transfer.files.errors.sort();
+
+        // Add parent(s) of a file if not selected
+        let mut dirs_todo = Vec::new();
+        self.transfer.files.iter().for_each(|(path, _)| {
+            let mut parts = path.trim_start_matches('/').split('/');
+            // Remove last (file basename)
+            let _ = parts.next_back();
+            let mut parent = String::from("");
+            for dir in parts {
+                parent.push('/');
+                parent.push_str(dir);
+                if !self.transfer.files.contains(&parent) {
+                    dirs_todo.push(parent.clone());
+                }
+            }
+        });
+        dirs_todo.iter().for_each(|dir| {
+            match src_reader
+                .comm
+                .getattr(proto::files::RequestGetAttr { path: dir.clone() })
+            {
+                Ok(rep) => self.transfer.files.add(dir, FileInfo::from(&rep)),
+                Err(err) => {
+                    error!("get attr '{dir}' err '{err}'");
+                    self.transfer.files.errors.push(dir.clone());
+                }
+            }
+        });
         Ok(files_size)
     }
 
@@ -731,18 +742,49 @@ impl FileSelectionState {
     ) -> Result<()> {
         trace!("tar src files");
         let mut current: u64 = 0;
-        for path in self
+
+        // Directory tree first
+        let dirs: Vec<String> = self
             .transfer
             .files
-            .directories
+            .files
             .iter()
-            .chain(self.transfer.files.files.iter())
-        {
-            if let Err(err) = self.file_to_tar(comm, children, path, &mut current, total_size) {
-                error!("Couldn't copy file '{path}': {err}");
-                self.transfer.files.errors.push(path.clone());
+            .filter_map(|(path, fi)| {
+                if fi.ftype == FileType::Directory {
+                    Some(path.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for dir in dirs {
+            if let Err(err) = self.file_to_tar(comm, children, &dir, &mut current, total_size) {
+                error!("Couldn't tar file '{dir}': {err}");
+                self.transfer.files.set_error(&dir);
             };
         }
+
+        // Then files
+        let files: Vec<String> = self
+            .transfer
+            .files
+            .files
+            .iter()
+            .filter_map(|(path, fi)| {
+                if fi.ftype == FileType::Regular {
+                    Some(path.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for file in files {
+            if let Err(err) = self.file_to_tar(comm, children, &file, &mut current, total_size) {
+                error!("Couldn't tar file '{file}': {err}");
+                self.transfer.files.set_error(&file);
+            };
+        }
+
         let report = self.transfer.to_report("success");
         self.write_report(
             &mut children.files2tar,
@@ -758,7 +800,7 @@ impl FileSelectionState {
     }
 
     fn file_to_tar(
-        &self,
+        &mut self,
         comm: &mut impl ProtoRespUsbsas,
         children: &mut Children,
         path: &str,
@@ -769,27 +811,38 @@ impl FileSelectionState {
             Device::Usb(_) => &mut children.scsi2files,
             _ => unimplemented!(),
         };
-        let mut attrs = src_reader
-            .comm
-            .getattr(proto::files::RequestGetAttr { path: path.into() })?;
         // Some FS (like ext4) have a directory size != 0, set it to 0 for
         // consistency with other FS (metadata is already taken into account)
-        if matches!(FileType::try_from(attrs.ftype), Ok(FileType::Directory)) {
-            attrs.size = 0;
-        }
+        let fileinfo = self.transfer.files.files.get_mut(path).unwrap();
+        let mut size = if matches!(fileinfo.ftype, FileType::Directory) {
+            fileinfo.size = 0;
+            0
+        } else {
+            fileinfo.size
+        };
         children
             .files2tar
             .comm
             .newfile(proto::writedst::RequestNewFile {
                 path: path.into(),
-                size: attrs.size,
-                ftype: attrs.ftype,
-                timestamp: attrs.timestamp,
+                size: fileinfo.size,
+                ftype: fileinfo.ftype.into(),
+                timestamp: fileinfo.timestamp,
             })?;
+
+        if matches!(fileinfo.ftype, FileType::Directory) {
+            children
+                .files2tar
+                .comm
+                .endfile(proto::writedst::RequestEndFile { path: path.into() })?;
+            return Ok(());
+        }
+
+        let mut hasher = Sha256::new();
         let mut offset: u64 = 0;
-        while attrs.size > 0 {
-            let size_todo = if attrs.size < READ_FILE_MAX_SIZE {
-                attrs.size
+        while size > 0 {
+            let size_todo = if size < READ_FILE_MAX_SIZE {
+                size
             } else {
                 READ_FILE_MAX_SIZE
             };
@@ -798,6 +851,7 @@ impl FileSelectionState {
                 offset,
                 size: size_todo,
             })?;
+            hasher.update(&rep.data);
             children
                 .files2tar
                 .comm
@@ -807,7 +861,7 @@ impl FileSelectionState {
                     data: rep.data,
                 })?;
             offset += size_todo;
-            attrs.size -= size_todo;
+            size -= size_todo;
             *current += size_todo;
             comm.status(*current, total_size, false, Status::ReadSrc)?;
         }
@@ -815,6 +869,7 @@ impl FileSelectionState {
             .files2tar
             .comm
             .endfile(proto::writedst::RequestEndFile { path: path.into() })?;
+        fileinfo.cksum = Some(format!("{:x}", hasher.finalize()));
         Ok(())
     }
 }
@@ -843,21 +898,18 @@ impl RunState for AnalyzeState {
 
         if let Some(ref report) = report {
             match report.version {
-                Some(2) => self.transfer.files.files.retain(|x| {
-                    if let Some(file_status) = report.files.get(x.trim_start_matches('/')) {
+                Some(2) => self.transfer.files.files.iter_mut().for_each(|(path, fi)| {
+                    if let Some(file_status) = report.files.get(path.trim_start_matches('/')) {
                         match file_status.status.as_str() {
-                            "CLEAN" => true,
+                            "CLEAN" => fi.status = FileStatus::Clean,
                             "DIRTY" => {
-                                self.transfer.files.dirty.push(x.to_string());
-                                false
+                                if let Some(size) = self.transfer.selected_size.as_mut() {
+                                    *size -= fi.size;
+                                }
+                                fi.status = FileStatus::Dirty
                             }
-                            _ => {
-                                self.transfer.files.errors.push(x.to_string());
-                                false
-                            }
+                            _ => (),
                         }
-                    } else {
-                        false
                     }
                 }),
                 _ => panic!("unsupported"),
@@ -871,7 +923,12 @@ impl RunState for AnalyzeState {
         };
 
         self.transfer.analyze_report = report;
-        if self.transfer.files.files.is_empty() {
+        if !self
+            .transfer
+            .files
+            .iter()
+            .any(|(_, fi)| fi.status == FileStatus::Clean)
+        {
             comm.error("Nothing to copy after analyzer, aborting")?;
             let report = self
                 .transfer
@@ -911,20 +968,49 @@ impl RunState for WriteDstFileState {
         }
 
         let mut current_size = 0;
-        for path in self
+
+        let dirs: Vec<String> = self
             .transfer
             .files
-            .directories
+            .files
             .iter()
-            // root directory already created whith filesystem
-            .filter(|dir| !(dir.is_empty() || *dir == "/"))
-            .chain(self.transfer.files.files.iter())
-        {
-            if let Err(err) = self.file_to_dst(comm, children, path, &mut current_size) {
-                error!("couldn't copy file {}: {}", &path, err);
-                self.transfer.files.errors.push(path.clone());
+            .filter_map(|(path, fi)| {
+                if fi.ftype == FileType::Directory && !(path.is_empty() || *path == "/") {
+                    Some(path.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for dir in dirs {
+            if let Err(err) = self.file_to_dst(comm, children, &dir, &mut current_size) {
+                error!("couldn't copy file '{dir}': {err}");
+                self.transfer.files.set_error(&dir);
             };
         }
+
+        let files: Vec<String> = self
+            .transfer
+            .files
+            .files
+            .iter()
+            .filter_map(|(path, fi)| {
+                if fi.ftype == FileType::Regular
+                    && !(self.transfer.analyze && fi.status != FileStatus::Clean)
+                {
+                    Some(path.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for file in files {
+            if let Err(err) = self.file_to_dst(comm, children, &file, &mut current_size) {
+                error!("couldn't copy file '{file}': {err}");
+                self.transfer.files.set_error(&file);
+            };
+        }
+
         if let Some(ref confreport) = self.config.report {
             if confreport.write_dest {
                 let report = self.transfer.to_report("sucess");
@@ -978,20 +1064,20 @@ impl WriteDstFileState {
             }
             Device::Usb(_) => (&mut children.files2fs, Status::MkFs),
         };
-        let mut attrs = children
-            .tar2files
-            .comm
-            .getattr(proto::files::RequestGetAttr { path: path.into() })?;
+
+        let fileinfo = self.transfer.files.files.get(path).unwrap();
         dst_writer.comm.newfile(proto::writedst::RequestNewFile {
             path: path.into(),
-            size: attrs.size,
-            ftype: attrs.ftype,
-            timestamp: attrs.timestamp,
+            size: fileinfo.size,
+            ftype: fileinfo.ftype.into(),
+            timestamp: fileinfo.timestamp,
         })?;
+
+        let mut size = fileinfo.size;
         let mut offset: u64 = 0;
-        while attrs.size > 0 {
-            let size_todo = if attrs.size < READ_FILE_MAX_SIZE {
-                attrs.size
+        while size > 0 {
+            let size_todo = if size < READ_FILE_MAX_SIZE {
+                size
             } else {
                 READ_FILE_MAX_SIZE
             };
@@ -1011,7 +1097,7 @@ impl WriteDstFileState {
                     data: rep.data,
                 })?;
             offset += size_todo;
-            attrs.size -= size_todo;
+            size -= size_todo;
             *current_size += size_todo;
             comm.status(
                 *current_size,

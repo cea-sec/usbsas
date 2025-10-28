@@ -3,30 +3,92 @@ use crate::children::Children;
 pub mod filter;
 pub mod states;
 
-use std::{collections::HashMap, env};
-use usbsas_proto::common::{device::Device, AnalyzeReport, FsType, TransferReport, UsbDevice};
+use std::{
+    collections::{BTreeMap, HashMap},
+    env,
+};
+use usbsas_proto::common::{
+    device::Device, AnalyzeReport, FileInfoReport, FileType, FsType, TransferReport, UsbDevice,
+};
 
 type Devices = HashMap<u64, Device>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 struct TransferFiles {
-    files: Vec<String>,
-    directories: Vec<String>,
+    files: BTreeMap<String, FileInfo>,
     filtered: Vec<String>,
     errors: Vec<String>,
-    dirty: Vec<String>,
 }
 
 impl TransferFiles {
     fn new() -> Self {
         TransferFiles {
-            files: Vec::new(),
-            directories: Vec::new(),
+            files: BTreeMap::new(),
             filtered: Vec::new(),
             errors: Vec::new(),
-            dirty: Vec::new(),
         }
     }
+
+    fn add(&mut self, path: &str, fi: FileInfo) {
+        self.files.insert(path.to_string(), fi);
+    }
+
+    fn contains(&self, path: &str) -> bool {
+        self.files.contains_key(path)
+            || self.errors.contains(&path.to_string())
+            || self.filtered.contains(&path.to_string())
+    }
+
+    fn iter(&self) -> std::collections::btree_map::Iter<'_, std::string::String, FileInfo> {
+        self.files.iter()
+    }
+
+    fn set_error(&mut self, path: &str) {
+        if let Some(fileinfo) = self.files.get_mut(path) {
+            fileinfo.status = FileStatus::Error;
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FileInfo {
+    size: u64,
+    ftype: FileType,
+    timestamp: i64,
+    status: FileStatus,
+    cksum: Option<String>,
+}
+
+impl From<&usbsas_proto::common::FileInfo> for FileInfo {
+    fn from(fi: &usbsas_proto::common::FileInfo) -> Self {
+        Self {
+            size: fi.size,
+            timestamp: fi.timestamp,
+            status: FileStatus::Unknown,
+            ftype: FileType::try_from(fi.ftype).unwrap_or(FileType::Other),
+            cksum: None,
+        }
+    }
+}
+
+impl From<&usbsas_proto::files::ResponseGetAttr> for FileInfo {
+    fn from(attrs: &usbsas_proto::files::ResponseGetAttr) -> Self {
+        Self {
+            size: attrs.size,
+            timestamp: attrs.timestamp,
+            status: FileStatus::Unknown,
+            ftype: FileType::try_from(attrs.ftype).unwrap_or(FileType::Other),
+            cksum: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum FileStatus {
+    Unknown,
+    Clean,
+    Dirty,
+    Error,
 }
 
 #[derive(Debug)]
@@ -50,9 +112,7 @@ impl Transfer {
             Some(self.userid.clone()),
             Some(&self.src),
             Some(&self.dst),
-            Some(self.files.files.clone()),
-            Some(self.files.filtered.clone()),
-            Some(self.files.errors.clone()),
+            Some(&self.files),
             self.analyze_report.clone(),
         )
     }
@@ -64,27 +124,61 @@ fn report(
     user: Option<String>,
     source: Option<&Device>,
     destination: Option<&Device>,
-    file_names: Option<Vec<String>>,
-    filtered_files: Option<Vec<String>>,
-    error_files: Option<Vec<String>>,
+    transfer_files: Option<&TransferFiles>,
     analyzereport: Option<AnalyzeReport>,
 ) -> TransferReport {
     let (hostname, time, datetime) = report_infos();
     let transfer_id = env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string());
-    let rejected_files: Vec<String> = if let Some(ref report) = analyzereport {
-        report
+    let mut files: BTreeMap<String, FileInfoReport> = BTreeMap::new();
+    let (errors, filtered, rejected) = if let Some(tfiles) = transfer_files {
+        tfiles
             .files
             .iter()
-            .filter_map(|(file, status)| {
-                if status.status == "DIRTY" {
-                    Some(file.into())
-                } else {
-                    None
-                }
+            .filter(|(_, fi)| {
+                fi.ftype == FileType::Regular
+                    && (fi.status != FileStatus::Dirty && fi.status != FileStatus::Error)
             })
-            .collect()
+            .for_each(|(path, fi)| {
+                let _ = files.insert(
+                    path.to_string(),
+                    FileInfoReport {
+                        size: fi.size,
+                        timestamp: fi.timestamp,
+                        sha256: fi.cksum.clone(),
+                    },
+                );
+            });
+        let mut errors = tfiles.errors.clone();
+        errors.extend_from_slice(
+            &tfiles
+                .files
+                .iter()
+                .filter_map(|(path, fi)| {
+                    if fi.status == FileStatus::Error {
+                        Some(path.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<String>>(),
+        );
+        (
+            errors,
+            tfiles.filtered.clone(),
+            tfiles
+                .files
+                .iter()
+                .filter_map(|(path, fi)| {
+                    if fi.status == FileStatus::Dirty {
+                        Some(path.trim_start_matches('/').into())
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        )
     } else {
-        Vec::new()
+        (vec![], vec![], vec![])
     };
     TransferReport {
         title: format!("{title}_{datetime}_{transfer_id}"),
@@ -96,10 +190,10 @@ fn report(
         user,
         source: source.map(|x| x.into()),
         destination: destination.map(|x| x.into()),
-        file_names: file_names.unwrap_or_default(),
-        error_files: error_files.unwrap_or_default(),
-        filtered_files: filtered_files.unwrap_or_default(),
-        rejected_files,
+        files,
+        errors,
+        filtered,
+        rejected,
         analyzereport,
     }
 }
@@ -113,8 +207,6 @@ fn report_diskimg(device: UsbDevice) -> TransferReport {
         Some(&Device::Usb(device)),
         None,
         None,
-        None,
-        None,
     )
 }
 
@@ -124,8 +216,6 @@ fn report_wipe(device: UsbDevice) -> TransferReport {
         "success",
         None,
         Some(&Device::Usb(device)),
-        None,
-        None,
         None,
         None,
         None,

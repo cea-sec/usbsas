@@ -14,6 +14,7 @@ pub mod cmdexec {
 }
 
 pub mod common {
+    use std::collections::BTreeMap;
     use std::hash::{DefaultHasher, Hash, Hasher};
     include!(concat!(env!("OUT_DIR"), "/common.rs"));
 
