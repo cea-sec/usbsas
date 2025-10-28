@@ -912,7 +912,7 @@ impl GUI {
                         b: 0.0,
                         a: 1.0,
                     };
-                    if !report.error_files.is_empty() {
+                    if !report.errors.is_empty() {
                         col_report = col_report
                             .push(text(self.i18n_txt("errors")).size(HEADER_SIZE))
                             .push(Space::new(Length::Fill, Length::Fixed(10.0)))
@@ -921,12 +921,12 @@ impl GUI {
                                     .style(container::dark),
                             )
                             .push(Space::new(Length::Fill, Length::Fixed(10.0)));
-                        for fname in &report.error_files {
+                        for fname in &report.errors {
                             col_report =
                                 col_report.push(text(fname).color(color_red).size(TXT_SIZE));
                         }
                     }
-                    if !report.filtered_files.is_empty() {
+                    if !report.filtered.is_empty() {
                         col_report = col_report
                             .push(Space::new(Length::Fill, Length::Fixed(15.0)))
                             .push(text(self.i18n_txt("filtered")).size(HEADER_SIZE))
@@ -936,7 +936,7 @@ impl GUI {
                                     .style(container::dark),
                             )
                             .push(Space::new(Length::Fill, Length::Fixed(10.0)));
-                        for fname in &report.filtered_files {
+                        for fname in &report.filtered {
                             col_report = col_report.push(
                                 text(fname.trim_start_matches('/'))
                                     .size(TXT_SIZE)
@@ -944,7 +944,7 @@ impl GUI {
                             );
                         }
                     }
-                    if !report.rejected_files.is_empty() {
+                    if !report.rejected.is_empty() {
                         col_report = col_report
                             .push(Space::new(Length::Fill, Length::Fixed(15.0)))
                             .push(text(self.i18n_txt("rejected")).size(HEADER_SIZE))
@@ -954,7 +954,7 @@ impl GUI {
                                     .style(container::dark),
                             )
                             .push(Space::new(Length::Fill, Length::Fixed(10.0)));
-                        for fname in &report.rejected_files {
+                        for fname in &report.rejected {
                             col_report =
                                 col_report.push(text(fname).size(TXT_SIZE).color(color_red));
                         }
