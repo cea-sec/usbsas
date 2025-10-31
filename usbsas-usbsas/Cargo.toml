@@ -25,7 +25,7 @@ uuid = { version = "1.18", features = ["v4"] }
 [dev-dependencies]
 assert_cmd = "2.0"
 flate2 = { version = "1.1", features = ["zlib-rs"], default-features = false }
-hex-literal = "1.0"
+hex-literal = "1.1"
 nix = { version = "0.30", features = ["process", "signal"] }
 reqwest = { version = "0.12", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
