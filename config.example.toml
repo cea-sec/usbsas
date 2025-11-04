@@ -3,6 +3,9 @@
 # Directory where temp tar and fs will be stored. (Mandatory)
 out_directory = "/tmp/"
 
+# Keep temporary files (tar & filesystem)
+#keep_tmp_files = false
+
 # GUI window title (Optional)
 window_title = "USBSAS"
 

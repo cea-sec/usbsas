@@ -13,24 +13,15 @@ use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_usbsas::{
     children::Children,
     states::{EndState, InitState, State},
+    TmpFiles,
 };
 use usbsas_utils::clap::UsbsasClap;
-
-pub struct UnixSocketPath {
-    path: String,
-}
-
-impl Drop for UnixSocketPath {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
-    }
-}
 
 fn main_loop(
     mut comm: impl ProtoRespUsbsas,
     mut children: Children,
     config: Config,
-    _socket_path: Option<UnixSocketPath>,
+    _tmp_files: TmpFiles,
 ) -> Result<()> {
     let init_state = InitState {
         config,
@@ -96,6 +87,14 @@ fn main() -> Result<()> {
     // Spawn children
     let children = Children::spawn(config_path, &tar_path, &fs_path).context("spawn children")?;
 
+    let mut tmpfiles = TmpFiles {
+        tar_path,
+        clean_tar_path,
+        fs_path,
+        socket_path: None,
+        keep: config.keep_tmp_files.unwrap_or(false),
+    };
+
     // Get file descriptors to apply seccomp rules
     let mut pipes_read = vec![];
     let mut pipes_write = vec![];
@@ -122,14 +121,22 @@ fn main() -> Result<()> {
     let available = fs_stats.block_size() * fs_stats.blocks_available();
     config.available_space = Some(available);
 
-    if let Some(path) = matches.get_one::<String>("socket") {
-        if let Ok(true) = std::path::Path::new(path).try_exists() {
-            log::warn!("socket already exists, probably residual, removing it");
-            fs::remove_file(path).expect("remove socket");
+    if matches.contains_id("socket") {
+        let socket_path = match matches.get_one::<String>("socket") {
+            Some(path) => path.to_string(),
+            None => format!(
+                "{}/usbsas.sock",
+                &config.out_directory.trim_end_matches('/')
+            ),
         };
-        let listener = UnixListener::bind(path).context("bind")?;
+        if let Ok(true) = std::path::Path::new(&socket_path).try_exists() {
+            log::warn!("socket already exists, probably residual, removing it");
+            fs::remove_file(&socket_path).expect("remove socket");
+        };
+        let listener = UnixListener::bind(&socket_path).context("bind")?;
         // Set R+W for owner and group
-        fs::set_permissions(path, Permissions::from_mode(0o660)).context("set perms socket")?;
+        fs::set_permissions(&socket_path, Permissions::from_mode(0o660))
+            .context("set perms socket")?;
         let stream = match listener.incoming().next() {
             Some(Ok(stream)) => stream,
             Some(Err(err)) => panic!("error listen incoming {err}"),
@@ -140,24 +147,25 @@ fn main() -> Result<()> {
             listen: listener.as_raw_fd(),
             read: comm.input_fd(),
             write: comm.output_fd(),
-            path: path.to_string(),
+            path: socket_path.clone(),
         };
         pipes_read.push(socket.read);
         pipes_write.push(socket.write);
-        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, Some(socket))
-            .context("seccomp")?;
-        main_loop(
-            comm,
-            children,
-            config,
-            Some(UnixSocketPath { path: path.into() }),
+        usbsas_sandbox::usbsas::sandbox(
+            pipes_read,
+            pipes_write,
+            Some(socket),
+            &config.out_directory,
         )
-        .context("main loop")
+        .context("seccomp")?;
+        tmpfiles.socket_path = Some(socket_path);
+        main_loop(comm, children, config, tmpfiles).context("main loop")
     } else {
         let comm: ComRpUsbsas = Comm::from_env()?;
         pipes_read.push(comm.input_fd());
         pipes_write.push(comm.output_fd());
-        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None).context("seccomp")?;
-        main_loop(comm, children, config, None).context("main loop")
+        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None, &config.out_directory)
+            .context("seccomp")?;
+        main_loop(comm, children, config, tmpfiles).context("main loop")
     }
 }

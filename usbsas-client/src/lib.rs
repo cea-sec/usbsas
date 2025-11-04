@@ -53,9 +53,6 @@ impl std::fmt::Display for LANG {
 
 static FSTYPES: &[FsType] = &[FsType::Ntfs, FsType::Exfat, FsType::Fat];
 
-// 1536 == tar with only a "/data" entry (512b) + 1024b zeroes (created by files2tar when it starts)
-const USBSAS_EMPTY_TAR: u64 = 1536;
-
 #[derive(Debug, Clone)]
 pub enum Status {
     Progress(proto::common::ResponseStatus),
@@ -170,9 +167,8 @@ pub fn client_clap() -> clap::Command {
                 .short('s')
                 .long("socket")
                 .value_name("SOCKET_PATH")
-                .help("Unix domain socket path used to communicate")
+                .help("Usbsas socket path")
                 .num_args(1)
-                .default_value(usbsas_utils::SOCKET_PATH)
                 .required(false),
         )
         .arg(
@@ -255,10 +251,13 @@ impl GUI {
             serde_json::from_str(LANG_FR_DATA).expect("can't parse lang json");
         i18n.insert(LANG::FR, fr);
 
-        let socket_path = matches
-            .get_one::<String>("socket")
-            .expect("clap socket")
-            .to_string();
+        let socket_path = match matches.get_one::<String>("socket") {
+            Some(path) => path.to_string(),
+            None => format!(
+                "{}/usbsas.sock",
+                &config.out_directory.trim_end_matches('/')
+            ),
+        };
 
         (
             Self {
@@ -332,7 +331,11 @@ impl GUI {
                     self.state = State::Init;
                 }
                 Err(err) => {
-                    log::error!("couldn't connect: {err} {:?}", self.state);
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        log::debug!("Waiting usbsas socket...");
+                    } else {
+                        log::error!("couldn't connect: {err} {:?}", self.state);
+                    }
                 }
             };
         } else {
@@ -377,7 +380,8 @@ impl GUI {
 
         for path in &[&tar_path, &clean_tar_path] {
             if let Ok(metadata) = fs::metadata(path) {
-                if metadata.len() == USBSAS_EMPTY_TAR {
+                // Empty tar
+                if metadata.len() == 1536 || metadata.len() == 512 {
                     if let Err(err) = fs::remove_file(Path::new(&path)) {
                         log::error!("couldn't rm file {}: {err}", path);
                     };

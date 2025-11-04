@@ -76,6 +76,7 @@ pub struct Config {
     pub usb_port_accesses: Option<UsbPortAccesses>,
     pub lang: Option<String>,
     pub menu_img: Option<String>,
+    pub keep_tmp_files: Option<bool>,
     // filled by usbsas process
     pub available_space: Option<u64>,
 }
