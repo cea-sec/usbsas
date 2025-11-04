@@ -53,9 +53,6 @@ impl std::fmt::Display for LANG {
 
 static FSTYPES: &[FsType] = &[FsType::Ntfs, FsType::Exfat, FsType::Fat];
 
-// 1536 == tar with only a "/data" entry (512b) + 1024b zeroes (created by files2tar when it starts)
-const USBSAS_EMPTY_TAR: u64 = 1536;
-
 #[derive(Debug, Clone)]
 pub enum Status {
     Progress(proto::common::ResponseStatus),
@@ -377,7 +374,8 @@ impl GUI {
 
         for path in &[&tar_path, &clean_tar_path] {
             if let Ok(metadata) = fs::metadata(path) {
-                if metadata.len() == USBSAS_EMPTY_TAR {
+                // Empty tar
+                if metadata.len() == 1536 || metadata.len() == 512 {
                     if let Err(err) = fs::remove_file(Path::new(&path)) {
                         log::error!("couldn't rm file {}: {err}", path);
                     };
