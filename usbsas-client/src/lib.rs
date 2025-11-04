@@ -331,7 +331,11 @@ impl GUI {
                     self.state = State::Init;
                 }
                 Err(err) => {
-                    log::error!("couldn't connect: {err} {:?}", self.state);
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        log::debug!("Waiting usbsas socket...");
+                    } else {
+                        log::error!("couldn't connect: {err} {:?}", self.state);
+                    }
                 }
             };
         } else {

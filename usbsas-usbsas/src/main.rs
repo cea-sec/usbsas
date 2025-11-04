@@ -152,8 +152,13 @@ fn main() -> Result<()> {
         };
         pipes_read.push(socket.read);
         pipes_write.push(socket.write);
-        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, Some(socket))
-            .context("seccomp")?;
+        usbsas_sandbox::usbsas::sandbox(
+            pipes_read,
+            pipes_write,
+            Some(socket),
+            &config.out_directory,
+        )
+        .context("seccomp")?;
         main_loop(
             comm,
             children,
@@ -165,7 +170,8 @@ fn main() -> Result<()> {
         let comm: ComRpUsbsas = Comm::from_env()?;
         pipes_read.push(comm.input_fd());
         pipes_write.push(comm.output_fd());
-        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None).context("seccomp")?;
+        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None, &config.out_directory)
+            .context("seccomp")?;
         main_loop(comm, children, config, None).context("main loop")
     }
 }
