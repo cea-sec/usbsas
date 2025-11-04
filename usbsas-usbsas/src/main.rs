@@ -13,24 +13,15 @@ use usbsas_config::{conf_parse, conf_read, Config};
 use usbsas_usbsas::{
     children::Children,
     states::{EndState, InitState, State},
+    TmpFiles,
 };
 use usbsas_utils::clap::UsbsasClap;
-
-pub struct UnixSocketPath {
-    path: String,
-}
-
-impl Drop for UnixSocketPath {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
-    }
-}
 
 fn main_loop(
     mut comm: impl ProtoRespUsbsas,
     mut children: Children,
     config: Config,
-    _socket_path: Option<UnixSocketPath>,
+    _tmp_files: TmpFiles,
 ) -> Result<()> {
     let init_state = InitState {
         config,
@@ -96,6 +87,14 @@ fn main() -> Result<()> {
     // Spawn children
     let children = Children::spawn(config_path, &tar_path, &fs_path).context("spawn children")?;
 
+    let mut tmpfiles = TmpFiles {
+        tar_path,
+        clean_tar_path,
+        fs_path,
+        socket_path: None,
+        keep: config.keep_tmp_files.unwrap_or(false),
+    };
+
     // Get file descriptors to apply seccomp rules
     let mut pipes_read = vec![];
     let mut pipes_write = vec![];
@@ -159,19 +158,14 @@ fn main() -> Result<()> {
             &config.out_directory,
         )
         .context("seccomp")?;
-        main_loop(
-            comm,
-            children,
-            config,
-            Some(UnixSocketPath { path: socket_path }),
-        )
-        .context("main loop")
+        tmpfiles.socket_path = Some(socket_path);
+        main_loop(comm, children, config, tmpfiles).context("main loop")
     } else {
         let comm: ComRpUsbsas = Comm::from_env()?;
         pipes_read.push(comm.input_fd());
         pipes_write.push(comm.output_fd());
         usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None, &config.out_directory)
             .context("seccomp")?;
-        main_loop(comm, children, config, None).context("main loop")
+        main_loop(comm, children, config, tmpfiles).context("main loop")
     }
 }

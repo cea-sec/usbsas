@@ -5,7 +5,7 @@ pub mod states;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    env,
+    env, fs,
 };
 use usbsas_proto::common::{
     device::Device, AnalyzeReport, FileInfoReport, FileType, FsType, TransferReport, UsbDevice,
@@ -248,4 +248,25 @@ fn report_infos() -> (String, time::OffsetDateTime, String) {
         time.millisecond()
     );
     (hostname, time, datetime)
+}
+
+pub struct TmpFiles {
+    pub tar_path: String,
+    pub clean_tar_path: String,
+    pub fs_path: String,
+    pub socket_path: Option<String>,
+    pub keep: bool,
+}
+
+impl Drop for TmpFiles {
+    fn drop(&mut self) {
+        if let Some(path) = &self.socket_path {
+            let _ = fs::remove_file(path);
+        }
+        if !self.keep {
+            let _ = fs::remove_file(&self.tar_path);
+            let _ = fs::remove_file(&self.clean_tar_path);
+            let _ = fs::remove_file(&self.fs_path);
+        }
+    }
 }
