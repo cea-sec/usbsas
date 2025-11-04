@@ -167,9 +167,8 @@ pub fn client_clap() -> clap::Command {
                 .short('s')
                 .long("socket")
                 .value_name("SOCKET_PATH")
-                .help("Unix domain socket path used to communicate")
+                .help("Usbsas socket path")
                 .num_args(1)
-                .default_value(usbsas_utils::SOCKET_PATH)
                 .required(false),
         )
         .arg(
@@ -252,10 +251,13 @@ impl GUI {
             serde_json::from_str(LANG_FR_DATA).expect("can't parse lang json");
         i18n.insert(LANG::FR, fr);
 
-        let socket_path = matches
-            .get_one::<String>("socket")
-            .expect("clap socket")
-            .to_string();
+        let socket_path = match matches.get_one::<String>("socket") {
+            Some(path) => path.to_string(),
+            None => format!(
+                "{}/usbsas.sock",
+                &config.out_directory.trim_end_matches('/')
+            ),
+        };
 
         (
             Self {

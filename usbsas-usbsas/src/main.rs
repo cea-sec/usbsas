@@ -122,14 +122,22 @@ fn main() -> Result<()> {
     let available = fs_stats.block_size() * fs_stats.blocks_available();
     config.available_space = Some(available);
 
-    if let Some(path) = matches.get_one::<String>("socket") {
-        if let Ok(true) = std::path::Path::new(path).try_exists() {
-            log::warn!("socket already exists, probably residual, removing it");
-            fs::remove_file(path).expect("remove socket");
+    if matches.contains_id("socket") {
+        let socket_path = match matches.get_one::<String>("socket") {
+            Some(path) => path.to_string(),
+            None => format!(
+                "{}/usbsas.sock",
+                &config.out_directory.trim_end_matches('/')
+            ),
         };
-        let listener = UnixListener::bind(path).context("bind")?;
+        if let Ok(true) = std::path::Path::new(&socket_path).try_exists() {
+            log::warn!("socket already exists, probably residual, removing it");
+            fs::remove_file(&socket_path).expect("remove socket");
+        };
+        let listener = UnixListener::bind(&socket_path).context("bind")?;
         // Set R+W for owner and group
-        fs::set_permissions(path, Permissions::from_mode(0o660)).context("set perms socket")?;
+        fs::set_permissions(&socket_path, Permissions::from_mode(0o660))
+            .context("set perms socket")?;
         let stream = match listener.incoming().next() {
             Some(Ok(stream)) => stream,
             Some(Err(err)) => panic!("error listen incoming {err}"),
@@ -140,7 +148,7 @@ fn main() -> Result<()> {
             listen: listener.as_raw_fd(),
             read: comm.input_fd(),
             write: comm.output_fd(),
-            path: path.to_string(),
+            path: socket_path.clone(),
         };
         pipes_read.push(socket.read);
         pipes_write.push(socket.write);
@@ -150,7 +158,7 @@ fn main() -> Result<()> {
             comm,
             children,
             config,
-            Some(UnixSocketPath { path: path.into() }),
+            Some(UnixSocketPath { path: socket_path }),
         )
         .context("main loop")
     } else {
