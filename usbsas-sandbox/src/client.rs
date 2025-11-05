@@ -4,10 +4,9 @@ use syscallz::{Action, Cmp, Comparator, Syscall};
 pub fn sandbox(
     paths_ro: Option<&[&str]>,
     paths_rw: Option<&[&str]>,
-    paths_x: Option<&[&str]>,
-    connect_ports: Option<&[u16]>,
+    paths_rm: Option<&[&str]>,
 ) -> Result<()> {
-    crate::landlock(paths_ro, paths_rw, paths_x, connect_ports)?;
+    crate::landlock(paths_ro, paths_rw, None, paths_rm, None)?;
 
     let mut ctx = seccomp::new_context_with_common_rules(vec![], vec![])?;
 
@@ -89,6 +88,12 @@ pub fn sandbox(
     ctx.allow_syscall(Syscall::statx)?;
     ctx.allow_syscall(Syscall::timerfd_settime)?;
     ctx.allow_syscall(Syscall::uname)?;
+
+    #[cfg(not(target_arch = "aarch64"))]
+    ctx.allow_syscall(Syscall::unlink)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::unlinkat)?;
+
     ctx.allow_syscall(Syscall::write)?;
     ctx.allow_syscall(Syscall::writev)?;
 

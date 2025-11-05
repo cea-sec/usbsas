@@ -168,6 +168,7 @@ pub fn client_clap() -> clap::Command {
                 .long("socket")
                 .value_name("SOCKET_PATH")
                 .help("Usbsas socket path")
+                .default_value(format!("{}/usbsas.sock", usbsas_utils::DEFAULT_SOCKET_DIR))
                 .num_args(1)
                 .required(false),
         )
@@ -207,7 +208,6 @@ pub struct GUI {
     socket_path: String,
 }
 
-//impl Default for GUI {
 impl GUI {
     pub fn new() -> (Self, Task<Message>) {
         let matches = client_clap().get_matches();
@@ -251,13 +251,7 @@ impl GUI {
             serde_json::from_str(LANG_FR_DATA).expect("can't parse lang json");
         i18n.insert(LANG::FR, fr);
 
-        let socket_path = match matches.get_one::<String>("socket") {
-            Some(path) => path.to_string(),
-            None => format!(
-                "{}/usbsas.sock",
-                &config.out_directory.trim_end_matches('/')
-            ),
-        };
+        let socket_path = matches.get_one::<String>("socket").unwrap().to_string();
 
         (
             Self {
@@ -300,6 +294,11 @@ impl GUI {
                 paths_rw.push(path);
             }
         };
+        let paths_rm: Option<&[&str]> = if let Some(false) = self.config.keep_tmp_files {
+            Some(&[self.config.out_directory.as_str()])
+        } else {
+            None
+        };
         usbsas_sandbox::client::sandbox(
             Some(&[
                 "/proc/cpuinfo",
@@ -313,8 +312,7 @@ impl GUI {
                 "/etc/localtime",
             ]),
             Some(&paths_rw),
-            None,
-            None,
+            paths_rm,
         )
         .expect("Unable to sandbox client");
         self.state = State::Connect;
@@ -370,23 +368,30 @@ impl GUI {
             self.config.out_directory.trim_end_matches('/'),
             self.session_id,
         );
-        if let Ok(metadata) = fs::metadata(&fs_path) {
-            if metadata.len() == 0 {
-                if let Err(err) = fs::remove_file(Path::new(&fs_path)) {
-                    log::error!("couldn't rm file {}: {err}", &fs_path);
-                };
-            }
-        };
-
-        for path in &[&tar_path, &clean_tar_path] {
-            if let Ok(metadata) = fs::metadata(path) {
-                // Empty tar
-                if metadata.len() == 1536 || metadata.len() == 512 {
-                    if let Err(err) = fs::remove_file(Path::new(&path)) {
-                        log::error!("couldn't rm file {}: {err}", path);
+        // in case usbsas failed to do it
+        if let Some(false) = self.config.keep_tmp_files {
+            let _ = fs::remove_file(&tar_path);
+            let _ = fs::remove_file(&clean_tar_path);
+            let _ = fs::remove_file(&fs_path);
+        } else {
+            if let Ok(metadata) = fs::metadata(&fs_path) {
+                if metadata.len() == 0 {
+                    if let Err(err) = fs::remove_file(Path::new(&fs_path)) {
+                        log::error!("couldn't rm file {}: {err}", &fs_path);
                     };
                 }
             };
+
+            for path in &[&tar_path, &clean_tar_path] {
+                if let Ok(metadata) = fs::metadata(path) {
+                    // Empty tar with only data/ dir
+                    if metadata.len() == 512 {
+                        if let Err(err) = fs::remove_file(Path::new(&path)) {
+                            log::error!("couldn't rm file {}: {err}", path);
+                        };
+                    }
+                };
+            }
         }
 
         self.state = State::Connect;

@@ -44,8 +44,9 @@ impl UsbsasClap for clap::Command {
             clap::Arg::new("socket")
                 .short('s')
                 .long("socket")
-                .value_name("SOCKET_PATH")
-                .help("Use Unix domain socket to communicate (instead of pipes), default path in out directory")
+                .value_name("SOCKET_DIR")
+                .help("Use Unix domain socket to communicate (instead of pipes), optionally set directory where to create it")
+                .default_missing_value(crate::DEFAULT_SOCKET_DIR)
                 .num_args(0..=1)
                 .required(false),
         )

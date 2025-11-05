@@ -7,7 +7,7 @@ pub fn sandbox(
     paths_x: Option<&[&str]>,
     connect_ports: Option<&[u16]>,
 ) -> Result<()> {
-    crate::landlock(paths_ro, paths_rw, paths_x, connect_ports)?;
+    crate::landlock(paths_ro, paths_rw, paths_x, None, connect_ports)?;
 
     let mut ctx = seccomp::new_context_with_common_rules(vec![], vec![])?;
 

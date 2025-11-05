@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use log::{error, info};
 use std::{
     env,
@@ -64,7 +64,21 @@ fn main() -> Result<()> {
     let config_path = matches.get_one::<String>("config").unwrap();
     let mut config = conf_parse(&conf_read(config_path)?)?;
 
-    // Create temp files
+    // Create out dir & temp files
+    match fs::metadata(&config.out_directory) {
+        Ok(md) => {
+            if !md.is_dir() {
+                bail!("out_directory '{}' is not a dir", &config.out_directory);
+            }
+        }
+        Err(err) => {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                fs::create_dir_all(&config.out_directory)?;
+            } else {
+                return Err(err.into());
+            }
+        }
+    }
     let tar_path = format!(
         "{}/usbsas_{}.tar",
         &config.out_directory.trim_end_matches('/'),
@@ -121,14 +135,22 @@ fn main() -> Result<()> {
     let available = fs_stats.block_size() * fs_stats.blocks_available();
     config.available_space = Some(available);
 
-    if matches.contains_id("socket") {
-        let socket_path = match matches.get_one::<String>("socket") {
-            Some(path) => path.to_string(),
-            None => format!(
-                "{}/usbsas.sock",
-                &config.out_directory.trim_end_matches('/')
-            ),
-        };
+    if let Some(dir) = matches.get_one::<String>("socket") {
+        match fs::metadata(dir) {
+            Ok(md) => {
+                if !md.is_dir() {
+                    bail!("socket dir '{}' is not a dir", &dir);
+                }
+            }
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    fs::create_dir_all(dir)?;
+                } else {
+                    return Err(err.into());
+                }
+            }
+        }
+        let socket_path = format!("{}/usbsas.sock", dir.trim_end_matches('/'));
         if let Ok(true) = std::path::Path::new(&socket_path).try_exists() {
             log::warn!("socket already exists, probably residual, removing it");
             fs::remove_file(&socket_path).expect("remove socket");
@@ -151,20 +173,25 @@ fn main() -> Result<()> {
         };
         pipes_read.push(socket.read);
         pipes_write.push(socket.write);
-        usbsas_sandbox::usbsas::sandbox(
-            pipes_read,
-            pipes_write,
-            Some(socket),
-            &config.out_directory,
-        )
-        .context("seccomp")?;
+        let paths_rm: Option<&[&str]> = if let Some(false) = config.keep_tmp_files {
+            Some(&[config.out_directory.as_str(), dir])
+        } else {
+            Some(&[dir])
+        };
+        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, Some(socket), paths_rm)
+            .context("seccomp")?;
         tmpfiles.socket_path = Some(socket_path);
         main_loop(comm, children, config, tmpfiles).context("main loop")
     } else {
         let comm: ComRpUsbsas = Comm::from_env()?;
         pipes_read.push(comm.input_fd());
         pipes_write.push(comm.output_fd());
-        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None, &config.out_directory)
+        let paths_rm: Option<&[&str]> = if let Some(false) = config.keep_tmp_files {
+            Some(&[config.out_directory.as_str()])
+        } else {
+            None
+        };
+        usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None, paths_rm)
             .context("seccomp")?;
         main_loop(comm, children, config, tmpfiles).context("main loop")
     }

@@ -2,11 +2,6 @@ use crate::{seccomp, Result};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
-use landlock::{
-    make_bitflags, path_beneath_rules, Access, AccessFs, CompatLevel, Compatible, Ruleset,
-    RulesetAttr, RulesetCreatedAttr, RulesetStatus,
-};
-
 pub struct UsbsasSocket {
     pub listen: RawFd,
     pub read: RawFd,
@@ -18,7 +13,7 @@ pub fn sandbox(
     fds_read: Vec<RawFd>,
     fds_write: Vec<RawFd>,
     socket: Option<UsbsasSocket>,
-    out_dir: &str,
+    paths_rm: Option<&[&str]>,
 ) -> Result<()> {
     let mut ctx = seccomp::new_context_with_common_rules(fds_read, fds_write)?;
 
@@ -51,27 +46,7 @@ pub fn sandbox(
     #[cfg(target_arch = "aarch64")]
     ctx.allow_syscall(Syscall::unlinkat)?;
 
-    #[cfg(not(feature = "landlock-enforce"))]
-    let ruleset = Ruleset::default().set_compatibility(CompatLevel::BestEffort);
-    #[cfg(feature = "landlock-enforce")]
-    let ruleset = Ruleset::default().set_compatibility(CompatLevel::HardRequirement);
-    let mut ruleset = ruleset
-        .handle_access(AccessFs::from_all(landlock::ABI::V2))?
-        .create()?;
-    // Allow removing files
-    ruleset = ruleset.add_rules(path_beneath_rules(
-        &[out_dir],
-        make_bitflags!(AccessFs::RemoveFile),
-    ))?;
-    let status = ruleset.restrict_self()?;
-    match status.ruleset {
-        RulesetStatus::FullyEnforced => {
-            log::debug!("landlock enforced");
-        }
-        RulesetStatus::PartiallyEnforced | RulesetStatus::NotEnforced => {
-            log::warn!("landlock not fully enforced: {:?}", status.ruleset);
-        }
-    }
+    crate::landlock(None, None, None, paths_rm, None)?;
 
     ctx.load()?;
 
