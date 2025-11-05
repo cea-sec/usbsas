@@ -1,7 +1,7 @@
 # usbsas configuration file
 
 # Directory where temp tar and fs will be stored. (Mandatory)
-out_directory = "/tmp/"
+out_directory = "/tmp/usbsas"
 
 # Keep temporary files (tar & filesystem)
 #keep_tmp_files = false

@@ -7,7 +7,7 @@ description = "Graphical User Interface for usbsas"
 
 [dependencies]
 bytesize = "2.1"
-clap = "4.5"
+clap = { version = "4.5", features = ["string"] }
 env_logger = "0.11"
 iced = { version = "0.13", features = ["advanced", "image", "smol", "svg"] }
 libc = "0.2"

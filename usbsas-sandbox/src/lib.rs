@@ -56,6 +56,7 @@ pub fn landlock(
     paths_ro: Option<&[&str]>,
     paths_rw: Option<&[&str]>,
     paths_x: Option<&[&str]>,
+    paths_rm: Option<&[&str]>,
     connect_ports: Option<&[u16]>,
 ) -> Result<()> {
     #[cfg(not(feature = "landlock-enforce"))]
@@ -85,6 +86,10 @@ pub fn landlock(
 
     if let Some(paths) = paths_x {
         ruleset = ruleset.add_rules(path_beneath_rules(paths, AccessFs::Execute))?;
+    }
+
+    if let Some(paths) = paths_rm {
+        ruleset = ruleset.add_rules(path_beneath_rules(paths, AccessFs::RemoveFile))?;
     }
 
     if let Some(ports) = connect_ports {
