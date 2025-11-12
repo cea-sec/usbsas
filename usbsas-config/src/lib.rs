@@ -33,6 +33,7 @@ pub struct Filter {
     pub contain: Option<Vec<String>>,
     pub start: Option<String>,
     pub end: Option<String>,
+    pub exact: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

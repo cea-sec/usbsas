@@ -1,3 +1,5 @@
+#![cfg(feature = "integration-tests")]
+
 use assert_cmd::prelude::*;
 use hex_literal::hex;
 use nix::{
