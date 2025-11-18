@@ -1,6 +1,5 @@
 use crate::{
-    filter::{Rule, Rules},
-    Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport,
+    filter::Rules, Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error, info, trace};
@@ -634,21 +633,7 @@ impl FileSelectionState {
             _ => unimplemented!(),
         };
         let mut files_size = 0;
-        let rules = Rules {
-            rules: self
-                .config
-                .filters
-                .take()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|f| Rule {
-                    contain: f.contain,
-                    start: f.start,
-                    end: f.end,
-                })
-                .collect(),
-        }
-        .into_lowercase();
+        let rules = Rules::from(self.config.filters.take().unwrap_or_default()).into_lowercase();
 
         while let Some(entry) = self.selected.pop_front() {
             if (matches!(self.transfer.src, Device::Network(_)) && entry == "/config.json")
@@ -657,7 +642,7 @@ impl FileSelectionState {
                 continue;
             }
 
-            if rules.match_all(&entry) {
+            if rules.match_all(&entry.trim_start_matches('/')) {
                 self.transfer.files.filtered.push(entry.clone());
                 continue;
             }

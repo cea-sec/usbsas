@@ -129,7 +129,7 @@ contain = [".lnk/"]
 end = ".lnk"
 
 [[filters]]
-contain = ["autorun.inf"]
+exact = ["autorun.inf"]
 
 [[filters]]
-contain = ["thumbs.db"]
+exact = ["thumbs.db"]
