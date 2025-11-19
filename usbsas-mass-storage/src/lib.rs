@@ -44,7 +44,14 @@ pub struct MassStorage {
 impl MassStorage {
     fn new(scsiusb: ScsiUsb<GlobalContext>, file: Option<File>) -> Result<Self> {
         let mut scsiusb = scsiusb;
-        let (max_lba, block_size, dev_size) = scsiusb.init_mass_storage()?;
+        let (max_lba, block_size, dev_size) = match scsiusb.init_mass_storage() {
+            Ok((max_lba, block_size, dev_size)) => (max_lba, block_size, dev_size),
+            Err(err) => {
+                log::warn!("Error mass storage init: {err}, resetting device and retrying");
+                scsiusb.handle.reset()?;
+                scsiusb.init_mass_storage()?
+            }
+        };
         // TODO: support more sector size
         assert!([0x200, 0x800, 0x1000].contains(&block_size));
         Ok(MassStorage {
