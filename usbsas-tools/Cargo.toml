@@ -60,7 +60,6 @@ revision = "1"
 depends = "$auto, usbsas-server, fuse3"
 section = "utility"
 priority = "optional"
-systemd-units = { enable = false }
 assets = [
   ["target/release/usbsas-fuse-mount", "usr/bin/", "755"],
   ["target/release/usbsas-imager", "usr/bin/", "755"],

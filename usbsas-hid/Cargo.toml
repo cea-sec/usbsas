@@ -1,16 +1,29 @@
 [package]
-name = "hid-dealer"
-version = "0.1.2"
+name = "usbsas-hid"
+version = "0.2.0"
 edition = "2021"
 license = "GPL-3.0"
-description = "usbsas userland HID manager"
+links = "X11,Xtst"
+description = "usbsas userland HID"
 
 [dependencies]
+bitfield = "0.19"
 env_logger = "0.11"
 log = "0.4"
 dbus-crossroads = "0.5"
 dbus = "0.9"
 lazy_static = "1.5"
+rusb = { version = "0.9", features = ["vendored"] }
+usbsas-sandbox = { path = "../usbsas-sandbox" }
+x11 = "2.21"
+
+[[bin]]
+name = "hid-dealer"
+path = "src/hid-dealer.rs"
+
+[[bin]]
+name = "hid-user"
+path = "src/hid-user.rs"
 
 # cargo-deb
 [package.metadata.deb]
@@ -22,7 +35,6 @@ depends = "$auto, sudo, dbus, usbsas-kiosk"
 section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
-systemd-units = { enable = false }
 triggers-file = "debian/triggers"
 assets = [
   ["target/release/hid-dealer", "usr/libexec/", "755"],
