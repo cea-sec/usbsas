@@ -1,27 +1,35 @@
-# Usbsas Python bindings
+# usbsas Python bindings
 
-## Usage
+## Prerequisite
 
-Run the Makefile to generate python protobuf code.
+Install dependencies:
+
+* make
+* protoc
+* python-protobuf
+
+Then generate python protobuf code:
 
 ```
 $ make
 ```
 
-## Dependencies:
-* make
-* protoc
-* python-protobuf
 
 ## Example
 
-Example using communication wrapper from `comm.py` (edit binary & configuration
-path if necessary).
+Example using communication wrapper from `comm.py`
 
-```pycon
-$ python
->>> from comm import start_usbsas
->>> comm = start_usbsas()
+```bash
+$ usbsas-usbsas -s
+```
+
+```python
+>>> import socket
+>>> from comm import CommUsbsas
+>>> socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+>>> socket.connect('/tmp/usbsas.sock')
+>>> # CommUsbsas expects one file descriptor for reading and one for writing (it was initially written for pipes) but since a socket is bidirectional you can use same fd for both
+>>> comm = CommUsbsas(socket.fileno(), socket.fileno())
 >>> comm.devices()
 devices {
   network {
@@ -318,4 +326,5 @@ analyzereport {
 }
 
 >>> comm.end()
+>>> socket.close()
 ```

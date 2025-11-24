@@ -64,6 +64,7 @@ pub struct Report {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    #[serde(default = "default_out_dir")]
     pub out_directory: String,
     pub report: Option<Report>,
     pub message: Option<String>,
@@ -80,6 +81,10 @@ pub struct Config {
     pub keep_tmp_files: Option<bool>,
     // filled by usbsas process
     pub available_space: Option<u64>,
+}
+
+fn default_out_dir() -> String {
+    String::from("/tmp/usbsas")
 }
 
 pub fn conf_read(config_path: &str) -> io::Result<String> {
