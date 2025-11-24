@@ -2482,29 +2482,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
-name = "hid-dealer"
-version = "0.1.2"
-dependencies = [
- "dbus",
- "dbus-crossroads",
- "env_logger",
- "lazy_static",
- "log",
-]
-
-[[package]]
-name = "hid-user"
-version = "0.1.3"
-dependencies = [
- "bitfield",
- "env_logger",
- "log",
- "rusb",
- "usbsas-sandbox",
- "x11",
-]
-
-[[package]]
 name = "http"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6227,6 +6204,21 @@ dependencies = [
  "thiserror 2.0.17",
  "time",
  "usbsas-proto",
+]
+
+[[package]]
+name = "usbsas-hid"
+version = "0.2.0"
+dependencies = [
+ "bitfield",
+ "dbus",
+ "dbus-crossroads",
+ "env_logger",
+ "lazy_static",
+ "log",
+ "rusb",
+ "usbsas-sandbox",
+ "x11",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ export USBSAS_ISO_VER=$(ISO_VER)
 
 SRV_VER := $(shell grep '^version = ' ../../usbsas-usbsas/Cargo.toml | cut -d'"' -f2)-1
 ASRV_VER := $(shell grep '^version = ' ../../usbsas-analyzer-server/Cargo.toml | cut -d'"' -f2)-1
-HID_VER := $(shell grep '^version = ' ../../usbsas-hid/hid-dealer/Cargo.toml | cut -d'"' -f2)-1
+HID_VER := $(shell grep '^version = ' ../../usbsas-hid/Cargo.toml | cut -d'"' -f2)-1
 KIOSK_VER := $(shell grep '^version = ' ../../usbsas-client/Cargo.toml | cut -d'"' -f2)-1
 TOOLS_VER := $(shell grep '^version = ' ../../usbsas-tools/Cargo.toml | cut -d'"' -f2)-1
 
