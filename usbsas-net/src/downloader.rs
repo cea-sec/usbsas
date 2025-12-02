@@ -59,7 +59,11 @@ impl InitState {
             ),
             Some(&[&self.tarpath]),
             None,
-            Some(&[port]),
+            Some(&[
+                port,
+                #[cfg(feature = "authkrb")]
+                crate::KRB_AS_PORT,
+            ]),
         )?;
 
         let file = OpenOptions::new()
