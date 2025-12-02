@@ -58,6 +58,7 @@ pub fn sandbox(
     ctx.allow_syscall(Syscall::ioctl)?;
     ctx.allow_syscall(Syscall::lseek)?;
     ctx.allow_syscall(Syscall::madvise)?;
+    ctx.allow_syscall(Syscall::memfd_create)?;
     ctx.allow_syscall(Syscall::newfstatat)?;
     ctx.allow_syscall(Syscall::openat)?;
 
