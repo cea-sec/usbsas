@@ -51,6 +51,8 @@ const KRB5_PATHS_RO: &[&str] = &[
     "/etc/krb5.conf",
     "/etc/krb5.conf.d",
 ];
+#[cfg(feature = "authkrb")]
+const KRB_AS_PORT: u16 = 88;
 
 struct FileReaderProgress<T> {
     comm: T,

@@ -43,6 +43,8 @@ impl InitState {
         let config_str = conf_read(&self.config_path)?;
         let config = conf_parse(&config_str)?;
         let mut connect_ports = Vec::new();
+        #[cfg(feature = "authkrb")]
+        connect_ports.push(crate::KRB_AS_PORT);
         if let Some(networks) = config.networks {
             for network in networks {
                 connect_ports.push(

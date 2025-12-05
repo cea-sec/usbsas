@@ -74,7 +74,11 @@ impl InitState {
             ),
             None,
             Some(&[&json_parser_path]),
-            Some(&[port]),
+            Some(&[
+                port,
+                #[cfg(feature = "authkrb")]
+                crate::KRB_AS_PORT,
+            ]),
         )?;
         let file = File::open(&self.tarpath)?;
         Ok(State::Running(RunningState {
