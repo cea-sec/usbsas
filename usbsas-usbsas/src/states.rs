@@ -642,7 +642,7 @@ impl FileSelectionState {
                 continue;
             }
 
-            if rules.match_all(&entry.trim_start_matches('/')) {
+            if rules.match_all(entry.trim_start_matches('/')) {
                 self.transfer.files.filtered.push(entry.clone());
                 continue;
             }
