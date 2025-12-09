@@ -129,7 +129,8 @@ fn report(
 ) -> TransferReport {
     let (hostname, time, datetime) = report_infos();
     let transfer_id = env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string());
-    let mut files: BTreeMap<String, FileInfoReport> = BTreeMap::new();
+    let mut files_info: BTreeMap<String, FileInfoReport> = BTreeMap::new();
+    let mut file_names = Vec::new();
     let (errors, filtered, rejected) = if let Some(tfiles) = transfer_files {
         tfiles
             .files
@@ -139,7 +140,8 @@ fn report(
                     && (fi.status != FileStatus::Dirty && fi.status != FileStatus::Error)
             })
             .for_each(|(path, fi)| {
-                let _ = files.insert(
+                file_names.push(path.to_string());
+                let _ = files_info.insert(
                     path.to_string(),
                     FileInfoReport {
                         size: fi.size,
@@ -190,7 +192,8 @@ fn report(
         user,
         source: source.map(|x| x.into()),
         destination: destination.map(|x| x.into()),
-        files,
+        files_info,
+        file_names,
         errors,
         filtered,
         rejected,

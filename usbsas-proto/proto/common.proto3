@@ -167,9 +167,10 @@ message TransferReport {
   string transfer_id = 7;
   DeviceReport source = 8;
   DeviceReport destination = 9;
-  map <string, FileInfoReport> files = 11;
-  repeated string errors = 12;
-  repeated string filtered = 13;
-  repeated string rejected = 14;
-  optional AnalyzeReport analyzereport = 15;
+  map <string, FileInfoReport> files_info = 11;
+  repeated string file_names = 12;
+  repeated string errors = 13;
+  repeated string filtered = 14;
+  repeated string rejected = 15;
+  optional AnalyzeReport analyzereport = 16;
 };

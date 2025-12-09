@@ -22,7 +22,7 @@ fn main() {
     prost_build.btree_map([
         "common.AnalyzeReport.antivirus",
         "common.AnalyzeReport.files",
-        "common.TransferReport.files",
+        "common.TransferReport.files_info",
     ]);
 
     // Impl serde::Serialize / Deserialize

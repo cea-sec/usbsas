@@ -219,11 +219,7 @@ impl IntegrationTester {
             .unwrap();
 
         assert_eq!(
-            report
-                .files
-                .keys()
-                .map(|x| x.as_str())
-                .collect::<Vec<&str>>(),
+            report.file_names,
             [
                 "/chicken.pdf",
                 "/quiche/lorem ipsum.txt",
@@ -240,7 +236,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("c59ec7d41232f5df72ff9def7d20f8c837dfd07cd69960800955fe5f4989f200")
+            hex!("2b8699f309785bf955fa1ac5d3b3b44035cbb4f6392c7cbdbb0c3b5cb26e8090")
         );
         Ok(())
     }
@@ -306,7 +302,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&format!("{}/bundle_test.tar", self.av_dir))?,
-            hex!("ea65ce0332be473dd79a3225d78e3806708e782d25c252f8163e82d9e869d7ff")
+            hex!("e47b5ae1ce68b002f52c31322b21de629d0a24bc139205208b10e903da6ddb9a")
         );
 
         Ok(())
@@ -359,7 +355,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("943e462051cf676a1c7c5f8e130d9ada46f0858db7c6aa45039b9facd81284f0")
+            hex!("9343dd8b58241b390f5902d550a4e5f128a3e5d445e61a3b9581163e96ad756c")
         );
 
         Ok(())
@@ -425,7 +421,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&format!("{}/quiche.tar", self.wdir))?,
-            hex!("c2b335bda88a3d189c402142a07f774004a1a91a2b39dc8a2c7f3624f580128d")
+            hex!("f79d9af346cbb1389e1c7c5cff0e3ee5b3bf821b0b3c99ab7f6ebd2c0273b7bf")
         );
 
         Ok(())
