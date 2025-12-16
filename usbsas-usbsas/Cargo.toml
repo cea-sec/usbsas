@@ -59,7 +59,7 @@ assets = [
   ["target/release/usbsas-files2fs", "usr/libexec/", "755"],
   ["target/release/usbsas-files2tar", "usr/libexec/", "755"],
   ["target/release/usbsas-fs2dev", "usr/libexec/", "755"],
-  ["target/release/usbsas-identificator", "usr/libexec/", "755"],
+  ["target/release/usbsas-identifier", "usr/libexec/", "755"],
   ["target/release/usbsas-scsi2files", "usr/libexec/", "755"],
   ["target/release/usbsas-tar2files", "usr/libexec/", "755"],
   ["target/release/usbsas-uploader", "usr/libexec/", "755"],

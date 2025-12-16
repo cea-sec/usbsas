@@ -7,10 +7,10 @@ out_directory = "/tmp/usbsas"
 #keep_tmp_files = false
 
 # GUI window title (Optional)
-window_title = "USBSAS"
+#window_title = "USBSAS"
 
 # Default lang of GUI (en or fr)
-lang = "en"
+#lang = "en"
 
 # Logo/image displayed next to hostname in upper right corner of GUI
 #menu_img = "/path/to/image"
@@ -35,10 +35,8 @@ lang = "en"
 
 
 # Source "network". (Optional)
-# Download a bundle from a remote network, to write it to an USB device.
+# Download a bundle from a remote host, to write it to an USB device.
 # description, longdescr and url are mandatory, krb_service_name is optional.
-# If krb_service_name is specified, mutual HTTP authentication with Kerberos
-# will be performed with the remote server prior to downupload.
 #[source_network]
 #description = "Source Network XXX"
 #longdescr = "Export files from network XXX"
@@ -113,6 +111,7 @@ write_dest = true
 # - contain: every strings in the filter are present in the filename
 # - start: the filenames startswith the string
 # - end: the filenames endswith the string
+# - exact: exact filename
 [[filters]]
 contain = ["__macosx"]
 
@@ -127,9 +126,10 @@ contain = [".lnk/"]
 
 [[filters]]
 end = ".lnk"
+contain = "whatever"
 
 [[filters]]
 exact = ["autorun.inf"]
 
 [[filters]]
-exact = ["thumbs.db"]
+contain = ["thumbs.db"]

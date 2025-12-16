@@ -114,7 +114,7 @@ fn main() -> Result<()> {
     let mut pipes_write = vec![];
     let comms: [&dyn ToFd; 12] = [
         &children.analyzer.comm,
-        &children.identificator.comm,
+        &children.identifier.comm,
         &children.cmdexec.comm,
         &children.downloader.comm,
         &children.files2fs.comm,

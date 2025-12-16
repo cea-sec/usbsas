@@ -6,7 +6,7 @@
    height="1016.2882165336845"
    id="svg107"
    sodipodi:docname="architecture.svg"
-   inkscape:version="1.4.1 (93de688d07, 2025-03-30)"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -22,11 +22,11 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="0.65327024"
-     inkscape:cx="840.38727"
-     inkscape:cy="645.98075"
+     inkscape:zoom="1.043767"
+     inkscape:cx="904.89545"
+     inkscape:cy="733.88027"
      inkscape:window-width="2558"
-     inkscape:window-height="1574"
+     inkscape:window-height="1572"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
@@ -38,6 +38,17 @@
      height="508.14410826684224"
      fill="#ffffff"
      id="rect1" />
+  <g
+     stroke-linecap="round"
+     transform="matrix(0.82318733,0,0,0.59924702,591.28664,374.13725)"
+     id="g11-6">
+    <path
+       d="M 10.09,0 C 50.58,0 91.07,0 114.67,0 M 10.09,0 c 31.28,0 62.56,0 104.58,0 m 0,0 c 6.73,0 10.09,3.36 10.09,10.09 M 114.67,0 c 6.73,0 10.09,3.36 10.09,10.09 m 0,0 c 0,4.3 0,8.61 0,20.19 m 0,-20.19 c 0,5.79 0,11.58 0,20.19 m 0,0 c 0,6.73 -3.36,10.1 -10.09,10.1 m 10.09,-10.1 c 0,6.73 -3.36,10.1 -10.09,10.1 m 0,0 c -36.38,0 -72.77,0 -104.58,0 m 104.58,0 c -29.23,0 -58.47,0 -104.58,0 m 0,0 C 3.36,40.38 0,37.01 0,30.28 m 10.09,10.1 C 3.36,40.38 0,37.01 0,30.28 m 0,0 C 0,22.77 0,15.25 0,10.09 M 0,30.28 C 0,24.91 0,19.55 0,10.09 m 0,0 C 0,3.36 3.36,0 10.09,0 M 0,10.09 C 0,3.36 3.36,0 10.09,0"
+       stroke="#1e1e1e"
+       stroke-width="2"
+       fill="none"
+       id="path10-7" />
+  </g>
   <g
      stroke-linecap="round"
      transform="translate(385.84187518023396 27.57131273168111) rotate(0 49.493895457822646 20.18797428498148)"
@@ -58,7 +69,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text1">usbsas</text>
@@ -183,7 +194,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text11">analyzer</text>
@@ -208,7 +219,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text13">analyzer-server</text>
@@ -233,7 +244,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text15">tar2files</text>
@@ -258,7 +269,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text17">files2fs</text>
@@ -283,7 +294,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text21">fs2dev</text>
@@ -342,7 +353,7 @@
        font-size="20px"
        fill="#f08c00"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text27">tmp </text>
@@ -352,7 +363,7 @@
        font-size="20px"
        fill="#f08c00"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text28">archive</text>
@@ -377,7 +388,7 @@
        font-size="20px"
        fill="#2f9e44"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text29">disk </text>
@@ -387,7 +398,7 @@
        font-size="20px"
        fill="#2f9e44"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text30">image</text>
@@ -599,7 +610,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text52">read</text>
@@ -613,7 +624,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text53">write</text>
@@ -627,7 +638,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text54">read</text>
@@ -641,7 +652,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text55">read</text>
@@ -655,7 +666,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text56">write</text>
@@ -688,7 +699,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text58">input USB</text>
@@ -721,7 +732,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="middle"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text60">output USB</text>
@@ -807,7 +818,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text69">read</text>
@@ -821,7 +832,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text70">write</text>
@@ -871,7 +882,7 @@
        font-size="20px"
        fill="#1e1e1e"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre;"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text75">enumerate</text>
@@ -897,7 +908,7 @@
        font-size="16px"
        fill="#868e96"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text77">sandboxed process</text>
@@ -929,7 +940,7 @@
        font-size="16px"
        fill="#868e96"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text80">protobuf</text>
@@ -961,7 +972,7 @@
        font-size="16px"
        fill="#868e96"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text83">HTTP</text>
@@ -987,7 +998,7 @@
        font-size="16px"
        fill="#868e96"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text85">file on disk</text>
@@ -1014,7 +1025,7 @@
        font-size="16px"
        fill="#868e96"
        text-anchor="start"
-       style="white-space: pre;"
+       style="white-space:pre"
        direction="ltr"
        dominant-baseline="text-before-edge"
        id="text87">USB device</text>
@@ -1173,4 +1184,19 @@
   </g>
   <mask
      id="mask107" />
+  <text
+     xml:space="preserve"
+     style="white-space:pre"
+     x="605.97461"
+     y="390.74823"
+     id="text4"><tspan
+       sodipodi:role="line"
+       id="tspan3"
+       style="stroke-width:0.5"
+       x="605.97461"
+       y="390.74823">jsonparser</tspan></text>
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1.80000001;stroke-linecap:round;stroke-linejoin:miter;stroke-opacity:1;stroke-dasharray:1.80000001,5.40000153;stroke-dashoffset:0"
+     d="m 574.8961,375.32323 16.5513,10.90667 0.0957,0.0957 v 0"
+     id="path5" />
 </svg>

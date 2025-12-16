@@ -1,8 +1,8 @@
-//! Dummy identificator
+//! Dummy identifier
 
 use thiserror::Error;
-use usbsas_comm::{ComRpIdentificator, ProtoRespCommon, ProtoRespIdentificator, ToFd};
-use usbsas_proto::{self as proto, identificator::request::Msg};
+use usbsas_comm::{ComRpIdentifier, ProtoRespCommon, ProtoRespIdentifier, ToFd};
+use usbsas_proto::{self as proto, identifier::request::Msg};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -24,7 +24,7 @@ enum State {
 }
 
 impl State {
-    fn run(self, comm: &mut ComRpIdentificator) -> Result<Self> {
+    fn run(self, comm: &mut ComRpIdentifier) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm),
             State::Running(s) => s.run(comm),
@@ -40,19 +40,19 @@ struct RunningState {
 }
 
 impl InitState {
-    fn run(self, comm: &mut ComRpIdentificator) -> Result<State> {
-        usbsas_sandbox::identificator::seccomp(comm.input_fd(), comm.output_fd())?;
+    fn run(self, comm: &mut ComRpIdentifier) -> Result<State> {
+        usbsas_sandbox::identifier::seccomp(comm.input_fd(), comm.output_fd())?;
         Ok(State::Running(RunningState { current_id: None }))
     }
 }
 
 impl RunningState {
-    fn run(mut self, comm: &mut ComRpIdentificator) -> Result<State> {
+    fn run(mut self, comm: &mut ComRpIdentifier) -> Result<State> {
         loop {
             match comm.recv_req()? {
                 Msg::UserId(_) => {
                     let userid = self.get_id()?;
-                    comm.userid(proto::identificator::ResponseUserId { userid })?;
+                    comm.userid(proto::identifier::ResponseUserId { userid })?;
                 }
                 Msg::End(_) => {
                     comm.end()?;
@@ -74,14 +74,14 @@ impl RunningState {
     }
 }
 
-pub struct Identificator {
-    comm: ComRpIdentificator,
+pub struct Identifier {
+    comm: ComRpIdentifier,
     state: State,
 }
 
-impl Identificator {
-    pub fn new(comm: ComRpIdentificator) -> Result<Self> {
-        Ok(Identificator {
+impl Identifier {
+    pub fn new(comm: ComRpIdentifier) -> Result<Self> {
+        Ok(Identifier {
             comm,
             state: State::Init(InitState {}),
         })

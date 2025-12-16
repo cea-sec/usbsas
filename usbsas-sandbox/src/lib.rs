@@ -7,7 +7,7 @@ pub mod files2tar;
 pub mod fs2dev;
 pub mod fswriter;
 pub mod hiduser;
-pub mod identificator;
+pub mod identifier;
 pub mod imager;
 pub mod jsonparser;
 pub mod net;

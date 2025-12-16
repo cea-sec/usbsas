@@ -5,8 +5,8 @@ pub mod analyzer {
     include!(concat!(env!("OUT_DIR"), "/analyzer.rs"));
 }
 
-pub mod identificator {
-    include!(concat!(env!("OUT_DIR"), "/identificator.rs"));
+pub mod identifier {
+    include!(concat!(env!("OUT_DIR"), "/identifier.rs"));
 }
 
 pub mod cmdexec {

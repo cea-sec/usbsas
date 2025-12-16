@@ -23,7 +23,7 @@
     "write_dst": "Écriture du système de fichier sur le périphérique destination",
     "mk_fs": "Création du système de fichier",
     "all_done": "Transfert terminé",
-    "transfering": "Transfert en cours",
+    "transferring": "Transfert en cours",
     "idreq": "Veuillez vous identifier",
     "src_files": "Fichiers du périphérique source",
     "selected_files": "Fichiers sélectionnés",
