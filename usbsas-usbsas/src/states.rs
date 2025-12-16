@@ -998,7 +998,7 @@ impl RunState for WriteDstFileState {
 
         if let Some(ref confreport) = self.config.report {
             if confreport.write_dest {
-                let report = self.transfer.to_report("sucess");
+                let report = self.transfer.to_report("success");
                 let (dst_writer, report_path) = match &self.transfer.dst {
                     Device::Network(_) | Device::Command(_) => {
                         (&mut children.files2cleantar, String::from("config.json"))

@@ -14,7 +14,7 @@ The graphical client has been developed with the [kiosk](./kiosk.md) station in
 mind, e.g. simple full screen window that can't be closed or minimized to
 interact with other components of the system.
 
-It allows transfering files from USB to USB or remote host, wiping a USB device and
+It allows transferring files from USB to USB or remote host, wiping a USB device and
 making image of a USB device.
 
 After [building](./build.md), start `usbsas` and the `client`:
@@ -39,7 +39,7 @@ analyzer-server included in this project is mainly used for tests and given as
 example, production use is not recommended. Files are analyzed with [Clam
 AntiVirus](https://www.clamav.net/)
 
-Scaning files is enabled or disabled in the [configuration
+Scanning files is enabled or disabled in the [configuration
 file](./configuration.md#analyzer).
 
 The archive containing files to analyze is first POSTed to "URL/[user_id]", the

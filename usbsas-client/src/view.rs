@@ -817,7 +817,7 @@ impl GUI {
                 let title = if let Some(title) = &self.status_title {
                     self.i18n_txt(title)
                 } else {
-                    self.i18n_txt("transfering")
+                    self.i18n_txt("transferring")
                 };
                 let mut col = Column::new()
                     .push(text(title).size(HEADER_SIZE))

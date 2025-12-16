@@ -182,7 +182,7 @@ async fn scan_result(
                     }
                 })
             };
-            // Fixed timestamp to keep a determistic filesystem hash
+            // Fixed timestamp to keep a deterministic filesystem hash
             #[cfg(feature = "integration-tests")]
             let av_infos = json!({
                 "ClamAV": {
