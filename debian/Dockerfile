@@ -1,4 +1,4 @@
-FROM rust:slim-bookworm
+FROM rust:slim-trixie
 
 RUN set -eux; \
     apt-get update && \

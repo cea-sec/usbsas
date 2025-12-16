@@ -1,4 +1,4 @@
-use log::{error, trace};
+use log::trace;
 use std::env;
 use thiserror::Error;
 use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev};
