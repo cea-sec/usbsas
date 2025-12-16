@@ -6222,7 +6222,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "usbsas-identificator"
+name = "usbsas-identifier"
 version = "0.1.2"
 dependencies = [
  "env_logger",

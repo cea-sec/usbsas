@@ -1,5 +1,5 @@
 syntax = "proto3";
-package identificator;
+package identifier;
 import "common.proto3";
 
 

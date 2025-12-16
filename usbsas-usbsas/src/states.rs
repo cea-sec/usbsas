@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
 use usbsas_comm::{
     ComRqFiles, ComRqWriteDst, ProtoReqAnalyzer, ProtoReqCmdExec, ProtoReqCommon,
-    ProtoReqDownloader, ProtoReqFiles, ProtoReqFs2Dev, ProtoReqIdentificator, ProtoReqUploader,
+    ProtoReqDownloader, ProtoReqFiles, ProtoReqFs2Dev, ProtoReqIdentifier, ProtoReqUploader,
     ProtoReqUsbDev, ProtoReqWriteDst, ProtoRespUsbsas,
 };
 use usbsas_config::Config;
@@ -97,9 +97,9 @@ pub trait RunState {
     ) -> Result<Option<String>> {
         trace!("handle req ID");
         let userid = children
-            .identificator
+            .identifier
             .comm
-            .userid(proto::identificator::RequestUserId {})?
+            .userid(proto::identifier::RequestUserId {})?
             .userid;
         if userid.is_empty() {
             comm.error("empty ID")?;

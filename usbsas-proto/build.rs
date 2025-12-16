@@ -1,7 +1,7 @@
 fn main() {
     let proto_files = [
         "proto/analyzer.proto3",
-        "proto/identificator.proto3",
+        "proto/identifier.proto3",
         "proto/cmdexec.proto3",
         "proto/common.proto3",
         "proto/downloader.proto3",

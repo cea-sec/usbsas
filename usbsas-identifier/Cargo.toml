@@ -1,5 +1,5 @@
 [package]
-name = "usbsas-identificator"
+name = "usbsas-identifier"
 version = "0.1.2"
 edition = "2021"
 license = "GPL-3.0"

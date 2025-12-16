@@ -339,7 +339,7 @@ protoresponse!(
     ReadSectors
 );
 protoresponse!(Fs2Dev, DevSize, WriteFs, LoadBitVec, Wipe);
-protoresponse!(Identificator, UserId);
+protoresponse!(Identifier, UserId);
 protoresponse!(Scsi, OpenDevice, Partitions, ReadSectors);
 protoresponse!(UsbDev, Devices);
 protoresponse!(
@@ -375,7 +375,7 @@ protorequest!(
     ReadSectors
 );
 protorequest!(Fs2Dev, DevSize, WriteFs, Wipe, LoadBitVec);
-protorequest!(Identificator, UserId);
+protorequest!(Identifier, UserId);
 protorequest!(
     Usbsas,
     Devices,

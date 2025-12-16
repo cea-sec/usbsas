@@ -85,7 +85,7 @@ remote server, files will be stored in the tar under a "/data/" directory and a
 "/config.json" file containing information about the input device, hostname etc.
 will be added.
 
-#### identificator
+#### identifier
 
 This process doesn't do much for now, its future intent will be to identify
 users. It currently always answers string ID "Tartempion".

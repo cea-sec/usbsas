@@ -1,13 +1,13 @@
 use anyhow::Result;
 use usbsas_comm::{
-    ComRqAnalyzer, ComRqCmdExec, ComRqDownloader, ComRqFiles, ComRqFs2Dev, ComRqIdentificator,
+    ComRqAnalyzer, ComRqCmdExec, ComRqDownloader, ComRqFiles, ComRqFs2Dev, ComRqIdentifier,
     ComRqUploader, ComRqUsbDev, ComRqWriteDst, ProtoRespUsbsas,
 };
 use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 
 pub struct Children {
     pub analyzer: UsbsasChild<ComRqAnalyzer>,
-    pub identificator: UsbsasChild<ComRqIdentificator>,
+    pub identifier: UsbsasChild<ComRqIdentifier>,
     pub cmdexec: UsbsasChild<ComRqCmdExec>,
     pub downloader: UsbsasChild<ComRqDownloader>,
     pub files2fs: UsbsasChild<ComRqWriteDst>,
@@ -23,8 +23,7 @@ pub struct Children {
 impl Children {
     pub fn spawn(config_path: &str, tar_path: &str, fs_path: &str) -> Result<Self> {
         log::trace!("spawn children");
-        let identificator =
-            UsbsasChildSpawner::new("usbsas-identificator").spawn::<ComRqIdentificator>()?;
+        let identifier = UsbsasChildSpawner::new("usbsas-identifier").spawn::<ComRqIdentifier>()?;
         let cmdexec = UsbsasChildSpawner::new("usbsas-cmdexec")
             .arg(tar_path)
             .arg(fs_path)
@@ -68,7 +67,7 @@ impl Children {
 
         Ok(Self {
             analyzer,
-            identificator,
+            identifier,
             cmdexec,
             downloader,
             files2fs,
@@ -85,7 +84,7 @@ impl Children {
     pub fn as_array_mut(&mut self) -> Vec<&mut dyn ChildMngt> {
         vec![
             &mut self.analyzer,
-            &mut self.identificator,
+            &mut self.identifier,
             &mut self.cmdexec,
             &mut self.downloader,
             &mut self.files2fs,
