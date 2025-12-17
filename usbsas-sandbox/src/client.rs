@@ -98,6 +98,25 @@ pub fn sandbox(
     ctx.allow_syscall(Syscall::write)?;
     ctx.allow_syscall(Syscall::writev)?;
 
+    #[cfg(not(target_arch = "arm"))]
+    ctx.allow_syscall(Syscall::mmap)?;
+    #[cfg(target_arch = "arm")]
+    ctx.allow_syscall(Syscall::mmap2)?;
+    // Disallow mmap with PROT_EXEC
+    ctx.set_rule_for_syscall(
+        Action::KillThread,
+        #[cfg(not(target_arch = "arm"))]
+        Syscall::mmap,
+        #[cfg(target_arch = "arm")]
+        Syscall::mmap2,
+        &[Comparator::new(
+            2,
+            Cmp::MaskedEq,
+            libc::PROT_EXEC as u64,
+            Some(libc::PROT_EXEC as u64),
+        )],
+    )?;
+
     ctx.load()?;
 
     Ok(())
