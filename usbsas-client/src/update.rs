@@ -379,10 +379,10 @@ impl GUI {
         }
 
         if self.fullscreen {
-            window::get_latest().and_then(move |window| {
-                window::get_mode(window).then(move |mode| {
+            window::latest().and_then(move |window| {
+                window::mode(window).then(move |mode| {
                     if mode != Mode::Fullscreen {
-                        window::change_mode(window, Mode::Fullscreen)
+                        window::set_mode(window, Mode::Fullscreen)
                     } else {
                         Task::none()
                     }
