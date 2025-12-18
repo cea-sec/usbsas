@@ -1,7 +1,7 @@
 use std::env;
 use usbsas_client::{client_clap, GUI};
 
-fn main() {
+fn main() -> iced::Result {
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or(
             "info,wgpu_hal=error,iced_winit=error,iced_wgpu=error,wgpu_core=error,cosmic_text=error,wgpu_hal=error,zbus=error,winit=error,naga=error,sctk=error,tracing=error",
@@ -19,9 +19,8 @@ fn main() {
         env::set_var("WINIT_X11_SCALE_FACTOR", "1.0")
     };
 
-    iced::application("usbsas", GUI::update, GUI::view)
+    iced::application(GUI::new, GUI::update, GUI::view)
         .window_size((width as f32, height as f32))
         .subscription(GUI::subscription)
-        .run_with(GUI::new)
-        .expect("run");
+        .run()
 }

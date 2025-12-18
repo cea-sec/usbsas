@@ -9,7 +9,7 @@ use ::time::OffsetDateTime;
 use bytesize::ByteSize;
 use iced::{
     widget::{
-        button, container, horizontal_space, image, progress_bar, scrollable,
+        button, container, image, progress_bar, scrollable,
         svg::{Handle, Svg},
         text, Checkbox, Column, Container, PickList, Row, Space,
     },
@@ -46,7 +46,7 @@ impl GUI {
                 Container::new(
                     Row::new()
                         .push(image(path))
-                        .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                        .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                         .push(hostname_txt)
                         .align_y(Alignment::Center),
                 )
@@ -57,33 +57,33 @@ impl GUI {
 
         let menu = Container::new(
             Column::new()
-                .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                 .push(
                     Row::new()
                         .height(70)
-                        .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                        .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                         .push(logo)
-                        .push(Space::new(Length::Fill, Length::Fill))
+                        .push(Space::new().width(Length::Fill).height(Length::Fill))
                         .push(
                             text(self.config.window_title.clone().unwrap_or("USBSAS".into()))
                                 .color(Color::BLACK)
                                 .size(MENU_SIZE),
                         )
-                        .push(Space::new(Length::Fill, Length::Fill))
+                        .push(Space::new().width(Length::Fill).height(Length::Fill))
                         .push(button_tools)
-                        .push(Space::new(Length::Fixed(5.0), Length::Fill))
+                        .push(Space::new().width(Length::Fixed(5.0)).height(Length::Fill))
                         .push(button_faq)
-                        .push(Space::new(Length::Fixed(5.0), Length::Fill))
+                        .push(Space::new().width(Length::Fixed(5.0)).height(Length::Fill))
                         .push(
                             PickList::new(LANGS, Some(self.lang.clone()), Message::LangSelect)
                                 .text_shaping(text::Shaping::Advanced),
                         )
-                        .push(Space::new(Length::Fill, Length::Fill))
+                        .push(Space::new().width(Length::Fill).height(Length::Fill))
                         .push(upper_right)
-                        .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                        .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                         .align_y(Alignment::Center),
                 )
-                .push(Space::new(Length::Fill, Length::Fixed(10.0))),
+                .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0))),
         )
         .style(container::rounded_box);
 
@@ -105,21 +105,21 @@ impl GUI {
                 .height(Length::Fill)
                 .align_y(Alignment::Center);
                 let column = Column::new()
-                    .push(Space::new(Length::Fill, Length::Fixed(30.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(30.0)))
                     .push(pane)
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
                         text(txt)
                             .size(MENU_SIZE)
                             .width(Length::Fill)
                             .align_x(Alignment::Center),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(30.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(30.0)));
                 Container::new(
                     Row::new()
-                        .push(Space::new(Length::Fixed(30.0), Length::Fill))
+                        .push(Space::new().width(Length::Fixed(30.0)).height(Length::Fill))
                         .push(column)
-                        .push(Space::new(Length::Fixed(30.0), Length::Fill)),
+                        .push(Space::new().width(Length::Fixed(30.0)).height(Length::Fill)),
                 )
             }
             State::Error(msg) => {
@@ -135,12 +135,12 @@ impl GUI {
                             .size(HEADER_SIZE)
                             .color(color_red),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(text(msg));
                 Container::new(col)
             }
@@ -198,14 +198,18 @@ impl GUI {
                                         .size(HEADER_SIZE)
                                         .width(Length::FillPortion(2)),
                                 )
-                                .push(Space::new(Length::Fixed(15.0), Length::Shrink))
+                                .push(
+                                    Space::new()
+                                        .width(Length::Fixed(15.0))
+                                        .height(Length::Shrink),
+                                )
                                 .push(
                                     text(self.i18n_txt(&format!("faqr{i}")))
                                         .size(HEADER_SIZE)
                                         .width(Length::FillPortion(4)),
                                 ),
                         )
-                        .push(Space::new(Length::Fill, Length::Fixed(30.0)));
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(30.0)));
                 }
                 Container::new(scrollable(col))
             }
@@ -217,12 +221,12 @@ impl GUI {
 
                 col = col
                     .push(text("System").size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(7.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(7.0)))
                     .push(
                         Row::new()
                             .width(Length::Fill)
@@ -292,21 +296,21 @@ impl GUI {
                                 .width(Length::FillPortion(4)),
                             ),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(20.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)));
 
                 // Storage
                 col = col
-                    .push(Space::new(Length::Fill, Length::Fixed(20.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
                     .push(text("Storage").size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(7.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(7.0)))
                     .push(
                         Row::new()
-                            .push(horizontal_space().width(Length::FillPortion(9)))
+                            .push(Space::new().width(Length::FillPortion(9)))
                             .push(text("Used").width(Length::FillPortion(2)))
                             .push(text("Free").width(Length::FillPortion(2)))
                             .push(text("Total").width(Length::FillPortion(2))),
@@ -348,14 +352,14 @@ impl GUI {
 
                 // Network
                 col = col
-                    .push(Space::new(Length::Fill, Length::Fixed(20.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
                     .push(text("Network").size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(7.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(7.0)));
                 // HashMap -> BTreeMap to have a sorted list
                 for (name, data) in sysinfo::Networks::new_with_refreshed_list()
                     .list()
@@ -394,69 +398,71 @@ impl GUI {
                 };
                 let mut col = Column::new()
                     .push(text(self.i18n_txt("askdlpin")).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(20.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
                     .push(
                         Row::new()
-                            .push(Space::new(Length::Fill, Length::Fixed(1.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .push(
                                 text(pin_txt)
                                     .size(MENU_SIZE)
                                     .align_x(Alignment::Center)
                                     .align_y(Alignment::Center),
                             )
-                            .push(Space::new(Length::Fill, Length::Fixed(1.0))),
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(1.0))),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(25.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(25.0)));
 
                 let row_789 = Row::new()
                     .push(button_numpad("7", Message::UserInput(7)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("8", Message::UserInput(8)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("9", Message::UserInput(9)));
                 let row_456 = Row::new()
                     .push(button_numpad("4", Message::UserInput(4)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("5", Message::UserInput(5)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("6", Message::UserInput(6)));
                 let row_123 = Row::new()
                     .push(button_numpad("1", Message::UserInput(1)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("2", Message::UserInput(2)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("3", Message::UserInput(3)));
                 let row_0 = Row::new()
                     .push(button_numpad("❌", Message::ClearInput(true)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("0", Message::UserInput(0)))
-                    .push(Space::new(Length::Fixed(10.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(10.0)).height(Length::Fill))
                     .push(button_numpad("◀", Message::ClearInput(false)))
                     .align_y(Alignment::Center);
 
                 let digits = Row::new()
-                    .push(Space::new(Length::Fill, Length::Fixed(1.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                     .push(
                         Column::new()
                             .push(row_789)
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                             .push(row_456)
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                             .push(row_123)
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                             .push(row_0)
                             .align_x(Alignment::Center),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(1.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(1.0)));
 
-                col = col
-                    .push(digits.height(Length::FillPortion(4)))
-                    .push(Space::new(Length::Fill, Length::FillPortion(1)));
+                col = col.push(digits.height(Length::FillPortion(4))).push(
+                    Space::new()
+                        .width(Length::Fill)
+                        .height(Length::FillPortion(1)),
+                );
 
                 Container::new(col)
             }
@@ -523,7 +529,11 @@ impl GUI {
                                         .width(Length::Fill)
                                         .align_x(Alignment::Center),
                                 )
-                                .push(Space::new(Length::Fixed(10.0), Length::Shrink))
+                                .push(
+                                    Space::new()
+                                        .width(Length::Fixed(10.0))
+                                        .height(Length::Shrink),
+                                )
                                 .push(
                                     text("Destination")
                                         .size(HEADER_SIZE)
@@ -531,11 +541,15 @@ impl GUI {
                                         .align_x(Alignment::Center),
                                 ),
                         )
-                        .push(Space::new(Length::Fill, Length::Fixed(20.0)))
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
                         .push(
                             Row::new()
                                 .push(scrollable(src_devices.width(Length::Fill)))
-                                .push(Space::new(Length::Fixed(10.0), Length::Shrink))
+                                .push(
+                                    Space::new()
+                                        .width(Length::Fixed(10.0))
+                                        .height(Length::Shrink),
+                                )
                                 .push(scrollable(dst_devices.width(Length::Fill))),
                         ),
                 )
@@ -544,12 +558,20 @@ impl GUI {
                 let col = Column::new()
                     .height(Length::Fill)
                     .push(text(self.i18n_txt("select_part")).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fixed(20.0), Length::Fixed(20.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Space::new()
+                            .width(Length::Fixed(20.0))
+                            .height(Length::Fixed(20.0)),
+                    )
+                    .push(
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fixed(20.0), Length::Fixed(20.0)))
+                    .push(
+                        Space::new()
+                            .width(Length::Fixed(20.0))
+                            .height(Length::Fixed(20.0)),
+                    )
                     .push(
                         Row::new()
                             .push(
@@ -568,7 +590,11 @@ impl GUI {
                                     .width(Length::Fill),
                             ),
                     )
-                    .push(Space::new(Length::Fixed(20.0), Length::Fixed(10.0)));
+                    .push(
+                        Space::new()
+                            .width(Length::Fixed(20.0))
+                            .height(Length::Fixed(10.0)),
+                    );
                 let mut parts_col = Column::new();
                 for (index, part) in parts.iter().enumerate() {
                     parts_col = parts_col
@@ -586,7 +612,7 @@ impl GUI {
                             .style(button::secondary)
                             .on_press(Message::PartSelect(index.try_into().unwrap_or(0))),
                         )
-                        .push(Space::new(Length::Fill, Length::Fixed(5.0)));
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(5.0)));
                 }
                 Container::new(col.push(scrollable(parts_col)))
             }
@@ -604,15 +630,15 @@ impl GUI {
                 }
                 let mut file_column = Column::new()
                     .push(text(self.i18n_txt("src_files")).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
                         Row::new()
-                            .push(Checkbox::new("", all_selected).on_toggle(|check| {
+                            .push(Checkbox::new(all_selected).on_toggle(|check| {
                                 if check {
                                     Message::SelectAll(
                                         files
@@ -629,19 +655,23 @@ impl GUI {
                                     )
                                 }
                             }))
-                            .push(Space::new(Length::Fixed(10.0), Length::Shrink))
+                            .push(
+                                Space::new()
+                                    .width(Length::Fixed(10.0))
+                                    .height(Length::Shrink),
+                            )
                             .push(back_button)
-                            .push(Space::new(Length::Fill, Length::Shrink))
+                            .push(Space::new().width(Length::Fill).height(Length::Shrink))
                             .align_y(Alignment::Center),
                     );
                 let mut selected_col = Column::new()
                     .push(text(self.i18n_txt("selected_files")).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(40.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(40.0)));
 
                 let mut file_list = Column::new();
 
@@ -658,17 +688,15 @@ impl GUI {
                         _ => "-".into(),
                     };
                     let mut file_row = Row::new()
-                        .push(
-                            Checkbox::new("", self.selected.contains(&file.path)).on_toggle(
-                                |check| {
-                                    if check {
-                                        Message::SelectFile(file.path.clone())
-                                    } else {
-                                        Message::UnSelectFile(file.path.clone())
-                                    }
-                                },
-                            ),
-                        )
+                        .push(Checkbox::new(self.selected.contains(&file.path)).on_toggle(
+                            |check| {
+                                if check {
+                                    Message::SelectFile(file.path.clone())
+                                } else {
+                                    Message::UnSelectFile(file.path.clone())
+                                }
+                            },
+                        ))
                         .align_y(Alignment::Center);
                     let path = if let Some(stripped) = file.path.strip_prefix(&self.current_dir) {
                         stripped
@@ -685,16 +713,28 @@ impl GUI {
                                                 .shaping(text::Shaping::Advanced)
                                                 .size(TXT_SIZE),
                                         )
-                                        .push(Space::new(Length::Fixed(5.0), Length::Shrink))
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
                                         .push(
                                             text(path.trim_start_matches('/'))
                                                 .shaping(text::Shaping::Advanced)
                                                 .size(TXT_SIZE)
                                                 .width(Length::Fill),
                                         )
-                                        .push(Space::new(Length::Fixed(5.0), Length::Shrink))
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
                                         .push(text(ByteSize(file.size).to_string()).size(TXT_SIZE))
-                                        .push(Space::new(Length::Fixed(5.0), Length::Shrink))
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
                                         .push(text(datetime).size(TXT_SIZE)),
                                 )
                                 .style(button::text)
@@ -710,16 +750,28 @@ impl GUI {
                                                 .shaping(text::Shaping::Advanced)
                                                 .size(TXT_SIZE),
                                         )
-                                        .push(Space::new(Length::Fixed(5.0), Length::Shrink))
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
                                         .push(
                                             text(path.trim_start_matches('/'))
                                                 .size(TXT_SIZE)
                                                 .shaping(text::Shaping::Advanced)
                                                 .width(Length::Fill),
                                         )
-                                        .push(Space::new(Length::Fixed(5.0), Length::Shrink))
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
                                         .push(text("").size(TXT_SIZE))
-                                        .push(Space::new(Length::Fixed(5.0), Length::Shrink))
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
                                         .push(text(datetime).size(TXT_SIZE)),
                                 )
                                 .style(button::text)
@@ -728,9 +780,11 @@ impl GUI {
                         }
                         _ => (),
                     };
-                    file_list = file_list
-                        .push(file_row)
-                        .push(Space::new(Length::Shrink, Length::Fixed(2.0)));
+                    file_list = file_list.push(file_row).push(
+                        Space::new()
+                            .width(Length::Shrink)
+                            .height(Length::Fixed(2.0)),
+                    );
                 }
                 file_column = file_column.push(scrollable(file_list));
 
@@ -739,7 +793,7 @@ impl GUI {
                     selected_list = selected_list.push(
                         Row::new()
                             .push(text(file).shaping(text::Shaping::Advanced).size(TXT_SIZE))
-                            .push(Space::new(Length::Fill, Length::Fixed(2.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(2.0)))
                             .push(
                                 button(text("🗑").shaping(text::Shaping::Advanced).size(TXT_SIZE))
                                     .style(button::text)
@@ -752,7 +806,11 @@ impl GUI {
                 Container::new(
                     Row::new()
                         .push(file_column.width(Length::Fill))
-                        .push(Space::new(Length::Fixed(20.0), Length::Fixed(10.0)))
+                        .push(
+                            Space::new()
+                                .width(Length::Fixed(20.0))
+                                .height(Length::Fixed(10.0)),
+                        )
                         .push(selected_col.width(Length::Fill)),
                 )
             }
@@ -760,12 +818,12 @@ impl GUI {
                 let mut col = Column::new()
                     .height(Length::Fill)
                     .push(text(self.i18n_txt("selectwipe")).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
 
                 for (id, dev) in self.devices.iter().filter(|(_, dev)| dev.is_dst()) {
                     if let Device::Usb(usb) = dev {
@@ -789,12 +847,12 @@ impl GUI {
                 let mut col = Column::new()
                     .height(Length::Fill)
                     .push(text(self.i18n_txt("selectdiskimg")).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                 for (id, dev) in self.devices.iter().filter(|(_, dev)| dev.is_src()) {
                     if let Device::Usb(usb) = dev {
                         let btn_txt =
@@ -821,12 +879,12 @@ impl GUI {
                 };
                 let mut col = Column::new()
                     .push(text(title).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                 let mut col_messages = Column::new();
                 let messages = &mut self.seen_status.iter().peekable();
                 while let Some(message) = messages.next() {
@@ -847,7 +905,11 @@ impl GUI {
                         )
                     }
                     row = row
-                        .push(Space::new(Length::Fixed(5.0), Length::Shrink))
+                        .push(
+                            Space::new()
+                                .width(Length::Fixed(5.0))
+                                .height(Length::Shrink),
+                        )
                         .push(
                             text(self.i18n_txt(message.as_str_name()))
                                 .size(TXT_SIZE)
@@ -857,7 +919,11 @@ impl GUI {
                         if let Status::Progress(progress) = status {
                             if progress.total != 0 {
                                 row = row
-                                    .push(Space::new(Length::Fixed(10.0), Length::Fixed(1.0)))
+                                    .push(
+                                        Space::new()
+                                            .width(Length::Fixed(10.0))
+                                            .height(Length::Fixed(1.0)),
+                                    )
                                     .push(progress_bar(
                                         0.0..=100.0,
                                         progress.current as f32 * 100.0 / progress.total as f32,
@@ -867,7 +933,7 @@ impl GUI {
                     }
                     col_messages = col_messages
                         .push(row)
-                        .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                 }
                 if let Status::Error(err) = status {
                     col_messages = col_messages.push(
@@ -882,14 +948,14 @@ impl GUI {
             State::Done => {
                 let mut row = Row::new();
                 let mut col = Column::new()
-                    .push(Space::new(Length::Fill, Length::Fixed(15.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(15.0)))
                     .push(text(self.i18n_txt("report")).size(HEADER_SIZE))
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                     .push(
-                        Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
+                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
 
                 let mut col_mess = Column::new();
                 for mess in &self.seen_status {
@@ -900,7 +966,7 @@ impl GUI {
                     );
                     col_mess = col_mess
                         .push(row)
-                        .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                 }
                 col = col.push(scrollable(col_mess));
                 // Display report
@@ -915,12 +981,14 @@ impl GUI {
                     if !report.errors.is_empty() {
                         col_report = col_report
                             .push(text(self.i18n_txt("errors")).size(HEADER_SIZE))
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                             .push(
-                                Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
-                                    .style(container::dark),
+                                Container::new(
+                                    Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                                )
+                                .style(container::dark),
                             )
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                         for fname in &report.errors {
                             col_report =
                                 col_report.push(text(fname).color(color_red).size(TXT_SIZE));
@@ -928,14 +996,16 @@ impl GUI {
                     }
                     if !report.filtered.is_empty() {
                         col_report = col_report
-                            .push(Space::new(Length::Fill, Length::Fixed(15.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(15.0)))
                             .push(text(self.i18n_txt("filtered")).size(HEADER_SIZE))
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                             .push(
-                                Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
-                                    .style(container::dark),
+                                Container::new(
+                                    Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                                )
+                                .style(container::dark),
                             )
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                         for fname in &report.filtered {
                             col_report = col_report.push(
                                 text(fname.trim_start_matches('/'))
@@ -946,14 +1016,16 @@ impl GUI {
                     }
                     if !report.rejected.is_empty() {
                         col_report = col_report
-                            .push(Space::new(Length::Fill, Length::Fixed(15.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(15.0)))
                             .push(text(self.i18n_txt("rejected")).size(HEADER_SIZE))
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                             .push(
-                                Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
-                                    .style(container::dark),
+                                Container::new(
+                                    Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                                )
+                                .style(container::dark),
                             )
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                         for fname in &report.rejected {
                             col_report =
                                 col_report.push(text(fname).size(TXT_SIZE).color(color_red));
@@ -962,7 +1034,7 @@ impl GUI {
                 }
                 row = row
                     .push(col)
-                    .push(Space::new(Length::Fixed(20.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(20.0)).height(Length::Fill))
                     .push(scrollable(col_report));
                 let mut col2 = Column::new().push(row);
                 if self
@@ -977,22 +1049,26 @@ impl GUI {
                 {
                     col2 = col2
                         .push(
-                            Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
-                                .style(container::dark),
+                            Container::new(
+                                Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                            )
+                            .style(container::dark),
                         )
-                        .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                         .push(
                             text(self.i18n_txt("rm_devs"))
                                 .size(HEADER_SIZE)
                                 .width(Length::Fill)
                                 .align_x(Alignment::Center),
                         )
-                        .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                         .push(
-                            Container::new(Space::new(Length::Fill, Length::Fixed(1.0)))
-                                .style(container::dark),
+                            Container::new(
+                                Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                            )
+                            .style(container::dark),
                         )
-                        .push(Space::new(Length::Fill, Length::Fixed(10.0)));
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                 }
                 Container::new(col2)
             }
@@ -1003,7 +1079,11 @@ impl GUI {
             if let Some(dst_id) = self.dst_id {
                 if let Some(Device::Usb(_)) = self.devices.get(&dst_id) {
                     button_row = button_row
-                        .push(Space::new(Length::Fixed(10.0), Length::Fixed(OPT_SIZE)))
+                        .push(
+                            Space::new()
+                                .width(Length::Fixed(10.0))
+                                .height(Length::Fixed(OPT_SIZE)),
+                        )
                         .push(
                             text(format!("{}: ", self.i18n_txt("fstype")))
                                 .size(OPT_SIZE)
@@ -1072,7 +1152,11 @@ impl GUI {
 
         if let Some(id) = &self.userid {
             button_row = button_row
-                .push(Space::new(Length::Fixed(10.0), Length::Fixed(OPT_SIZE)))
+                .push(
+                    Space::new()
+                        .width(Length::Fixed(10.0))
+                        .height(Length::Fixed(OPT_SIZE)),
+                )
                 .push(
                     text(format!("👤 {id}"))
                         .shaping(text::Shaping::Advanced)
@@ -1082,11 +1166,19 @@ impl GUI {
         };
         button_row = button_row.push(
             Row::new()
-                .push(Space::new(Length::Fill, Length::Shrink))
+                .push(Space::new().width(Length::Fill).height(Length::Shrink))
                 .push(button_nok)
-                .push(Space::new(Length::Fixed(20.0), Length::Shrink))
+                .push(
+                    Space::new()
+                        .width(Length::Fixed(20.0))
+                        .height(Length::Shrink),
+                )
                 .push(button_ok)
-                .push(Space::new(Length::Fixed(40.0), Length::Shrink))
+                .push(
+                    Space::new()
+                        .width(Length::Fixed(40.0))
+                        .height(Length::Shrink),
+                )
                 .align_y(Alignment::Center),
         );
         let button_bar = Container::new(if matches!(self.state, State::Init | State::Connect) {
@@ -1098,27 +1190,27 @@ impl GUI {
         let footer = Container::new(
             Row::new()
                 .height(30)
-                .push(Space::new(Length::Fill, Length::Shrink))
+                .push(Space::new().width(Length::Fill).height(Length::Shrink))
                 .push(text(format!("Version: {}", self.version)).size(FOOT_SIZE))
-                .push(Space::new(Length::Fill, Length::Shrink))
+                .push(Space::new().width(Length::Fill).height(Length::Shrink))
                 .align_y(Alignment::Center),
         );
 
         let body = Column::new()
             .push(menu)
-            .push(Space::new(Length::Fill, Length::Fixed(40.0)))
+            .push(Space::new().width(Length::Fill).height(Length::Fixed(40.0)))
             .push(
                 Row::new()
-                    .push(Space::new(Length::Fixed(40.0), Length::Fill))
+                    .push(Space::new().width(Length::Fixed(40.0)).height(Length::Fill))
                     .push(
                         Column::new()
                             .push(main.height(Length::Fill))
-                            .push(Space::new(Length::Fill, Length::Fixed(10.0)))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
                             .push(button_bar),
                     )
-                    .push(Space::new(Length::Fixed(40.0), Length::Fill)),
+                    .push(Space::new().width(Length::Fixed(40.0)).height(Length::Fill)),
             )
-            .push(Space::new(Length::Fill, Length::Fixed(5.0)))
+            .push(Space::new().width(Length::Fill).height(Length::Fixed(5.0)))
             .push(footer);
         Container::new(body)
             .width(Length::Fill)
