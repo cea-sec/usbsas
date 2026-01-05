@@ -15,7 +15,7 @@ log = "0.4"
 serde_json = "1.0"
 sysinfo = "0.37"
 time = { version = "0.3", features = ["local-offset"] }
-tokio = { version = "1.48", features = ["sync"] }
+tokio = { version = "1.49", features = ["sync"] }
 tokio-stream = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
