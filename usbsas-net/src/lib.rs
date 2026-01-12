@@ -38,6 +38,7 @@ const NET_PATHS_RO: &[&str] = &[
     "/etc/hosts",
     "/etc/localtime",
     "/etc/ssl",
+    "/etc/ca-certificates",
     "/etc/openssl",
     "/etc/resolv.conf",
     "/usr/lib/",
