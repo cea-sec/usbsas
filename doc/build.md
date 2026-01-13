@@ -29,11 +29,12 @@ $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
 Already included in the project:
 
 * [FatFs](http://elm-chan.org/fsw/ff/00index_e.html): for reading and writing
-  FAT/exFAT file systems (patched source code is located in `ff/src/ff`).
+  FAT/exFAT file systems (patched source code is located in
+  `usbsas-fsrw/ff/src/ff`).
 * [ntfs3g](https://github.com/tuxera/ntfs-3g): for writing NTFS file systems.
   (The rust crate used for reading may support writing at some point and
   hopefully ntfs3g won't be needed in the future, patched source code is located
-  in `ntfs3g/src/ntfs-3g`).
+  in `usbsas-fsrw/ntfs3g/src/ntfs-3g`).
 
 
 ## Build

@@ -1,7 +1,5 @@
 [workspace]
 members = [
-  "ff",
-  "ntfs3g",
   "usbsas-utils",
   "usbsas-comm",
   "usbsas-proto",
@@ -29,8 +27,6 @@ members = [
   "usbsas-tools"
 ]
 default-members = [
-  "ff",
-  "ntfs3g",
   "usbsas-utils",
   "usbsas-comm",
   "usbsas-proto",

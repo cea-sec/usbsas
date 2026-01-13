@@ -60,8 +60,8 @@ translation.
 
 Dependencies included in this project:
 
-- `ntfs3g` is  GPLv2 (see ntfs3g/src/ntfs-3g/COPYING).
-- `FatFs` has a custom BSD-style license (see ff/src/ff/LICENSE.txt)
+- `ntfs3g` is  GPLv2 (see usbsas-fsrw/ntfs3g/src/ntfs-3g/COPYING).
+- `FatFs` has a custom BSD-style license (see usbsas-fsrw/ff/src/ff/LICENSE.txt)
 
 usbsas is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
