@@ -94,7 +94,7 @@ static const char *corrupt_volume_msg =
 "made to NTFS by this software.\n";
 
 static const char *hibernated_volume_msg =
-"The NTFS partition is hibernated. Please resume Windows and turned it \n"
+"The NTFS partition is hibernated. Please resume Windows and turn it \n"
 "off properly, so mounting could be done safely.\n";
 
 static const char *unclean_journal_msg =

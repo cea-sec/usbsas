@@ -1192,7 +1192,7 @@ int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
 			const char *value, size_t size, int flags)
 {
 	int res;
-	u8 dummy;
+	u8 dummy = 0;
 	ntfs_inode *xrni;
 	ntfs_index_context *xr;
 

@@ -386,7 +386,7 @@ static int update_object_id(ntfs_inode *ni, ntfs_index_context *xo,
 static int add_object_id(ntfs_inode *ni, int flags)
 {
 	int res;
-	u8 dummy;
+	u8 dummy = 0;
 
 	res = -1; /* default return */
 	if (!ntfs_attr_exist(ni,AT_OBJECT_ID, AT_UNNAMED,0)) {
