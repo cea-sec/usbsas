@@ -122,6 +122,7 @@ pub(crate) fn new_context_with_common_rules(
     ctx.allow_syscall(Syscall::futex)?;
     ctx.allow_syscall(Syscall::brk)?;
     ctx.allow_syscall(Syscall::clock_gettime)?;
+    ctx.allow_syscall(Syscall::gettid)?;
     #[cfg(target_arch = "arm")]
     ctx.allow_syscall(Syscall::clock_gettime64)?;
     ctx.allow_syscall(Syscall::rt_sigreturn)?;
