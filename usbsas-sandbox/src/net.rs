@@ -66,6 +66,7 @@ pub fn sandbox(
     ctx.allow_syscall(Syscall::sendto)?;
     ctx.allow_syscall(Syscall::set_robust_list)?;
     ctx.allow_syscall(Syscall::setsockopt)?;
+    ctx.allow_syscall(Syscall::shutdown)?;
     ctx.allow_syscall(Syscall::socket)?;
     ctx.allow_syscall(Syscall::socketpair)?;
     ctx.allow_syscall(Syscall::statx)?;
