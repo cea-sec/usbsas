@@ -1,20 +1,35 @@
-From 954166aba7ec6535f267866ea823290a8102787f Mon Sep 17 00:00:00 2001
 Subject: [PATCH] usbsas
 
 ---
- mft.c      |   6 +-
- mkntfs.c   | 439 ++---------------------------------------------------
- mkntfs.h   |  30 ++++
- security.c |   2 +-
- unix_io.c  | 163 ++------------------
- unix_io.h  |   8 +
- utils.c    |   2 +-
- volume.c   |   4 +-
- volume.h   |   9 +-
- 9 files changed, 78 insertions(+), 585 deletions(-)
+ ea.c        |   2 +-
+ mft.c       |   6 +-
+ mkntfs.c    | 439 ++--------------------------------------------------
+ mkntfs.h    |  30 ++++
+ object_id.c |   2 +-
+ reparse.c   |   2 +-
+ security.c  |   2 +-
+ unix_io.c   | 163 ++-----------------
+ unix_io.h   |   8 +
+ utils.c     |   2 +-
+ volume.c    |   4 +-
+ volume.h    |   9 +-
+ 12 files changed, 81 insertions(+), 588 deletions(-)
  create mode 100644 mkntfs.h
  create mode 100644 unix_io.h
 
+diff --git a/ea.c b/ea.c
+index b86930a..d29d521 100644
+--- a/ea.c
++++ b/ea.c
+@@ -74,7 +74,7 @@ static const char lxmod[] = "$LXMOD";
+ 
+ static int ntfs_need_ea(ntfs_inode *ni, ATTR_TYPES type, int size, int flags)
+ {
+-	u8 dummy;
++	u8 dummy = 0;
+ 	int res;
+ 
+ 	res = 0;
 diff --git a/mft.c b/mft.c
 index cd2b415..657408d 100644
 --- a/mft.c
@@ -587,6 +602,32 @@ index 0000000..a2f1d93
 +extern int mkntfs(struct mkntfs_options *opts2, void *priv_data);
 +
 +#endif /* defined _NTFS_MKNTFS_H */
+diff --git a/object_id.c b/object_id.c
+index 090070f..0074a25 100644
+--- a/object_id.c
++++ b/object_id.c
+@@ -386,7 +386,7 @@ static int update_object_id(ntfs_inode *ni, ntfs_index_context *xo,
+ static int add_object_id(ntfs_inode *ni, int flags)
+ {
+ 	int res;
+-	u8 dummy;
++	u8 dummy = 0;
+ 
+ 	res = -1; /* default return */
+ 	if (!ntfs_attr_exist(ni,AT_OBJECT_ID, AT_UNNAMED,0)) {
+diff --git a/reparse.c b/reparse.c
+index 76dbe2f..960bddc 100644
+--- a/reparse.c
++++ b/reparse.c
+@@ -1192,7 +1192,7 @@ int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
+ 			const char *value, size_t size, int flags)
+ {
+ 	int res;
+-	u8 dummy;
++	u8 dummy = 0;
+ 	ntfs_inode *xrni;
+ 	ntfs_index_context *xr;
+ 
 diff --git a/security.c b/security.c
 index acee0a5..a2b5de0 100644
 --- a/security.c
@@ -871,7 +912,7 @@ index 0000000..de7e7c7
 +
 +#endif /* UNIX_IO_H */
 diff --git a/utils.c b/utils.c
-index 31522da..d35a4e4 100644
+index 8f56cac..cd80ac2 100644
 --- a/utils.c
 +++ b/utils.c
 @@ -281,7 +281,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags)
@@ -932,5 +973,5 @@ index 42800a2..600d648 100644
  
  extern int ntfs_version_is_supported(ntfs_volume *vol);
 -- 
-2.51.0
+2.52.0
 

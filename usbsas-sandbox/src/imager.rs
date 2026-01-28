@@ -21,6 +21,17 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
             Comparator::new(1, Cmp::Eq, libc::TCGETS, None),
         ],
     )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::ioctl,
+        &[
+            Comparator::new(0, Cmp::Eq, 1, None),
+            #[cfg(target_env = "musl")]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS2 as u64, None),
+            #[cfg(not(target_env = "musl"))]
+            Comparator::new(1, Cmp::Eq, libc::TCGETS2, None),
+        ],
+    )?;
     // ioctl(2, TCGETS, ..)
     ctx.set_rule_for_syscall(
         Action::Allow,

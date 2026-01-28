@@ -74,7 +74,7 @@ static const char lxmod[] = "$LXMOD";
 
 static int ntfs_need_ea(ntfs_inode *ni, ATTR_TYPES type, int size, int flags)
 {
-	u8 dummy;
+	u8 dummy = 0;
 	int res;
 
 	res = 0;
