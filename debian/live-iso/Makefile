@@ -1,4 +1,4 @@
-ISO_VER=0.3.2
+ISO_VER=0.3.3
 
 DST_PKG_DIR=config/includes.chroot
 SRC_PKG_DIR=../../target/debian
