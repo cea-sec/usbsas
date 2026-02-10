@@ -21,6 +21,13 @@ pub struct Command {
     pub command_args: Vec<String>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct LocalDir {
+    pub path: String,
+    pub description: String,
+    pub longdescr: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PostCopy {
     pub description: String,
@@ -72,6 +79,7 @@ pub struct Config {
     pub command: Option<Command>,
     pub networks: Option<Vec<Network>>,
     pub source_network: Option<Network>,
+    pub src_local_dirs: Option<Vec<LocalDir>>,
     pub filters: Option<Vec<Filter>>,
     pub post_copy: Option<PostCopy>,
     pub analyzer: Option<Analyzer>,

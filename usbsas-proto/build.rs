@@ -29,6 +29,7 @@ fn main() {
     prost_build.message_attribute("common.Network", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.UsbDevice", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.Command", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.LocalDir", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.TransferReport", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.DeviceReport", "#[derive(serde::Serialize)]");
     prost_build.message_attribute(
@@ -37,6 +38,7 @@ fn main() {
     );
     prost_build.message_attribute("common.NetworkReport", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.CommandReport", "#[derive(serde::Serialize)]");
+    prost_build.message_attribute("common.LocalDirReport", "#[derive(serde::Serialize)]");
     prost_build.enum_attribute("common.DeviceReport.device", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.PartitionInfo", "#[derive(serde::Serialize)]");
     prost_build.enum_attribute("common.Device.device", "#[derive(serde::Serialize)]");

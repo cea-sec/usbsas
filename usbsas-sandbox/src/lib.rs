@@ -10,6 +10,7 @@ pub mod hiduser;
 pub mod identifier;
 pub mod imager;
 pub mod jsonparser;
+pub mod local2files;
 pub mod net;
 pub mod scsi2files;
 pub mod tar2files;

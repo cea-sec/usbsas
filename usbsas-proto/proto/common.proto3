@@ -74,13 +74,22 @@ message Command {
   bool is_dst = 6;
 };
 
+message LocalDir {
+  string path = 1;
+  string title = 2;
+  string description = 3;
+  bool is_src = 4;
+  bool is_dst = 5;
+};
+
 message Device {
   oneof device {
     Network network = 1;
     Command command = 2;
     UsbDevice usb = 3;
+    LocalDir local_dir = 4;
   }
-  uint64 id = 4;
+  uint64 id = 5;
 };
 
 message PartitionInfo {
@@ -143,11 +152,17 @@ message CommandReport {
   string description = 2;
 };
 
+message LocalDirReport {
+  string title = 1;
+  string description = 2;
+};
+
 message DeviceReport {
   oneof device {
     UsbDeviceReport usb = 1;
     NetworkReport network = 2;
     CommandReport command = 3;
+    LocalDirReport local_dir = 4;
   }
 }
 
