@@ -14,6 +14,7 @@ pub struct Children {
     pub files2tar: UsbsasChild<ComRqWriteDst>,
     pub files2cleantar: UsbsasChild<ComRqWriteDst>,
     pub fs2dev: UsbsasChild<ComRqFs2Dev>,
+    pub local2files: UsbsasChild<ComRqFiles>,
     pub scsi2files: UsbsasChild<ComRqFiles>,
     pub tar2files: UsbsasChild<ComRqFiles>,
     pub uploader: UsbsasChild<ComRqUploader>,
@@ -38,6 +39,7 @@ impl Children {
             .args(&["-c", config_path])
             .spawn::<ComRqUsbDev>()?;
         let scsi2files = UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<ComRqFiles>()?;
+        let local2files = UsbsasChildSpawner::new("usbsas-local2files").spawn::<ComRqFiles>()?;
         let files2tar = UsbsasChildSpawner::new("usbsas-files2tar")
             .arg(tar_path)
             .spawn::<ComRqWriteDst>()?;
@@ -74,6 +76,7 @@ impl Children {
             files2tar,
             files2cleantar,
             fs2dev,
+            local2files,
             scsi2files,
             tar2files,
             uploader,
@@ -91,6 +94,7 @@ impl Children {
             &mut self.files2tar,
             &mut self.files2cleantar,
             &mut self.fs2dev,
+            &mut self.local2files,
             &mut self.scsi2files,
             &mut self.tar2files,
             &mut self.uploader,

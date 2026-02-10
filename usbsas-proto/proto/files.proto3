@@ -20,6 +20,10 @@ message RequestOpenDevice {
   uint32 devnum = 2;
 };
 
+message RequestOpenLocalDir {
+  string path = 1;
+};
+
 message RequestPartitions {
 };
 
@@ -56,6 +60,7 @@ message Request {
     RequestReadDir ReadDir = 6;
     RequestReadFile ReadFile = 7;
     RequestReadSectors ReadSectors = 8;
+    RequestOpenLocalDir OpenLocalDir = 9;
   }
 };
 
@@ -64,6 +69,9 @@ message Request {
 message ResponseOpenDevice {
   uint64 block_size = 1;
   uint64 dev_size = 2;
+};
+
+message ResponseOpenLocalDir {
 };
 
 message ResponseOpenPartition {
@@ -103,5 +111,6 @@ message Response {
     ResponseReadFile ReadFile = 8;
     ResponseReadSectors ReadSectors = 9;
     common.ResponseStatus Status = 10;
+    ResponseOpenLocalDir OpenLocalDir = 11;
   }
 };

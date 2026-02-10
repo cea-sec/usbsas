@@ -204,6 +204,14 @@ impl RunState for InitState {
             let device = Device::Network(net);
             devices.insert(device.id(), device);
         });
+        self.config.src_local_dirs.as_ref().inspect(|dirs| {
+            dirs.iter().for_each(|dir| {
+                let mut directory = proto::common::LocalDir::from(dir);
+                directory.is_src = true;
+                let device = Device::LocalDir(directory);
+                devices.insert(device.id(), device);
+            })
+        });
         self.config.command.as_ref().inspect(|command| {
             let device = Device::Command(proto::common::Command::from(*command));
             devices.insert(device.id(), device);
@@ -349,6 +357,7 @@ impl InitState {
                         Device::Usb(_) => conf.analyze_usb,
                         Device::Network(_) => conf.analyze_net,
                         Device::Command(_) => conf.analyze_cmd,
+                        _ => false,
                     }
                 } else {
                     false
@@ -379,6 +388,18 @@ impl InitState {
                     config: self.config,
                     transfer,
                 }),
+                Device::LocalDir(ref dir) => {
+                    children
+                        .local2files
+                        .comm
+                        .openlocaldir(proto::files::RequestOpenLocalDir {
+                            path: dir.path.clone(),
+                        })?;
+                    State::BrowseSrc(BrowseSrcState {
+                        config: self.config,
+                        transfer,
+                    })
+                }
                 _ => {
                     bail!("Source device unsupported");
                 }
@@ -459,6 +480,7 @@ impl RunState for BrowseSrcState {
     fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
         let src_reader: &mut UsbsasChild<ComRqFiles> = match self.transfer.src {
             Device::Usb(_) => &mut children.scsi2files,
+            Device::LocalDir(_) => &mut children.local2files,
             _ => unimplemented!(),
         };
         let selected = loop {
@@ -630,6 +652,7 @@ impl FileSelectionState {
                 children.tar2files.unlock_with(1)?;
                 &mut children.tar2files
             }
+            Device::LocalDir(_) => &mut children.local2files,
             _ => unimplemented!(),
         };
         let mut files_size = 0;
@@ -794,6 +817,7 @@ impl FileSelectionState {
     ) -> Result<()> {
         let src_reader: &mut UsbsasChild<ComRqFiles> = match self.transfer.src {
             Device::Usb(_) => &mut children.scsi2files,
+            Device::LocalDir(_) => &mut children.local2files,
             _ => unimplemented!(),
         };
         // Some FS (like ext4) have a directory size != 0, set it to 0 for
@@ -1007,6 +1031,7 @@ impl RunState for WriteDstFileState {
                         &mut children.files2fs,
                         format!("/usbsas-report-{}.json", report.timestamp),
                     ),
+                    Device::LocalDir(_) => unimplemented!(),
                 };
                 self.write_report(dst_writer, &report, report_path)?;
             }
@@ -1026,6 +1051,7 @@ impl RunState for WriteDstFileState {
                     .close(proto::writedst::RequestClose {})?;
                 Status::MkFs
             }
+            Device::LocalDir(_) => unimplemented!(),
         };
         comm.done(status)?;
         Ok(State::TransferDst(TransferDstState {
@@ -1048,6 +1074,7 @@ impl WriteDstFileState {
                 (&mut children.files2cleantar, Status::MkArchive)
             }
             Device::Usb(_) => (&mut children.files2fs, Status::MkFs),
+            Device::LocalDir(_) => unimplemented!(),
         };
 
         let fileinfo = self.transfer.files.files.get(path).unwrap();
@@ -1109,6 +1136,7 @@ impl RunState for TransferDstState {
             Device::Usb(_) => self.write_fs(comm, children)?,
             Device::Network(_) => self.upload(comm, children)?,
             Device::Command(_) => self.exec_cmd(comm, children)?,
+            Device::LocalDir(_) => unimplemented!(),
         }
 
         if self.config.post_copy.is_some() {

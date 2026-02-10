@@ -39,6 +39,7 @@ pub mod common {
                 device::Device::Network(net) => net.is_src,
                 device::Device::Command(cmd) => cmd.is_src,
                 device::Device::Usb(usb) => usb.is_src,
+                device::Device::LocalDir(dir) => dir.is_src,
             }
         }
         pub fn is_dst(&self) -> bool {
@@ -46,6 +47,7 @@ pub mod common {
                 device::Device::Network(net) => net.is_dst,
                 device::Device::Command(cmd) => cmd.is_dst,
                 device::Device::Usb(usb) => usb.is_dst,
+                device::Device::LocalDir(dir) => dir.is_dst,
             }
         }
         pub fn title(&self) -> &str {
@@ -53,6 +55,7 @@ pub mod common {
                 device::Device::Network(net) => &net.title,
                 device::Device::Command(cmd) => &cmd.title,
                 device::Device::Usb(usb) => &usb.manufacturer,
+                device::Device::LocalDir(dir) => &dir.title,
             }
         }
         pub fn description(&self) -> &str {
@@ -60,6 +63,7 @@ pub mod common {
                 device::Device::Network(net) => &net.description,
                 device::Device::Command(cmd) => &cmd.description,
                 device::Device::Usb(usb) => &usb.description,
+                device::Device::LocalDir(dir) => &dir.description,
             }
         }
         pub fn id(&self) -> u64 {
@@ -84,6 +88,18 @@ pub mod common {
             Network {
                 url: item.url.clone(),
                 krb_service_name: item.krb_service_name.clone(),
+                title: item.description.clone(),
+                description: item.longdescr.clone(),
+                is_src: false,
+                is_dst: false,
+            }
+        }
+    }
+
+    impl From<&usbsas_config::LocalDir> for LocalDir {
+        fn from(item: &usbsas_config::LocalDir) -> Self {
+            LocalDir {
+                path: item.path.clone(),
                 title: item.description.clone(),
                 description: item.longdescr.clone(),
                 is_src: false,
@@ -129,6 +145,24 @@ pub mod common {
                         description: cmd.description.clone(),
                     })),
                 },
+                device::Device::LocalDir(dir) => DeviceReport {
+                    device: Some(device_report::Device::LocalDir(LocalDirReport {
+                        title: dir.title.clone(),
+                        description: dir.description.clone(),
+                    })),
+                },
+            }
+        }
+    }
+
+    impl From<std::fs::FileType> for FileType {
+        fn from(ft: std::fs::FileType) -> FileType {
+            if ft.is_file() {
+                FileType::Regular
+            } else if ft.is_dir() {
+                FileType::Directory
+            } else {
+                FileType::Other
             }
         }
     }

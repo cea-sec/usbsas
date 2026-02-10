@@ -478,6 +478,7 @@ impl GUI {
                             ),
                             Device::Network(net) => (net.title.clone(), net.description.clone()),
                             Device::Command(cmd) => (cmd.title.clone(), cmd.description.clone()),
+                            Device::LocalDir(dir) => (dir.title.clone(), dir.description.clone()),
                         };
                         src_devices = src_devices.push(
                             button(
@@ -502,6 +503,7 @@ impl GUI {
                             ),
                             Device::Network(net) => (net.title.clone(), net.description.clone()),
                             Device::Command(cmd) => (cmd.title.clone(), cmd.description.clone()),
+                            Device::LocalDir(_) => unimplemented!(),
                         };
                         dst_devices = dst_devices.push(
                             button(

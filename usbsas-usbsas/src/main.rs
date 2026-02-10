@@ -112,7 +112,7 @@ fn main() -> Result<()> {
     // Get file descriptors to apply seccomp rules
     let mut pipes_read = vec![];
     let mut pipes_write = vec![];
-    let comms: [&dyn ToFd; 12] = [
+    let comms: [&dyn ToFd; 13] = [
         &children.analyzer.comm,
         &children.identifier.comm,
         &children.cmdexec.comm,
@@ -120,6 +120,7 @@ fn main() -> Result<()> {
         &children.files2fs.comm,
         &children.files2tar.comm,
         &children.files2cleantar.comm,
+        &children.local2files.comm,
         &children.fs2dev.comm,
         &children.scsi2files.comm,
         &children.tar2files.comm,

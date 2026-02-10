@@ -44,6 +44,15 @@ out_directory = "/tmp/usbsas"
 #krb_service_name = "HTTP@your.domain"
 
 
+# Export files from local filesystem (Optional)
+# Path must be readable by the user running usbsas
+
+#[[src_local_dirs]]
+#path = "/path/to/dir"
+#description = "Local export"
+#longdescr = "Export files from local directory XXX"
+
+
 # Destination "command". (Optional)
 # Execute a command.
 # "%SOURCE_FILE%" in command_args will be replaced with the filename of the

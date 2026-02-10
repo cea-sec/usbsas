@@ -179,6 +179,9 @@ impl GUI {
                             self.state = State::Status(Status::init());
                             return Task::stream(self.recv_status()).map(Message::Status);
                         };
+                        if let Some(Device::LocalDir(_)) = self.devices.get(&src_id) {
+                            return Task::done(Message::ReadDir("/".into()));
+                        };
                     };
                 }
                 State::ReadDir(_) => {

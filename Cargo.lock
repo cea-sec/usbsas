@@ -6404,6 +6404,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "usbsas-local2files"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "thiserror 2.0.18",
+ "usbsas-comm",
+ "usbsas-config",
+ "usbsas-proto",
+ "usbsas-sandbox",
+ "usbsas-utils",
+]
+
+[[package]]
 name = "usbsas-mass-storage"
 version = "0.2.0"
 dependencies = [
