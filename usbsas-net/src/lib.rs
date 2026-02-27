@@ -40,6 +40,7 @@ const NET_PATHS_RO: &[&str] = &[
     "/etc/ssl",
     "/etc/ca-certificates",
     "/usr/share/ca-certificates",
+    "/usr/local/share/ca-certificates",
     "/etc/openssl",
     "/etc/resolv.conf",
     "/usr/lib/",
