@@ -24,7 +24,7 @@ usbsas-utils = { path = "../usbsas-utils" }
 uuid = { version = "1.21", features = ["v4"] }
 
 [dev-dependencies]
-assert_cmd = "2.1"
+assert_cmd = "2.2"
 flate2 = { version = "1.1", features = ["zlib-rs"], default-features = false }
 hex-literal = "1.1"
 nix = { version = "0.31", features = ["process", "signal"] }
