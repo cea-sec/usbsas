@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 anyhow = "1.0"
-clap = "4.5"
+clap = "4.6"
 log = "0.4"
 nix = { version = "0.31", features = ["feature", "fs"] }
 serde_json = "1.0"
