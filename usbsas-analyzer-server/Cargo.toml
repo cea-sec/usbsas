@@ -8,16 +8,16 @@ license = "GPL-3.0"
 [dependencies]
 actix-files = "0.6"
 actix-web = "4.13"
-clap = "4.5"
+clap = "4.6"
 env_logger = "0.11"
 futures = "0.3"
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tar = "0.4"
-tempfile = "3.25"
-tokio = { version = "1.49", features = ["fs"] }
-uuid = { version = "1.21", features = ["v4"] }
+tempfile = "3.27"
+tokio = { version = "1.50", features = ["fs"] }
+uuid = { version = "1.22", features = ["v4"] }
 
 [features]
 integration-tests = []
