@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 anyhow = "1.0"
-clap = "4.5"
+clap = "4.6"
 log = "0.4"
 nix = { version = "0.31", features = ["feature", "fs"] }
 serde_json = "1.0"
@@ -21,10 +21,10 @@ usbsas-process = { path = "../usbsas-process" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
-uuid = { version = "1.21", features = ["v4"] }
+uuid = { version = "1.22", features = ["v4"] }
 
 [dev-dependencies]
-assert_cmd = "2.1"
+assert_cmd = "2.2"
 flate2 = { version = "1.1", features = ["zlib-rs"], default-features = false }
 hex-literal = "1.1"
 nix = { version = "0.31", features = ["process", "signal"] }
