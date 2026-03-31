@@ -118,6 +118,7 @@ pub(crate) fn new_context_with_common_rules(
     ctx.allow_syscall(Syscall::rt_sigprocmask)?;
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::munmap)?;
+    ctx.allow_syscall(Syscall::exit)?;
     ctx.allow_syscall(Syscall::exit_group)?;
     ctx.allow_syscall(Syscall::futex)?;
     ctx.allow_syscall(Syscall::brk)?;

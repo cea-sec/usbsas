@@ -79,6 +79,7 @@ pub fn seccomp_thread(udev_socket: RawFd, poll_fd: RawFd) -> Result<()> {
     ctx.allow_syscall(Syscall::readlinkat)?;
     ctx.allow_syscall(Syscall::openat)?;
     ctx.allow_syscall(Syscall::read)?;
+    ctx.allow_syscall(Syscall::madvise)?;
     ctx.allow_syscall(Syscall::close)?;
     ctx.allow_syscall(Syscall::getrandom)?;
     ctx.allow_syscall(Syscall::clock_nanosleep)?;
