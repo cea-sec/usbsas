@@ -15,14 +15,14 @@ log = "0.4"
 serde_json = "1.0"
 sysinfo = "0.38"
 time = { version = "0.3", features = ["local-offset"] }
-tokio = { version = "1.50", features = ["sync"] }
+tokio = { version = "1.51", features = ["sync"] }
 tokio-stream = "0.1"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config" }
 usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
-uuid = { version = "1.22", features = ["v4"] }
+uuid = { version = "1.23", features = ["v4"] }
 
 # cargo-deb
 [package.metadata.deb]
