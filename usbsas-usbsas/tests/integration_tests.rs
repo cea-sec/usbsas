@@ -1,6 +1,7 @@
 #![cfg(feature = "integration-tests")]
 
 use assert_cmd::prelude::*;
+use digest_io::IoWrapper;
 use hex_literal::hex;
 use nix::{
     sys::signal::{self, SIGTERM},
@@ -487,9 +488,9 @@ impl Drop for IntegrationTester {
 
 fn sha256(path: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut file = fs::File::open(path)?;
-    let mut hasher = Sha256::new();
+    let mut hasher = IoWrapper(Sha256::new());
     let _ = io::copy(&mut file, &mut hasher)?;
-    Ok(hasher.finalize().to_vec())
+    Ok(hasher.0.finalize().to_vec())
 }
 
 #[test]
