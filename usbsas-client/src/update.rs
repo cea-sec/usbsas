@@ -102,16 +102,8 @@ impl GUI {
                     .filter(|(_, dev)| matches!(dev, Device::Usb(_)))
                     .count();
                 match self.state {
-                    State::Init => {
-                        if usb_count > 0 {
-                            self.state = State::DevSelect
-                        }
-                    }
-                    State::DevSelect => {
-                        if usb_count == 0 {
-                            self.state = State::Init
-                        }
-                    }
+                    State::Init if usb_count > 0 => self.state = State::DevSelect,
+                    State::DevSelect if usb_count == 0 => self.state = State::Init,
                     _ => (),
                 }
             }

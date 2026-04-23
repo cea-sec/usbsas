@@ -2,6 +2,7 @@ use crate::{
     filter::Rules, Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport,
 };
 use anyhow::{anyhow, bail, Context, Result};
+use base16ct::HexDisplay;
 use log::{debug, error, info, trace};
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -878,7 +879,7 @@ impl FileSelectionState {
             .files2tar
             .comm
             .endfile(proto::writedst::RequestEndFile { path: path.into() })?;
-        fileinfo.cksum = Some(format!("{:x}", hasher.finalize()));
+        fileinfo.cksum = Some(format!("{:x}", HexDisplay(&hasher.finalize())));
         Ok(())
     }
 }
