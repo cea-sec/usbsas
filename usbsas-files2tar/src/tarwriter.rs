@@ -35,7 +35,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
 
     fn newfile(&mut self, path: &str, ftype: FileType, size: u64, timestamp: i64) -> Result<()> {
         let mut path_string: String = path.trim_start_matches('/').into();
-        if path_string.starts_with("../") || path_string.contains("/../") {
+        if path_string.starts_with("../") || path_string.contains("/../") || path_string == ".." {
             return Err(Error::Error("Bad file name".to_string()));
         }
         let mut header = tar::Header::new_ustar();
