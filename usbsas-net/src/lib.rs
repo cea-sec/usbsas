@@ -178,17 +178,17 @@ impl HttpClient {
         let mut resp_ret: Option<Response> = None;
         if let Some(krb_service_name) = &self.krb_service_name {
             let desired_mechs = {
-                let mut set = OidSet::new()?;
-                set.add(&GSS_MECH_KRB5)?;
+                let mut set = OidSet::new();
+                set.add(GSS_MECH_KRB5)?;
                 set
             };
-            let service = Name::new(krb_service_name.as_bytes(), Some(&GSS_NT_HOSTBASED_SERVICE))?;
+            let service = Name::new(krb_service_name.as_bytes(), Some(GSS_NT_HOSTBASED_SERVICE))?;
             let client_cred = Cred::acquire(None, None, CredUsage::Initiate, Some(&desired_mechs))?;
             let mut client_ctx = ClientCtx::new(
                 Some(client_cred),
                 service,
                 CtxFlags::GSS_C_MUTUAL_FLAG,
-                Some(&GSS_MECH_KRB5),
+                Some(GSS_MECH_KRB5),
             );
 
             let mut server_token: Option<Vec<u8>> = None;
