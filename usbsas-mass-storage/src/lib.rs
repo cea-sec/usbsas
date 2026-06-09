@@ -52,8 +52,9 @@ impl MassStorage {
                 scsiusb.init_mass_storage()?
             }
         };
-        // TODO: support more sector size
-        assert!([0x200, 0x800, 0x1000].contains(&block_size));
+        if !([0x200, 0x400, 0x800, 0x1000].contains(&block_size)) {
+            return Err(Error::Error("Unsupported block size".into()));
+        }
         Ok(MassStorage {
             scsiusb: RwLock::new(scsiusb),
             max_lba,
@@ -66,7 +67,11 @@ impl MassStorage {
 
     pub fn from_opened_file(file: File) -> Result<Self> {
         rusb::disable_device_discovery()?;
-        assert!(rusb::supports_detach_kernel_driver());
+        if !rusb::supports_detach_kernel_driver() {
+            return Err(Error::Error(
+                "libusb doesn't support detaching the kernel driver".into(),
+            ));
+        }
 
         let context = rusb::GlobalContext::default();
         let handle = unsafe { context.open_device_with_fd(file.as_raw_fd())? };
