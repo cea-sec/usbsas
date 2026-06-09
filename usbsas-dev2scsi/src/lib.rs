@@ -46,7 +46,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 // Max we need to read for ext4 check (other fs need less) and iso9660
-const MAX_LEN_PART_HEADER: u64 = 0x464;
+const MAX_LEN_PART_HEADER: u64 = 0x488;
 const MAX_LEN_ISO_HEADER: u64 = 0x8806;
 
 enum State {
