@@ -1156,10 +1156,12 @@ fn get_screen_display() -> Result<ScreenInfo, Error> {
     log::debug!("Root windows: {rootwindow:?}");
     unsafe { XSelectInput(display, rootwindow, KeyReleaseMask) };
 
-    /* Get screen size */
     let count_screens = unsafe { XScreenCount(display) };
-    assert!(count_screens > 0);
+    if count_screens <= 0 {
+        return Err(Error::other("No screen detected".to_string()));
+    }
 
+    /* Get screen size */
     let screen = unsafe { XScreenOfDisplay(display, 0) };
     let width = unsafe { (*screen).width };
     let height = unsafe { (*screen).height };
@@ -1438,7 +1440,11 @@ fn main() -> Result<(), Error> {
         .parse::<u8>()
         .map_err(|err| Error::other(format!("DEVNUM is not an integer: {err:?}")))?;
 
-    assert!(rusb::supports_detach_kernel_driver());
+    if !rusb::supports_detach_kernel_driver() {
+        return Err(Error::other(
+            "libusb doesn't support detaching kernel driver",
+        ));
+    }
 
     log::info!("Busnum: {busnum} Devnum: {devnum}");
 

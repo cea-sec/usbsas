@@ -465,7 +465,9 @@ impl<T: UsbContext> ScsiUsb<T> {
             }
         }
 
-        assert!(buffer[4] == 0 && buffer[5] == 0);
+        if buffer[4] != 0 || buffer[5] != 0 {
+            return Err(io::Error::other("scsi read capacity error"));
+        }
 
         let max_lba: u32 = BigEndian::read_u32(&buffer[0..4]);
         let block_size: u32 = BigEndian::read_u32(&buffer[4..8]);
