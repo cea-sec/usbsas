@@ -112,7 +112,7 @@ impl LoadMetadataState {
         for entry in archive.entries()? {
             let entry = entry?;
             let path_name = entry.path()?.to_path_buf().to_string_lossy().to_string();
-            if path_name.contains("/../") {
+            if path_name.starts_with("../") || path_name.contains("/../") || path_name == ".." {
                 log::debug!("ignoring file '{path_name}'");
                 continue;
             }
