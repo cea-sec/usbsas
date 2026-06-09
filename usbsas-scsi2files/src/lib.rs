@@ -301,10 +301,10 @@ impl PartitionOpenedState {
         offset: u64,
         size: u64,
     ) -> Result<()> {
-        let mut data = Box::new(vec![0u8; size as usize]);
         if size > READ_FILE_MAX_SIZE {
             return Err(Error::Error("max read size exceeded".to_string()));
         }
+        let mut data = Box::new(vec![0u8; size as usize]);
         self.fs.read_file(&path, &mut data, offset, size)?;
         comm.readfile(proto::files::ResponseReadFile { data: *data })?;
         Ok(())
