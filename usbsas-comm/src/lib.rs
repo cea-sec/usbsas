@@ -16,7 +16,7 @@ use std::{
     },
     str::FromStr,
 };
-use usbsas_utils::{INPUT_PIPE_FD_VAR, OUTPUT_PIPE_FD_VAR};
+use usbsas_utils::{INPUT_PIPE_FD_VAR, MAX_PROTO_MESS_SIZE, OUTPUT_PIPE_FD_VAR};
 
 pub trait FromEnv: Sized {
     type Err;
@@ -129,6 +129,10 @@ pub trait SendRecv: Read + Write {
         T: std::default::Default,
     {
         let len = self.read_u64::<LittleEndian>()?;
+
+        if len > MAX_PROTO_MESS_SIZE {
+            return Err(std::io::Error::other("Message size exceeded"));
+        }
 
         let mut buf = vec![0; len as usize];
         self.read_exact(&mut buf)?;
