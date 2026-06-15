@@ -66,7 +66,7 @@ impl<T: Read + Seek> FatFs<T> {
         // a Box<dyn Trait>.
         // We wrap this box into a second one for 2 reasons:
         //  - We can use Box::into_raw() / Box::from_raw() to cast into / from void*. We can't do
-        //    that with a simple box because dyn Trait in a fat pointer.
+        //    that with a simple box because dyn Trait is a fat pointer.
         //  - The first box will be on the heap and won't move. We could have Pinned it but it would
         //    require T to impl Unpin for the into_inner() function.
         let inner_box: Box<Box<dyn WrapperFatFs>> =
