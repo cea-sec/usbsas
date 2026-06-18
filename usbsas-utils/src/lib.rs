@@ -7,6 +7,7 @@ pub mod log;
 
 pub const INPUT_PIPE_FD_VAR: &str = "INPUT_PIPE_FD";
 pub const OUTPUT_PIPE_FD_VAR: &str = "OUTPUT_PIPE_FD";
+pub const MAX_PROTO_MESS_SIZE: u64 = 1024 * 1024 * 32;
 pub const READ_FILE_MAX_SIZE: u64 = 1024 * 1024 * 10;
 pub const SECTOR_SIZE: u64 = 512;
 pub const TAR_BLOCK_SIZE: usize = 512;

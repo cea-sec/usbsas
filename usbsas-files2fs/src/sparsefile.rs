@@ -35,14 +35,15 @@ impl<T: Read + Write + Seek> Read for SparseFile<T> {
 
 impl<T: Read + Write + Seek> Write for SparseFile<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        /* Get file position */
         let offset = self.file.stream_position()?;
-
         match self.file.write(buf)? {
             0 => Ok(0),
             size => {
                 let sector_start = (offset / self.sector_size) as usize;
                 let sector_stop = (offset + size as u64).div_ceil(self.sector_size) as usize;
+                if sector_stop > self.bitvec.len() {
+                    return Err(io::Error::new(io::ErrorKind::StorageFull, "bitvec full"));
+                }
                 self.bitvec[sector_start..sector_stop].fill(true);
                 Ok(size)
             }

@@ -254,11 +254,16 @@ impl RunState for InitState {
                 },
                 Msg::Wipe(req) => match devices.remove(&req.id) {
                     Some(Device::Usb(dev)) => {
+                        let outfstype = if let Ok(fstype) = FsType::try_from(req.fstype) {
+                            fstype
+                        } else {
+                            bail!("no matching out fs type, waiting end");
+                        };
                         return Ok(State::Wipe(WipeState {
                             device: dev,
                             quick: req.quick,
-                            outfstype: FsType::try_from(req.fstype).unwrap(),
-                        }))
+                            outfstype,
+                        }));
                     }
                     _ => {
                         bail!("no matching device for wiping, waiting end");

@@ -205,6 +205,16 @@ impl CopyingState {
         let fs_size = self.fs.seek(SeekFrom::End(0))?;
         self.fs.rewind()?;
 
+        if let Some(last_sector) = self.fs_bv.bv.last_one() {
+            if last_sector * SECTOR_SIZE as usize > fs_size as usize {
+                comm.error("weird bitvec received")?;
+                return Ok(State::WaitEnd(WaitEndState {}));
+            }
+        } else {
+            comm.error("no sectors to write")?;
+            return Ok(State::WaitEnd(WaitEndState {}));
+        };
+
         let total_size = self.fs_bv.count_ones() as u64 * SECTOR_SIZE;
 
         trace!("state=copying: size={total_size} ");
