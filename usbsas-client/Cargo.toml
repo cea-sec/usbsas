@@ -6,7 +6,7 @@ license = "GPL-3.0"
 description = "Graphical User Interface for usbsas"
 
 [dependencies]
-bytesize = "2.3"
+bytesize = "2.4"
 clap = { version = "4.6", features = ["string"] }
 env_logger = "0.11"
 iced = { version = "0.14", features = ["advanced", "image", "smol", "svg"] }

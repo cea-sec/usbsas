@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-bitvec = "1.0"
+bitvec = "1.1"
 byteorder = "1.5"
 env_logger = "0.11"
 log = "0.4"
