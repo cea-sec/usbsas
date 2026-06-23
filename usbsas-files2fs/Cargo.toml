@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [dependencies]
-bitvec = "1.0"
+bitvec = "1.1"
 env_logger = "0.11"
 fscommon = { git = "https://github.com/rafalh/rust-fscommon", rev = "89706258032efff88689f6083510ed34b845fe46" }
 log = "0.4"
