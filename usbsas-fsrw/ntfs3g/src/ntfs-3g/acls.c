@@ -3716,15 +3716,38 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 		/*
 		 * Build a raw posix security descriptor
 		 * by just translating permissions and ids
-		 * Add 2 to the count of ACE to be able to insert
-		 * a group ACE later in access and default ACLs
-		 * and add 2 more to be able to insert ACEs for owner
-		 * and 2 more for other
+		 *
+		 * The worst case number of ACE entries consists of:
+		 * - 'acecount' ACE entries from the main loop (see below)
+		 *   iterating over the 'securattr' array.
+		 * - 1 ACE entry which may be added when creating world
+		 *   permissions if none exist.
+		 * - 1 ACE entry which may be added when setting basic owner
+		 *   permissions if none exist (both lists).
+		 * - 1 ACE entry which may be added when duplicating world
+		 *   permissions as group_obj permissions if none exist.
+		 * - 'acecount + 2' ACE entries which may be added when
+		 *   duplicating world permissions as group permissions if they
+		 *   were converted to masks and the masks are not followed by a
+		 *   group entry.
+		 * - 1 ACE entry which may be added when inserting a default
+		 *   mask if none is present and there are designated users or
+		 *   groups.
+		 *
+		 * This amounts to 2*acecnt + 6 ACE entries in the worst case.
 		 */
-	alloccnt = acecnt + 6;
+	alloccnt = 2*acecnt + 6;
 	pxdesc = (struct POSIX_SECURITY*)malloc(
 				sizeof(struct POSIX_SECURITY)
 				+ alloccnt*sizeof(struct POSIX_ACE));
+	if (!pxdesc) {
+		ntfs_log_perror("Unable to allocate %zu bytes for "
+				"POSIX_SECURITY structure",
+				(size_t)(sizeof(struct POSIX_SECURITY) +
+					alloccnt*sizeof(struct POSIX_ACE)));
+		errno = ENOMEM;
+		return NULL;
+	}
 	k = 0;
 	l = alloccnt;
 	for (i=0; i<2; i++) {
