@@ -39,16 +39,13 @@ fn main() {
             "src/ntfs-3g/sd.c",
             "src/ntfs-3g/unistr.c",
             "src/ntfs-3g/unix_io.c",
-            "src/ntfs-3g/utils.c",
             "src/ntfs-3g/volume.c",
             "src/ntfs-3g/xattrs.c",
         ])
         .define("HAVE_CONFIG_H", "1")
         .flag("-Wno-unused-parameter")
-        .flag("-Wno-implicit-function-declaration")
         .flag("-Wno-address-of-packed-member")
         .flag("-Wno-unused-but-set-variable")
-        .flag("-Wno-unknown-warning-option")
         .flag("-O2")
         .flag("-D_FORTIFY_SOURCE=2")
         .flag("-fPIC")

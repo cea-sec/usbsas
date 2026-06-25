@@ -40,7 +40,6 @@
 #include "./ntfs-3g/sd.h"
 #include "./ntfs-3g/support.h"
 #include "./ntfs-3g/unistr.h"
-#include "./ntfs-3g/utils.h"
 #include "./ntfs-3g/unix_io.h"
 #include "./ntfs-3g/volume.h"
 #include "./ntfs-3g/xattrs.h"
