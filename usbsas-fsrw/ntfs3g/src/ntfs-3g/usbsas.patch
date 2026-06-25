@@ -3,17 +3,16 @@ Subject: [PATCH] usbsas
 ---
  ea.c        |   2 +-
  mft.c       |   6 +-
- mkntfs.c    | 439 ++--------------------------------------------------
+ mkntfs.c    | 477 +++++++---------------------------------------------
  mkntfs.h    |  30 ++++
  object_id.c |   2 +-
  reparse.c   |   2 +-
  security.c  |   2 +-
- unix_io.c   | 163 ++-----------------
+ unix_io.c   | 163 ++----------------
  unix_io.h   |   8 +
- utils.c     |   2 +-
  volume.c    |   4 +-
  volume.h    |   9 +-
- 12 files changed, 81 insertions(+), 588 deletions(-)
+ 11 files changed, 124 insertions(+), 581 deletions(-)
  create mode 100644 mkntfs.h
  create mode 100644 unix_io.h
 
@@ -48,7 +47,7 @@ index cd2b415..657408d 100644
  	if (!base_ni)
  		vol->mft_data_pos = bit + 1;
 diff --git a/mkntfs.c b/mkntfs.c
-index 5c3a367..5ce581b 100644
+index eb4363c..6f213e2 100644
 --- a/mkntfs.c
 +++ b/mkntfs.c
 @@ -140,6 +140,7 @@
@@ -68,7 +67,7 @@ index 5c3a367..5ce581b 100644
  struct BITMAP_ALLOCATION {
  	struct BITMAP_ALLOCATION *next;
  	LCN	lcn;		/* first allocated cluster */
-@@ -206,91 +205,7 @@ static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
+@@ -206,91 +205,57 @@ static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
  
  static struct BITMAP_ALLOCATION *g_allocation	  = NULL;	/* Head of cluster allocations */
  
@@ -94,15 +93,60 @@ index 5c3a367..5ce581b 100644
 -	char *label;			/* -L, volume label */
 -} opts;
 -
--
--/**
++struct mkntfs_options opts;
+ 
+ /**
 - * mkntfs_license
-- */
++ * from utils.c
++ * linux-ntfs's ntfs_mbstoucs has different semantics, so we emulate it with
++ * ntfs-3g's.
+  */
 -static void mkntfs_license(void)
--{
++int ntfs_mbstoucs_libntfscompat(const char *ins,
++		ntfschar **outs, int outs_len)
+ {
 -	ntfs_log_info("%s", ntfs_gpl);
--}
--
++	if(!outs) {
++		errno = EINVAL;
++		return -1;
++	}
++	else if(*outs != NULL) {
++		/* Note: libntfs's mbstoucs implementation allows the caller to
++		 * specify a preallocated buffer while libntfs-3g's always
++		 * allocates the output buffer.
++		 */
++		ntfschar *tmpstr = NULL;
++		int tmpstr_len;
++
++		tmpstr_len = ntfs_mbstoucs(ins, &tmpstr);
++		if(tmpstr_len >= 0) {
++			if((tmpstr_len + 1) > outs_len) {
++				/* Doing a realloc instead of reusing tmpstr
++				 * because it emulates libntfs's mbstoucs more
++				 * closely. */
++				ntfschar *re_outs = realloc(*outs,
++					sizeof(ntfschar)*(tmpstr_len + 1));
++				if(!re_outs)
++					tmpstr_len = -1;
++				else
++					*outs = re_outs;
++			}
++
++			if(tmpstr_len >= 0) {
++				/* The extra character is the \0 terminator. */
++				memcpy(*outs, tmpstr,
++					sizeof(ntfschar)*(tmpstr_len + 1));
++			}
++
++			free(tmpstr);
++		}
++
++		return tmpstr_len;
++	}
++	else
++		return ntfs_mbstoucs(ins, outs);
+ }
+ 
 -/**
 - * mkntfs_usage
 - */
@@ -157,11 +201,10 @@ index 5c3a367..5ce581b 100644
 -	ntfs_log_info("Copyright (c) 2010-2018 Jean-Pierre Andre\n");
 -	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 -}
-+struct mkntfs_options opts;
  
  /*
   *  crc64, adapted from http://rpm5.org/docs/api/digest_8c-source.html
-@@ -514,258 +429,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
+@@ -514,258 +479,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
  	}
  }
  
@@ -420,7 +463,7 @@ index 5c3a367..5ce581b 100644
  
  /**
   * mkntfs_time
-@@ -3465,18 +3128,16 @@ static void mkntfs_cleanup(void)
+@@ -3465,18 +3178,16 @@ static void mkntfs_cleanup(void)
  /**
   * mkntfs_open_partition -
   */
@@ -441,7 +484,7 @@ index 5c3a367..5ce581b 100644
  	if (!vol->dev) {
  		ntfs_log_perror("Could not create device");
  		goto done;
-@@ -3496,61 +3157,7 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
+@@ -3496,61 +3207,7 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
  			ntfs_log_perror("Could not open %s", vol->dev->d_name);
  		goto done;
  	}
@@ -503,7 +546,7 @@ index 5c3a367..5ce581b 100644
  	result = TRUE;
  done:
  	return result;
-@@ -4974,7 +4581,7 @@ static BOOL mkntfs_create_root_structures(void)
+@@ -4974,7 +4631,7 @@ static BOOL mkntfs_create_root_structures(void)
  /**
   * mkntfs_redirect
   */
@@ -512,7 +555,7 @@ index 5c3a367..5ce581b 100644
  {
  	u64 upcase_crc;
  	int result = 1;
-@@ -4984,6 +4591,14 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+@@ -4984,6 +4641,14 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
  	MFT_RECORD *m;
  	int i, err;
  
@@ -527,7 +570,7 @@ index 5c3a367..5ce581b 100644
  	if (!opts2) {
  		ntfs_log_error("Internal error: invalid parameters to mkntfs_options.\n");
  		goto done;
-@@ -5033,7 +4648,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+@@ -5033,7 +4698,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
  			sizeof(attrdef_ntfs3x_array));
  	g_vol->attrdef_len = sizeof(attrdef_ntfs3x_array);
  	/* Open the partition. */
@@ -536,7 +579,7 @@ index 5c3a367..5ce581b 100644
  		goto done;
  	/*
  	 * Decide on the sector size, cluster size, mft record and index record
-@@ -5177,29 +4792,3 @@ done:
+@@ -5177,29 +4842,3 @@ done:
  	return result;
  }
  
@@ -911,19 +954,6 @@ index 0000000..de7e7c7
 +extern s64 ntfs_dev_lseek(struct ntfs_device *dev, s64 offset, int whence);
 +
 +#endif /* UNIX_IO_H */
-diff --git a/utils.c b/utils.c
-index 8f56cac..cd80ac2 100644
---- a/utils.c
-+++ b/utils.c
-@@ -281,7 +281,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags)
- 	if (!utils_valid_device(device, flags & NTFS_MNT_RECOVER))
- 		return NULL;
- 
--	vol = ntfs_mount(device, flags);
-+	vol = ntfs_mount(device, flags, NULL);
- 	if (!vol) {
- 		ntfs_log_perror("Failed to mount '%s'", device);
- 		if (errno == EINVAL)
 diff --git a/volume.c b/volume.c
 index a6d467b..f675102 100644
 --- a/volume.c
@@ -973,5 +1003,5 @@ index 42800a2..600d648 100644
  
  extern int ntfs_version_is_supported(ntfs_volume *vol);
 -- 
-2.52.0
+2.54.0
 
