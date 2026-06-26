@@ -366,7 +366,8 @@ impl ForwardBitVecState {
     fn run(self, comm: &mut ComRpWriteDst) -> Result<State> {
         trace!("forward bitvec state");
         let mut last = false;
-        let mut chunks = self.bitvec.chunks(10 * 1024 * 1024).peekable(); // limit protobuf messages to 10Mb
+        // limit protobuf messages to 10MB chunks
+        let mut chunks = self.bitvec.chunks(8 * 10 * 1024 * 1024).peekable();
         let newstate = loop {
             match comm.recv_req()? {
                 Msg::BitVec(_) => {
