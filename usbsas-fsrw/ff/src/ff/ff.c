@@ -6001,7 +6001,7 @@ static FRESULT create_partition (
 
 		memset(buf, 0, FF_MAX_SS);		/* Clear MBR */
 		pte = buf + MBR_Table;	/* Partition table in the MBR */
-		for (i = 0, nxt_alloc32 = n_sc; i < 4 && nxt_alloc32 != 0 && nxt_alloc32 < sz_drv32; i++, nxt_alloc32 += sz_part32) {
+		for (i = 0, nxt_alloc32 = 2048; i < 4 && nxt_alloc32 != 0 && nxt_alloc32 < sz_drv32; i++, nxt_alloc32 += sz_part32) {	/* usbsas: first partition aligned on 1 MiB (was n_sc=63) */
 			sz_part32 = (DWORD)plst[i];	/* Get partition size */
 			if (sz_part32 <= 100) sz_part32 = (sz_part32 == 100) ? sz_drv32 : sz_drv32 / 100 * sz_part32;	/* Size in percentage? */
 			if (nxt_alloc32 + sz_part32 > sz_drv32 || nxt_alloc32 + sz_part32 < nxt_alloc32) sz_part32 = sz_drv32 - nxt_alloc32;	/* Clip at drive size */
@@ -6149,8 +6149,8 @@ FRESULT f_mkfs (
 			} else
 #endif
 			{	/* Partitioning is in MBR */
-				if (sz_vol > N_SEC_TRACK) {
-					b_vol = N_SEC_TRACK; sz_vol -= b_vol;	/* Estimated partition offset and size */
+				if (sz_vol > 2048) {	/* usbsas: align on 1 MiB (was N_SEC_TRACK=63) */
+					b_vol = 2048; sz_vol -= b_vol;	/* Estimated partition offset and size */
 				}
 			}
 		}

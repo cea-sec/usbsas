@@ -16,7 +16,9 @@ pub const MBR_SIGNATURE: [u8; 2] = [0x55, 0xAA];
 /// pub const MBR_SIZE : usize = 512;
 /// ```
 pub const MBR_SIZE: usize = 512;
-pub const SECTOR_START: u64 = 0x3f;
+// First partition aligned on 1 MiB (LBA 2048), not the legacy 0x3f (63) that
+// modern Windows mounts poorly. Kept in sync with FatFs (b_vol / nxt_alloc32).
+pub const SECTOR_START: u64 = 2048;
 
 /// mbr partition entry structure
 #[derive(Debug, Default)]

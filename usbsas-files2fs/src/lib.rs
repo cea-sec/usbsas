@@ -28,6 +28,10 @@ use usbsas_utils::SECTOR_SIZE;
 mod sparsefile;
 use sparsefile::{FileBitVec, SparseFile};
 
+// Trailing sectors of the device forced back to zero (covers a stale backup
+// GPT in the last 33 sectors; rounded up to 1 MiB). See the Close handler.
+const TAIL_WIPE_SECTORS: usize = 2048;
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -228,7 +232,30 @@ impl WaitNewFileState {
         let newstate = match comm.recv_req()? {
             Msg::NewFile(msg) => self.newfile(comm, msg.path, msg.timestamp, msg.ftype)?,
             Msg::Close(_) => {
-                let bitvec = self.fs.unmount_fs()?.into_inner().get_bitvec()?;
+                let mut sparse_file = self.fs.unmount_fs()?.into_inner();
+                // Windows won't assign a drive letter to a disk whose MBR signature
+                // (offset 440-443) is zero; write a per-transfer non-zero value.
+                // getrandom isn't allowed by files2fs's seccomp policy, so derive it
+                // from the clock (nanoseconds avoid collisions between sticks).
+                let disk_signature: u32 = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos() as u32)
+                    .ok()
+                    .filter(|v| *v != 0)
+                    .unwrap_or(0x5553_4241); // fallback: "USBA"
+                sparse_file.seek(SeekFrom::Start(440))?;
+                sparse_file.write_all(&disk_signature.to_le_bytes())?;
+                let mut bitvec = sparse_file.get_bitvec()?;
+                // Force fs2dev to overwrite the structural zones Windows revalidates
+                // but our new FS may not touch, so stale data from the device's
+                // previous contents can't survive there: the MBR-to-partition gap
+                // (0..SECTOR_START) and the device tail (old backup GPT). fill(true)
+                // only schedules skipped sectors (zero in the sparse image); it never
+                // alters an already-written sector.
+                let total_sectors = bitvec.len();
+                bitvec[..(SECTOR_START as usize).min(total_sectors)].fill(true);
+                let tail_start = total_sectors.saturating_sub(TAIL_WIPE_SECTORS);
+                bitvec[tail_start..].fill(true);
                 comm.close(proto::writedst::ResponseClose {})?;
                 State::ForwardBitVec(ForwardBitVecState { bitvec })
             }
