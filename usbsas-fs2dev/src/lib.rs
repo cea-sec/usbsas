@@ -230,7 +230,10 @@ impl CopyingState {
             let sector_count = sector_stop - sector_start;
             let sector_write_size = sector_count * SECTOR_SIZE;
 
-            let (size, pad) = if sector_start_pos + sector_write_size > fs_size {
+            let (size, pad) = if sector_start_pos >= fs_size {
+                // Chunk fully past image EOF (forced tail sector): write zeros.
+                (0, sector_write_size)
+            } else if sector_start_pos + sector_write_size > fs_size {
                 let size = fs_size - sector_start_pos;
                 (size, (sector_write_size - size))
             } else {
