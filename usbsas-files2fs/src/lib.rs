@@ -228,7 +228,20 @@ impl WaitNewFileState {
         let newstate = match comm.recv_req()? {
             Msg::NewFile(msg) => self.newfile(comm, msg.path, msg.timestamp, msg.ftype)?,
             Msg::Close(_) => {
-                let bitvec = self.fs.unmount_fs()?.into_inner().get_bitvec()?;
+                let mut sparse_file = self.fs.unmount_fs()?.into_inner();
+                // Windows won't assign a drive letter to a disk whose MBR signature
+                // (offset 440-443) is zero; write a per-transfer non-zero value.
+                // getrandom isn't allowed by files2fs's seccomp policy, so derive it
+                // from the clock (nanoseconds avoid collisions between sticks).
+                let disk_signature: u32 = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos() as u32)
+                    .ok()
+                    .filter(|v| *v != 0)
+                    .unwrap_or(0x5553_4241); // fallback: "USBA"
+                sparse_file.seek(SeekFrom::Start(440))?;
+                sparse_file.write_all(&disk_signature.to_le_bytes())?;
+                let bitvec = sparse_file.get_bitvec()?;
                 comm.close(proto::writedst::ResponseClose {})?;
                 State::ForwardBitVec(ForwardBitVecState { bitvec })
             }
