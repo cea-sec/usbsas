@@ -90,9 +90,9 @@ impl GUI {
         let main = match &self.state {
             State::Sandbox | State::Connect | State::Init | State::Reload => {
                 let (txt, opacity) = if self.comm.is_some() {
-                    (self.i18n_txt("init"), 1.0)
+                    (self.i18n_txt("init"), 1.0_f32)
                 } else {
-                    (self.i18n_txt("loading"), 0.5)
+                    (self.i18n_txt("loading"), 0.5_f32)
                 };
                 let pane = Container::new(
                     Svg::new(Handle::from_memory(include_bytes!(
