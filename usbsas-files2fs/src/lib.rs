@@ -228,7 +228,10 @@ impl WaitNewFileState {
         let newstate = match comm.recv_req()? {
             Msg::NewFile(msg) => self.newfile(comm, msg.path, msg.timestamp, msg.ftype)?,
             Msg::Close(_) => {
-                let bitvec = self.fs.unmount_fs()?.into_inner().get_bitvec()?;
+                let mut bitvec = self.fs.unmount_fs()?.into_inner().get_bitvec()?;
+                // Ensure old MBR / GPT is erased
+                let total_sectors = bitvec.len();
+                bitvec[..(SECTOR_START as usize).min(total_sectors)].fill(true);
                 comm.close(proto::writedst::ResponseClose {})?;
                 State::ForwardBitVec(ForwardBitVecState { bitvec })
             }
