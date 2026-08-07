@@ -186,18 +186,11 @@ impl WaitFsInfosState {
             FsType::Ntfs => {
                 // Write mbr before mkfs
                 sparse_file.seek(SeekFrom::Start(446))?;
-                let partition = usbsas_mbr::MbrPartitionEntry {
-                    boot_indicator: 0,
-                    start_head: 1,
-                    start_sector: 1,
-                    start_cylinder: 0,
-                    partition_type: 0x7,
-                    end_head: 0xfe,
-                    end_sector: 0x3f,
-                    end_cylinder: 0x2,
-                    start_in_lba: u32::try_from(SECTOR_START)?,
-                    size_in_lba: u32::try_from(sector_count)?,
-                };
+                let partition = usbsas_mbr::MbrPartitionEntry::new(
+                    0x7,
+                    u32::try_from(SECTOR_START)?,
+                    u32::try_from(sector_count)?,
+                );
                 usbsas_mbr::write_partition(&mut sparse_file, &partition)?;
                 sparse_file.seek(SeekFrom::Start(510))?;
                 sparse_file.write_all(&[0x55, 0xAA])?;
