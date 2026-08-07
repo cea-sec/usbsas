@@ -16,7 +16,7 @@ pub const MBR_SIGNATURE: [u8; 2] = [0x55, 0xAA];
 /// pub const MBR_SIZE : usize = 512;
 /// ```
 pub const MBR_SIZE: usize = 512;
-pub const SECTOR_START: u64 = 0x3f;
+pub const SECTOR_START: u64 = 2048;
 
 /// mbr partition entry structure
 #[derive(Debug, Default)]
