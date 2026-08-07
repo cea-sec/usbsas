@@ -34,6 +34,21 @@ pub struct MbrPartitionEntry {
 }
 
 impl MbrPartitionEntry {
+    pub fn new(partition_type: u8, start_in_lba: u32, size_in_lba: u32) -> Self {
+        Self {
+            boot_indicator: 0,
+            start_head: 1,
+            start_sector: 1,
+            start_cylinder: 0,
+            partition_type,
+            end_head: 0xfe,
+            end_sector: 0x3f,
+            end_cylinder: 0x2,
+            start_in_lba,
+            size_in_lba,
+        }
+    }
+
     /// parse a single mbr partition entry from bytes
     pub fn from_bytes(bytes: &[u8]) -> MbrPartitionEntry {
         MbrPartitionEntry {
