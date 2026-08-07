@@ -185,7 +185,7 @@ impl WaitFsInfosState {
                 Box::new(ff::FatFsWriter::mkfs(
                     file_slice,
                     SECTOR_SIZE,
-                    fs_sector_count,
+                    fs_sector_count + SECTOR_START,
                     Some(out_fs_type),
                 )?)
             }
