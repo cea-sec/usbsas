@@ -237,7 +237,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("fdef28f25854edf7ccefffda706243295d696455c73fee406fa325912e90b44c")
+            hex!("9e71267ee545a9cf00751fbdd5a0b0c8ef8415fff5eb906efb3d4923c8ba933a")
         );
         Ok(())
     }
@@ -356,7 +356,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("ad9d4eee9ec133b74d3cbadb85346c08a451c632016891e9079207d60b24de97")
+            hex!("22e1feb741e6dbd71600bb750539005bcf861ab723611b44d58968909e6cfd17")
         );
 
         Ok(())
@@ -460,7 +460,7 @@ impl IntegrationTester {
 
         assert_eq!(
             sha256(&env::var("USBSAS_MOCK_OUT_DEV")?)?,
-            hex!("bf6cc60d79898f54bee2f9c2375c6992580d0f0053f3e6d78250345df12af238")
+            hex!("9db1f12d3caf1a9810f1eb9b3a2cbc2fd4f73a1ac19a6f2fcd989a61cea35008")
         );
 
         Ok(())
