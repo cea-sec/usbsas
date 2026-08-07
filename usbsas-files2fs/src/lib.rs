@@ -173,47 +173,41 @@ impl WaitFsInfosState {
             (SECTOR_START + fs_sector_count) as usize,
         )?;
 
+        let ptype = match out_fs_type {
+            FsType::Fat => 0xc,
+            FsType::Exfat | FsType::Ntfs => 0x7,
+        };
+
+        // Write mbr before mkfs
+        sparse_file.seek(SeekFrom::Start(446))?;
+        let partition = usbsas_mbr::MbrPartitionEntry::new(
+            ptype,
+            u32::try_from(SECTOR_START)?,
+            u32::try_from(fs_sector_count)?,
+        );
+        usbsas_mbr::write_partition(&mut sparse_file, &partition)?;
+        sparse_file.seek(SeekFrom::Start(510))?;
+        sparse_file.write_all(&[0x55, 0xAA])?;
+
+        let file_slice = StreamSlice::new(
+            sparse_file,
+            SECTOR_START * SECTOR_SIZE,
+            (SECTOR_START + fs_sector_count) * SECTOR_SIZE,
+        )?;
+
         let fs: Box<dyn FSWrite<StreamSlice<SparseFile<File>>>> = match out_fs_type {
-            FsType::Fat | FsType::Exfat => {
-                // ff handles writing mbr but still wrap in StreamSlice so we have the same type as ntfs below
-                let file_slice = StreamSlice::new(
-                    sparse_file,
-                    0,
-                    (SECTOR_START + fs_sector_count) * SECTOR_SIZE,
-                )?;
-
-                Box::new(ff::FatFsWriter::mkfs(
-                    file_slice,
-                    SECTOR_SIZE,
-                    fs_sector_count + SECTOR_START,
-                    Some(out_fs_type),
-                )?)
-            }
-            FsType::Ntfs => {
-                // Write mbr before mkfs
-                sparse_file.seek(SeekFrom::Start(446))?;
-                let partition = usbsas_mbr::MbrPartitionEntry::new(
-                    0x7,
-                    u32::try_from(SECTOR_START)?,
-                    u32::try_from(fs_sector_count)?,
-                );
-                usbsas_mbr::write_partition(&mut sparse_file, &partition)?;
-                sparse_file.seek(SeekFrom::Start(510))?;
-                sparse_file.write_all(&[0x55, 0xAA])?;
-
-                let file_slice = StreamSlice::new(
-                    sparse_file,
-                    SECTOR_START * SECTOR_SIZE,
-                    (SECTOR_START + fs_sector_count) * SECTOR_SIZE,
-                )?;
-
-                Box::new(ntfs::NTFS3G::mkfs(
-                    file_slice,
-                    SECTOR_SIZE,
-                    fs_sector_count,
-                    None,
-                )?)
-            }
+            FsType::Fat | FsType::Exfat => Box::new(ff::FatFsWriter::mkfs(
+                file_slice,
+                SECTOR_SIZE,
+                fs_sector_count,
+                Some(out_fs_type),
+            )?),
+            FsType::Ntfs => Box::new(ntfs::NTFS3G::mkfs(
+                file_slice,
+                SECTOR_SIZE,
+                fs_sector_count,
+                None,
+            )?),
         };
 
         comm.init(proto::writedst::ResponseInit {})?;

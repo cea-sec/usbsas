@@ -222,7 +222,9 @@ impl<T: Read + Write + Seek> FatFs<T> {
         let drive = str_to_utf16(DRIVE);
 
         let mkfs_params = ff_c::MKFS_PARM {
-            fmt: fstype,
+            // use S(uper)F(loppy)D(isk) param format to write fs directly
+            // without already handled MBR / partition entry
+            fmt: fstype | ff_c::FM_SFD as u8,
             n_fat: 0,
             align: 4096 / sector_size,
             n_root: 0,
