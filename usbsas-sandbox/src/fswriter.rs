@@ -15,7 +15,12 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Syscall::lseek,
         #[cfg(target_arch = "arm")]
         Syscall::_llseek,
-        &[Comparator::new(0, Cmp::Eq, fd_in_file as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(fd_in_file as u64),
+        )],
     )?;
 
     // The following rules are for the progress bar
@@ -24,7 +29,7 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 1, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -35,7 +40,7 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 1, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS2 as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -47,7 +52,7 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 2, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(2)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -59,7 +64,7 @@ pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()>
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 2, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(2)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ as u64, None),
             #[cfg(not(target_env = "musl"))]
