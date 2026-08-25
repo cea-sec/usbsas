@@ -16,7 +16,7 @@ pub const MBR_SIGNATURE: [u8; 2] = [0x55, 0xAA];
 /// pub const MBR_SIZE : usize = 512;
 /// ```
 pub const MBR_SIZE: usize = 512;
-pub const SECTOR_START: u64 = 0x3f;
+pub const SECTOR_START: u64 = 2048;
 
 /// mbr partition entry structure
 #[derive(Debug, Default)]
@@ -33,7 +33,47 @@ pub struct MbrPartitionEntry {
     pub size_in_lba: u32,
 }
 
+fn lba_to_encoded_chs(lba: u32) -> (u8, u8, u8) {
+    const HEADS_PER_CYLINDER: u32 = 255;
+    const SECTORS_PER_TRACK: u32 = 63;
+
+    let cylinder = lba / (HEADS_PER_CYLINDER * SECTORS_PER_TRACK);
+
+    // conventional max CHS value.
+    if cylinder > 1023 {
+        return (0xFE, 0xFF, 0xFF);
+    }
+
+    let head = (lba / SECTORS_PER_TRACK) % HEADS_PER_CYLINDER;
+    let sector = (lba % SECTORS_PER_TRACK) + 1;
+
+    let head_byte = head as u8;
+    let sector_byte = ((sector & 0x3F) as u8) | (((cylinder >> 2) & 0xC0) as u8);
+    let cylinder_byte = (cylinder & 0xFF) as u8;
+
+    (head_byte, sector_byte, cylinder_byte)
+}
+
 impl MbrPartitionEntry {
+    pub fn new(partition_type: u8, start_in_lba: u32, size_in_lba: u32) -> Self {
+        let (start_head, start_sector, start_cylinder) = lba_to_encoded_chs(start_in_lba);
+        let (end_head, end_sector, end_cylinder) =
+            lba_to_encoded_chs(start_in_lba + size_in_lba - 1);
+
+        Self {
+            boot_indicator: 0,
+            start_head,
+            start_sector,
+            start_cylinder,
+            partition_type,
+            end_head,
+            end_sector,
+            end_cylinder,
+            start_in_lba,
+            size_in_lba,
+        }
+    }
+
     /// parse a single mbr partition entry from bytes
     pub fn from_bytes(bytes: &[u8]) -> MbrPartitionEntry {
         MbrPartitionEntry {
