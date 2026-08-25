@@ -30,7 +30,7 @@ digest-io = "0.1"
 flate2 = { version = "1.1", features = ["zlib-rs"], default-features = false }
 hex-literal = "1.1"
 nix = { version = "0.31", features = ["process", "signal"] }
-reqwest = { version = "0.13", features = ["blocking"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.11"
 toml = "1.1"
