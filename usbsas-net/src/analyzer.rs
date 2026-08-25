@@ -131,7 +131,7 @@ impl RunningState {
 
         match self.upload(comm) {
             Ok(res) => {
-                trace!("upload for scan result: {:#?}", &res);
+                trace!("upload for scan result: {:#?}", res);
                 if res.status == "uploaded" {
                     // XXX TODO uploaded but not id returned
                     let id = res.id.ok_or(Error::BadRequest)?;
@@ -146,7 +146,7 @@ impl RunningState {
 
         let report = self.poll_result()?;
 
-        trace!("analyzer report: {:?}", &report);
+        trace!("analyzer report: {:?}", report);
         Ok(report)
     }
 
@@ -162,7 +162,7 @@ impl RunningState {
             status: Status::UploadAv,
         };
         let body = Body::sized(filereaderprogress, filesize);
-        trace!("upload to {}", &self.url);
+        trace!("upload to {}", self.url);
         let resp = self.http_client.post(&self.url, body)?;
         if !resp.status().is_success() {
             return Err(Error::Remote);
@@ -183,7 +183,7 @@ impl RunningState {
         trace!("poll result");
         // XXX TODO timeout
         loop {
-            trace!("polling {}", &self.url);
+            trace!("polling {}", self.url);
             let resp = self.http_client.get(&self.url)?;
             if !resp.status().is_success() {
                 return Err(Error::Remote);

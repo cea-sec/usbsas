@@ -260,7 +260,7 @@ impl WaitNewFileState {
         timestamp: i64,
         ftype: i32,
     ) -> Result<State> {
-        debug!("New file: \"{}\"", &path);
+        debug!("New file: \"{}\"", path);
         let newstate: State = match FileType::try_from(ftype) {
             Ok(FileType::Regular | FileType::Metadata) => State::WritingFile(WritingFileState {
                 fs: self.fs,

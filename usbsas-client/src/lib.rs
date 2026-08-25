@@ -377,7 +377,7 @@ impl GUI {
             if let Ok(metadata) = fs::metadata(&fs_path) {
                 if metadata.len() == 0 {
                     if let Err(err) = fs::remove_file(Path::new(&fs_path)) {
-                        log::error!("couldn't rm file {}: {err}", &fs_path);
+                        log::error!("couldn't rm file {}: {err}", fs_path);
                     };
                 }
             };

@@ -68,7 +68,7 @@ fn main() -> Result<()> {
     match fs::metadata(&config.out_directory) {
         Ok(md) => {
             if !md.is_dir() {
-                bail!("out_directory '{}' is not a dir", &config.out_directory);
+                bail!("out_directory '{}' is not a dir", config.out_directory);
             }
         }
         Err(err) => {
@@ -81,19 +81,19 @@ fn main() -> Result<()> {
     }
     let tar_path = format!(
         "{}/usbsas_{}.tar",
-        &config.out_directory.trim_end_matches('/'),
+        config.out_directory.trim_end_matches('/'),
         session_id
     );
     let _ = File::create(&tar_path).context(format!("create {tar_path}"))?;
     let clean_tar_path = format!(
         "{}/usbsas_{}_clean.tar",
-        &config.out_directory.trim_end_matches('/'),
+        config.out_directory.trim_end_matches('/'),
         session_id
     );
     let _ = File::create(&clean_tar_path).context(format!("create {clean_tar_path}"))?;
     let fs_path = format!(
         "{}/usbsas_{}.img",
-        &config.out_directory.trim_end_matches('/'),
+        config.out_directory.trim_end_matches('/'),
         session_id
     );
     let _ = File::create(&fs_path).context(format!("create {fs_path}"))?;
@@ -140,7 +140,7 @@ fn main() -> Result<()> {
         match fs::metadata(dir) {
             Ok(md) => {
                 if !md.is_dir() {
-                    bail!("socket dir '{}' is not a dir", &dir);
+                    bail!("socket dir '{}' is not a dir", dir);
                 }
             }
             Err(err) => {

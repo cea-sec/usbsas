@@ -211,7 +211,7 @@ impl HttpClient {
                             reqwest::header::AUTHORIZATION,
                             format!(
                                 "Negotiate {}",
-                                &b64eng::general_purpose::STANDARD
+                                b64eng::general_purpose::STANDARD
                                     .encode::<&[u8]>(client_token.as_ref())
                             )
                             .parse()?,
