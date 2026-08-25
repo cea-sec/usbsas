@@ -546,7 +546,7 @@ pub struct DownloadSrcState {
 
 impl RunState for DownloadSrcState {
     fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
-        let remote_path = format!("{}/{}", &self.transfer.userid, self.pin);
+        let remote_path = format!("{}/{}", self.transfer.userid, self.pin);
         let archive_size = children
             .downloader
             .comm
@@ -708,7 +708,7 @@ impl FileSelectionState {
                             });
                         }
                         Err(err) => {
-                            error!("get attr '{}' err '{}'", &entry, err);
+                            error!("get attr '{}' err '{}'", entry, err);
                             self.transfer.files.errors.push(entry.clone());
                             continue;
                         }

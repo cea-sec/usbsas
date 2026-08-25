@@ -333,7 +333,7 @@ impl GUI {
                     if let Ok(proto::common::Status::AllDone) = &status.status.try_into() {
                         self.report = comm!(report, proto::usbsas::RequestReport {}).report;
                         if let Some(ref report) = self.report {
-                            log::debug!("{:#?}", &report);
+                            log::debug!("{:#?}", report);
                             if let Some(ref report_conf) = self.config.report {
                                 if let Some(path) = &report_conf.write_local {
                                     let filename = format!(

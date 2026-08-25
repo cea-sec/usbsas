@@ -131,7 +131,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
         {
             Ok(rep) => rep,
             Err(err) => {
-                log::error!("getattr err: {:?} {err}", &path);
+                log::error!("getattr err: {:?} {err}", path);
                 return Err(libc::ENOENT);
             }
         };
@@ -156,7 +156,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
         size: u32,
         callback: impl FnOnce(ResultSlice<'_>) -> CallbackResult,
     ) -> CallbackResult {
-        log::debug!("read: {:?} ({offset}/{size})", &path);
+        log::debug!("read: {:?} ({offset}/{size})", path);
 
         match self
             .scsi2files
@@ -170,7 +170,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
             }) {
             Ok(rep) => callback(Ok(&rep.data)),
             Err(err) => {
-                log::error!("read error {:?} ({offset}/{size}): {:?}", &path, err);
+                log::error!("read error {:?} ({offset}/{size}): {:?}", path, err);
                 callback(Err(libc::EIO))
             }
         }
@@ -217,7 +217,7 @@ impl fuse_mt::FilesystemMT for UsbsasFS {
     }
 
     fn releasedir(&self, _req: RequestInfo, path: &Path, _fh: u64, _flags: u32) -> ResultEmpty {
-        log::trace!("releasedir: {:?}", &path);
+        log::trace!("releasedir: {:?}", path);
         Ok(())
     }
 }

@@ -70,7 +70,7 @@ impl WaitNewFileState {
                         }))
                     }
                     Err(err) => {
-                        error!("Couldn't add file \"{}\": {}", &req.path, err);
+                        error!("Couldn't add file \"{}\": {}", req.path, err);
                         comm.error(err)?;
                         Ok(State::WaitNewFile(self))
                     }

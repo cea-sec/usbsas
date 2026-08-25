@@ -56,7 +56,7 @@ impl FsWriter {
 
         log::info!(
             "Writing fs '{}' on device BUS {busnum} DEV {devnum}",
-            &fs_path,
+            fs_path,
         );
 
         Ok(Self { fs2dev, fs })
