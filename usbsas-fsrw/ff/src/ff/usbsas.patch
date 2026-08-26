@@ -264,10 +264,10 @@ index 195f432..0451d4e 100644
  
  /* Disk Status Bits (DSTATUS) */
 diff --git a/source/ff.c b/source/ff.c
-index 0598b57..28b843c 100644
+index 586decb..6c04f36 100644
 --- a/source/ff.c
 +++ b/source/ff.c
-@@ -247,10 +247,8 @@
+@@ -250,10 +250,8 @@
  
  /* Definitions of logical drive to physical location conversion */
  #if FF_MULTI_PARTITION
@@ -278,7 +278,7 @@ index 0598b57..28b843c 100644
  #define LD2PT(vol) 0			/* Auto partition search */
  #endif
  
-@@ -3765,7 +3763,6 @@ FRESULT f_mount (
+@@ -3770,7 +3768,6 @@ FRESULT f_mount (
  	}
  
  	if (fs) {					/* Register new filesystem object */
@@ -286,7 +286,7 @@ index 0598b57..28b843c 100644
  #if FF_FS_REENTRANT				/* Create a volume mutex */
  		fs->ldrv = (BYTE)vol;	/* Owner volume ID */
  		if (!ff_mutex_create(vol)) return FR_INT_ERR;
-@@ -5898,20 +5895,20 @@ FRESULT f_forward (
+@@ -5903,20 +5900,20 @@ FRESULT f_forward (
  /* Create partitions on the physical drive in format of MBR or GPT */
  
  static FRESULT create_partition (
@@ -311,7 +311,7 @@ index 0598b57..28b843c 100644
  
  #if FF_LBA64
  	if (sz_drv >= FF_MIN_GPT) {	/* Create partitions in GPT format */
-@@ -6041,6 +6038,7 @@ static FRESULT create_partition (
+@@ -6046,6 +6043,7 @@ static FRESULT create_partition (
  
  
  FRESULT f_mkfs (
@@ -319,7 +319,7 @@ index 0598b57..28b843c 100644
  	const TCHAR* path,		/* Logical drive number */
  	const MKFS_PARM* opt,	/* Format options */
  	void* work,				/* Pointer to working buffer (null: use len bytes of heap memory) */
-@@ -6049,8 +6047,8 @@ FRESULT f_mkfs (
+@@ -6054,8 +6052,8 @@ FRESULT f_mkfs (
  {
  	static const WORD cst[] = {1, 4, 16, 64, 256, 512, 0};	/* Cluster size boundary for FAT volume (4K sector unit) */
  	static const WORD cst32[] = {1, 2, 4, 8, 16, 32, 0};	/* Cluster size boundary for FAT32 volume (128K sector unit) */
@@ -330,7 +330,7 @@ index 0598b57..28b843c 100644
  	BYTE *buf;
  	BYTE *pte;
  	WORD ss;	/* Sector size */
-@@ -6068,7 +6066,6 @@ FRESULT f_mkfs (
+@@ -6073,7 +6071,6 @@ FRESULT f_mkfs (
  	vol = get_ldnumber(&path);					/* Get logical drive number to be formatted */
  	if (vol < 0) return FR_INVALID_DRIVE;
  	if (FatFs[vol]) FatFs[vol]->fs_type = 0;	/* Clear the fs object if mounted */
@@ -338,7 +338,7 @@ index 0598b57..28b843c 100644
  	ipart = LD2PT(vol);		/* Hosting partition (0:create as new, 1..:existing partition) */
  
  	/* Initialize the hosting physical drive */
-@@ -6141,7 +6138,8 @@ FRESULT f_mkfs (
+@@ -6146,7 +6143,8 @@ FRESULT f_mkfs (
  			sz_vol = ld_32(pte + PTE_SizLba);	/* Get volume size */
  		}
  	} else {	/* The volume is associated with a physical drive */
@@ -348,7 +348,7 @@ index 0598b57..28b843c 100644
  		if (!(fsopt & FM_SFD)) {	/* To be partitioned? */
  			/* Create a single-partition on the drive in this function */
  #if FF_LBA64
-@@ -6527,7 +6525,7 @@ FRESULT f_mkfs (
+@@ -6533,7 +6531,7 @@ FRESULT f_mkfs (
  	} else {								/* Volume as a new single partition */
  		if (!(fsopt & FM_SFD)) {			/* Create partition table if not in SFD format */
  			lba[0] = sz_vol; lba[1] = 0;
@@ -357,7 +357,7 @@ index 0598b57..28b843c 100644
  			if (res != FR_OK) LEAVE_MKFS(res);
  		}
  	}
-@@ -6546,7 +6544,7 @@ FRESULT f_mkfs (
+@@ -6552,7 +6550,7 @@ FRESULT f_mkfs (
  /*-----------------------------------------------------------------------*/
  
  FRESULT f_fdisk (
@@ -366,7 +366,7 @@ index 0598b57..28b843c 100644
  	const LBA_t ptbl[],	/* Pointer to the size table for each partitions */
  	void* work			/* Pointer to the working buffer (null: use heap memory) */
  )
-@@ -6566,7 +6564,7 @@ FRESULT f_fdisk (
+@@ -6572,7 +6570,7 @@ FRESULT f_fdisk (
  #endif
  	if (!buf) return FR_NOT_ENOUGH_CORE;
  
@@ -487,5 +487,5 @@ index cb7842c..d8d5104 100644
  #define FF_NORTC_MDAY	1
  #define FF_NORTC_YEAR	2025
 -- 
-2.52.0
+2.55.0
 
