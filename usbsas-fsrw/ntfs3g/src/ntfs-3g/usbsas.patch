@@ -3,7 +3,7 @@ Subject: [PATCH] usbsas
 ---
  ea.c        |   2 +-
  mft.c       |   6 +-
- mkntfs.c    | 477 +++++++---------------------------------------------
+ mkntfs.c    | 478 +++++++---------------------------------------------
  mkntfs.h    |  30 ++++
  object_id.c |   2 +-
  reparse.c   |   2 +-
@@ -12,7 +12,7 @@ Subject: [PATCH] usbsas
  unix_io.h   |   8 +
  volume.c    |   4 +-
  volume.h    |   9 +-
- 11 files changed, 124 insertions(+), 581 deletions(-)
+ 11 files changed, 124 insertions(+), 582 deletions(-)
  create mode 100644 mkntfs.h
  create mode 100644 unix_io.h
 
@@ -47,10 +47,18 @@ index cd2b415..657408d 100644
  	if (!base_ni)
  		vol->mft_data_pos = bit + 1;
 diff --git a/mkntfs.c b/mkntfs.c
-index eb4363c..6f213e2 100644
+index eb4363c..ca79971 100644
 --- a/mkntfs.c
 +++ b/mkntfs.c
-@@ -140,6 +140,7 @@
+@@ -130,7 +130,6 @@
+ #include "mft.h"
+ #include "mst.h"
+ #include "runlist.h"
+-#include "utils.h"
+ #include "ntfstime.h"
+ #include "sd.h"
+ #include "boot.h"
+@@ -140,6 +139,7 @@
  #include "support.h"
  #include "unistr.h"
  #include "misc.h"
@@ -58,7 +66,7 @@ index eb4363c..6f213e2 100644
  
  #if defined(__sun) && defined (__SVR4)
  #undef basename
-@@ -157,8 +158,6 @@ switch if you want to be able to build the NTFS utilities."
+@@ -157,8 +157,6 @@ switch if you want to be able to build the NTFS utilities."
  /* Page size on ia32. Can change to 8192 on Alpha. */
  #define NTFS_PAGE_SIZE	4096
  
@@ -67,7 +75,7 @@ index eb4363c..6f213e2 100644
  struct BITMAP_ALLOCATION {
  	struct BITMAP_ALLOCATION *next;
  	LCN	lcn;		/* first allocated cluster */
-@@ -206,91 +205,57 @@ static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
+@@ -206,91 +204,57 @@ static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
  
  static struct BITMAP_ALLOCATION *g_allocation	  = NULL;	/* Head of cluster allocations */
  
@@ -204,7 +212,7 @@ index eb4363c..6f213e2 100644
  
  /*
   *  crc64, adapted from http://rpm5.org/docs/api/digest_8c-source.html
-@@ -514,258 +479,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
+@@ -514,258 +478,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
  	}
  }
  
@@ -463,7 +471,7 @@ index eb4363c..6f213e2 100644
  
  /**
   * mkntfs_time
-@@ -3465,18 +3178,16 @@ static void mkntfs_cleanup(void)
+@@ -3465,18 +3177,16 @@ static void mkntfs_cleanup(void)
  /**
   * mkntfs_open_partition -
   */
@@ -484,7 +492,7 @@ index eb4363c..6f213e2 100644
  	if (!vol->dev) {
  		ntfs_log_perror("Could not create device");
  		goto done;
-@@ -3496,61 +3207,7 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
+@@ -3496,61 +3206,7 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
  			ntfs_log_perror("Could not open %s", vol->dev->d_name);
  		goto done;
  	}
@@ -546,7 +554,7 @@ index eb4363c..6f213e2 100644
  	result = TRUE;
  done:
  	return result;
-@@ -4974,7 +4631,7 @@ static BOOL mkntfs_create_root_structures(void)
+@@ -4974,7 +4630,7 @@ static BOOL mkntfs_create_root_structures(void)
  /**
   * mkntfs_redirect
   */
@@ -555,7 +563,7 @@ index eb4363c..6f213e2 100644
  {
  	u64 upcase_crc;
  	int result = 1;
-@@ -4984,6 +4641,14 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+@@ -4984,6 +4640,14 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
  	MFT_RECORD *m;
  	int i, err;
  
@@ -570,7 +578,7 @@ index eb4363c..6f213e2 100644
  	if (!opts2) {
  		ntfs_log_error("Internal error: invalid parameters to mkntfs_options.\n");
  		goto done;
-@@ -5033,7 +4698,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
+@@ -5033,7 +4697,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
  			sizeof(attrdef_ntfs3x_array));
  	g_vol->attrdef_len = sizeof(attrdef_ntfs3x_array);
  	/* Open the partition. */
@@ -579,7 +587,7 @@ index eb4363c..6f213e2 100644
  		goto done;
  	/*
  	 * Decide on the sector size, cluster size, mft record and index record
-@@ -5177,29 +4842,3 @@ done:
+@@ -5177,29 +4841,3 @@ done:
  	return result;
  }
  
@@ -659,10 +667,10 @@ index 090070f..0074a25 100644
  	res = -1; /* default return */
  	if (!ntfs_attr_exist(ni,AT_OBJECT_ID, AT_UNNAMED,0)) {
 diff --git a/reparse.c b/reparse.c
-index 76dbe2f..960bddc 100644
+index 54858ca..ff05413 100644
 --- a/reparse.c
 +++ b/reparse.c
-@@ -1192,7 +1192,7 @@ int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
+@@ -1200,7 +1200,7 @@ int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
  			const char *value, size_t size, int flags)
  {
  	int res;
@@ -672,10 +680,10 @@ index 76dbe2f..960bddc 100644
  	ntfs_index_context *xr;
  
 diff --git a/security.c b/security.c
-index acee0a5..a2b5de0 100644
+index d0e030e..13fd9b6 100644
 --- a/security.c
 +++ b/security.c
-@@ -5342,7 +5342,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
+@@ -5366,7 +5366,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
  	scapi = (struct SECURITY_API*)NULL;
  	mnt = ntfs_check_if_mounted(device, &mntflag);
  	if (!mnt && !(mntflag & NTFS_MF_MOUNTED) && !getuid()) {
@@ -1003,5 +1011,5 @@ index 42800a2..600d648 100644
  
  extern int ntfs_version_is_supported(ntfs_volume *vol);
 -- 
-2.54.0
+2.55.0
 

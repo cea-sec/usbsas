@@ -206,8 +206,6 @@ static struct BITMAP_ALLOCATION *g_allocation	  = NULL;	/* Head of cluster alloc
 
 struct mkntfs_options opts;
 
-
-
 /**
  * from utils.c
  * linux-ntfs's ntfs_mbstoucs has different semantics, so we emulate it with
@@ -256,6 +254,7 @@ int ntfs_mbstoucs_libntfscompat(const char *ins,
 	else
 		return ntfs_mbstoucs(ins, outs);
 }
+
 
 /*
  *  crc64, adapted from http://rpm5.org/docs/api/digest_8c-source.html
