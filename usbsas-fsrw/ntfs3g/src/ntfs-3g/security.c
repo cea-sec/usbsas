@@ -3944,6 +3944,30 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 	usidsz = ntfs_sid_size(usid);
 	gsidsz = ntfs_sid_size(gsid);
 	newattrsz = parentattrsz + 3*usidsz + 3*gsidsz;
+	/*
+	 * The +3*usidsz + 3*gsidsz slack above only covers a few creator SID
+	 * expansions during ntfs_inherit_acl().  Add worst-case slack for every
+	 * ALLOW/DENY creator-owner and creator-group ACE in both the parent
+	 * DACL and SACL.
+	 */
+	if (pphead->dacl) {
+		offpacl = le32_to_cpu(pphead->dacl);
+		if ((unsigned int)offpacl + sizeof(ACL) <=
+				(unsigned int)parentattrsz) {
+			ppacl = (const ACL*)&parentattr[offpacl];
+			newattrsz += ntfs_inherit_acl_extra_size(ppacl,
+					usid, gsid);
+		}
+	}
+	if (pphead->sacl) {
+		offpacl = le32_to_cpu(pphead->sacl);
+		if ((unsigned int)offpacl + sizeof(ACL) <=
+				(unsigned int)parentattrsz) {
+			ppacl = (const ACL*)&parentattr[offpacl];
+			newattrsz += ntfs_inherit_acl_extra_size(ppacl,
+					usid, gsid);
+		}
+	}
 	if (fordir)
 		newattrsz *= 2;
 	newattr = (char*)ntfs_malloc(newattrsz);

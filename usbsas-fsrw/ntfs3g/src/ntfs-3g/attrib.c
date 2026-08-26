@@ -3530,6 +3530,10 @@ int ntfs_attr_inconsistent(const ATTR_RECORD *a, const MFT_REF mref)
 			if (a->non_resident
 			    || (le32_to_cpu(a->value_length)
 				< offsetof(INDEX_ROOT, index.reserved))
+			    || (le32_to_cpu(ir->index_block_size)
+				< NTFS_BLOCK_SIZE)
+			    || (le32_to_cpu(ir->index_block_size)
+				& (le32_to_cpu(ir->index_block_size) - 1))
 			    || (le32_to_cpu(ir->index.entries_offset)
 				< sizeof(INDEX_HEADER))
 			    || (le32_to_cpu(ir->index.index_length)
@@ -3542,6 +3546,9 @@ int ntfs_attr_inconsistent(const ATTR_RECORD *a, const MFT_REF mref)
 				ntfs_log_error("Corrupt index root"
 					" in MFT record %lld.\n",
 					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			} else if (ntfs_ie_stream_inconsistent(&ir->index, inum)) {
 				errno = EIO;
 				ret = -1;
 			}
