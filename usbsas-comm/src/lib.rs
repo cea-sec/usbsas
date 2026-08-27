@@ -4,7 +4,7 @@
 //! the size of the message (64 bit LE).
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use paste::paste;
+use pastey::paste;
 use std::{
     env,
     fs::File,
