@@ -1,4 +1,4 @@
-use crate::{seccomp, Result};
+use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::Syscall;
 

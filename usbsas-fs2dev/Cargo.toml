@@ -1,7 +1,8 @@
 [package]
 name = "usbsas-fs2dev"
+description = "usbsas-fs2dev"
 version = "0.1.4"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]

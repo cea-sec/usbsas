@@ -1,11 +1,11 @@
-use crate::{Message, State, Status, GUI};
+use crate::{ComRqUsbsas, GUI, Message, State, Status};
 use iced::{
+    Task,
     futures::Stream,
     window::{self, Mode},
-    Task,
 };
-use std::{fs, path, thread};
-use tokio::sync::mpsc;
+use std::{fs, path, sync::Arc, thread};
+use tokio::sync::{Mutex, mpsc};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use usbsas_comm::{ProtoReqCommon, ProtoReqUsbsas};
 use usbsas_proto::{self as proto, common::device::Device};
@@ -35,32 +35,31 @@ macro_rules! comm_req {
     };
 }
 
-impl GUI {
-    fn recv_status(&mut self) -> impl Stream<Item = Status> {
-        let comm = self.comm.as_ref().unwrap().clone();
-        let (sender, receiver) = mpsc::unbounded_channel();
-        let recv_stream = UnboundedReceiverStream::new(receiver);
-        thread::spawn(move || {
-            let mut done = false;
-            while !done {
-                let status = match comm.blocking_lock().recv_status() {
-                    Ok(resp) => {
-                        if let Ok(usbsas_proto::common::Status::AllDone) = resp.status.try_into() {
-                            done = true;
-                        }
-                        Status::Progress(resp)
-                    }
-                    Err(err) => {
+fn recv_status(comm: Arc<Mutex<ComRqUsbsas>>) -> impl Stream<Item = Status> {
+    let (sender, receiver) = mpsc::unbounded_channel();
+    let recv_stream = UnboundedReceiverStream::new(receiver);
+    thread::spawn(move || {
+        let mut done = false;
+        while !done {
+            let status = match comm.blocking_lock().recv_status() {
+                Ok(resp) => {
+                    if let Ok(usbsas_proto::common::Status::AllDone) = resp.status.try_into() {
                         done = true;
-                        Status::Error(format!("{err}"))
                     }
-                };
-                let _ = sender.send(status);
-            }
-        });
-        recv_stream
-    }
+                    Status::Progress(resp)
+                }
+                Err(err) => {
+                    done = true;
+                    Status::Error(format!("{err}"))
+                }
+            };
+            let _ = sender.send(status);
+        }
+    });
+    recv_stream
+}
 
+impl GUI {
     fn unselect_path(&mut self, path: &str, unselect_children: bool) {
         self.selected.remove(path);
         if unselect_children {
@@ -142,11 +141,11 @@ impl GUI {
                         }
                     }
                     if let (Some(src_id), Some(dst_id)) = (self.src_id, self.dst_id) {
-                        if let Some(Device::Network(_)) = self.devices.get(&src_id) {
-                            if self.download_pin.is_none() {
-                                self.state = State::DownloadPin;
-                                return Task::none();
-                            }
+                        if let Some(Device::Network(_)) = self.devices.get(&src_id)
+                            && self.download_pin.is_none()
+                        {
+                            self.state = State::DownloadPin;
+                            return Task::none();
                         };
                         comm!(
                             inittransfer,
@@ -169,7 +168,8 @@ impl GUI {
                         };
                         if let Some(Device::Network(_)) = self.devices.get(&src_id) {
                             self.state = State::Status(Status::init());
-                            return Task::stream(self.recv_status()).map(Message::Status);
+                            return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
+                                .map(Message::Status);
                         };
                         if let Some(Device::LocalDir(_)) = self.devices.get(&src_id) {
                             return Task::done(Message::ReadDir("/".into()));
@@ -184,7 +184,8 @@ impl GUI {
                         }
                     );
                     self.state = State::Status(Status::init());
-                    return Task::stream(self.recv_status()).map(Message::Status);
+                    return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
+                        .map(Message::Status);
                 }
                 State::Wipe(quick) => {
                     if let Some(dst_id) = self.dst_id {
@@ -198,7 +199,8 @@ impl GUI {
                             }
                         );
                         self.state = State::Status(Status::init());
-                        return Task::stream(self.recv_status()).map(Message::Status);
+                        return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
+                            .map(Message::Status);
                     }
                 }
                 State::DiskImg => {
@@ -206,7 +208,8 @@ impl GUI {
                         comm!(imgdisk, proto::usbsas::RequestImgDisk { id: src_id });
                         self.status_title = Some("diskimg".into());
                         self.state = State::Status(Status::init());
-                        return Task::stream(self.recv_status()).map(Message::Status);
+                        return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
+                            .map(Message::Status);
                     }
                 }
                 State::Done => {
@@ -237,24 +240,22 @@ impl GUI {
             Message::SrcSelect(new_src_id) => {
                 self.src_id = Some(new_src_id);
                 // Network to network transfer unsupported
-                if let Some(dst_id) = self.dst_id {
-                    if new_src_id == dst_id
+                if let Some(dst_id) = self.dst_id
+                    && (new_src_id == dst_id
                         || (matches!(self.devices.get(&new_src_id), Some(Device::Network(_)))
-                            && matches!(self.devices.get(&dst_id), Some(Device::Network(_))))
-                    {
-                        self.dst_id = None;
-                    }
+                            && matches!(self.devices.get(&dst_id), Some(Device::Network(_)))))
+                {
+                    self.dst_id = None;
                 };
             }
             Message::DstSelect(new_dst_id) => {
                 self.dst_id = Some(new_dst_id);
-                if let Some(src_id) = self.src_id {
-                    if new_dst_id == src_id
+                if let Some(src_id) = self.src_id
+                    && (new_dst_id == src_id
                         || (matches!(self.devices.get(&new_dst_id), Some(Device::Network(_)))
-                            && matches!(self.devices.get(&src_id), Some(Device::Network(_))))
-                    {
-                        self.src_id = None;
-                    }
+                            && matches!(self.devices.get(&src_id), Some(Device::Network(_)))))
+                {
+                    self.src_id = None;
                 };
             }
             Message::PartSelect(index) => {
@@ -329,34 +330,34 @@ impl GUI {
                     );
                 };
                 self.state = State::Status(status.clone());
-                if let Status::Progress(status) = &status {
-                    if let Ok(proto::common::Status::AllDone) = &status.status.try_into() {
-                        self.report = comm!(report, proto::usbsas::RequestReport {}).report;
-                        if let Some(ref report) = self.report {
-                            log::debug!("{:#?}", report);
-                            if let Some(ref report_conf) = self.config.report {
-                                if let Some(path) = &report_conf.write_local {
-                                    let filename = format!(
-                                        "usbsas_report_{}_{}.json",
-                                        report.datetime, report.transfer_id
-                                    );
-                                    match fs::File::create(path::Path::new(path).join(filename)) {
-                                        Ok(mut file) => {
-                                            if let Err(err) =
-                                                serde_json::to_writer_pretty(&mut file, report)
-                                            {
-                                                log::error!("Error writing report: {err}");
-                                            };
-                                        }
-                                        Err(err) => {
-                                            log::error!("couldn't write report: {err}");
-                                        }
-                                    }
-                                };
-                            };
+                if let Status::Progress(status) = &status
+                    && let Ok(proto::common::Status::AllDone) = &status.status.try_into()
+                {
+                    self.report = comm!(report, proto::usbsas::RequestReport {}).report;
+                    if let Some(ref report) = self.report {
+                        log::debug!("{:#?}", report);
+                        if let Some(ref report_conf) = self.config.report
+                            && let Some(path) = &report_conf.write_local
+                        {
+                            let filename = format!(
+                                "usbsas_report_{}_{}.json",
+                                report.datetime, report.transfer_id
+                            );
+                            match fs::File::create(path::Path::new(path).join(filename)) {
+                                Ok(mut file) => {
+                                    if let Err(err) =
+                                        serde_json::to_writer_pretty(&mut file, report)
+                                    {
+                                        log::error!("Error writing report: {err}");
+                                    };
+                                }
+                                Err(err) => {
+                                    log::error!("couldn't write report: {err}");
+                                }
+                            }
                         };
-                        self.state = State::Done;
-                    }
+                    };
+                    self.state = State::Done;
                 }
             }
             Message::Tick(_) => match self.state {

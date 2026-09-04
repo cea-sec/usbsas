@@ -8,7 +8,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fs::File,
-    io::{prelude::*, SeekFrom},
+    io::{SeekFrom, prelude::*},
     os::unix::io::AsRawFd,
 };
 use tar::Archive;

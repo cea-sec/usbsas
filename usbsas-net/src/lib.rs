@@ -10,18 +10,18 @@ pub use downloader::Downloader;
 pub use jsonparser::JsonParser;
 pub use uploader::Uploader;
 
-use base64::{engine as b64eng, Engine as _};
+use base64::{Engine as _, engine as b64eng};
 #[cfg(feature = "authkrb")]
 use libgssapi::{
     context::{ClientCtx, CtxFlags, SecurityContext},
     credential::{Cred, CredUsage},
     name::Name,
-    oid::{OidSet, GSS_MECH_KRB5, GSS_NT_HOSTBASED_SERVICE},
+    oid::{GSS_MECH_KRB5, GSS_NT_HOSTBASED_SERVICE, OidSet},
 };
 use reqwest::{
+    Method, StatusCode,
     blocking::{Body, Client, Response},
     header::{HeaderMap, HeaderValue},
-    Method, StatusCode,
 };
 use std::{
     fs::File,

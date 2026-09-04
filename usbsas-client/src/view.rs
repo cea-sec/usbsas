@@ -1,19 +1,20 @@
 use crate::{
+    Device, FSTYPES, GUI, LANGS, Message, State, Status,
     components::{
-        button_numpad, style_primary, style_secondary, FOOT_SIZE, HEADER_SIZE, MENU_SIZE, OPT_SIZE,
-        TXT_SIZE,
+        FOOT_SIZE, HEADER_SIZE, MENU_SIZE, OPT_SIZE, TXT_SIZE, button_numpad, style_primary,
+        style_secondary,
     },
-    Device, Message, State, Status, FSTYPES, GUI, LANGS,
 };
 use ::time::OffsetDateTime;
 use bytesize::ByteSize;
 use iced::{
-    widget::{
-        button, container, image, progress_bar, scrollable,
-        svg::{Handle, Svg},
-        text, Checkbox, Column, Container, PickList, Row, Space,
-    },
     Alignment, Color, ContentFit, Length,
+    widget::{
+        Checkbox, Column, Container, PickList, Row, Space, button, container, image, progress_bar,
+        scrollable,
+        svg::{Handle, Svg},
+        text,
+    },
 };
 use sysinfo::System;
 use usbsas_proto::common::FileType;
@@ -917,22 +918,21 @@ impl GUI {
                                 .size(TXT_SIZE)
                                 .align_y(Alignment::Center),
                         );
-                    if messages.peek().is_none() {
-                        if let Status::Progress(progress) = status {
-                            if progress.total != 0 {
-                                row = row
-                                    .push(
-                                        Space::new()
-                                            .width(Length::Fixed(10.0))
-                                            .height(Length::Fixed(1.0)),
-                                    )
-                                    .push(progress_bar(
-                                        0.0..=100.0,
-                                        progress.current as f32 * 100.0 / progress.total as f32,
-                                    ));
-                            }
-                        };
-                    }
+                    if messages.peek().is_none()
+                        && let Status::Progress(progress) = status
+                        && progress.total != 0
+                    {
+                        row = row
+                            .push(
+                                Space::new()
+                                    .width(Length::Fixed(10.0))
+                                    .height(Length::Fixed(1.0)),
+                            )
+                            .push(progress_bar(
+                                0.0..=100.0,
+                                progress.current as f32 * 100.0 / progress.total as f32,
+                            ));
+                    };
                     col_messages = col_messages
                         .push(row)
                         .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
@@ -1077,27 +1077,26 @@ impl GUI {
         };
 
         let mut button_row = Row::new();
-        if let State::DevSelect | State::Wipe(_) | State::DownloadPin = &self.state {
-            if let Some(dst_id) = self.dst_id {
-                if let Some(Device::Usb(_)) = self.devices.get(&dst_id) {
-                    button_row = button_row
-                        .push(
-                            Space::new()
-                                .width(Length::Fixed(10.0))
-                                .height(Length::Fixed(OPT_SIZE)),
-                        )
-                        .push(
-                            text(format!("{}: ", self.i18n_txt("fstype")))
-                                .size(OPT_SIZE)
-                                .align_y(Alignment::Center),
-                        )
-                        .push(
-                            PickList::new(FSTYPES, Some(self.fstype), Message::FsTypeSelect)
-                                .text_size(OPT_SIZE),
-                        );
-                };
-            };
-        }
+        if let State::DevSelect | State::Wipe(_) | State::DownloadPin = &self.state
+            && let Some(dst_id) = self.dst_id
+            && let Some(Device::Usb(_)) = self.devices.get(&dst_id)
+        {
+            button_row = button_row
+                .push(
+                    Space::new()
+                        .width(Length::Fixed(10.0))
+                        .height(Length::Fixed(OPT_SIZE)),
+                )
+                .push(
+                    text(format!("{}: ", self.i18n_txt("fstype")))
+                        .size(OPT_SIZE)
+                        .align_y(Alignment::Center),
+                )
+                .push(
+                    PickList::new(FSTYPES, Some(self.fstype), Message::FsTypeSelect)
+                        .text_size(OPT_SIZE),
+                );
+        };
         let mut button_ok = if let State::Done = &self.state {
             button(self.i18n_txt("reset"))
         } else {

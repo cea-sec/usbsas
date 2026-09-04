@@ -3,7 +3,7 @@ use crate::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
 use usbsas_proto::common::{FileInfo, FileType};
 
-use iso9660::{DirectoryEntry, ISO9660Reader, ISODirectory, ISOFile, ISO9660};
+use iso9660::{DirectoryEntry, ISO9660, ISO9660Reader, ISODirectory, ISOFile};
 
 pub struct Iso9660<T: Read + Seek> {
     fs: ISO9660<T>,

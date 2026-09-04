@@ -1,4 +1,4 @@
-use iced::{time::Instant, Task};
+use iced::{Task, time::Instant};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
@@ -11,7 +11,7 @@ use usbsas_comm::{Comm, ProtoReqCommon};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto::{
     self as proto,
-    common::{device::Device, FileInfo, FsType, TransferReport},
+    common::{FileInfo, FsType, TransferReport, device::Device},
 };
 use usbsas_utils::clap::UsbsasClap;
 
@@ -122,10 +122,10 @@ pub enum Message {
 
 impl Drop for GUI {
     fn drop(&mut self) {
-        if let Some(comm) = &self.comm {
-            if comm.blocking_lock().end().is_err() {
-                log::error!("couldn't end usbsas properly");
-            }
+        if let Some(comm) = &self.comm
+            && comm.blocking_lock().end().is_err()
+        {
+            log::error!("couldn't end usbsas properly");
         };
     }
 }
@@ -216,7 +216,7 @@ impl GUI {
             .expect("can't parse config");
 
         let session_id = uuid::Uuid::new_v4().simple().to_string();
-        std::env::set_var("USBSAS_SESSION_ID", &session_id);
+        unsafe { std::env::set_var("USBSAS_SESSION_ID", &session_id) };
 
         let lang = match config.lang {
             Some(ref opt) => match opt.as_str() {
@@ -227,20 +227,20 @@ impl GUI {
             None => LANG::EN,
         };
 
-        if let Some(ref report_conf) = config.report {
-            if let Some(path) = &report_conf.write_local {
-                match fs::exists(path) {
-                    Ok(true) => (),
-                    Ok(false) => {
-                        if let Err(err) = fs::create_dir(path) {
-                            panic!("Can't create report directory \"{path}\" ({err})");
-                        }
-                    }
-                    Err(err) => {
-                        panic!("Can't check existence of \"{path}\": {err}");
+        if let Some(ref report_conf) = config.report
+            && let Some(path) = &report_conf.write_local
+        {
+            match fs::exists(path) {
+                Ok(true) => (),
+                Ok(false) => {
+                    if let Err(err) = fs::create_dir(path) {
+                        panic!("Can't create report directory \"{path}\" ({err})");
                     }
                 }
-            };
+                Err(err) => {
+                    panic!("Can't check existence of \"{path}\": {err}");
+                }
+            }
         };
 
         let mut i18n = HashMap::new();
@@ -289,10 +289,10 @@ impl GUI {
 impl GUI {
     fn sandbox(&mut self) {
         let mut paths_rw = vec!["/dev/dri", &self.socket_path];
-        if let Some(report_conf) = &self.config.report {
-            if let Some(path) = &report_conf.write_local {
-                paths_rw.push(path);
-            }
+        if let Some(report_conf) = &self.config.report
+            && let Some(path) = &report_conf.write_local
+        {
+            paths_rw.push(path);
         };
         let paths_rm: Option<&[&str]> = if let Some(false) = self.config.keep_tmp_files {
             Some(&[self.config.out_directory.as_str()])
@@ -374,22 +374,21 @@ impl GUI {
             let _ = fs::remove_file(&clean_tar_path);
             let _ = fs::remove_file(&fs_path);
         } else {
-            if let Ok(metadata) = fs::metadata(&fs_path) {
-                if metadata.len() == 0 {
-                    if let Err(err) = fs::remove_file(Path::new(&fs_path)) {
-                        log::error!("couldn't rm file {}: {err}", fs_path);
-                    };
-                }
+            if let Ok(metadata) = fs::metadata(&fs_path)
+                && metadata.len() == 0
+                && let Err(err) = fs::remove_file(Path::new(&fs_path))
+            {
+                log::error!("couldn't rm file {}: {err}", fs_path);
             };
 
             for path in &[&tar_path, &clean_tar_path] {
                 if let Ok(metadata) = fs::metadata(path) {
                     // Empty tar with only data/ dir
-                    if metadata.len() == 512 {
-                        if let Err(err) = fs::remove_file(Path::new(&path)) {
-                            log::error!("couldn't rm file {}: {err}", path);
-                        };
-                    }
+                    if metadata.len() == 512
+                        && let Err(err) = fs::remove_file(Path::new(&path))
+                    {
+                        log::error!("couldn't rm file {}: {err}", path);
+                    };
                 };
             }
         }
@@ -408,7 +407,7 @@ impl GUI {
         self.status_title = None;
         self.fstype = FsType::Ntfs;
         self.session_id = uuid::Uuid::new_v4().simple().to_string();
-        std::env::set_var("USBSAS_SESSION_ID", &self.session_id);
+        unsafe { std::env::set_var("USBSAS_SESSION_ID", &self.session_id) };
 
         Task::none()
     }

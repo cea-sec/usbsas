@@ -2,7 +2,7 @@
 name = "usbsas-analyzer-server"
 description = "usbsas analyzer server (with clamav)"
 version = "0.2.3"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]
