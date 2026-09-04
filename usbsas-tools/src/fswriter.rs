@@ -4,7 +4,7 @@ use bitvec::prelude::*;
 use clap::{Arg, Command};
 use std::{
     fs::File,
-    io::{prelude::*, SeekFrom},
+    io::{SeekFrom, prelude::*},
     os::unix::io::AsRawFd,
 };
 use thiserror::Error;

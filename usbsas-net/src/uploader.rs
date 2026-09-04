@@ -1,7 +1,7 @@
 use crate::{Error, FileReaderProgress, HttpClient, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, trace};
-use reqwest::{blocking::Body, Url};
+use reqwest::{Url, blocking::Body};
 use std::fs::File;
 use usbsas_comm::{ComRpUploader, ProtoRespCommon, ProtoRespUploader};
 use usbsas_config::{conf_parse, conf_read};

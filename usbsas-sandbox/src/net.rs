@@ -1,4 +1,4 @@
-use crate::{seccomp, Result};
+use crate::{Result, seccomp};
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
 pub fn sandbox(

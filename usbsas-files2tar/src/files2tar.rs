@@ -1,4 +1,4 @@
-use crate::{tarwriter::TarWriter, ArchiveWriter};
+use crate::{ArchiveWriter, tarwriter::TarWriter};
 use crate::{Error, Result};
 use log::{error, trace};
 use std::{fs, os::unix::io::AsRawFd};

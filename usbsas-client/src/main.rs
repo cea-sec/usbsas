@@ -1,5 +1,5 @@
 use std::env;
-use usbsas_client::{client_clap, GUI};
+use usbsas_client::{GUI, client_clap};
 
 fn main() -> iced::Result {
     env_logger::Builder::from_env(
@@ -16,7 +16,7 @@ fn main() -> iced::Result {
 
     // see https://github.com/rust-windowing/winit/issues/2231
     if env::var("WINIT_X11_SCALE_FACTOR").is_err() {
-        env::set_var("WINIT_X11_SCALE_FACTOR", "1.0")
+        unsafe { env::set_var("WINIT_X11_SCALE_FACTOR", "1.0") }
     };
 
     iced::application(GUI::new, GUI::update, GUI::view)

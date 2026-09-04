@@ -4,7 +4,7 @@ use usbsas_comm::{ComRpJsonParser, ProtoRespCommon, ProtoRespJsonParser, ToFd};
 use usbsas_proto::{
     self as proto,
     common::AnalyzeReport,
-    jsonparser::{request::Msg, SrvResp},
+    jsonparser::{SrvResp, request::Msg},
 };
 
 enum State {

@@ -7,7 +7,7 @@ use log::{debug, error, trace};
 use proto::fs2dev::{self, request::Msg};
 use std::{
     fs::File,
-    io::{prelude::*, SeekFrom},
+    io::{SeekFrom, prelude::*},
 };
 use thiserror::Error;
 use usbsas_comm::{ComRpFs2Dev, ProtoRespCommon, ProtoRespFs2Dev};

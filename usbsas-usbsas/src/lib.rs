@@ -8,7 +8,7 @@ use std::{
     env, fs,
 };
 use usbsas_proto::common::{
-    device::Device, AnalyzeReport, FileInfoReport, FileType, FsType, TransferReport, UsbDevice,
+    AnalyzeReport, FileInfoReport, FileType, FsType, TransferReport, UsbDevice, device::Device,
 };
 
 type Devices = HashMap<u64, Device>;

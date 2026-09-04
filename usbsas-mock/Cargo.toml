@@ -1,7 +1,8 @@
 [package]
 name = "usbsas-mock"
+description = "usbsas-mock"
 version = "0.1.3"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]

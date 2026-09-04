@@ -1,4 +1,4 @@
-use crate::{seccomp, Result};
+use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 
 pub fn seccomp(fd_read: RawFd, fd_write: RawFd, device_fd: Option<RawFd>) -> Result<()> {

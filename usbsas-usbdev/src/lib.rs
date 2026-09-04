@@ -14,7 +14,7 @@ use std::{
 };
 use thiserror::Error;
 use usbsas_comm::{ComRpUsbDev, ProtoRespCommon, ProtoRespUsbDev, ToFd};
-use usbsas_config::{conf_parse, conf_read, UsbPortAccesses};
+use usbsas_config::{UsbPortAccesses, conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
 
@@ -82,14 +82,12 @@ fn handle_udev_events(
 
     for dev in enumerator.scan_devices()? {
         // Only add mass storage devices
-        if let Some(value) = dev.property_value("ID_USB_INTERFACES") {
-            if value.to_string_lossy().contains(":080650:")
-                || value.to_string_lossy().contains(":080250:")
-            {
-                if let Err(err) = cur_dev.add_device(&dev) {
-                    log::error!("Couldn't add dev {dev:?} ({err})");
-                }
-            }
+        if let Some(value) = dev.property_value("ID_USB_INTERFACES")
+            && (value.to_string_lossy().contains(":080650:")
+                || value.to_string_lossy().contains(":080250:"))
+            && let Err(err) = cur_dev.add_device(&dev)
+        {
+            log::error!("Couldn't add dev {dev:?} ({err})");
         }
     }
     drop(cur_dev);
@@ -103,20 +101,12 @@ fn handle_udev_events(
                 for ev in socket.iter() {
                     match ev.event_type() {
                         udev::EventType::Add => {
-                            if let Some(value) = ev.property_value("ID_USB_INTERFACES") {
-                                if value.to_string_lossy().contains(":080650:")
-                                    || value.to_string_lossy().contains(":080250:")
-                                {
-                                    if let Err(err) =
-                                        current_devices.lock()?.add_device(&ev.device())
-                                    {
-                                        log::error!(
-                                            "Couldn't add dev {:#?} ({})",
-                                            ev.device(),
-                                            err
-                                        );
-                                    }
-                                }
+                            if let Some(value) = ev.property_value("ID_USB_INTERFACES")
+                                && (value.to_string_lossy().contains(":080650:")
+                                    || value.to_string_lossy().contains(":080250:"))
+                                && let Err(err) = current_devices.lock()?.add_device(&ev.device())
+                            {
+                                log::error!("Couldn't add dev {:#?} ({})", ev.device(), err);
                             }
                         }
                         udev::EventType::Remove => {

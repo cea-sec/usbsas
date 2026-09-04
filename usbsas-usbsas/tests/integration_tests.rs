@@ -22,7 +22,7 @@ use usbsas_comm::{ComRqUsbsas, ProtoReqCommon, ProtoReqUsbsas};
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto::{
     self as proto,
-    common::{device::Device, FsType, Status},
+    common::{FsType, Status, device::Device},
 };
 
 const OUT_DEV_SIZE: usize = 10;
@@ -53,7 +53,9 @@ impl IntegrationTester {
             }
         }
 
-        env::set_var("USBSAS_SESSION_ID", "integration-tests");
+        unsafe {
+            env::set_var("USBSAS_SESSION_ID", "integration-tests");
+        }
 
         // Start analyzer server
         let analyzer_server = Command::cargo_bin("usbsas-analyzer-server")
@@ -72,7 +74,9 @@ impl IntegrationTester {
         );
         let mut decoder = flate2::bufread::GzDecoder::new(file_reader);
         io::copy(&mut decoder, &mut mock_file).expect("decode input file");
-        env::set_var("USBSAS_MOCK_IN_DEV", mock_in_dev);
+        unsafe {
+            env::set_var("USBSAS_MOCK_IN_DEV", mock_in_dev);
+        }
 
         // create mock output dev
         let mock_out_dev = format!("{wdir}/mock_out_dev.img");
@@ -81,7 +85,9 @@ impl IntegrationTester {
         for _ in 0..OUT_DEV_SIZE {
             out_file.write_all(&zero_buf).expect("zeroing out file");
         }
-        env::set_var("USBSAS_MOCK_OUT_DEV", mock_out_dev);
+        unsafe {
+            env::set_var("USBSAS_MOCK_OUT_DEV", mock_out_dev);
+        }
 
         // Copy export bundle in working dir
         let _ = fs::create_dir(format!("{av_dir}/Tartempion"));

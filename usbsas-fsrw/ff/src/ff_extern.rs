@@ -6,17 +6,17 @@ use std::{
 
 // Impl ff extern functions defined in disk_io.h
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ff_disk_initialize(_pdrv: c_void) -> ff_c::DSTATUS {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ff_disk_status(_pdrv: c_void) -> ff_c::DSTATUS {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ff_disk_read(
     pdrv: *mut c_void,
     buff: *mut ff_c::BYTE,
@@ -34,12 +34,12 @@ pub extern "C" fn ff_disk_read(
     }
 
     let mut data = vec![0; (count as u64 * inner.sector_size() as u64) as usize];
-    if let Ok(read_count) = inner.read(&mut data) {
-        if read_count != data.len() {
-            eprintln!("ff disk_read read_count != data.len()");
-            std::mem::forget(inner);
-            return ff_c::DRESULT_RES_ERROR;
-        }
+    if let Ok(read_count) = inner.read(&mut data)
+        && read_count != data.len()
+    {
+        eprintln!("ff disk_read read_count != data.len()");
+        std::mem::forget(inner);
+        return ff_c::DRESULT_RES_ERROR;
     };
 
     unsafe { std::ptr::copy(data.as_mut_ptr(), buff, data.len()) };
@@ -47,7 +47,7 @@ pub extern "C" fn ff_disk_read(
     ff_c::DRESULT_RES_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ff_disk_write(
     pdrv: *mut c_void,
     buff: *const ff_c::BYTE,
@@ -74,7 +74,7 @@ pub extern "C" fn ff_disk_write(
     ff_c::DRESULT_RES_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ff_disk_ioctl(
     pdrv: *mut c_void,
     cmd: ff_c::BYTE,

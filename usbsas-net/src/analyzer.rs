@@ -1,7 +1,7 @@
 use crate::FileReaderProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
-use reqwest::{blocking::Body, Url};
+use reqwest::{Url, blocking::Body};
 use std::{fs::File, thread::sleep, time::Duration};
 use usbsas_comm::{
     ComRpAnalyzer, ComRqJsonParser, ProtoReqCommon, ProtoReqJsonParser, ProtoRespAnalyzer,

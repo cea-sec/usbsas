@@ -1,8 +1,8 @@
 use crate::Message;
 use iced::{
-    border::Radius,
-    widget::{button, text, Button},
     Border, Color, Length, Renderer, Shadow, Theme,
+    border::Radius,
+    widget::{Button, button, text},
 };
 
 pub const MENU_SIZE: f32 = 30.0;

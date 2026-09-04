@@ -12,7 +12,7 @@ use usbsas_comm::{
     ComRpFiles, ComRqScsi, ProtoReqCommon, ProtoReqScsi, ProtoRespCommon, ProtoRespFiles, SendRecv,
     ToFd,
 };
-use usbsas_fsrw::{ext4fs, ff, iso9660fs, ntfs, FSRead};
+use usbsas_fsrw::{FSRead, ext4fs, ff, iso9660fs, ntfs};
 use usbsas_mass_storage::MassStorageComm;
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
@@ -317,10 +317,10 @@ impl WaitEndState {
         loop {
             match comm.recv_req()? {
                 Msg::End(_) => {
-                    if let Some(child_comm) = self.child_comm {
-                        if let Ok(mut child_comm) = child_comm.write() {
-                            child_comm.end()?;
-                        }
+                    if let Some(child_comm) = self.child_comm
+                        && let Ok(mut child_comm) = child_comm.write()
+                    {
+                        child_comm.end()?;
                     }
                     comm.end()?;
                     break;
