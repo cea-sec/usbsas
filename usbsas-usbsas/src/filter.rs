@@ -35,10 +35,10 @@ impl Rule {
 
     fn match_(&self, input: &str) -> bool {
         let input = input.to_lowercase();
-        if let Some(ref exact) = self.exact {
-            if input != *exact {
-                return false;
-            }
+        if let Some(ref exact) = self.exact
+            && input != *exact
+        {
+            return false;
         }
         if let Some(ref contain) = self.contain {
             for pattern in contain.iter() {
@@ -47,15 +47,15 @@ impl Rule {
                 }
             }
         }
-        if let Some(ref start) = self.start {
-            if !input.starts_with(start) {
-                return false;
-            }
+        if let Some(ref start) = self.start
+            && !input.starts_with(start)
+        {
+            return false;
         }
-        if let Some(ref end) = self.end {
-            if !input.ends_with(end) {
-                return false;
-            }
+        if let Some(ref end) = self.end
+            && !input.ends_with(end)
+        {
+            return false;
         }
         true
     }

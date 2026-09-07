@@ -7,7 +7,7 @@ use std::{
 
 // impl ntfs3g extern functions defined in unix_io.h
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ntfs_dev_lseek(dev: *mut n3g_c::ntfs_device, pos: i64, whence: c_int) -> i64 {
     if whence != libc::SEEK_SET {
         return -1;
@@ -31,7 +31,7 @@ pub extern "C" fn ntfs_dev_lseek(dev: *mut n3g_c::ntfs_device, pos: i64, whence:
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ntfs_dev_read(
     dev: *mut n3g_c::ntfs_device,
     buf: *mut c_void,
@@ -59,7 +59,7 @@ pub extern "C" fn ntfs_dev_read(
     i64::try_from(count).unwrap_or(-1)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn ntfs_dev_write(
     dev: *mut n3g_c::ntfs_device,
     buf: *mut c_void,

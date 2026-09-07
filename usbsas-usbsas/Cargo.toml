@@ -2,7 +2,7 @@
 name = "usbsas-usbsas"
 description = "usbsas"
 version = "0.3.3"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]

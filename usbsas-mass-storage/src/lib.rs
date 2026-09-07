@@ -262,15 +262,14 @@ impl MassStorageComm {
     pub fn read_sectors(&self, offset: u64, count: u64) -> io::Result<Vec<u8>> {
         // Don't cache data if we're reading a lot of sectors,
         // it's probably a file (only read once) and not FS stuff
-        if count <= MAX_SECTORS_COUNT_CACHE {
-            if let Some(data) = self
+        if count <= MAX_SECTORS_COUNT_CACHE
+            && let Some(data) = self
                 .cache
                 .write()
                 .map_err(|err| io::Error::other(format!("cache lock error: {err}")))?
                 .get(&(offset, count))
-            {
-                return Ok(data.clone());
-            }
+        {
+            return Ok(data.clone());
         }
         let rep = self
             .comm

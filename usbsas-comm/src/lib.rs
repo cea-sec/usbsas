@@ -363,7 +363,9 @@ protoresponse!(
     Wipe
 );
 protoresponse!(Uploader, Upload);
-protoresponse!(WriteDst, Init, NewFile, WriteFile, EndFile, WriteRaw, WriteData, Close, BitVec);
+protoresponse!(
+    WriteDst, Init, NewFile, WriteFile, EndFile, WriteRaw, WriteData, Close, BitVec
+);
 protoresponse!(JsonParser, ParseResp, ParseReport);
 
 protorequest!(Analyzer, Analyze, Report);
@@ -400,5 +402,7 @@ protorequest!(
 protorequest!(Scsi, OpenDevice, Partitions, ReadSectors);
 protorequest!(UsbDev, Devices);
 protorequest!(Uploader, Upload);
-protorequest!(WriteDst, Init, NewFile, WriteFile, EndFile, Close, BitVec, WriteRaw, WriteData);
+protorequest!(
+    WriteDst, Init, NewFile, WriteFile, EndFile, Close, BitVec, WriteRaw, WriteData
+);
 protorequest!(JsonParser, ParseResp, ParseReport);

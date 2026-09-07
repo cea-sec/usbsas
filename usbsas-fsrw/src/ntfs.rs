@@ -253,7 +253,7 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
             None => {
                 return Err(Error::FSError(format!(
                     "No ntfs data stream for file {path}"
-                )))
+                )));
             }
         };
         let mut data_value = data_item.to_attribute()?.value(&mut self.reader)?;

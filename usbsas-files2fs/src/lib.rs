@@ -16,7 +16,7 @@ use std::{
 };
 use thiserror::Error;
 use usbsas_comm::{ComRpWriteDst, ProtoRespCommon, ProtoRespWriteDst, ToFd};
-use usbsas_fsrw::{ff, ntfs, FSWrite};
+use usbsas_fsrw::{FSWrite, ff, ntfs};
 use usbsas_mbr::SECTOR_START;
 use usbsas_proto as proto;
 use usbsas_proto::{

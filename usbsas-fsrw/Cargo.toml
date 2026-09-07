@@ -1,7 +1,8 @@
 [package]
 name = "usbsas-fsrw"
+description = "usbsas-fsrw"
 version = "0.1.4"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]

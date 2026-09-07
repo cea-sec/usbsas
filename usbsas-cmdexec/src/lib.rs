@@ -8,7 +8,7 @@ use log::{error, info, trace};
 use std::process::{Command, Stdio};
 use thiserror::Error;
 use usbsas_comm::{ComRpCmdExec, ProtoRespCmdExec, ProtoRespCommon};
-use usbsas_config::{conf_parse, conf_read, Command as CmdConf, PostCopy};
+use usbsas_config::{Command as CmdConf, PostCopy, conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{cmdexec::request::Msg, common::OutFileType};
 

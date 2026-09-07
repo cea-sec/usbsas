@@ -1,7 +1,7 @@
-use crate::{Message, State, GUI};
+use crate::{GUI, Message, State};
 use iced::{
-    time::{self, Duration},
     Subscription,
+    time::{self, Duration},
 };
 
 impl GUI {

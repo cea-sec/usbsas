@@ -2,8 +2,8 @@
 //! touch screens.
 
 use rusb::{
-    request_type, Context, DeviceHandle, Direction, Recipient, RequestType, TransferType,
-    UsbContext,
+    Context, DeviceHandle, Direction, Recipient, RequestType, TransferType, UsbContext,
+    request_type,
 };
 use std::{
     collections::HashMap, env, io::Error, os::unix::io::AsRawFd, ptr::null_mut, time::Duration,

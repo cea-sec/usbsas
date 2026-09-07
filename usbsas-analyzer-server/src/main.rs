@@ -2,7 +2,7 @@
 //! Mainly used for example and integration tests.
 
 use actix_files::NamedFile;
-use actix_web::{get, head, http::header, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpResponse, HttpServer, Responder, get, head, http::header, post, web};
 use clap::{Arg, Command};
 use futures::TryStreamExt;
 use serde_json::json;
@@ -334,7 +334,7 @@ impl Clamav {
             let _ = fs::create_dir(format!("{working_path}/db"));
             std::fs::write(
                 format!("{working_path}/db/test.ndb"),
-                "Eicar-Test-Signature:0:0:58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e444152442d414e544956495255532d544553542d46494c452124482b482a\nEicar-Test-Signature-1:0:*:574456504956416c51454651577a5263554670594e54516f554634704e304e444b5464394a45564a513046534c564e555155354551564a454c55464f56456c5753564a565579315552564e550a4c555a4a544555684a45677253436f3d0a"
+                "Eicar-Test-Signature:0:0:58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e444152442d414e544956495255532d544553542d46494c452124482b482a\nEicar-Test-Signature-1:0:*:574456504956416c51454651577a5263554670594e54516f554634704e304e444b5464394a45564a513046534c564e555155354551564a454c55464f56456c5753564a565579315552564e550a4c555a4a544555684a45677253436f3d0a",
             )?;
         }
 

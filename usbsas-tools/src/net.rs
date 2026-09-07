@@ -211,7 +211,7 @@ fn main() -> Result<()> {
             _ => {
                 return Err(Error::ArgConf(
                     "Bad action specified, either: upload, analyze or download".to_owned(),
-                ))
+                ));
             }
         },
         _ => return Err(Error::ArgConf("args parse failed".to_owned())),

@@ -2,7 +2,7 @@
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use log::{debug, error};
-use rusb::{request_type, DeviceHandle, Direction, Recipient, RequestType, UsbContext};
+use rusb::{DeviceHandle, Direction, Recipient, RequestType, UsbContext, request_type};
 use std::{
     convert::TryFrom,
     io::{self, ErrorKind},
@@ -386,7 +386,9 @@ impl<T: UsbContext> ScsiUsb<T> {
                                             /* 2.4.1.6 Additional Sense and Additional Sense Qualifier codes */
                                             match buffer[12] {
                                                 0x4 => {
-                                                    debug!("Logical Unit Not Ready, Cause Not Reportable");
+                                                    debug!(
+                                                        "Logical Unit Not Ready, Cause Not Reportable"
+                                                    );
                                                     /* Logical Unit Not Ready, Cause Not Reportable */
 
                                                     /* Wait 200ms */

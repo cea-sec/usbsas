@@ -20,8 +20,8 @@ pub mod usbsas;
 pub(crate) mod seccomp;
 
 use landlock::{
-    path_beneath_rules, Access, AccessFs, AccessNet, CompatLevel, Compatible, NetPort, Ruleset,
-    RulesetAttr, RulesetCreatedAttr, RulesetStatus,
+    Access, AccessFs, AccessNet, CompatLevel, Compatible, NetPort, Ruleset, RulesetAttr,
+    RulesetCreatedAttr, RulesetStatus, path_beneath_rules,
 };
 use thiserror::Error;
 
@@ -42,7 +42,7 @@ type Result<T> = std::result::Result<T, Error>;
  * because it cannot develop macro.
  * see: https://github.com/rust-lang/rust-bindgen/issues/753
  */
-extern "C" {
+unsafe extern "C" {
     pub fn usbdevfs_submiturb() -> u64;
     pub fn usbdevfs_reapurbndelay() -> u64;
     pub fn usbdevfs_releaseinterface() -> u64;

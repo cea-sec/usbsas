@@ -1,7 +1,7 @@
 use crate::{
-    filter::Rules, Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport,
+    Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport, filter::Rules,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use base16ct::HexDisplay;
 use log::{debug, error, info, trace};
 use serde_json::json;
@@ -16,7 +16,7 @@ use usbsas_config::Config;
 use usbsas_process::{ChildMngt, UsbsasChild};
 use usbsas_proto::{
     self as proto,
-    common::{device::Device, FileType, FsType, Network, OutFileType, Status, UsbDevice},
+    common::{FileType, FsType, Network, OutFileType, Status, UsbDevice, device::Device},
     usbsas::request::Msg,
 };
 use usbsas_utils::READ_FILE_MAX_SIZE;
@@ -245,7 +245,7 @@ impl RunState for InitState {
                 }
                 Msg::ImgDisk(req) => match devices.remove(&req.id) {
                     Some(Device::Usb(dev)) => {
-                        return Ok(State::ImgDisk(ImgDiskState { device: dev }))
+                        return Ok(State::ImgDisk(ImgDiskState { device: dev }));
                     }
                     _ => {
                         comm.error("no matching device for imaging")?;
@@ -595,13 +595,12 @@ impl RunState for FileSelectionState {
             bail!("Selected files size is larger than destination size, aborting transfer");
         }
 
-        if let Some(space) = self.config.available_space {
-            if ((self.transfer.analyze || matches!(self.transfer.dst, Device::Usb(_)))
+        if let Some(space) = self.config.available_space
+            && (((self.transfer.analyze || matches!(self.transfer.dst, Device::Usb(_)))
                 && 2 * selected_size > space)
-                || selected_size > space
-            {
-                bail!("Not enough space");
-            }
+                || selected_size > space)
+        {
+            bail!("Not enough space");
         };
 
         self.transfer.selected_size = Some(selected_size);
@@ -1026,21 +1025,21 @@ impl RunState for WriteDstFileState {
             };
         }
 
-        if let Some(ref confreport) = self.config.report {
-            if confreport.write_dest {
-                let report = self.transfer.to_report("success");
-                let (dst_writer, report_path) = match &self.transfer.dst {
-                    Device::Network(_) | Device::Command(_) => {
-                        (&mut children.files2cleantar, String::from("config.json"))
-                    }
-                    Device::Usb(_) => (
-                        &mut children.files2fs,
-                        format!("/usbsas-report-{}.json", report.timestamp),
-                    ),
-                    Device::LocalDir(_) => unimplemented!(),
-                };
-                self.write_report(dst_writer, &report, report_path)?;
-            }
+        if let Some(ref confreport) = self.config.report
+            && confreport.write_dest
+        {
+            let report = self.transfer.to_report("success");
+            let (dst_writer, report_path) = match &self.transfer.dst {
+                Device::Network(_) | Device::Command(_) => {
+                    (&mut children.files2cleantar, String::from("config.json"))
+                }
+                Device::Usb(_) => (
+                    &mut children.files2fs,
+                    format!("/usbsas-report-{}.json", report.timestamp),
+                ),
+                Device::LocalDir(_) => unimplemented!(),
+            };
+            self.write_report(dst_writer, &report, report_path)?;
         }
         let status = match &self.transfer.dst {
             Device::Network(_) | Device::Command(_) => {
@@ -1180,7 +1179,7 @@ impl TransferDstState {
     }
 
     fn upload(&self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<()> {
-        if let Device::Network(ref network) = &self.transfer.dst {
+        if let Device::Network(network) = &self.transfer.dst {
             children
                 .uploader
                 .comm

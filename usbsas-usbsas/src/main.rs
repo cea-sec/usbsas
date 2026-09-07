@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use log::{error, info};
 use std::{
     env,
@@ -9,11 +9,11 @@ use std::{
     },
 };
 use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespUsbsas, ToFd};
-use usbsas_config::{conf_parse, conf_read, Config};
+use usbsas_config::{Config, conf_parse, conf_read};
 use usbsas_usbsas::{
+    TmpFiles,
     children::Children,
     states::{EndState, InitState, State},
-    TmpFiles,
 };
 use usbsas_utils::clap::UsbsasClap;
 
@@ -53,7 +53,7 @@ fn main() -> Result<()> {
         Ok(id) => id,
         Err(_) => {
             let id = uuid::Uuid::new_v4().simple().to_string();
-            env::set_var("USBSAS_SESSION_ID", &id);
+            unsafe { env::set_var("USBSAS_SESSION_ID", &id) };
             id
         }
     };
