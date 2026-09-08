@@ -74,7 +74,7 @@ job of dev2scsi. It is the only process able to read the input device.
 
 scsi2files manages dev2scsi, it is in charge of parsing the file system from the
 data it asks dev2scsi to read from the input device. usbsas currently supports
-reading `FAT`, `exFAT`, `NTFS`, `ext4` and `ISO9660`.
+reading `FAT`, `exFAT`, `NTFS`, `ext 2/3/4` and `ISO9660`.
 
 #### files2tar
 

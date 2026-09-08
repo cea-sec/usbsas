@@ -707,43 +707,6 @@ impl GUI {
                         &file.path
                     };
                     match FileType::try_from(file.ftype) {
-                        Ok(FileType::Regular) => {
-                            file_row = file_row.push(
-                                button(
-                                    Row::new()
-                                        .push(
-                                            text("📄")
-                                                .shaping(text::Shaping::Advanced)
-                                                .size(TXT_SIZE),
-                                        )
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(
-                                            text(path.trim_start_matches('/'))
-                                                .shaping(text::Shaping::Advanced)
-                                                .size(TXT_SIZE)
-                                                .width(Length::Fill),
-                                        )
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(text(ByteSize(file.size).to_string()).size(TXT_SIZE))
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(text(datetime).size(TXT_SIZE)),
-                                )
-                                .style(button::text)
-                                .on_press(Message::SelectFile(file.path.clone())),
-                            )
-                        }
                         Ok(FileType::Directory) => {
                             file_row = file_row.push(
                                 button(
@@ -779,6 +742,43 @@ impl GUI {
                                 )
                                 .style(button::text)
                                 .on_press(Message::ReadDir(file.path.clone())),
+                            )
+                        }
+                        Ok(_) => {
+                            file_row = file_row.push(
+                                button(
+                                    Row::new()
+                                        .push(
+                                            text("📄")
+                                                .shaping(text::Shaping::Advanced)
+                                                .size(TXT_SIZE),
+                                        )
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
+                                        .push(
+                                            text(path.trim_start_matches('/'))
+                                                .shaping(text::Shaping::Advanced)
+                                                .size(TXT_SIZE)
+                                                .width(Length::Fill),
+                                        )
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
+                                        .push(text(ByteSize(file.size).to_string()).size(TXT_SIZE))
+                                        .push(
+                                            Space::new()
+                                                .width(Length::Fixed(5.0))
+                                                .height(Length::Shrink),
+                                        )
+                                        .push(text(datetime).size(TXT_SIZE)),
+                                )
+                                .style(button::text)
+                                .on_press(Message::SelectFile(file.path.clone())),
                             )
                         }
                         _ => (),

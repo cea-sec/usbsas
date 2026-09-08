@@ -17,6 +17,8 @@ pub enum Error {
     Tryfromint(#[from] std::num::TryFromIntError),
     #[error("ntfs error: {0}")]
     Ntfs(#[from] ::ntfs::NtfsError),
+    #[error("ext4 error: {0}")]
+    Ext4(#[from] ext4_view::Ext4Error),
     #[error("iso error: {0}")]
     Iso9660(#[from] iso9660::ISOError),
     #[error("{0}")]
