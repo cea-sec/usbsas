@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 anyhow = "1.0"
-ext4 = { git = "https://github.com/FauxFaux/ext4-rs", rev = "292c80fdf99533d6ac700a588497cd9f52631614" }
+ext4-view = { git = "https://github.com/nicholasbishop/ext4-view-rs", rev = "47af2a2bc04d481b04157ad6a28e915417c42df9" }
 ff = { path = "./ff" }
 iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
 libc = "0.2"
