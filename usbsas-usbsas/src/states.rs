@@ -245,7 +245,10 @@ impl RunState for InitState {
                 }
                 Msg::ImgDisk(req) => match devices.remove(&req.id) {
                     Some(Device::Usb(dev)) => {
-                        return Ok(State::ImgDisk(ImgDiskState { device: dev }));
+                        return Ok(State::ImgDisk(ImgDiskState {
+                            device: dev,
+                            config: self.config,
+                        }));
                     }
                     _ => {
                         comm.error("no matching device for imaging")?;
@@ -1204,6 +1207,7 @@ impl TransferDstState {
 
 pub struct ImgDiskState {
     device: UsbDevice,
+    config: Config,
 }
 
 impl RunState for ImgDiskState {
@@ -1253,6 +1257,16 @@ impl RunState for ImgDiskState {
             }
         }
         let report = crate::report_diskimg(self.device);
+
+        let session_id = self.config.session_id.unwrap();
+        std::fs::rename(
+            format!("{}/usbsas_{}.img", self.config.out_directory, session_id),
+            format!(
+                "{}/usbsas_imgdisk_{}.img",
+                self.config.out_directory, session_id
+            ),
+        )?;
+
         info!("imgdisk done");
         comm.done(Status::AllDone)?;
         Ok(State::End(EndState {

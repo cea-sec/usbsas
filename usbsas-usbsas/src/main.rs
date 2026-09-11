@@ -135,6 +135,7 @@ fn main() -> Result<()> {
     let fs_stats = nix::sys::statvfs::statvfs(config.out_directory.as_str())?;
     let available = fs_stats.block_size() * fs_stats.blocks_available();
     config.available_space = Some(available);
+    config.session_id = Some(session_id);
 
     if let Some(dir) = matches.get_one::<String>("socket") {
         match fs::metadata(dir) {
@@ -174,11 +175,7 @@ fn main() -> Result<()> {
         };
         pipes_read.push(socket.read);
         pipes_write.push(socket.write);
-        let paths_rm: Option<&[&str]> = if let Some(false) = config.keep_tmp_files {
-            Some(&[config.out_directory.as_str(), dir])
-        } else {
-            Some(&[dir])
-        };
+        let paths_rm: Option<&[&str]> = Some(&[config.out_directory.as_str(), dir]);
         usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, Some(socket), paths_rm)
             .context("seccomp")?;
         tmpfiles.socket_path = Some(socket_path);
@@ -187,11 +184,7 @@ fn main() -> Result<()> {
         let comm: ComRpUsbsas = Comm::from_env()?;
         pipes_read.push(comm.input_fd());
         pipes_write.push(comm.output_fd());
-        let paths_rm: Option<&[&str]> = if let Some(false) = config.keep_tmp_files {
-            Some(&[config.out_directory.as_str()])
-        } else {
-            None
-        };
+        let paths_rm: Option<&[&str]> = Some(&[config.out_directory.as_str()]);
         usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, None, paths_rm)
             .context("seccomp")?;
         main_loop(comm, children, config, tmpfiles).context("main loop")

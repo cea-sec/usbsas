@@ -40,11 +40,12 @@ pub fn sandbox(
         )?;
     };
 
-    // Allow unlink syscall but restrict it to socket path with landlock
+    // Allow unlink & rename but restrict it to out dir & socket path with landlock
     #[cfg(not(target_arch = "aarch64"))]
     ctx.allow_syscall(Syscall::unlink)?;
     #[cfg(target_arch = "aarch64")]
     ctx.allow_syscall(Syscall::unlinkat)?;
+    ctx.allow_syscall(Syscall::rename)?;
 
     crate::landlock(None, None, None, paths_rm, None)?;
 

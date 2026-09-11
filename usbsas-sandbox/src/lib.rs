@@ -90,7 +90,10 @@ pub fn landlock(
     }
 
     if let Some(paths) = paths_rm {
-        ruleset = ruleset.add_rules(path_beneath_rules(paths, AccessFs::RemoveFile))?;
+        ruleset = ruleset.add_rules(path_beneath_rules(
+            paths,
+            AccessFs::RemoveFile | AccessFs::MakeReg,
+        ))?;
     }
 
     if let Some(ports) = connect_ports {
