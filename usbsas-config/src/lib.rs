@@ -89,6 +89,7 @@ pub struct Config {
     pub keep_tmp_files: Option<bool>,
     // filled by usbsas process
     pub available_space: Option<u64>,
+    pub session_id: Option<String>,
 }
 
 fn default_out_dir() -> String {
