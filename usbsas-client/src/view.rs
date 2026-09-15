@@ -706,83 +706,50 @@ impl GUI {
                     } else {
                         &file.path
                     };
-                    match FileType::try_from(file.ftype) {
-                        Ok(FileType::Directory) => {
-                            file_row = file_row.push(
-                                button(
-                                    Row::new()
-                                        .push(
-                                            text("📁")
-                                                .shaping(text::Shaping::Advanced)
-                                                .size(TXT_SIZE),
-                                        )
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(
-                                            text(path.trim_start_matches('/'))
-                                                .size(TXT_SIZE)
-                                                .shaping(text::Shaping::Advanced)
-                                                .width(Length::Fill),
-                                        )
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(text("").size(TXT_SIZE))
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(text(datetime).size(TXT_SIZE)),
-                                )
-                                .style(button::text)
-                                .on_press(Message::ReadDir(file.path.clone())),
-                            )
-                        }
-                        Ok(_) => {
-                            file_row = file_row.push(
-                                button(
-                                    Row::new()
-                                        .push(
-                                            text("📄")
-                                                .shaping(text::Shaping::Advanced)
-                                                .size(TXT_SIZE),
-                                        )
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(
-                                            text(path.trim_start_matches('/'))
-                                                .shaping(text::Shaping::Advanced)
-                                                .size(TXT_SIZE)
-                                                .width(Length::Fill),
-                                        )
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(text(ByteSize(file.size).to_string()).size(TXT_SIZE))
-                                        .push(
-                                            Space::new()
-                                                .width(Length::Fixed(5.0))
-                                                .height(Length::Shrink),
-                                        )
-                                        .push(text(datetime).size(TXT_SIZE)),
-                                )
-                                .style(button::text)
-                                .on_press(Message::SelectFile(file.path.clone())),
-                            )
-                        }
-                        _ => (),
+                    let (icon, message) = match FileType::try_from(file.ftype) {
+                        Ok(FileType::Directory) => ("📁", Message::ReadDir(file.path.clone())),
+                        Ok(_) => ("📄", Message::SelectFile(file.path.clone())),
+                        _ => continue,
                     };
+                    file_row = file_row
+                        .push(
+                            button(
+                                Row::new()
+                                    .push(
+                                        text(icon).shaping(text::Shaping::Advanced).size(TXT_SIZE),
+                                    )
+                                    .push(
+                                        Space::new()
+                                            .width(Length::Fixed(5.0))
+                                            .height(Length::Shrink),
+                                    )
+                                    .push(
+                                        text(path.trim_start_matches('/'))
+                                            .size(TXT_SIZE)
+                                            .shaping(text::Shaping::Advanced)
+                                            .width(Length::Fill),
+                                    ),
+                            )
+                            .style(button::text)
+                            .on_press(message),
+                        )
+                        .push(
+                            Space::new()
+                                .width(Length::Fixed(5.0))
+                                .height(Length::Shrink),
+                        )
+                        .push(text(ByteSize(file.size).to_string()).size(TXT_SIZE))
+                        .push(
+                            Space::new()
+                                .width(Length::Fixed(5.0))
+                                .height(Length::Shrink),
+                        )
+                        .push(text(datetime).size(TXT_SIZE))
+                        .push(
+                            Space::new()
+                                .width(Length::Fixed(12.0))
+                                .height(Length::Shrink),
+                        );
                     file_list = file_list.push(file_row).push(
                         Space::new()
                             .width(Length::Shrink)
