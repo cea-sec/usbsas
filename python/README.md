@@ -20,7 +20,7 @@ $ make
 Example using communication wrapper from `comm.py`
 
 ```bash
-$ usbsas-usbsas -s
+$ usbsas-usbsas -s /tmp
 ```
 
 ```python
