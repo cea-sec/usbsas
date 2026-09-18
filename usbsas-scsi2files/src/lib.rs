@@ -242,6 +242,7 @@ impl PartitionsListedState {
         };
         log::info!("Reading partition: {part_infos:?}");
         self.usb_mass.partition_sector_start = part_infos.start;
+        self.usb_mass.partition_size = part_infos.size;
         let sector_size = self.usb_mass.block_size;
         let fs: Box<dyn FSRead<MassStorageComm>> = match part_infos.type_str.as_str() {
             "EXFAT" | "FAT" => Box::new(ff::FatFsReader::new(self.usb_mass, sector_size)?),
