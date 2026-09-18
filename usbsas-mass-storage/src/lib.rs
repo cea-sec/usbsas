@@ -231,6 +231,9 @@ pub struct MassStorageComm {
     pub seek: u64,
     pub dev_size: u64,
     pub partition_sector_start: u64,
+    // Byte length of the currently opened partition, needed to resolve
+    // SeekFrom::End
+    pub partition_size: u64,
     // RwLock because we need to impl ReadAt which takes a non mut ref
     pub comm: Arc<RwLock<ComRqScsi>>,
     // Small cache to avoid reading the same sectors multiple time
@@ -244,6 +247,7 @@ impl MassStorageComm {
             seek: 0,
             dev_size: 0,
             partition_sector_start: 0,
+            partition_size: 0,
             comm: Arc::new(RwLock::new(comm)),
             cache: RwLock::new(lru::LruCache::new(
                 // TODO: add an option to change this value in the configuration file
@@ -321,9 +325,14 @@ impl Seek for MassStorageComm {
                     return Err(io::Error::new(ErrorKind::InvalidInput, "Unsupported seek"));
                 }
             },
-            _ => {
-                return Err(io::Error::new(ErrorKind::InvalidInput, "Unsupported seek"));
-            }
+            SeekFrom::End(pos) => match self.partition_size.checked_add_signed(pos) {
+                Some(result) => {
+                    self.seek = result;
+                }
+                None => {
+                    return Err(io::Error::new(ErrorKind::InvalidInput, "Unsupported seek"));
+                }
+            },
         }
         Ok(self.seek)
     }
