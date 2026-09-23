@@ -24,7 +24,6 @@ fn run_son(busnum: u8, devnum: u8) -> Result<Child, std::io::Error> {
                 || k == "LANG"
                 || k == "HOME"
                 || k == "PATH"
-                || k == "DISPLAY"
                 || k == "RUST_LOG"
                 || k == "RUST_BACKTRACE"
         })

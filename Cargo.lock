@@ -6396,10 +6396,10 @@ dependencies = [
  "dbus-crossroads",
  "env_logger",
  "lazy_static",
+ "libc",
  "log",
  "rusb",
  "usbsas-sandbox",
- "x11",
 ]
 
 [[package]]
@@ -7636,16 +7636,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
 dependencies = [
  "tap",
-]
-
-[[package]]
-name = "x11"
-version = "2.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "502da5464ccd04011667b11c435cb992822c2c0dbde1770c988480d312a0db2e"
-dependencies = [
- "libc",
- "pkg-config",
 ]
 
 [[package]]
