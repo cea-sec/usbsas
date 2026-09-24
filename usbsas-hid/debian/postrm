@@ -2,9 +2,17 @@
 set -e
 
 if [ "$1" = "remove" ]; then
+
     # Reload udev rules
     echo "reloading udev rules"
     udevadm control --reload-rules
+
+    # Remove usbsas-hid user
+    set +e
+    if id usbsas-hid >/dev/null 2>&1; then
+        set -e
+        userdel -r -f usbsas-hid
+    fi
 fi
 
 #DEBHELPER#

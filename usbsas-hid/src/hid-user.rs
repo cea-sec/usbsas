@@ -1,20 +1,26 @@
-//! Minimal HID userland driver for X. It only supports left click of mouses and
-//! touch screens.
+//! Minimal HID userland driver. It reads raw HID reports from a USB mouse or
+//! touch screen and replays them on a virtual `uinput` device. Only pointer
+//! motion and left click are supported, no keyboard keys.
+
+mod uinput;
 
 use rusb::{
     Context, DeviceHandle, Direction, Recipient, RequestType, TransferType, UsbContext,
     request_type,
 };
-use std::{
-    collections::HashMap, env, io::Error, os::unix::io::AsRawFd, ptr::null_mut, time::Duration,
-};
-use x11::{
-    xlib::{
-        CurrentTime, Display, KeyReleaseMask, XFlush, XOpenDisplay, XRootWindow, XScreenCount,
-        XScreenOfDisplay, XSelectInput, XWarpPointer,
-    },
-    xtest::XTestFakeButtonEvent,
-};
+use std::{collections::HashMap, env, io::Error, os::unix::io::AsRawFd, time::Duration};
+
+/// Number of physical buttons forwarded to the virtual device.
+/// 1 is left click only, set 3 to add right click and wheel.
+const FORWARDED_BUTTONS: usize = 1;
+
+/// uinput code of each forwarded button, in HID declaration order.
+const BUTTON_CODES: [u16; 3] = [uinput::BTN_LEFT, uinput::BTN_RIGHT, uinput::BTN_MIDDLE];
+
+const _: () = assert!(FORWARDED_BUTTONS <= BUTTON_CODES.len());
+
+const MAX_HID_DESCRIPTOR_LENGTH: usize = 1000;
+const MAX_REPORT_COUNT: usize = 2048;
 
 enum LibusbClassCode {
     Hid = 0x03,
@@ -141,7 +147,11 @@ fn get_item_value_u32(size: u8, buffer: &mut Vec<u8>) -> Result<u32, Error> {
             _ => Err(Error::other("Buffer too short")),
         },
         _ => {
-            todo!("bsize {size:?}");
+            log::error!("bsize {size:?}");
+            Err(Error::other(format!(
+                "unimplemented get_item_value_u32 {}",
+                size
+            )))
         }
     }
 }
@@ -177,7 +187,11 @@ fn get_item_value_i32(size: u8, buffer: &mut Vec<u8>) -> Result<i32, Error> {
             _ => Err(Error::other("Buffer too short")),
         },
         _ => {
-            todo!("bsize {size:?}");
+            log::error!("bsize {size:?}");
+            Err(Error::other(format!(
+                "unimplemented get_item_value_i32 {}",
+                size
+            )))
         }
     }
 }
@@ -471,7 +485,7 @@ struct HidItem {
     coordinatestate: CoordinateState,
     count: u8,
     size: u8,
-    r#type: HidItemType,
+    itemtype: HidItemType,
 }
 
 impl HidItem {
@@ -572,7 +586,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                     coordinatestate,
                                     count: report_count as u8,
                                     size: report_size as u8,
-                                    r#type: HidItemType::Input,
+                                    itemtype: HidItemType::Input,
                                 };
                                 if report_count != 0 {
                                     items.push(item);
@@ -648,7 +662,7 @@ fn parse_report(mut buffer: Vec<u8>) -> Result<HashMap<u32, (Vec<HidItem>, usize
                                     coordinatestate,
                                     count: report_count as u8,
                                     size: report_size as u8,
-                                    r#type: HidItemType::Feature,
+                                    itemtype: HidItemType::Feature,
                                 };
                                 if report_count != 0 {
                                     items.push(item);
@@ -1138,44 +1152,171 @@ fn get_u16(
     }
 }
 
-struct ScreenInfo {
-    display: *mut Display,
-    rootwindow: u64,
-    width: i32,
-    height: i32,
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PointerKind {
+    /// Relative pointer (mouse), reported with `REL_X`/`REL_Y`.
+    Mouse,
+    /// Absolute pointer (touch screen), reported with `ABS_X`/`ABS_Y`.
+    Touchscreen,
 }
 
-fn get_screen_display() -> Result<ScreenInfo, Error> {
-    /* X11 */
-    let display = unsafe { XOpenDisplay(null_mut()) };
-    if display.is_null() {
-        return Err(Error::other("Error in XOpenDisplay".to_string()));
-    }
-    log::debug!("Display: {display:?}");
-    let rootwindow = unsafe { XRootWindow(display, 0) };
-    log::debug!("Root windows: {rootwindow:?}");
-    unsafe { XSelectInput(display, rootwindow, KeyReleaseMask) };
-
-    let count_screens = unsafe { XScreenCount(display) };
-    if count_screens <= 0 {
-        return Err(Error::other("No screen detected".to_string()));
-    }
-
-    /* Get screen size */
-    let screen = unsafe { XScreenOfDisplay(display, 0) };
-    let width = unsafe { (*screen).width };
-    let height = unsafe { (*screen).height };
-
-    Ok(ScreenInfo {
-        display,
-        rootwindow,
-        width,
-        height,
-    })
+/// What the physical device is able to report, deduced from its report
+/// descriptor. It tells which capabilities the virtual device must declare.
+#[derive(Debug)]
+struct PointerProfile {
+    kind: PointerKind,
+    abs_x: Option<uinput::AbsRange>,
+    abs_y: Option<uinput::AbsRange>,
+    wheel: bool,
+    buttons: usize,
 }
 
-const MAX_HID_DESCRIPTOR_LENGTH: usize = 1000;
-const MAX_REPORT_COUNT: usize = 2048;
+impl PointerProfile {
+    /// Walks the parsed input items looking for the axes and buttons we know
+    /// how to translate.
+    fn from_reports(reports: &HashMap<u32, (Vec<HidItem>, usize)>) -> Result<Self, Error> {
+        let mut abs_x = None;
+        let mut abs_y = None;
+        let mut relative = false;
+        let mut wheel = false;
+        let mut buttons = 0;
+
+        fn set_abs(axis: &mut Option<uinput::AbsRange>, item: &HidItem) {
+            if item.logical_max <= item.logical_min {
+                log::warn!("Ignoring absolute axis with empty range: {item:?}");
+                return;
+            }
+            let range = uinput::AbsRange {
+                min: item.logical_min,
+                max: item.logical_max,
+            };
+            match axis {
+                None => *axis = Some(range),
+                Some(previous) => {
+                    if previous.min != range.min || previous.max != range.max {
+                        log::warn!(
+                            "Ignoring conflicting absolute range {range:?}, keeping {previous:?}"
+                        );
+                    }
+                }
+            }
+        }
+
+        for (items, _) in reports.values() {
+            for item in items {
+                if item.itemtype != HidItemType::Input {
+                    continue;
+                }
+                match item.usage_page {
+                    HidUsagePage::Button => {
+                        if item.size == 1 {
+                            buttons = buttons.max(item.count as usize);
+                        }
+                    }
+                    HidUsagePage::GenericDesktopControls => {
+                        for usage in &item.usage {
+                            match (usage, &item.coordinatestate) {
+                                (
+                                    HidUsage::GenericDesktop(HidUsageGenericDesktop::X),
+                                    CoordinateState::Abs,
+                                ) => set_abs(&mut abs_x, item),
+                                (
+                                    HidUsage::GenericDesktop(HidUsageGenericDesktop::Y),
+                                    CoordinateState::Abs,
+                                ) => set_abs(&mut abs_y, item),
+                                (
+                                    HidUsage::GenericDesktop(
+                                        HidUsageGenericDesktop::X | HidUsageGenericDesktop::Y,
+                                    ),
+                                    CoordinateState::Rel,
+                                ) => relative = true,
+                                (
+                                    HidUsage::GenericDesktop(HidUsageGenericDesktop::Wheel),
+                                    CoordinateState::Rel,
+                                ) => wheel = true,
+                                _ => (),
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+
+        let kind = match (abs_x, abs_y) {
+            (Some(_), Some(_)) => {
+                if relative {
+                    log::warn!("Device reports both absolute and relative axes, using absolute");
+                }
+                PointerKind::Touchscreen
+            }
+            _ => {
+                if !relative {
+                    return Err(Error::other("Device has no supported pointer axis"));
+                }
+                PointerKind::Mouse
+            }
+        };
+
+        Ok(PointerProfile {
+            kind,
+            abs_x,
+            abs_y,
+            wheel,
+            buttons: buttons.min(FORWARDED_BUTTONS),
+        })
+    }
+
+    /// Creates the virtual device matching this profile.
+    fn create_device(&self, vendor: u16, product: u16) -> Result<uinput::VirtualDevice, Error> {
+        let mut builder = match self.kind {
+            PointerKind::Mouse => {
+                let mut builder = uinput::VirtualDeviceBuilder::new("HID mouse", vendor, product)
+                    .prop(uinput::INPUT_PROP_POINTER)
+                    .rel(uinput::REL_X)
+                    .rel(uinput::REL_Y)
+                    .key(uinput::BTN_LEFT);
+                if self.wheel {
+                    builder = builder.rel(uinput::REL_WHEEL).rel(uinput::REL_HWHEEL);
+                }
+                for code in BUTTON_CODES.iter().take(self.buttons).skip(1) {
+                    builder = builder.key(*code);
+                }
+                builder
+            }
+            PointerKind::Touchscreen => {
+                let mut builder =
+                    uinput::VirtualDeviceBuilder::new("HID touchscreen", vendor, product)
+                        .prop(uinput::INPUT_PROP_DIRECT)
+                        .key(uinput::BTN_TOUCH)
+                        .abs(uinput::ABS_MT_SLOT, uinput::AbsRange { min: 0, max: 1 })
+                        .abs(
+                            uinput::ABS_MT_TRACKING_ID,
+                            uinput::AbsRange {
+                                min: 0,
+                                max: 0xffff,
+                            },
+                        );
+                if let Some(range) = self.abs_x {
+                    builder = builder.abs(uinput::ABS_MT_POSITION_X, range);
+                }
+                if let Some(range) = self.abs_y {
+                    builder = builder.abs(uinput::ABS_MT_POSITION_Y, range);
+                }
+                builder
+            }
+        };
+
+        if let Some(range) = self.abs_x {
+            builder = builder.abs(uinput::ABS_X, range);
+        }
+        if let Some(range) = self.abs_y {
+            builder = builder.abs(uinput::ABS_Y, range);
+        }
+
+        builder.build()
+    }
+}
 
 fn get_hid_descriptor(device: &UsbDevice) -> Result<Vec<u8>, Error> {
     let mut buffer: Vec<u8> = vec![0; MAX_HID_DESCRIPTOR_LENGTH];
@@ -1216,99 +1357,194 @@ fn get_associated_report<'a>(
         .ok_or_else(|| Error::other("No default report"))
 }
 
-struct DisplayContext {
-    screen: ScreenInfo,
-    cursor_x: i32,
-    cursor_y: i32,
-    surface_touched: bool,
-    change_surface: bool,
-    button_num: usize,
-    finger_touch: bool,
+/// HID report
+#[derive(Debug)]
+struct ReportState {
+    rel_x: i32,
+    rel_y: i32,
+    wheel: i32,
+    hwheel: i32,
+    abs_x: Option<i32>,
+    abs_y: Option<i32>,
+    touch: Option<bool>,
+    contact_active: bool,
+    buttons: [Option<bool>; FORWARDED_BUTTONS],
+    button_index: usize,
 }
 
-impl DisplayContext {
-    fn new(screen: ScreenInfo) -> DisplayContext {
-        let cursor_x = screen.width / 2;
-        let cursor_y = screen.height / 2;
-        DisplayContext {
-            screen,
-            cursor_x,
-            cursor_y,
-            surface_touched: false,
-            change_surface: false,
-            button_num: 0,
-            finger_touch: false,
+impl ReportState {
+    fn new() -> ReportState {
+        ReportState {
+            rel_x: 0,
+            rel_y: 0,
+            wheel: 0,
+            hwheel: 0,
+            abs_x: None,
+            abs_y: None,
+            touch: None,
+            contact_active: true,
+            buttons: [None; FORWARDED_BUTTONS],
+            button_index: 0,
         }
     }
 
-    fn updt_cursor(&self) {
-        /* Move cursor */
-        unsafe {
-            XWarpPointer(
-                self.screen.display,
-                0,
-                self.screen.rootwindow,
-                0,
-                0,
-                0,
-                0,
-                self.cursor_x,
-                self.cursor_y,
-            )
-        };
-        unsafe { XFlush(self.screen.display) };
+    fn reset(&mut self) {
+        *self = ReportState::new();
     }
 }
 
+/// Translates the decoded reports into `uinput` events.
+struct VirtualPointer {
+    device: uinput::VirtualDevice,
+    kind: PointerKind,
+    touching: bool,
+    tracking_id: i32,
+    events: Vec<(u16, u16, i32)>,
+}
+
+impl AsRawFd for VirtualPointer {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        self.device.as_raw_fd()
+    }
+}
+
+impl VirtualPointer {
+    fn new(device: uinput::VirtualDevice, kind: PointerKind) -> VirtualPointer {
+        VirtualPointer {
+            device,
+            kind,
+            touching: false,
+            tracking_id: 0,
+            events: Vec::with_capacity(8),
+        }
+    }
+
+    fn emit(&mut self, state: &ReportState) -> Result<(), Error> {
+        self.events.clear();
+
+        match self.kind {
+            PointerKind::Mouse => {
+                for (code, value) in [
+                    (uinput::REL_X, state.rel_x),
+                    (uinput::REL_Y, state.rel_y),
+                    (uinput::REL_WHEEL, state.wheel),
+                    (uinput::REL_HWHEEL, state.hwheel),
+                ] {
+                    if value != 0 {
+                        self.events.push((uinput::EV_REL, code, value));
+                    }
+                }
+
+                for (index, pressed) in state.buttons.iter().enumerate() {
+                    if let Some(pressed) = pressed {
+                        self.events.push((
+                            uinput::EV_KEY,
+                            BUTTON_CODES[index],
+                            i32::from(*pressed),
+                        ));
+                    }
+                }
+            }
+            PointerKind::Touchscreen => {
+                // Some touch panels report the contact as a digitizer tip
+                // switch, others as a plain button.
+                let touching = state
+                    .touch
+                    .or_else(|| state.buttons.first().copied().flatten())
+                    .unwrap_or(self.touching);
+
+                // Slot 0 is the only contact we forward.
+                self.events.push((uinput::EV_ABS, uinput::ABS_MT_SLOT, 0));
+
+                if touching {
+                    if !self.touching {
+                        // A new contact needs a new tracking id.
+                        self.tracking_id = (self.tracking_id + 1) & 0xffff;
+                        self.events.push((
+                            uinput::EV_ABS,
+                            uinput::ABS_MT_TRACKING_ID,
+                            self.tracking_id,
+                        ));
+                    }
+                    // Coordinates are only meaningful while the surface is
+                    // touched, a finger up keeps the last known position.
+                    if let Some(value) = state.abs_x {
+                        self.events
+                            .push((uinput::EV_ABS, uinput::ABS_MT_POSITION_X, value));
+                        self.events.push((uinput::EV_ABS, uinput::ABS_X, value));
+                    }
+                    if let Some(value) = state.abs_y {
+                        self.events
+                            .push((uinput::EV_ABS, uinput::ABS_MT_POSITION_Y, value));
+                        self.events.push((uinput::EV_ABS, uinput::ABS_Y, value));
+                    }
+                } else if self.touching {
+                    self.events
+                        .push((uinput::EV_ABS, uinput::ABS_MT_TRACKING_ID, -1));
+                }
+
+                if touching != self.touching {
+                    self.events
+                        .push((uinput::EV_KEY, uinput::BTN_TOUCH, i32::from(touching)));
+                    self.touching = touching;
+                } else if self.events.len() == 1 {
+                    self.events.clear();
+                }
+            }
+        }
+
+        log::trace!("state {state:?}");
+        log::debug!("Emitting {:?}", self.events);
+        self.device.emit(&self.events)
+    }
+}
+
+/// Relative axes are reported as a signed offset around the center of their
+/// logical range (which is 0 for the usual -127..127 mice).
+fn relative_delta(item: &HidItem, value: i32) -> i32 {
+    value - (item.logical_max + item.logical_min) / 2
+}
+
 fn parse_generic_desktop_control(
-    context: &mut DisplayContext,
+    state: &mut ReportState,
     item: &HidItem,
     buffer: &[u8],
 ) -> Result<(), Error> {
     for index in 0..item.count as usize {
+        let Some(usage) = item.usage.get(index) else {
+            log::debug!("Item has no usage for index {index}: {item:?}");
+            break;
+        };
         // TODO check min max
         let value = item.get_value(index, buffer)?;
-        let usage = &item.usage[index];
 
         match usage {
             HidUsage::GenericDesktop(HidUsageGenericDesktop::X) => {
                 log::trace!("value x {value}");
                 match item.coordinatestate {
                     CoordinateState::Abs => {
-                        if context.finger_touch {
-                            context.cursor_x = ((value) * context.screen.width) / item.logical_max;
+                        if state.contact_active && state.abs_x.is_none() {
+                            state.abs_x = Some(value);
                         }
                     }
-                    CoordinateState::Rel => {
-                        let logical_center_x = (item.logical_max + item.logical_min) / 2;
-                        context.cursor_x += value - logical_center_x;
-                        context.cursor_x = context.cursor_x.clamp(0, context.screen.width);
-                    }
+                    CoordinateState::Rel => state.rel_x += relative_delta(item, value),
                 }
             }
             HidUsage::GenericDesktop(HidUsageGenericDesktop::Y) => {
                 log::trace!("value y {value}");
                 match item.coordinatestate {
                     CoordinateState::Abs => {
-                        if context.finger_touch {
-                            context.cursor_y = (value * context.screen.height) / item.logical_max;
+                        if state.contact_active && state.abs_y.is_none() {
+                            state.abs_y = Some(value);
                         }
                     }
-                    CoordinateState::Rel => {
-                        let logical_center_y = (item.logical_max + item.logical_min) / 2;
-                        context.cursor_y += value - logical_center_y;
-                        context.cursor_y = context.cursor_y.clamp(0, context.screen.height);
-                    }
+                    CoordinateState::Rel => state.rel_y += relative_delta(item, value),
                 }
             }
             HidUsage::GenericDesktop(HidUsageGenericDesktop::Wheel) => {
-                // TODO
-            }
-            HidUsage::GenericDesktop(HidUsageGenericDesktop::Rz) => {
-                // TODO
-            }
-            HidUsage::GenericDesktop(HidUsageGenericDesktop::Slider) => {
-                // TODO
+                if let CoordinateState::Rel = item.coordinatestate {
+                    state.wheel += relative_delta(item, value);
+                }
             }
             usage => {
                 log::debug!("Unsupported item {usage:?}");
@@ -1318,17 +1554,13 @@ fn parse_generic_desktop_control(
     Ok(())
 }
 
-fn parse_digitizer(
-    context: &mut DisplayContext,
-    item: &HidItem,
-    buffer: &[u8],
-) -> Result<(), Error> {
+fn parse_digitizer(state: &mut ReportState, item: &HidItem, buffer: &[u8]) -> Result<(), Error> {
     log::trace!("item {item:?}");
-    if item.count as usize != item.usage.len() {
-        return Ok(());
-    }
     for index in 0..item.count as usize {
-        let usage = &item.usage[index];
+        let Some(usage) = item.usage.get(index) else {
+            log::debug!("Item has no usage for index {index}: {item:?}");
+            break;
+        };
         log::trace!("item usage {usage:?}");
         match usage {
             HidUsage::Digitizer(HidUsageDigitizer::TipSwitch) => {
@@ -1336,14 +1568,10 @@ fn parse_digitizer(
                     continue;
                 }
                 let button_value = item.get_value(index, buffer)?;
-                log::trace!("button {index} {button_value}");
-                if button_value != 0 {
-                    context.finger_touch = true;
-                    context.surface_touched = true;
-                } else {
-                    context.finger_touch = false;
-                }
-                context.change_surface = true;
+                log::trace!("tip switch {index} {button_value}");
+                let down = button_value != 0;
+                state.contact_active = down;
+                state.touch = Some(state.touch.unwrap_or(false) || down);
             }
             usage => {
                 log::debug!("Unsupported item {usage:?}");
@@ -1353,27 +1581,16 @@ fn parse_digitizer(
     Ok(())
 }
 
-fn parse_button(context: &mut DisplayContext, item: &HidItem, buffer: &[u8]) -> Result<(), Error> {
+fn parse_button(state: &mut ReportState, item: &HidItem, buffer: &[u8]) -> Result<(), Error> {
     if item.size != 1 {
         return Ok(());
     }
     for index in 0..item.count as usize {
         let button_value = item.get_value(index, buffer)?;
-        if context.button_num == 0 {
-            // Only forward left button
-            unsafe {
-                if context.button_num < 10 {
-                    XTestFakeButtonEvent(
-                        context.screen.display,
-                        context.button_num as u32 + 1,
-                        button_value & 1,
-                        CurrentTime,
-                    );
-                }
-            };
-            unsafe { XFlush(context.screen.display) };
-            context.button_num += 1;
+        if state.button_index < FORWARDED_BUTTONS {
+            state.buttons[state.button_index] = Some(button_value & 1 != 0);
         }
+        state.button_index += 1;
     }
     Ok(())
 }
@@ -1391,7 +1608,10 @@ fn request_reports(device: &UsbDevice, reports: &HashMap<u32, (Vec<HidItem>, usi
         );
         log::debug!("Get report id: {report_id:?} {result:?}, {buffer:?}");
 
-        if !items.iter().all(|item| item.r#type == HidItemType::Feature) {
+        if !items
+            .iter()
+            .all(|item| item.itemtype == HidItemType::Feature)
+        {
             continue;
         }
 
@@ -1453,20 +1673,24 @@ fn main() -> Result<(), Error> {
 
     let buffer = get_hid_descriptor(&device)?;
     let reports = parse_report(buffer)?;
-    /* Request reports */
     request_reports(&device, &reports);
 
-    let screen = get_screen_display()?;
-    log::debug!("Screen: {}x{}", screen.width, screen.height);
+    let profile = PointerProfile::from_reports(&reports)?;
+    log::info!("Pointer profile: {profile:?}");
 
-    // ConnectionNumber returns the socket fd (see libx11's Xlib.h)
-    let socket_fd = unsafe { x11::xlib::XConnectionNumber(screen.display) };
-    usbsas_sandbox::hiduser::seccomp(device.dev_file.as_raw_fd(), socket_fd)
+    let descriptor = device
+        .handle
+        .device()
+        .device_descriptor()
+        .map_err(|err| Error::other(format!("Cannot get device descriptor: {err:?}")))?;
+    let uinput_device = profile.create_device(descriptor.vendor_id(), descriptor.product_id())?;
+
+    let mut pointer = VirtualPointer::new(uinput_device, profile.kind);
+
+    usbsas_sandbox::hiduser::seccomp(device.dev_file.as_raw_fd(), pointer.as_raw_fd())
         .map_err(|err| Error::other(format!("Error applying seccomp filter: {err}")))?;
 
-    let mut context = DisplayContext::new(screen);
-    context.updt_cursor();
-
+    let mut state = ReportState::new();
     let mut buffer = vec![0; device.ep_in_size as usize];
     loop {
         match device
@@ -1474,25 +1698,20 @@ fn main() -> Result<(), Error> {
             .read_interrupt(device.ep_in, &mut buffer, Duration::from_millis(1000))
         {
             Ok(_) => {
-                context.surface_touched = false;
-                context.button_num = 0;
-                context.finger_touch = false;
+                state.reset();
 
                 log::debug!("Read: {buffer:?}");
                 let report = get_associated_report(&buffer, &reports)?;
                 for item in report.0.iter() {
                     match &item.usage_page {
                         HidUsagePage::Button => {
-                            parse_button(&mut context, item, &buffer)?;
+                            parse_button(&mut state, item, &buffer)?;
                         }
                         HidUsagePage::GenericDesktopControls => {
-                            parse_generic_desktop_control(&mut context, item, &buffer)?;
-                        }
-                        HidUsagePage::Consumer => {
-                            // TODO
+                            parse_generic_desktop_control(&mut state, item, &buffer)?;
                         }
                         HidUsagePage::Digitizer => {
-                            parse_digitizer(&mut context, item, &buffer)?;
+                            parse_digitizer(&mut state, item, &buffer)?;
                         }
                         value => {
                             log::debug!("Unknown: {value:?}");
@@ -1500,29 +1719,10 @@ fn main() -> Result<(), Error> {
                     }
                 }
 
-                unsafe {
-                    XWarpPointer(
-                        context.screen.display,
-                        0,
-                        context.screen.rootwindow,
-                        0,
-                        0,
-                        0,
-                        0,
-                        context.cursor_x,
-                        context.cursor_y,
-                    )
-                };
-                if context.change_surface {
-                    let value = i32::from(context.surface_touched);
-                    unsafe {
-                        XTestFakeButtonEvent(context.screen.display, 1, value, CurrentTime);
-                    };
-                }
-                unsafe { XFlush(context.screen.display) };
+                pointer.emit(&state)?;
             }
             Err(rusb::Error::Timeout) => {
-                // skip
+                log::debug!("rusb timeout");
             }
             Err(err) => {
                 log::error!("Err {err:?}, exiting");

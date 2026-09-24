@@ -6,7 +6,7 @@ if [ "remove" = "$1" ]; then
     systemctl unmask autovt@tty2.service
 
     set +e
-    if id usbsas-client; then
+    if id usbsas-client >/dev/null 2>&1; then
         set -e
         userdel -r -f usbsas-client
     fi

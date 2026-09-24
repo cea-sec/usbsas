@@ -2,6 +2,14 @@
 set -e
 
 if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
+
+    set +e
+    if [ -z "$(id -u usbsas-hid 2>/dev/null)" ]; then
+        set -e
+        echo "adding usbsas-hid user"
+        adduser --comment "usbsas-hid" --disabled-password --quiet usbsas-hid
+    fi
+
     # Reload udev rules
     echo "reloading udev rules"
     udevadm control --reload-rules

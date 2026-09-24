@@ -1,3 +1,5 @@
-ACTION=="add",    SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":03*:", MODE="0660", OWNER="usbsas-client", RUN+="/usr/libexec/hid-hotplug update"
-ACTION=="change", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":03*:", MODE="0660", OWNER="usbsas-client", RUN+="/usr/libexec/hid-hotplug update"
-ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":03*:", MODE="0660", OWNER="usbsas-client", RUN+="/usr/libexec/hid-hotplug remove"
+ACTION=="add",    SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":03*:", MODE="0660", OWNER="usbsas-hid", RUN+="/usr/libexec/hid-hotplug update"
+ACTION=="change", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":03*:", MODE="0660", OWNER="usbsas-hid", RUN+="/usr/libexec/hid-hotplug update"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":03*:", MODE="0660", OWNER="usbsas-hid", RUN+="/usr/libexec/hid-hotplug remove"
+
+KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", OWNER="usbsas-hid"

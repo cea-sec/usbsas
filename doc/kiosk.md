@@ -102,11 +102,9 @@ It will install clamav-daemon and clamav-freshclam as dependencies.
 This package contains the minimal HID implementation running in user space,
 it only supports mouse left click (no keyboard).
 
-It is started by the graphical user interface if it is installed.
-
 `hid` kernel modules are prevented from loading with a modprobe configuration file.
 
-A `udev` rule will give ownership of HID devices to `usbsas-client` when plugged
+A `udev` rule will give ownership of HID devices to `usbsas-hid` when plugged
 and start the HID manager.
 
 The installation of `usbsas-hid` is recommended but not mandatory.
@@ -144,6 +142,7 @@ Enable the services and reboot:
 sudo systemctl enable usbsas-server.service
 sudo systemctl enable usbsas-analyzer-server.service
 sudo systemctl enable usbsas-client.service
+sudo systemctl enable usbsas-hid.service
 sudo reboot
 ```
 

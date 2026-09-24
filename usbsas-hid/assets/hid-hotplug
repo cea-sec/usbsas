@@ -8,7 +8,7 @@ set -eu
 busnum=$((10#$BUSNUM))
 devnum=$((10#$DEVNUM))
 
-HID_USER=usbsas-client
+HID_USER=usbsas-hid
 
 sudo -u $HID_USER \
     DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u $HID_USER)/bus \
