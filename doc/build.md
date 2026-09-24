@@ -15,7 +15,7 @@ Linux distribution): `rust`, `cargo`, `pkgconf`, `clang`, `cmake`, `protobuf`,
 `libseccomp`, `libusb`, `libudev`, `libkrb5 `.
 
 Optional dependencies to build the analyzer-server, the tools and the HID
-userland implementation: `libclamav`, `libdbus`, `libxtst`, `libx11`, `libfuse3`
+userland implementation: `libclamav`, `libdbus`,  `libfuse3`
 
 A recent version of `rustc` and `cargo` (edition 2021) is needed: instead of a
 packaged version, a [rustup](https://rustup.rs/) installation may be necessary.
