@@ -8,6 +8,8 @@ license = "GPL-3.0"
 [dependencies]
 anyhow = "1.0"
 ext4-view = "1.0"
+fatfs = { version = "0.3", default-features = false, features = ["std", "alloc"] }
+fscommon = { git = "https://github.com/rafalh/rust-fscommon", rev = "89706258032efff88689f6083510ed34b845fe46" }
 ff = { path = "./ff" }
 iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
 libc = "0.2"

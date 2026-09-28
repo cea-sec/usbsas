@@ -16,7 +16,7 @@ use std::{
 };
 use thiserror::Error;
 use usbsas_comm::{ComRpWriteDst, ProtoRespCommon, ProtoRespWriteDst, ToFd};
-use usbsas_fsrw::{FSWrite, ff, ntfs};
+use usbsas_fsrw::{FSWrite, fat, ff, ntfs};
 use usbsas_mbr::SECTOR_START;
 use usbsas_proto as proto;
 use usbsas_proto::{
@@ -196,7 +196,13 @@ impl WaitFsInfosState {
         )?;
 
         let fs: Box<dyn FSWrite<StreamSlice<SparseFile<File>>>> = match out_fs_type {
-            FsType::Fat | FsType::Exfat => Box::new(ff::FatFsWriter::mkfs(
+            FsType::Fat => Box::new(fat::FatWriter::mkfs(
+                file_slice,
+                SECTOR_SIZE,
+                fs_sector_count,
+                Some(out_fs_type),
+            )?),
+            FsType::Exfat => Box::new(ff::ExFatFsWriter::mkfs(
                 file_slice,
                 SECTOR_SIZE,
                 fs_sector_count,

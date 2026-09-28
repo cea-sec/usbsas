@@ -5,6 +5,7 @@ use thiserror::Error;
 use usbsas_proto::common::{FileInfo, FileType, FsType};
 
 pub mod ext4fs;
+pub mod fat;
 pub mod ff;
 pub mod iso9660fs;
 pub mod ntfs;
