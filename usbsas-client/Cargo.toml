@@ -9,7 +9,7 @@ description = "Graphical User Interface for usbsas"
 bytesize = "2.7"
 clap = { version = "4.6", features = ["string"] }
 env_logger = "0.11"
-iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "thread-pool", "advanced", "image", "smol", "svg", "wayland", "x11"] }
+iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "thread-pool", "advanced", "image", "smol", "svg", "wayland"] }
 libc = "0.2"
 log = "0.4"
 serde_json = "1.0"
@@ -30,12 +30,11 @@ name = "usbsas-kiosk"
 maintainer = "usbsas"
 copyright = "usbsas"
 revision = "1"
-depends = "$auto, usbsas-server, xserver-xorg-core, x11-xserver-utils, libxkbcommon-x11-0, xinit, xdotool, unclutter, fonts-noto-color-emoji"
+depends = "$auto, usbsas-server, cage, fonts-noto-color-emoji"
 section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
 systemd-units = { unit-name = "usbsas-client", enable = false }
 assets = [
   ["target/release/usbsas-client", "usr/bin/", "755"],
-  ["assets/usbsas-client-xinit", "usr/bin/", "755"],
 ]

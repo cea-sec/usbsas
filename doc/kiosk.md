@@ -43,9 +43,7 @@ $ sudo apt install -y --no-install-recommends \
       libudev-dev \
       libusb-1.0-0-dev \
       protobuf-compiler \
-      libdbus-1-dev \
-      libxtst-dev \
-      libx11-dev
+      libdbus-1-dev
 ```
 
 Packages can be built individually with cargo-deb:
@@ -80,11 +78,10 @@ from loading will also be installed.
 
 ### <a name="debkiosk">usbsas-kiosk (usbsas-client) package</a>
 
-This package contains usbsas graphical interface, a `systemd` service and a
-`xinit` script.
+This package contains usbsas graphical interface and a `systemd` service.
 
 The systemd service, when enabled, will automatically start the application at
-boot (through `xinit`).
+boot, in a [cage](https://github.com/cage-kiosk/cage).
 
 Upon installation, a new user `usbsas-client` will be added, the graphical
 interface will run with this user.
