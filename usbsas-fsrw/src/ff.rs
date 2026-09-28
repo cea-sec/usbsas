@@ -6,14 +6,14 @@ use std::{
 };
 use usbsas_proto::common::{FileInfo, FileType, FsType};
 
-pub struct FatFsReader<T> {
+pub struct ExFatFsReader<T> {
     fs: ff::FatFs<T>,
 }
 
-impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
+impl<T: Read + Seek> FSRead<T> for ExFatFsReader<T> {
     fn new(reader: T, sector_size: u32) -> Result<Self> {
         let fs = ff::FatFs::new(reader, sector_size)?;
-        Ok(FatFsReader { fs })
+        Ok(ExFatFsReader { fs })
     }
 
     fn get_attr(&mut self, path: &str) -> Result<(FileType, u64, i64)> {
@@ -72,21 +72,20 @@ impl<T: Read + Seek> FSRead<T> for FatFsReader<T> {
     }
 }
 
-pub struct FatFsWriter<T> {
+pub struct ExFatFsWriter<T> {
     fs: ff::FatFs<T>,
 }
 
-impl<T: Read + Write + Seek> FSWrite<T> for FatFsWriter<T> {
+impl<T: Read + Write + Seek> FSWrite<T> for ExFatFsWriter<T> {
     fn mkfs(writer: T, sector_size: u64, sector_count: u64, fstype: Option<FsType>) -> Result<Self>
     where
         Self: Sized,
     {
         let fstype = match fstype {
             Some(FsType::Exfat) => ff::FM_EXFAT as u8,
-            Some(FsType::Fat) => ff::FM_FAT32 as u8,
             _ => return Err(Error::FSError("ff unsupported fstype".into())),
         };
-        Ok(FatFsWriter {
+        Ok(ExFatFsWriter {
             fs: ff::FatFs::mkfs(
                 writer,
                 u32::try_from(sector_size)?,

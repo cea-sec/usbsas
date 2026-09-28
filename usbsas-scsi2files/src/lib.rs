@@ -12,7 +12,7 @@ use usbsas_comm::{
     ComRpFiles, ComRqScsi, ProtoReqCommon, ProtoReqScsi, ProtoRespCommon, ProtoRespFiles, SendRecv,
     ToFd,
 };
-use usbsas_fsrw::{FSRead, ext4fs, ff, iso9660fs, ntfs};
+use usbsas_fsrw::{FSRead, ext4fs, fat, ff, iso9660fs, ntfs};
 use usbsas_mass_storage::MassStorageComm;
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
@@ -245,7 +245,8 @@ impl PartitionsListedState {
         self.usb_mass.partition_size = part_infos.size;
         let sector_size = self.usb_mass.block_size;
         let fs: Box<dyn FSRead<MassStorageComm>> = match part_infos.type_str.as_str() {
-            "EXFAT" | "FAT" => Box::new(ff::FatFsReader::new(self.usb_mass, sector_size)?),
+            "EXFAT" => Box::new(ff::ExFatFsReader::new(self.usb_mass, sector_size)?),
+            "FAT" => Box::new(fat::FatReader::new(self.usb_mass, sector_size)?),
             "NTFS" => Box::new(ntfs::NTFS::new(self.usb_mass, sector_size)?),
             "Linux/Ext" => Box::new(ext4fs::Ext4::new(self.usb_mass, sector_size)?),
             "ISO9660" => Box::new(iso9660fs::Iso9660::new(self.usb_mass, sector_size)?),
