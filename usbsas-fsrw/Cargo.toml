@@ -7,11 +7,12 @@ license = "GPL-3.0"
 
 [dependencies]
 anyhow = "1.0"
+bytemuck = "1.25"
 ext4-view = "1.0"
 fatfs = { version = "0.3", default-features = false, features = ["std", "alloc"] }
 fscommon = { git = "https://github.com/rafalh/rust-fscommon", rev = "89706258032efff88689f6083510ed34b845fe46" }
 ff = { path = "./ff" }
-iso9660 = { git = "https://github.com/losynix/iso9660-rs", branch = "into_inner" }
+hadris-iso = { version = "2.4", default-features = false, features = ["std", "sync", "joliet"] }
 libc = "0.2"
 log = "0.4"
 ntfs = "0.4"

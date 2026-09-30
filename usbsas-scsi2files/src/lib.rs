@@ -12,7 +12,7 @@ use usbsas_comm::{
     ComRpFiles, ComRqScsi, ProtoReqCommon, ProtoReqScsi, ProtoRespCommon, ProtoRespFiles, SendRecv,
     ToFd,
 };
-use usbsas_fsrw::{FSRead, ext4fs, fat, ff, iso9660fs, ntfs};
+use usbsas_fsrw::{FSRead, ext4fs, fat, ff, iso9660, ntfs};
 use usbsas_mass_storage::MassStorageComm;
 use usbsas_process::{UsbsasChild, UsbsasChildSpawner};
 use usbsas_proto as proto;
@@ -249,7 +249,7 @@ impl PartitionsListedState {
             "FAT" => Box::new(fat::FatReader::new(self.usb_mass, sector_size)?),
             "NTFS" => Box::new(ntfs::NTFS::new(self.usb_mass, sector_size)?),
             "Linux/Ext" => Box::new(ext4fs::Ext4::new(self.usb_mass, sector_size)?),
-            "ISO9660" => Box::new(iso9660fs::Iso9660::new(self.usb_mass, sector_size)?),
+            "ISO9660" => Box::new(iso9660::Iso9660::new(self.usb_mass, sector_size)?),
             _ => return Err(Error::Partition("Unsupported filesystem".into())),
         };
         comm.openpartition(proto::files::ResponseOpenPartition {})?;

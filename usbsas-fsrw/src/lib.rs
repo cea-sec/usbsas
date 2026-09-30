@@ -7,7 +7,7 @@ use usbsas_proto::common::{FileInfo, FileType, FsType};
 pub mod ext4fs;
 pub mod fat;
 pub mod ff;
-pub mod iso9660fs;
+pub mod iso9660;
 pub mod ntfs;
 
 #[derive(Error, Debug)]
@@ -21,7 +21,7 @@ pub enum Error {
     #[error("ext4 error: {0}")]
     Ext4(#[from] ext4_view::Ext4Error),
     #[error("iso error: {0}")]
-    Iso9660(#[from] iso9660::ISOError),
+    Iso9660(#[from] hadris_iso::Error),
     #[error("{0}")]
     Error(String),
     #[error("{0}")]
