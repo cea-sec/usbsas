@@ -161,7 +161,6 @@ pub(crate) struct HttpClient {
 impl HttpClient {
     fn new(#[cfg(feature = "authkrb")] krb_service_name: Option<String>) -> Result<Self> {
         let client = Client::builder()
-            .timeout(None)
             .gzip(true)
             .connect_timeout(Duration::from_secs(30))
             .build()?;
