@@ -10,11 +10,12 @@ bitfield = "0.19"
 env_logger = "0.11"
 libc = "0.2"
 log = "0.4"
-dbus-crossroads = "0.5"
-dbus = "0.9"
 lazy_static = "1.5"
+mio = { version = "1.2", features = ["os-ext"] }
 rusb = { version = "0.9", features = ["vendored"] }
+udev = { version = "0.9", features = ["mio"] }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
+usbsas-utils = { path = "../usbsas-utils" }
 
 [[bin]]
 name = "hid-dealer"
@@ -30,7 +31,7 @@ name = "usbsas-hid"
 maintainer = "usbsas"
 copyright = "usbsas"
 revision = "1"
-depends = "$auto, sudo, dbus, usbsas-kiosk"
+depends = "$auto, usbsas-kiosk"
 section = "utility"
 priority = "optional"
 maintainer-scripts = "debian/"
@@ -38,10 +39,8 @@ triggers-file = "debian/triggers"
 assets = [
   ["target/release/hid-dealer", "usr/libexec/", "755"],
   ["target/release/hid-user", "usr/libexec/", "755"],
-  ["assets/hid-hotplug", "usr/libexec/", "755"],
   ["assets/99-usbsas-hid.rules", "etc/udev/rules.d/", "644"],
   ["assets/hid.conf", "etc/modprobe.d/", "644"],
   ["assets/uinput.conf", "etc/modules-load.d/", "644"],
   ["assets/hid-dealer.service", "usr/lib/systemd/system/", "644"],
-  ["assets/udev-trigger", "etc/sudoers.d/", "644"],
 ]
