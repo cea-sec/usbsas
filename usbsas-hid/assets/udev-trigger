@@ -1,3 +1,0 @@
-Defaults:usbsas-hid !requiretty
-
-usbsas-hid ALL=(ALL) NOPASSWD: /usr/bin/udevadm trigger

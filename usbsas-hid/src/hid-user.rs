@@ -1666,10 +1666,15 @@ fn main() -> Result<(), Error> {
         ));
     }
 
-    log::info!("Busnum: {busnum} Devnum: {devnum}");
+    log::info!("Starting hid-user with busnum: {busnum} devnum: {devnum}");
 
-    let device = open_device(busnum, devnum)
-        .map_err(|err| Error::other(format!("Usb device error: {err:?}")))?;
+    let device = match open_device(busnum, devnum) {
+        Ok(device) => device,
+        Err(err) => {
+            log::error!("Couldn't open device: {err}");
+            std::process::exit(1);
+        }
+    };
 
     let buffer = get_hid_descriptor(&device)?;
     let reports = parse_report(buffer)?;

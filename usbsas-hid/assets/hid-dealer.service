@@ -1,16 +1,14 @@
 [Unit]
 Description=USB HID dealer
-Wants=dbus.socket systemd-logind.service
-After=dbus.socket systemd-logind.service
+Wants=systemd-udevd.service
+After=systemd-udevd.service
 
 [Service]
 User=usbsas-hid
 Type=simple
 Environment="RUST_LOG=info"
 ExecStart=/usr/libexec/hid-dealer
-ExecStartPost=sudo udevadm trigger
 Restart=always
-PAMName=usbsas-hid
 
 [Install]
 WantedBy=graphical.target usbsas-client.service
