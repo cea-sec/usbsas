@@ -154,10 +154,18 @@ impl CurrentDevices {
         }
 
         // Check if device is connected to an allowed port if policy configured
-        let (is_src, mut is_dst) = if let Some(ports) = &self.usb_port_accesses {
+        let (is_src, mut is_dst) = if let Some(config) = &self.usb_port_accesses {
             (
-                ports.ports_src.contains(&dev_path),
-                ports.ports_dst.contains(&dev_path),
+                if let Some(ref ports) = config.ports_src {
+                    ports.contains(&dev_path)
+                } else {
+                    true
+                },
+                if let Some(ref ports) = config.ports_dst {
+                    ports.contains(&dev_path)
+                } else {
+                    true
+                },
             )
         } else {
             (true, true)
