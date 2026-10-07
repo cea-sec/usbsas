@@ -2259,9 +2259,9 @@ dependencies = [
 
 [[package]]
 name = "hadris-common"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2419641e2ce38205ac40e8c127d5d635f700f4b6bd79494f570141296b7682e9"
+checksum = "0848bdca19cf3cdced59392757a2dfcdc4165cb2ca8751f9ea65953e84e7d9ec"
 dependencies = [
  "bytemuck",
  "chrono",
@@ -2276,30 +2276,29 @@ dependencies = [
 
 [[package]]
 name = "hadris-fixed"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2f979ce5abdf45f06df09e7fede7b7ac54aae20b63407e3f5f9595999f5cb96"
+checksum = "a9113caea96eb0e12db9045d69e8baefe6677384b2d21b7adff491819bdd0f8f"
 dependencies = [
  "bytemuck",
 ]
 
 [[package]]
 name = "hadris-io"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85372a1e658e46128d98b0b2221485dd72ab6adaca1b643d7f9bfc0fa42bc290"
+checksum = "16435cbe44eb91d440d8c6c85086c265ef51d8e3d5f95db5ef5f9aa82bb044e4"
 dependencies = [
  "bytemuck",
- "cfg-if",
  "embedded-io",
  "embedded-io-async",
 ]
 
 [[package]]
 name = "hadris-iso"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a69d124e4e925e2282b750c71e3596497c815c2463f09815080357c33278c935"
+checksum = "61a58cbaa0048c1a0c7cfb53b9bd012659c6a29b7e517ed3333acc7e1fa20192"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
@@ -2317,18 +2316,18 @@ dependencies = [
 
 [[package]]
 name = "hadris-macros"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793233288d1b5f23451f75b2c57696808b544eabd45919cceed46b5403c7df8e"
+checksum = "e3d6d0b20f4982244c26a3d796d8479d7f89f2b562d70d4df3c73d67eb1070d0"
 dependencies = [
  "proc-macro2",
 ]
 
 [[package]]
 name = "hadris-part"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aa09999a69352ff34aa658d4b03161b509d32a3cb78f0a812718d8d8423d861"
+checksum = "9e6f38682af0484e7a6745fa696df006db89f41d0467778cced604974f366130"
 dependencies = [
  "bytemuck",
  "endian-num",
@@ -2338,9 +2337,9 @@ dependencies = [
 
 [[package]]
 name = "hadris-path"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af25620d0760ae6cdcf56a5c269d29f2e380a712355924143c199552cba895de"
+checksum = "0179c8acf85bf76fb3134c67e41dc53420457f02331f520172bbeb6ac1ab19b5"
 
 [[package]]
 name = "half"
