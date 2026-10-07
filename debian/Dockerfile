@@ -13,8 +13,6 @@ RUN set -eux; \
     libfuse3-dev \
     libssl-dev \
     libkrb5-dev \
-    libx11-dev \
-    libxtst-dev \
     libdbus-1-dev \
     libudev-dev \
     libseccomp-dev \
