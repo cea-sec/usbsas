@@ -15,6 +15,7 @@ lb config noauto \
 	--verbose \
 	--binary-image iso-hybrid \
 	--system live \
+	--checksums sha256 \
 	--mirror-bootstrap "${MIRROR}/debian/" \
 	--mirror-chroot "${MIRROR}/debian/" \
 	--mirror-binary "${MIRROR}/debian/" \

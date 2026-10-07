@@ -162,7 +162,11 @@ Since it runs from RAM, a machine with at least 4GB is recommended. Half of it
 will be dedicated to /tmp (tmpfs) and 3 times the size of a transfer is needed
 in /tmp for each transfer.
 
-This live-iso should only be used to try usbsas.
+**This live-iso isn't an installation medium and shouldn't be used in
+production**, usbsas-hid is missing, it uses the demo analyzer-server and the
+system isn't hardened.
+It is only a way to try usbsas's look and feel.
+
 
 #### Build the image
 
