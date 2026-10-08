@@ -1802,7 +1802,7 @@ dependencies = [
 
 [[package]]
 name = "ff"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "bindgen 0.72.1",
  "cc",
@@ -3702,7 +3702,7 @@ dependencies = [
 
 [[package]]
 name = "ntfs3g"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "bindgen 0.72.1",
  "cc",
@@ -6321,7 +6321,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-client"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "bytesize",
  "clap",
@@ -6358,7 +6358,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-comm"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "byteorder",
  "pastey 0.2.3",
@@ -6369,7 +6369,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-config"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "log",
  "serde",
@@ -6395,7 +6395,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-files2fs"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "bitvec",
  "env_logger",
@@ -6412,7 +6412,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-files2tar"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "env_logger",
  "log",
@@ -6426,7 +6426,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-fs2dev"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "bitvec",
  "byteorder",
@@ -6443,7 +6443,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-fsrw"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -6464,7 +6464,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-hid"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bitfield",
  "env_logger",
@@ -6508,7 +6508,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-mass-storage"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "log",
  "lru 0.18.5",
@@ -6522,7 +6522,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-mbr"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "byteorder",
 ]
@@ -6540,7 +6540,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-net"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.23.1",
  "byteorder",
@@ -6574,7 +6574,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-proto"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "prost",
  "prost-build",
@@ -6584,7 +6584,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-sandbox"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "cc",
  "landlock",
@@ -6606,7 +6606,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-scsi2files"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "byteorder",
  "env_logger",
@@ -6623,7 +6623,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-tar2files"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "byteorder",
  "env_logger",
@@ -6662,7 +6662,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-usbdev"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "env_logger",
  "log",
@@ -6679,7 +6679,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-usbsas"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "assert_cmd",
