@@ -7,7 +7,8 @@ use std::{
     sync::{Mutex, mpsc},
     {thread, time},
 };
-use usbsas_utils::USBSAS_BIN_PATH;
+use usbsas_config::{conf_parse, conf_read};
+use usbsas_utils::{USBSAS_BIN_PATH, clap::UsbsasClap};
 
 lazy_static::lazy_static! {
     static ref HM_SONS: Mutex<HashMap<(u8, u8), Child>> = {
@@ -99,16 +100,22 @@ fn wait_sons() -> ! {
     }
 }
 
-fn busnum_devnum_from_hid_dev(device: &udev::Device) -> Option<(u8, u8)> {
-    let id_usb_interfaces = device.property_value("ID_USB_INTERFACES")?;
+// Check device is HID and is plugged on an allowed port
+// returns its (busnum, devnum)
+fn checked_busnum_devnum(
+    device: &udev::Device,
+    ports_hid: &Option<Vec<Vec<u8>>>,
+) -> Option<(u8, u8)> {
     // Check device is HID
-    if !id_usb_interfaces
+    if !device
+        .property_value("ID_USB_INTERFACES")?
         .to_string_lossy()
         .split(':')
         .any(|iface| iface.get(0..2) == Some("03"))
     {
         return None;
     }
+
     let busnum = device
         .property_value("BUSNUM")?
         .to_string_lossy()
@@ -119,6 +126,28 @@ fn busnum_devnum_from_hid_dev(device: &udev::Device) -> Option<(u8, u8)> {
         .to_string_lossy()
         .parse::<u8>()
         .ok()?;
+
+    // Check physical port matches config if specified
+    if let Some(ports_hid) = ports_hid {
+        let mut dev_path = Vec::new();
+        dev_path.push(busnum);
+
+        for port in device
+            .attribute_value("devpath")?
+            .to_string_lossy()
+            .split('.')
+        {
+            dev_path.push(port.parse::<u8>().ok()?)
+        }
+
+        if !ports_hid.contains(&dev_path) {
+            log::warn!(
+                "HID device ({busnum}, {devnum}) not allowed on this physical port ({dev_path:?})"
+            );
+            return None;
+        }
+    };
+
     Some((busnum, devnum))
 }
 
@@ -144,23 +173,23 @@ fn dev_info(device: &udev::Device) -> String {
         device
             .attribute_value("manufacturer")
             .unwrap_or(OsStr::new("unknown"))
-            .to_string_lossy()
-            .to_string(),
+            .to_string_lossy(),
         device
             .attribute_value("product")
             .unwrap_or(OsStr::new("unknown"))
-            .to_string_lossy()
-            .to_string(),
+            .to_string_lossy(),
         device
             .attribute_value("serial")
             .unwrap_or(OsStr::new("unknown"))
-            .to_string_lossy()
-            .to_string()
+            .to_string_lossy(),
     )
 }
 
 /// Look for already plugged HID devices then monitor udev events for new ones
-fn handle_udev_events(tx: mpsc::Sender<DevEvent>) -> Result<(), Box<dyn Error>> {
+fn handle_udev_events(
+    tx: mpsc::Sender<DevEvent>,
+    ports_hid: Option<Vec<Vec<u8>>>,
+) -> Result<(), Box<dyn Error>> {
     let monitor = udev::MonitorBuilder::new()?.match_subsystem_devtype("usb", "usb_device")?;
     let mut poll = Poll::new()?;
 
@@ -178,7 +207,7 @@ fn handle_udev_events(tx: mpsc::Sender<DevEvent>) -> Result<(), Box<dyn Error>> 
     enumerator.match_subsystem("usb")?;
 
     for dev in enumerator.scan_devices()? {
-        if let Some((busnum, devnum)) = busnum_devnum_from_hid_dev(&dev) {
+        if let Some((busnum, devnum)) = checked_busnum_devnum(&dev, &ports_hid) {
             log::info!(
                 "HID device already plugged at startup: {} - {} / {}",
                 busnum,
@@ -198,7 +227,8 @@ fn handle_udev_events(tx: mpsc::Sender<DevEvent>) -> Result<(), Box<dyn Error>> 
                 for ev in socket.iter() {
                     match ev.event_type() {
                         udev::EventType::Add | udev::EventType::Change => {
-                            if let Some((busnum, devnum)) = busnum_devnum_from_hid_dev(&ev.device())
+                            if let Some((busnum, devnum)) =
+                                checked_busnum_devnum(&ev.device(), &ports_hid)
                             {
                                 log::info!(
                                     "HID device plugged: {} - {} / {}",
@@ -210,7 +240,8 @@ fn handle_udev_events(tx: mpsc::Sender<DevEvent>) -> Result<(), Box<dyn Error>> 
                             }
                         }
                         udev::EventType::Remove => {
-                            if let Some((busnum, devnum)) = busnum_devnum_from_hid_dev(&ev.device())
+                            if let Some((busnum, devnum)) =
+                                checked_busnum_devnum(&ev.device(), &ports_hid)
                             {
                                 log::info!(
                                     "HID device unplugged: {} - {} / {}",
@@ -235,6 +266,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         .target(env_logger::Target::Stdout)
         .init();
 
+    let matches = usbsas_utils::clap::new_usbsas_cmd("hid-dealer")
+        .add_config_arg()
+        .get_matches();
+    let config_path = matches.get_one::<String>("config").unwrap().to_owned();
+
     usbsas_sandbox::landlock(
         Some(&[
             "/proc/",
@@ -244,6 +280,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "/sys/devices/",
             "/lib",
             "/usr/lib",
+            &config_path,
             USBSAS_BIN_PATH,
         ]),
         Some(&["/dev/bus/usb", "/dev/uinput"]),
@@ -252,11 +289,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         None,
     )?;
 
+    let config = conf_parse(&conf_read(&config_path)?)?;
+
+    let hid_ports = if let Some(config) = config.usb_port_accesses {
+        config.ports_hid
+    } else {
+        None
+    };
+
     thread::spawn(wait_sons);
 
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        if let Err(err) = handle_udev_events(tx) {
+        if let Err(err) = handle_udev_events(tx, hid_ports) {
             log::error!("udev events thread error: {err}");
         }
     });

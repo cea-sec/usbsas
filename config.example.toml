@@ -93,7 +93,8 @@ analyze_cmd = true
 
 
 # USB ports allowed. (Optional)
-# Enforce USB topology for source and destination USB devices.
+# Enforce USB topology for USB mass storage source, destination and/or HID
+# devices.
 # [4, 3] means: device should be plugged into Port 3 of Bus 4.
 # [3, 2, 5] means: There is a USB hub in the Port 2 of Bus 3 and the device
 #                  should be plugged into the Port 5 of the hub.
@@ -103,6 +104,7 @@ analyze_cmd = true
 #[usb_port_accesses]
 #ports_src = [ [6, 2, 3, 1], [2, 3] ]
 #ports_dst = [ [4, 3] ]
+#ports_hid = [ [3, 3] ]
 
 # A transfer report can be written on the destination device. (Optional)
 # It can also be written on the local disk. (Optional)

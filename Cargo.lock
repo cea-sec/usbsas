@@ -6474,6 +6474,7 @@ dependencies = [
  "mio",
  "rusb",
  "udev",
+ "usbsas-config",
  "usbsas-sandbox",
  "usbsas-utils",
 ]
