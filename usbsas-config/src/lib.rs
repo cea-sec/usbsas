@@ -61,6 +61,7 @@ pub struct Analyzer {
 pub struct UsbPortAccesses {
     pub ports_src: Option<Vec<Vec<u8>>>,
     pub ports_dst: Option<Vec<Vec<u8>>>,
+    pub ports_hid: Option<Vec<Vec<u8>>>,
 }
 
 #[derive(Debug, Deserialize)]
