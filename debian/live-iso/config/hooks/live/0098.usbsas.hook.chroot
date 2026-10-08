@@ -11,6 +11,7 @@ freshclam
 
 usermod -a -G video usbsas-client
 usermod -a -G input usbsas-client
+usermod -a -G render usbsas-client
 
 systemctl enable usbsas-analyzer-server
 systemctl enable usbsas-client
