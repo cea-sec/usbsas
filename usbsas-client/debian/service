@@ -12,7 +12,9 @@ After=getty@tty2.service
 Type=simple
 User=usbsas-client
 WorkingDirectory=/var/lib/usbsas-client
+RuntimeDirectory=%u
 Environment="RUST_LOG=info,wgpu_hal=error,iced_winit=error,iced_wgpu=error,wgpu_core=error"
+Environment=XDG_RUNTIME_DIR=/run/%u
 PAMName=usbsas-client
 TTYPath=/dev/tty2
 TTYReset=yes
