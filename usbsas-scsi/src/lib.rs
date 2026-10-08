@@ -400,11 +400,8 @@ impl<T: UsbContext> ScsiUsb<T> {
                                                 _ => {
                                                     /* XXX TODO: All others code signal a fail? */
                                                     error!(
-                                                        "{}",
-                                                        &format!(
-                                                            "Sense sub error code: {:?}",
-                                                            &buffer[12..13]
-                                                        )
+                                                        "Sense sub error code: {:?}",
+                                                        &buffer[12..13]
                                                     );
                                                     is_ok = false;
                                                     break;

@@ -1,6 +1,6 @@
 [package]
 name = "usbsas-client"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 license = "GPL-3.0"
 description = "Graphical User Interface for usbsas"

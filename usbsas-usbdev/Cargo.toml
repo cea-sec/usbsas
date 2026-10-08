@@ -1,7 +1,7 @@
 [package]
 name = "usbsas-usbdev"
 description = "usbsas-usbdev"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 license = "GPL-3.0"
 
