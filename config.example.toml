@@ -57,14 +57,14 @@ out_directory = "/tmp/usbsas"
 # Execute a command.
 # "%SOURCE_FILE%" in command_args will be replaced with the filename of the
 # output tar before execution.
-[command]
-description = "Save files on disk"
-longdescr = "Save out tar in /usbsas_data/"
-command_bin = "/bin/cp"
-command_args = [
-    "%SOURCE_FILE%",
-    "/usbsas_data/"
-]
+#[command]
+#description = "Save files on disk"
+#longdescr = "Save out tar in /usbsas_data/"
+#command_bin = "/bin/cp"
+#command_args = [
+#    "%SOURCE_FILE%",
+#    "/usbsas_data/"
+#]
 
 
 # Remote analyzer server. (Optional)
@@ -99,7 +99,8 @@ analyze_cmd = true
 # [3, 2, 5] means: There is a USB hub in the Port 2 of Bus 3 and the device
 #                  should be plugged into the Port 5 of the hub.
 # There can be more than 1 hub (e.g. [2, 3, 1, 2]).
-# To check your topology: $ lsusb -t
+# usbsas-devmonitor or 'lsusb -t' can be used to find logical paths of physical
+# ports.
 # Multiple ports can be allowed.
 #[usb_port_accesses]
 #ports_src = [ [6, 2, 3, 1], [2, 3] ]

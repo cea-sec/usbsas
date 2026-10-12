@@ -140,17 +140,21 @@ Example:
 [usb_port_accesses]
 ports_src = [ [3, 2, 5], [2, 3] ]
 ports_dst = [ [4, 3] ]
+ports_hid = [ [3, 3] ]
 ```
 
-Here source devices can only be plugged on the port 5 of the hub that is
+In this example, source devices can only be plugged on the port 5 of the hub that is
 connected on the port 2 of the bus 3 and on the port 3 of the bus 2. Destination
-devices can only be plugged on the port 3 of the bus 4.
+devices can only be plugged on the port 3 of the bus 4. HID devices should be
+connected to the port 3 of bus 3.
 
-`$ lsusb -t` can be used to check USB topology.
-
+The program `usbsas-devmonitor` (in the `usbsas-tools` crate) can be used to
+identify logical paths of physical ports (`lsusb -t` can also be used).
+Administrators should keep in mind that USB 3.0 ports usually also handle USB
+2.0, meaning there are 2 different logical buses for the same physical port.
 
 This only means usbsas will ignore devices plugged in other ports, they won't be
-disabled however. Same port can be allowed for both source and destination.
+disabled however.
 
 
 ### Filters
