@@ -13,11 +13,13 @@ fuse_mt = { version = "0.6", optional = true }
 indicatif = { version = "0.18", optional = true }
 libc = { version = "0.2", optional = true }
 log = "0.4"
+mio = { version = "1.2", features = ["os-ext"], optional = true }
 nix = { version = "0.31", optional = true, features = ["user"] }
-tempfile = { version = "3.27", optional = true }
 serde_json = { version = "1.0", optional = true}
+tempfile = { version = "3.27", optional = true }
 thiserror = "2.0"
 time = { version = "0.3", optional = true }
+udev = { version = "0.9", features = ["mio"], optional = true }
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-config = { path = "../usbsas-config", optional = true }
 usbsas-process = { path = "../usbsas-process" }
@@ -26,11 +28,12 @@ usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils", optional = true }
 
 [features]
+devmonitor = ["udev", "mio"]
 imager = ["indicatif", "tempfile", "usbsas-config", "usbsas-utils"]
 fswriter = ["bitvec"]
 fuse-mount = ["fuse_mt", "libc", "time", "nix"]
 net = ["serde_json"]
-default = ["imager", "fswriter", "fuse-mount", "net"]
+default = ["imager", "fswriter", "fuse-mount", "net", "devmonitor"]
 
 [[bin]]
 name = "usbsas-imager"
@@ -52,6 +55,11 @@ name = "usbsas-fswriter"
 path = "src/fswriter.rs"
 required-features = ["fswriter"]
 
+[[bin]]
+name = "usbsas-devmonitor"
+path = "src/devmonitor.rs"
+required-features = ["devmonitor"]
+
 # cargo-deb
 [package.metadata.deb]
 maintainer = "usbsas"
@@ -65,4 +73,5 @@ assets = [
   ["target/release/usbsas-imager", "usr/bin/", "755"],
   ["target/release/usbsas-net", "usr/bin/", "755"],
   ["target/release/usbsas-fswriter", "usr/bin/", "755"],
+  ["target/release/usbsas-devmonitor", "usr/bin/", "755"],
 ]
