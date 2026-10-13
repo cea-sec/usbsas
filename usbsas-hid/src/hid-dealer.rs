@@ -4,17 +4,15 @@ use std::{
     error::Error,
     ffi::OsStr,
     process::{Child, Command},
-    sync::{Mutex, mpsc},
-    {thread, time},
+    sync::{LazyLock, Mutex, mpsc},
+    thread, time,
 };
 use usbsas_utils::USBSAS_BIN_PATH;
 
-lazy_static::lazy_static! {
-    static ref HM_SONS: Mutex<HashMap<(u8, u8), Child>> = {
-        let hm = HashMap::new();
-        Mutex::new(hm)
-    };
-}
+static HM_SONS: LazyLock<Mutex<HashMap<(u8, u8), Child>>> = LazyLock::new(|| {
+    let hm = HashMap::new();
+    Mutex::new(hm)
+});
 
 enum DevEvent {
     Update(u8, u8),
