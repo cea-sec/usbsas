@@ -1642,9 +1642,7 @@ fn request_reports(device: &UsbDevice, reports: &HashMap<u32, (Vec<HidItem>, usi
 }
 
 fn main() -> Result<(), Error> {
-    env_logger::Builder::from_default_env()
-        .target(env_logger::Target::Stdout)
-        .init();
+    env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
 
     let busnum = env::var("BUSNUM")
         .map_err(|err| Error::other(format!("Cannot get BUSNUM env: {err:?}")))?;

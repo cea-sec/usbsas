@@ -4,18 +4,16 @@ use std::{
     error::Error,
     ffi::OsStr,
     process::{Child, Command},
-    sync::{Mutex, mpsc},
-    {thread, time},
+    sync::{LazyLock, Mutex, mpsc},
+    thread, time,
 };
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_utils::{USBSAS_BIN_PATH, clap::UsbsasClap};
 
-lazy_static::lazy_static! {
-    static ref HM_SONS: Mutex<HashMap<(u8, u8), Child>> = {
-        let hm = HashMap::new();
-        Mutex::new(hm)
-    };
-}
+static HM_SONS: LazyLock<Mutex<HashMap<(u8, u8), Child>>> = LazyLock::new(|| {
+    let hm = HashMap::new();
+    Mutex::new(hm)
+});
 
 enum DevEvent {
     Update(u8, u8),
@@ -262,9 +260,7 @@ fn handle_udev_events(
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    env_logger::Builder::from_default_env()
-        .target(env_logger::Target::Stdout)
-        .init();
+    env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
 
     let matches = usbsas_utils::clap::new_usbsas_cmd("hid-dealer")
         .add_config_arg()
