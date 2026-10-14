@@ -6,8 +6,8 @@ edition = "2024"
 license = "GPL-3.0"
 
 [build-dependencies]
-bindgen = "0.72"
-cc = "1.4"
+bindgen = "0.73"
+cc = "1.8"
 
 [dependencies]
 libc = "0.2"
