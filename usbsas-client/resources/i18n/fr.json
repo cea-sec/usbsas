@@ -48,6 +48,8 @@
     "wipe": "Effacement du périphérique",
     "wipe_title": "Formatage",
     "selectwipe":"Sélection du périphérique à effacer",
+    "wait_open_dev": "Lecture du périphérique source",
+    "wait_list_files": "Lecture des attributs des fichiers sources",
     "wipe_secure": "Formatage sécurisé",
     "wipe_secure_desc": "Écriture d'un nouveau système de fichier sur le périphérique après effacement complet de la mémoire",
     "wipe_quick": "Formatage rapide",

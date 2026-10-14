@@ -47,6 +47,8 @@
     "wipe": "Wiping device",
     "wipe_title": "Device wipe",
     "selectwipe":"Select device to wipe",
+    "wait_open_dev": "Reading source device",
+    "wait_list_files": "Reading source files attributes",
     "wipe_secure": "Secure wipe",
     "wipe_secure_desc": "Write a new and empty filesystem on the device after a complete wipe",
     "wipe_quick": "Quick wipe",

@@ -140,52 +140,20 @@ impl GUI {
                             return Task::none();
                         }
                     }
-                    if let (Some(src_id), Some(dst_id)) = (self.src_id, self.dst_id) {
+                    if let (Some(src_id), Some(_)) = (self.src_id, self.dst_id) {
                         if let Some(Device::Network(_)) = self.devices.get(&src_id)
                             && self.download_pin.is_none()
                         {
                             self.state = State::DownloadPin;
                             return Task::none();
                         };
-                        comm!(
-                            inittransfer,
-                            proto::usbsas::RequestInitTransfer {
-                                source: src_id,
-                                destination: dst_id,
-                                fstype: Some(self.fstype.into()),
-                                pin: self.download_pin.clone(),
-                            }
-                        );
-                        if let Some(Device::Usb(_)) = self.devices.get(&src_id) {
-                            let partitions =
-                                comm!(partitions, proto::usbsas::RequestPartitions {}).partitions;
-
-                            if partitions.len() == 1 {
-                                return Task::done(Message::PartSelect(0));
-                            } else {
-                                self.state = State::PartSelect(partitions);
-                            }
-                        };
-                        if let Some(Device::Network(_)) = self.devices.get(&src_id) {
-                            self.state = State::Status(Status::init());
-                            return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
-                                .map(Message::Status);
-                        };
-                        if let Some(Device::LocalDir(_)) = self.devices.get(&src_id) {
-                            return Task::done(Message::ReadDir("/".into()));
-                        };
+                        self.state = State::Wait("wait_open_dev".to_string());
+                        return Task::done(Message::InitTransfer);
                     };
                 }
                 State::ReadDir(_) => {
-                    comm!(
-                        selectfiles,
-                        proto::usbsas::RequestSelectFiles {
-                            selected: self.selected.clone().into_iter().collect(),
-                        }
-                    );
-                    self.state = State::Status(Status::init());
-                    return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
-                        .map(Message::Status);
+                    self.state = State::Wait("wait_list_files".to_string());
+                    return Task::done(Message::ListFiles);
                 }
                 State::Wipe(quick) => {
                     if let Some(dst_id) = self.dst_id {
@@ -231,6 +199,48 @@ impl GUI {
                     return Task::done(Message::Reset);
                 }
             },
+            Message::InitTransfer => {
+                // ok to unwrap, checked at last state
+                let src_id = self.src_id.unwrap();
+                let dst_id = self.dst_id.unwrap();
+                comm!(
+                    inittransfer,
+                    proto::usbsas::RequestInitTransfer {
+                        source: src_id,
+                        destination: dst_id,
+                        fstype: Some(self.fstype.into()),
+                        pin: self.download_pin.clone(),
+                    }
+                );
+                if let Some(Device::Usb(_)) = self.devices.get(&src_id) {
+                    let partitions =
+                        comm!(partitions, proto::usbsas::RequestPartitions {}).partitions;
+                    if partitions.len() == 1 {
+                        return Task::done(Message::PartSelect(0));
+                    } else {
+                        self.state = State::PartSelect(partitions);
+                    }
+                };
+                if let Some(Device::Network(_)) = self.devices.get(&src_id) {
+                    self.state = State::Status(Status::init());
+                    return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
+                        .map(Message::Status);
+                };
+                if let Some(Device::LocalDir(_)) = self.devices.get(&src_id) {
+                    return Task::done(Message::ReadDir("/".into()));
+                };
+            }
+            Message::ListFiles => {
+                comm!(
+                    selectfiles,
+                    proto::usbsas::RequestSelectFiles {
+                        selected: self.selected.clone().into_iter().collect(),
+                    }
+                );
+                self.state = State::Status(Status::init());
+                return Task::stream(recv_status(self.comm.as_ref().unwrap().clone()))
+                    .map(Message::Status);
+            }
             Message::Wipe(quick) => {
                 self.state = State::Wipe(quick);
             }
