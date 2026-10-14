@@ -784,6 +784,16 @@ impl GUI {
                         .push(selected_col.width(Length::Fill)),
                 )
             }
+            State::Wait(txt) => Container::new(
+                Row::new()
+                    .push(
+                        text("⏳")
+                            .size(TXT_SIZE)
+                            .shaping(text::Shaping::Advanced)
+                            .align_y(Alignment::Center),
+                    )
+                    .push(text(self.i18n_txt(txt))),
+            ),
             State::Wipe(_) => {
                 let mut col = Column::new()
                     .height(Length::Fill)
@@ -1076,9 +1086,12 @@ impl GUI {
         };
 
         match self.state {
-            State::Status(_) | State::Tools | State::PartSelect(_) | State::Faq | State::UserID => {
-                button_nok = button_nok.on_press(Message::Nok)
-            }
+            State::Status(_)
+            | State::Tools
+            | State::PartSelect(_)
+            | State::Faq
+            | State::UserID
+            | State::Wait(_) => button_nok = button_nok.on_press(Message::Nok),
             State::Wipe(_) => {
                 if self.dst_id.is_some() {
                     button_ok = button_ok.on_press(Message::Ok);
