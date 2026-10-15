@@ -1,477 +1,555 @@
-//! SCSI implementation
+//! SCSI over USB Mass Storage Bulk-Only Transport.
+//!
+//! [`ScsiUsb`] drives a USB mass storage device directly through rusb (libusb
+//! rust bindings):
 
-use byteorder::{BigEndian, ByteOrder, LittleEndian};
-use log::{debug, error};
-use rusb::{DeviceHandle, Direction, Recipient, RequestType, UsbContext, request_type};
-use std::{
-    convert::TryFrom,
-    io::{self, ErrorKind},
-    time::Duration,
-    {thread, time},
-};
+mod bot;
+mod cdb;
+mod error;
+mod sense;
+mod transport;
 
-const LIBUSB_ENDPOINT_IN: u8 = 0x80;
-const LIBUSB_ENDPOINT_OUT: u8 = 0x00;
+use bot::{CBW_LEN, CSW_LEN, Cbw, Csw, CswStatus, Direction};
+use cdb::Cdb;
+use log::{debug, error, warn};
+use rusb::{Direction as UsbDirection, Recipient, RequestType, request_type};
+use sense::ASC_LUN_NOT_READY;
+use std::{thread, time::Duration};
 
-const SCSI_TEST_UNIT_READY: u8 = 0x00;
-const SCSI_READ_CAPACITY_10: u8 = 0x25;
-const SCSI_READ_10: u8 = 0x28;
-const SCSI_WRITE_10: u8 = 0x2A;
-const SCSI_INQUIRY: u8 = 0x12;
-const SCSI_REQUEST_SENSE: u8 = 0x3;
-const SCSI_MAX_READ_SECTORS: u64 = 0x800;
-const ACK_TRYCOUNT: u8 = 3;
-const SCSI_DEV_TYPE_DIRECT_ACCESS_BLOCK_DEVICE: u8 = 0x0;
-const SCSI_DEV_TYPE_CD_DVD: u8 = 0x5;
+pub use error::{Error, Result, Stage};
+pub use sense::{SenseData, SenseKey};
+pub use transport::UsbTransport;
 
-//#[derive(Debug, Default)]
-pub struct ScsiUsb<T: UsbContext> {
-    pub handle: DeviceHandle<T>,
-    pub tag: u32,
-    pub lun: Option<u8>,
-    pub endpoint_in: u8,
-    pub endpoint_out: u8,
-    pub timeout: Duration,
+/// Maximum number of blocks requested by a single READ(10) in [`ScsiUsb::read_sectors`].
+pub const MAX_SECTORS_PER_TRANSFER: u16 = 0x800;
+
+/// Attempts at reading a CSW when the device times out.
+const CSW_READ_ATTEMPTS: u32 = 3;
+/// TEST UNIT READY polls per logical unit before giving up on it.
+const TEST_UNIT_READY_ATTEMPTS: u32 = 100;
+/// Delay between polls while a unit is becoming ready.
+const NOT_READY_DELAY: Duration = Duration::from_millis(200);
+
+const INQUIRY_LEN: u8 = 36;
+const SENSE_LEN: u8 = 18;
+const READ_CAPACITY_10_LEN: usize = 8;
+
+const PERIPHERAL_DIRECT_ACCESS: u8 = 0x00;
+const PERIPHERAL_CD_DVD: u8 = 0x05;
+
+/// Mass storage class requests.
+const REQ_GET_MAX_LUN: u8 = 0xfe;
+const REQ_BULK_ONLY_RESET: u8 = 0xff;
+/// LUNs are 4 bits wide in a CBW.
+const MAX_LUN: u8 = 15;
+
+/// Fallback when the endpoint descriptor cannot be read (high-speed bulk size).
+const DEFAULT_MAX_PACKET_SIZE: usize = 512;
+
+/// Capacity reported by READ CAPACITY(10).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Capacity {
+    /// Address of the last logical block.
+    pub max_lba: u32,
+    /// Block length in bytes.
+    pub block_size: u32,
 }
 
-impl<T: UsbContext> ScsiUsb<T> {
+impl Capacity {
+    pub fn block_count(&self) -> u64 {
+        u64::from(self.max_lba) + 1
+    }
+
+    /// Device size in bytes.
+    pub fn device_size(&self) -> u64 {
+        self.block_count() * u64::from(self.block_size)
+    }
+}
+
+/// Data stage of a Bulk-Only command.
+enum Data<'a> {
+    None,
+    In(&'a mut [u8]),
+    Out(&'a [u8]),
+}
+
+/// Result of a command that completed at the transport level.
+#[derive(Debug, Clone, Copy)]
+struct Outcome {
+    passed: bool,
+    /// Bytes actually moved during the data stage.
+    transferred: usize,
+}
+
+/// A USB mass storage device speaking SCSI over the Bulk-Only Transport.
+pub struct ScsiUsb<H: UsbTransport> {
+    handle: H,
+    interface: u8,
+    endpoint_in: u8,
+    endpoint_out: u8,
+    max_packet_size: usize,
+    timeout: Duration,
+    tag: u32,
+    lun: u8,
+}
+
+impl<H: UsbTransport> ScsiUsb<H> {
+    /// Wrap a handle whose mass storage `interface` is already claimed.
+    ///
+    /// Selects the alternate setting `interface_alt`; a failure there is only
+    /// logged, since many single-setting devices reject the request.
     pub fn new(
-        handle: DeviceHandle<T>,
-        interface_num: u8,
+        handle: H,
+        interface: u8,
         interface_alt: u8,
         endpoint_in: u8,
         endpoint_out: u8,
         timeout: Duration,
-    ) -> ScsiUsb<T> {
-        let mut scsi = ScsiUsb {
+    ) -> Self {
+        if let Err(err) = handle.set_alternate_setting(interface, interface_alt) {
+            warn!(
+                "couldn't select alternate setting {interface_alt} of interface {interface}: {err}"
+            );
+        }
+        let max_packet_size = handle
+            .max_packet_size(endpoint_in)
+            .filter(|&size| size != 0)
+            .map_or(DEFAULT_MAX_PACKET_SIZE, usize::from);
+        Self {
             handle,
-            tag: 1,
-            lun: None,
+            interface,
             endpoint_in,
             endpoint_out,
+            max_packet_size,
             timeout,
-        };
-        scsi.set_active_interface(interface_num, interface_alt);
-        scsi
-    }
-
-    fn command_to_size(&self, cmd: u8) -> Option<u8> {
-        match cmd {
-            0x00..=0x1F => Some(6),
-            0x20..=0x5F => Some(10),
-            0x60..=0x7F => None,
-            0x80..=0x9F => Some(16),
-            0xA0..=0xBF => Some(12),
-            0xC0..=0xFF => None,
+            tag: 0,
+            lun: 0,
         }
     }
 
-    fn cbw_init(
-        &self,
-        buffer: &[u8],
-        dir: u8,
-        command_data: [u8; 16],
-    ) -> Result<[u8; 31], io::Error> {
-        let mut cbw: [u8; 31] = [0; 31];
-        cbw[0] = 0x55;
-        cbw[1] = 0x53;
-        cbw[2] = 0x42;
-        cbw[3] = 0x43;
-
-        LittleEndian::write_u32(&mut cbw[4..8], self.tag);
-        LittleEndian::write_u32(&mut cbw[8..12], buffer.len() as u32);
-
-        cbw[12] = dir;
-        cbw[13] = self
-            .lun
-            .ok_or_else(|| io::Error::other("lun must be set"))?;
-        cbw[14] = self
-            .command_to_size(command_data[0])
-            .ok_or_else(|| io::Error::other("cbw error"))?;
-        cbw[15..31].copy_from_slice(&command_data);
-        Ok(cbw)
+    pub fn handle(&self) -> &H {
+        &self.handle
     }
 
-    fn ack_data(&mut self) -> Result<u8, io::Error> {
-        let mut csw: [u8; 13] = [0; 13];
-        let mut tried = 0;
-        while let Err(err) = self
-            .handle
-            .read_bulk(self.endpoint_in, &mut csw, self.timeout)
-        {
-            if let rusb::Error::Timeout = err {
-                tried += 1;
-                if tried == ACK_TRYCOUNT {
-                    return Err(io::Error::other(format!(
-                        "Usb ack error: {err} ({tried} times)"
-                    )));
-                } else {
-                    log::warn!("usb ack timed out, retrying");
-                    csw = [0; 13];
-                    continue;
+    /// Logical unit commands are sent to.
+    pub fn lun(&self) -> u8 {
+        self.lun
+    }
+
+    /// Issue a USB port reset of the device.
+    pub fn reset_device(&mut self) -> Result<()> {
+        self.handle.reset().map_err(Error::usb(Stage::Control))
+    }
+
+    /// Find the first ready direct-access or CD/DVD logical unit, select it
+    /// and return its capacity.
+    pub fn init_mass_storage(&mut self) -> Result<Capacity> {
+        let max_lun = self.get_max_lun();
+        debug!("init mass storage, max lun: {max_lun}");
+
+        let mut candidates = Vec::new();
+        for lun in 0..=max_lun {
+            self.lun = lun;
+            match self.inquiry()? {
+                Some(byte0) => {
+                    let qualifier = byte0 >> 5;
+                    let device_type = byte0 & 0x1f;
+                    debug!("lun {lun}: qualifier {qualifier}, type {device_type:#04x}");
+                    if qualifier == 0
+                        && matches!(device_type, PERIPHERAL_DIRECT_ACCESS | PERIPHERAL_CD_DVD)
+                    {
+                        candidates.push(lun);
+                    }
                 }
-            } else {
-                return Err(io::Error::other(format!("Usb ack error: {err}")));
+                None => warn!("lun {lun}: INQUIRY failed, skipping"),
             }
         }
-        self.tag += 1;
-        Ok(csw[12])
-    }
+        debug!("candidate luns: {candidates:?}");
 
-    fn read_bulk(&mut self, data: &mut [u8]) -> Result<(), io::Error> {
-        let mut buffer = data;
-        while !buffer.is_empty() {
-            let size = match self
-                .handle
-                .read_bulk(self.endpoint_in, buffer, self.timeout)
-            {
-                Ok(size) => {
-                    if size == 0 {
-                        return Err(io::Error::other("usb read_bulk returned null size"));
-                    } else if size > buffer.len() {
-                        return Err(io::Error::other("usb read_bulk returned invalid size"));
-                    }
-                    size
-                }
-                Err(err) => {
-                    return Err(io::Error::other(format!("Usb read_bulk error: {err}")));
-                }
-            };
-            buffer = &mut buffer[size..];
+        for lun in candidates {
+            debug!("testing lun {lun}");
+            self.lun = lun;
+            self.inquiry()?;
+            if self.wait_until_ready()? {
+                return self.read_capacity();
+            }
         }
-        Ok(())
+
+        error!("no ready lun found");
+        Err(Error::NoReadyLun)
     }
 
-    fn write_bulk(&mut self, data: &[u8]) -> Result<(), io::Error> {
-        let mut buffer = data;
-        while !buffer.is_empty() {
-            let size = match self
-                .handle
-                .write_bulk(self.endpoint_out, buffer, self.timeout)
-            {
-                Ok(size) => {
-                    if size == 0 {
-                        return Err(io::Error::other("usb write_bulk returned null size"));
-                    } else if size > buffer.len() {
-                        return Err(io::Error::other("usb write_bulk returned invalid size"));
-                    }
-                    size
-                }
-                Err(err) => {
-                    return Err(io::Error::other(format!("Usb write_bulk error: {err}")));
-                }
-            };
-            buffer = &buffer[size..];
+    /// Read `count` blocks of `block_size` bytes starting at `offset`, split
+    /// into READ(10) commands of at most [`MAX_SECTORS_PER_TRANSFER`] blocks.
+    pub fn read_sectors(&mut self, offset: u64, count: u64, block_size: usize) -> Result<Vec<u8>> {
+        if block_size == 0 {
+            return Err(Error::InvalidBlockSize(0));
         }
-        Ok(())
-    }
-
-    fn bulk_transfer_read(
-        &mut self,
-        command_data: [u8; 16],
-        buffer: &mut [u8],
-    ) -> Result<u8, io::Error> {
-        let cbw = self.cbw_init(buffer, LIBUSB_ENDPOINT_IN, command_data)?;
-        self.write_bulk(&cbw)?;
-        if !buffer.is_empty() {
-            self.read_bulk(buffer)?;
-        }
-        self.ack_data()
-    }
-
-    fn bulk_transfer_write(
-        &mut self,
-        command_data: [u8; 16],
-        buffer: &mut [u8],
-    ) -> Result<u8, io::Error> {
-        let cbw = self.cbw_init(buffer, LIBUSB_ENDPOINT_OUT, command_data)?;
-        self.write_bulk(&cbw)?;
-        self.write_bulk(buffer)?;
-        self.ack_data()
-    }
-
-    fn scsi_test_unit_ready(&mut self, buffer: &mut [u8]) -> Result<u8, io::Error> {
-        let mut command_data: [u8; 16] = [0; 16];
-        command_data[0] = SCSI_TEST_UNIT_READY;
-        let cbw = self.cbw_init(buffer, LIBUSB_ENDPOINT_OUT, command_data)?;
-        self.write_bulk(&cbw)?;
-        self.ack_data()
-    }
-
-    fn scsi_read_capacity_10(&mut self, buffer: &mut [u8]) -> Result<u8, io::Error> {
-        let mut command_data: [u8; 16] = [0; 16];
-        command_data[0] = SCSI_READ_CAPACITY_10;
-        self.bulk_transfer_read(command_data, buffer)
-    }
-
-    pub fn scsi_read_10(
-        &mut self,
-        buffer: &mut [u8],
-        offset: u64,
-        count: u64,
-    ) -> Result<u8, io::Error> {
-        let mut command_data: [u8; 16] = [0; 16];
-        command_data[0] = SCSI_READ_10;
-        BigEndian::write_u32(
-            &mut command_data[2..6],
-            u32::try_from(offset).map_err(|_| {
-                io::Error::new(ErrorKind::InvalidData, "Couldn't convert u64 to u32")
-            })?,
-        );
-        BigEndian::write_u16(
-            &mut command_data[7..9],
-            u16::try_from(count).map_err(|_| {
-                io::Error::new(ErrorKind::InvalidData, "Couldn't convert u64 to u16")
-            })?,
-        );
-        self.bulk_transfer_read(command_data, buffer)
-    }
-
-    pub fn scsi_write_10(
-        &mut self,
-        buffer: &mut [u8],
-        offset: u64,
-        count: u64,
-    ) -> Result<u8, io::Error> {
-        let mut command_data: [u8; 16] = [0; 16];
-        command_data[0] = SCSI_WRITE_10;
-        BigEndian::write_u32(
-            &mut command_data[2..6],
-            u32::try_from(offset).map_err(|_| {
-                io::Error::new(ErrorKind::InvalidData, "Couldn't convert u64 to u32")
-            })?,
-        );
-        BigEndian::write_u16(
-            &mut command_data[7..9],
-            u16::try_from(count).map_err(|_| {
-                io::Error::new(ErrorKind::InvalidData, "Couldn't convert u64 to u16")
-            })?,
-        );
-        self.bulk_transfer_write(command_data, buffer)
-    }
-
-    fn scsi_inquiry(&mut self, buffer: &mut [u8]) -> Result<u8, io::Error> {
-        let mut command_data: [u8; 16] = [0; 16];
-        command_data[0] = SCSI_INQUIRY;
-        BigEndian::write_u32(&mut command_data[1..5], 0x24);
-        self.bulk_transfer_read(command_data, buffer)
-    }
-
-    fn scsi_request_sense(&mut self, buffer: &mut [u8]) -> Result<u8, io::Error> {
-        let mut command_data: [u8; 16] = [0; 16];
-        command_data[0] = SCSI_REQUEST_SENSE;
-        BigEndian::write_u32(&mut command_data[1..5], buffer.len() as u32);
-        self.bulk_transfer_read(command_data, buffer)
-    }
-
-    fn get_max_lun(&mut self) -> u8 {
-        let mut buffer: [u8; 1] = [0; 1];
-        let _len = self.handle.read_control(
-            request_type(Direction::In, RequestType::Class, Recipient::Interface),
-            0xfe, // Get max lun
-            0,
-            0,
-            &mut buffer,
-            self.timeout,
-        );
-        buffer[0]
-    }
-
-    pub fn set_active_conf(&mut self) {
-        let buffer: [u8; 0] = [0; 0];
-        let _len = self.handle.write_control(
-            request_type(Direction::Out, RequestType::Standard, Recipient::Device),
-            0x9, // set active configuration
-            1,
-            0,
-            &buffer,
-            self.timeout,
-        );
-    }
-
-    fn set_active_interface(&mut self, interface_num: u8, interface_alt: u8) {
-        let buffer: [u8; 0] = [0; 0];
-        let _len = self.handle.write_control(
-            request_type(Direction::Out, RequestType::Standard, Recipient::Interface),
-            11, // set active interface
-            interface_num as u16,
-            interface_alt as u16,
-            &buffer,
-            self.timeout,
-        );
-    }
-
-    pub fn read_sectors(
-        &mut self,
-        offset: u64,
-        count: u64,
-        block_size: usize,
-    ) -> Result<Vec<u8>, io::Error> {
-        let mut buffer = Vec::new();
-        let mut offset = offset;
-        let mut remaining_sectors = count;
-        while remaining_sectors != 0 {
-            let sectors_to_read = std::cmp::min(remaining_sectors, SCSI_MAX_READ_SECTORS);
-            let mut tmp = vec![0; block_size * sectors_to_read as usize];
-            self.scsi_read_10(&mut tmp, offset, sectors_to_read)?;
-            offset += sectors_to_read;
-            buffer.append(&mut tmp);
-            remaining_sectors -= sectors_to_read;
+        let len = usize::try_from(count)
+            .ok()
+            .and_then(|count| count.checked_mul(block_size))
+            .ok_or(Error::OutOfRange {
+                what: "sector count",
+                value: count,
+            })?;
+        let mut buffer = vec![0; len];
+        let chunk_len = block_size * usize::from(MAX_SECTORS_PER_TRANSFER);
+        let mut lba = offset;
+        for chunk in buffer.chunks_mut(chunk_len) {
+            let blocks = (chunk.len() / block_size) as u64;
+            self.scsi_read_10(chunk, lba, blocks)?;
+            lba += blocks;
         }
         Ok(buffer)
     }
 
-    pub fn init_mass_storage(&mut self) -> Result<(u32, u32, u64), io::Error> {
-        let max_lun = self.get_max_lun();
-        debug!("init mass storage. Luns: {max_lun}");
-        // Store luns which Direct access device set
-        let mut lun_dad = vec![];
-        for lun in 0..=max_lun {
-            self.lun = Some(lun);
-            let mut buffer: [u8; 36] = [0; 36];
-            self.scsi_inquiry(&mut buffer)?;
-            let device_type = buffer[0] & 0x1f;
-            debug!("Lun {lun} of type {device_type}");
-            if device_type == SCSI_DEV_TYPE_DIRECT_ACCESS_BLOCK_DEVICE
-                || device_type == SCSI_DEV_TYPE_CD_DVD
-            {
-                lun_dad.push(lun);
+    /// READ(10) `count` blocks at `offset` into `buffer`, which must be
+    /// exactly `count` blocks long.
+    pub fn scsi_read_10(&mut self, buffer: &mut [u8], offset: u64, count: u64) -> Result<()> {
+        let cdb = Cdb::read_10(lba_10(offset)?, blocks_10(count)?);
+        let expected = buffer.len();
+        let outcome = self.execute(&cdb, Data::In(buffer))?;
+        self.ensure_complete(&cdb, outcome, expected, Stage::DataIn)
+    }
+
+    /// WRITE(10) `buffer`, which must be exactly `count` blocks long, at `offset`.
+    pub fn scsi_write_10(&mut self, buffer: &[u8], offset: u64, count: u64) -> Result<()> {
+        let cdb = Cdb::write_10(lba_10(offset)?, blocks_10(count)?);
+        let outcome = self.execute(&cdb, Data::Out(buffer))?;
+        self.ensure_complete(&cdb, outcome, buffer.len(), Stage::DataOut)
+    }
+
+    /// Poll the current LUN with TEST UNIT READY until it is ready (`true`)
+    /// or reports a condition it won't recover from (`false`).
+    fn wait_until_ready(&mut self) -> Result<bool> {
+        for _ in 0..TEST_UNIT_READY_ATTEMPTS {
+            if self.execute(&Cdb::test_unit_ready(), Data::None)?.passed {
+                debug!("unit ready");
+                return Ok(true);
+            }
+
+            let sense = match self.request_sense() {
+                Ok(Some(sense)) => sense,
+                Ok(None) => {
+                    warn!("unit not ready, no usable sense data");
+                    continue;
+                }
+                Err(err) => {
+                    error!("REQUEST SENSE failed: {err}");
+                    return Ok(false);
+                }
+            };
+            debug!("unit not ready: {sense}");
+
+            match sense.key {
+                SenseKey::NoSense | SenseKey::RecoveredError | SenseKey::Completed => {}
+                SenseKey::NotReady if sense.asc == ASC_LUN_NOT_READY => {
+                    thread::sleep(NOT_READY_DELAY)
+                }
+                SenseKey::UnitAttention => thread::sleep(NOT_READY_DELAY),
+                SenseKey::NotReady
+                | SenseKey::MediumError
+                | SenseKey::HardwareError
+                | SenseKey::IllegalRequest => {
+                    error!("unit failed: {sense}");
+                    return Ok(false);
+                }
+                _ => error!("unhandled sense: {sense}"),
             }
         }
+        warn!("unit still not ready after {TEST_UNIT_READY_ATTEMPTS} attempts");
+        Ok(false)
+    }
 
-        debug!("Direct access devices luns: {lun_dad:?}");
+    /// INQUIRY the current LUN; returns the peripheral qualifier/type byte,
+    /// or `None` if the command failed.
+    fn inquiry(&mut self) -> Result<Option<u8>> {
+        let mut buf = [0; INQUIRY_LEN as usize];
+        let outcome = self.execute(&Cdb::inquiry(INQUIRY_LEN), Data::In(&mut buf))?;
+        Ok((outcome.passed && outcome.transferred > 0).then_some(buf[0]))
+    }
 
-        /* For each lun, test if ready or not present, stop at first lun ready  */
+    /// REQUEST SENSE; returns `None` if the command failed or the data is unparsable.
+    fn request_sense(&mut self) -> Result<Option<SenseData>> {
+        let mut buf = [0; SENSE_LEN as usize];
+        let outcome = self.execute(&Cdb::request_sense(SENSE_LEN), Data::In(&mut buf))?;
+        Ok(outcome
+            .passed
+            .then(|| SenseData::parse(&buf[..outcome.transferred]))
+            .flatten())
+    }
 
-        let mut is_ok = false;
-        'outer: for lun in lun_dad.iter() {
-            debug!("Test lun {lun}");
-            self.lun = Some(*lun);
-            let mut buffer: [u8; 36] = [0; 36];
-            self.scsi_inquiry(&mut buffer)?;
-            for _ in 0..100 {
-                debug!("Testing unit ready...");
-                let mut buffer: [u8; 0] = [0; 0];
-                match self.scsi_test_unit_ready(&mut buffer) {
-                    Ok(0) => {
-                        /* Everything is ok */
-                        is_ok = true;
-                        log::debug!("Test unit ready");
-                        break 'outer;
-                    }
-                    Ok(ret) => {
-                        debug!("Test unit response {ret}");
-                        debug!("Test unit buffer {buffer:?}");
+    fn read_capacity(&mut self) -> Result<Capacity> {
+        let cdb = Cdb::read_capacity_10();
+        let mut buf = [0; READ_CAPACITY_10_LEN];
+        let outcome = self.execute(&cdb, Data::In(&mut buf))?;
+        self.ensure_complete(&cdb, outcome, buf.len(), Stage::DataIn)?;
 
-                        let mut buffer: [u8; 18] = [0; 18];
-                        /*
-                         * https://www.seagate.com/files/staticfiles/support/docs/manual/Interface%20manuals/100293068j.pdf
-                         * 2.4.1.2 Fixed format sense data
-                         */
-                        match self.scsi_request_sense(&mut buffer) {
-                            Ok(ret) => {
-                                debug!("Request Sense {ret}");
-                                debug!("Request Sense buffer {buffer:?}");
-                                if buffer[0] & 0x70 == 0x70 {
-                                    /* Sense response error code */
-                                    match buffer[2] & 0xF {
-                                        0x0 => {
-                                            debug!("No sense");
-                                        }
-                                        1 => {
-                                            debug!("Recovered error");
-                                        }
-                                        0x2 => {
-                                            /* Unit not ready */
-                                            /* 2.4.1.6 Additional Sense and Additional Sense Qualifier codes */
-                                            match buffer[12] {
-                                                0x4 => {
-                                                    debug!(
-                                                        "Logical Unit Not Ready, Cause Not Reportable"
-                                                    );
-                                                    /* Logical Unit Not Ready, Cause Not Reportable */
+        let (max_lba, block_size) = buf.split_at(4);
+        let capacity = Capacity {
+            max_lba: u32::from_be_bytes(max_lba.try_into()?),
+            block_size: u32::from_be_bytes(block_size.try_into()?),
+        };
+        if capacity.block_size == 0 || capacity.block_size > u32::from(u16::MAX) {
+            return Err(Error::InvalidBlockSize(capacity.block_size.into()));
+        }
+        if capacity.max_lba == u32::MAX {
+            warn!(
+                "device is larger than READ CAPACITY(10) can report, only the first 2^32 blocks are usable"
+            );
+        }
+        debug!("capacity: {capacity:?}");
+        Ok(capacity)
+    }
 
-                                                    /* Wait 200ms */
-                                                    let ten_millis =
-                                                        time::Duration::from_millis(200);
-                                                    thread::sleep(ten_millis);
-                                                    continue;
-                                                }
-                                                _ => {
-                                                    /* XXX TODO: All others code signal a fail? */
-                                                    error!(
-                                                        "Sense sub error code: {:?}",
-                                                        &buffer[12..13]
-                                                    );
-                                                    is_ok = false;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        3..=5 => {
-                                            error!("Medium error");
-                                            is_ok = false;
-                                            break;
-                                        }
-                                        0x6 => {
-                                            debug!(
-                                                "Unit attention: ASC: 0x{:x} ASCQ: 0x{:x}",
-                                                buffer[12], buffer[13]
-                                            );
-                                            /* Wait 200ms */
-                                            let ten_millis = time::Duration::from_millis(200);
-                                            thread::sleep(ten_millis);
-                                            continue;
-                                        }
-                                        0xF => {
-                                            debug!("Sense 0xF ok");
-                                        }
-                                        _ => {
-                                            error!("Unhandled sense code: {:?}", buffer[2]);
-                                        }
-                                    }
-                                } else {
-                                    error!("Strange error code");
-                                }
-                            }
-                            Err(_) => {
-                                error!("Error during request sense");
-                                is_ok = false;
-                                break;
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        return Err(io::Error::other("Test usb key fail"));
+    /// Map a non-passing or incomplete command to an error, fetching sense
+    /// data for failed ones.
+    fn ensure_complete(
+        &mut self,
+        cdb: &Cdb,
+        outcome: Outcome,
+        expected: usize,
+        stage: Stage,
+    ) -> Result<()> {
+        if !outcome.passed {
+            let sense = self.request_sense().unwrap_or_else(|err| {
+                warn!(
+                    "REQUEST SENSE after failed command {:#04x}: {err}",
+                    cdb.opcode()
+                );
+                None
+            });
+            return Err(Error::CommandFailed {
+                opcode: cdb.opcode(),
+                sense,
+            });
+        }
+        if outcome.transferred != expected {
+            return Err(Error::ShortTransfer {
+                stage,
+                expected,
+                actual: outcome.transferred,
+            });
+        }
+        Ok(())
+    }
+
+    /// GET MAX LUN. Devices with a single LUN may stall it, which means LUN 0.
+    fn get_max_lun(&mut self) -> u8 {
+        let mut buf = [0; 1];
+        match self.handle.read_control(
+            request_type(UsbDirection::In, RequestType::Class, Recipient::Interface),
+            REQ_GET_MAX_LUN,
+            0,
+            self.interface.into(),
+            &mut buf,
+            self.timeout,
+        ) {
+            Ok(1) => buf[0].min(MAX_LUN),
+            Ok(_) => 0,
+            Err(err) => {
+                debug!("GET MAX LUN failed ({err}), assuming a single lun");
+                0
+            }
+        }
+    }
+
+    /// Run one Bulk-Only transaction: CBW, optional data stage, CSW.
+    ///
+    /// A `Failed` status is reported through [`Outcome::passed`]; transport
+    /// failures, phase errors and invalid CSWs are errors, the last two after
+    /// a reset recovery.
+    fn execute(&mut self, cdb: &Cdb, data: Data<'_>) -> Result<Outcome> {
+        let (direction, length) = match &data {
+            Data::None => (Direction::Out, 0),
+            Data::In(buf) => (Direction::In, buf.len()),
+            Data::Out(buf) => (Direction::Out, buf.len()),
+        };
+        let transfer_length = u32::try_from(length).map_err(|_| Error::OutOfRange {
+            what: "transfer length",
+            value: length as u64,
+        })?;
+
+        self.tag = self.tag.wrapping_add(1);
+        let tag = self.tag;
+        let cbw = Cbw {
+            tag,
+            transfer_length,
+            direction,
+            lun: self.lun,
+            cdb,
+        }
+        .to_bytes();
+        let sent = self
+            .handle
+            .write_bulk(self.endpoint_out, &cbw, self.timeout)
+            .map_err(Error::usb(Stage::Command))?;
+        if sent != CBW_LEN {
+            return Err(Error::ShortTransfer {
+                stage: Stage::Command,
+                expected: CBW_LEN,
+                actual: sent,
+            });
+        }
+
+        let transferred = match data {
+            Data::None => 0,
+            Data::In(buf) => self.data_in(buf)?,
+            Data::Out(buf) => self.data_out(buf)?,
+        };
+
+        let csw = match self.read_csw(tag) {
+            Ok(csw) => csw,
+            Err(err @ Error::InvalidCsw(_)) => {
+                self.reset_recovery();
+                return Err(err);
+            }
+            Err(err) => return Err(err),
+        };
+        match csw.status {
+            CswStatus::Passed | CswStatus::Failed => {}
+            CswStatus::PhaseError => {
+                self.reset_recovery();
+                return Err(Error::PhaseError);
+            }
+        }
+        if csw.residue != 0 {
+            debug!("command {:#04x}: residue {}", cdb.opcode(), csw.residue);
+        }
+
+        Ok(Outcome {
+            passed: csw.status == CswStatus::Passed,
+            transferred,
+        })
+    }
+
+    /// Receive up to `buf.len()` bytes; returns the number received.
+    ///
+    /// rusb reports a timeout that moved some data as a short success, so
+    /// keep reading while only full packets arrive. A short packet ends the
+    /// stage; so does a stall, which is cleared so the CSW can be read.
+    fn data_in(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let mut done = 0;
+        while done < buf.len() {
+            match self
+                .handle
+                .read_bulk(self.endpoint_in, &mut buf[done..], self.timeout)
+            {
+                Ok(n) => {
+                    done += n;
+                    if n == 0 || n % self.max_packet_size != 0 {
+                        break;
                     }
                 }
-                if is_ok {
+                Err(rusb::Error::Pipe) => {
+                    debug!("data-in stalled after {done} bytes");
+                    self.clear_halt(self.endpoint_in);
                     break;
                 }
+                Err(err) => {
+                    return Err(Error::Usb {
+                        stage: Stage::DataIn,
+                        source: err,
+                    });
+                }
             }
         }
-
-        if !is_ok {
-            error!("No lun found!");
-            return Err(io::Error::other("Cannot find lun"));
-        }
-
-        let mut buffer: [u8; 8] = [0; 8];
-        match self.scsi_read_capacity_10(&mut buffer) {
-            Ok(_) => {}
-            Err(_) => {
-                return Err(io::Error::other("Cannot read capacity"));
-            }
-        }
-
-        if buffer[4] != 0 || buffer[5] != 0 {
-            return Err(io::Error::other("scsi read capacity error"));
-        }
-
-        let max_lba: u32 = BigEndian::read_u32(&buffer[0..4]);
-        let block_size: u32 = BigEndian::read_u32(&buffer[4..8]);
-        let dev_size: u64 = (u64::from(max_lba) + 1) * (u64::from(block_size));
-
-        Ok((max_lba, block_size, dev_size))
+        Ok(done)
     }
+
+    /// Send `buf`; returns the number of bytes the device accepted before
+    /// completing or stalling.
+    fn data_out(&mut self, buf: &[u8]) -> Result<usize> {
+        let mut done = 0;
+        while done < buf.len() {
+            match self
+                .handle
+                .write_bulk(self.endpoint_out, &buf[done..], self.timeout)
+            {
+                Ok(0) => break,
+                Ok(n) => done += n,
+                Err(rusb::Error::Pipe) => {
+                    debug!("data-out stalled after {done} bytes");
+                    self.clear_halt(self.endpoint_out);
+                    break;
+                }
+                Err(err) => {
+                    return Err(Error::Usb {
+                        stage: Stage::DataOut,
+                        source: err,
+                    });
+                }
+            }
+        }
+        Ok(done)
+    }
+
+    /// Read the CSW for `tag`, retrying on timeouts and clearing one stall
+    fn read_csw(&mut self, tag: u32) -> Result<Csw> {
+        let mut buf = [0; CSW_LEN];
+        let mut stall_cleared = false;
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            match self
+                .handle
+                .read_bulk(self.endpoint_in, &mut buf, self.timeout)
+            {
+                Ok(CSW_LEN) => return Csw::parse(&buf, tag),
+                Ok(n) => return Err(Error::InvalidCsw(format!("{n} bytes long"))),
+                Err(rusb::Error::Pipe) if !stall_cleared => {
+                    debug!("status stage stalled, clearing halt");
+                    stall_cleared = true;
+                    self.clear_halt(self.endpoint_in);
+                }
+                Err(rusb::Error::Timeout) if attempt < CSW_READ_ATTEMPTS => {
+                    warn!("timed out reading CSW, retrying ({attempt}/{CSW_READ_ATTEMPTS})");
+                }
+                Err(err) => {
+                    return Err(Error::Usb {
+                        stage: Stage::Status,
+                        source: err,
+                    });
+                }
+            }
+        }
+    }
+
+    fn clear_halt(&self, endpoint: u8) {
+        if let Err(err) = self.handle.clear_halt(endpoint) {
+            warn!("clear halt on endpoint {endpoint:#04x} failed: {err}");
+        }
+    }
+
+    /// Bulk-Only Mass Storage Reset followed by clearing both bulk endpoints
+    /// Best effort: failures are logged.
+    fn reset_recovery(&mut self) {
+        warn!("performing bulk-only reset recovery");
+        if let Err(err) = self.handle.write_control(
+            request_type(UsbDirection::Out, RequestType::Class, Recipient::Interface),
+            REQ_BULK_ONLY_RESET,
+            0,
+            self.interface.into(),
+            &[],
+            self.timeout,
+        ) {
+            warn!("bulk-only reset failed: {err}");
+        }
+        self.clear_halt(self.endpoint_in);
+        self.clear_halt(self.endpoint_out);
+    }
+}
+
+fn lba_10(offset: u64) -> Result<u32> {
+    u32::try_from(offset).map_err(|_| Error::OutOfRange {
+        what: "LBA",
+        value: offset,
+    })
+}
+
+fn blocks_10(count: u64) -> Result<u16> {
+    u16::try_from(count).map_err(|_| Error::OutOfRange {
+        what: "block count",
+        value: count,
+    })
 }

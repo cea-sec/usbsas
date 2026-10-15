@@ -1,4 +1,3 @@
-use std::env;
 use usbsas_client::{GUI, client_clap};
 
 fn main() -> iced::Result {

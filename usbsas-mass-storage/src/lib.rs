@@ -1,7 +1,7 @@
 //! Mass storage structs used by usbsas processes.
 
 use positioned_io2::ReadAt;
-use rusb::{Direction, GlobalContext, TransferType, UsbContext};
+use rusb::{DeviceHandle, Direction, GlobalContext, TransferType, UsbContext};
 use std::{
     fs::File,
     io::{self, ErrorKind, Read, Seek, SeekFrom},
@@ -20,6 +20,8 @@ pub enum Error {
     IO(#[from] std::io::Error),
     #[error("rusb error: {0}")]
     Rusb(#[from] rusb::Error),
+    #[error("scsi error: {0}")]
+    Scsi(#[from] usbsas_scsi::Error),
     #[error("{0}")]
     Error(String),
 }
@@ -33,7 +35,7 @@ const MSC_PROTOCOL_CLASS_BULK_ONLY: u8 = 0x50;
 
 // Mass storage struct used by dev2scsi
 pub struct MassStorage {
-    scsiusb: RwLock<ScsiUsb<GlobalContext>>,
+    scsiusb: RwLock<ScsiUsb<DeviceHandle<GlobalContext>>>,
     pub max_lba: u32,
     pub block_size: u32,
     pub dev_size: u64,
@@ -42,24 +44,23 @@ pub struct MassStorage {
 }
 
 impl MassStorage {
-    fn new(scsiusb: ScsiUsb<GlobalContext>, file: Option<File>) -> Result<Self> {
-        let mut scsiusb = scsiusb;
-        let (max_lba, block_size, dev_size) = match scsiusb.init_mass_storage() {
-            Ok((max_lba, block_size, dev_size)) => (max_lba, block_size, dev_size),
+    fn new(mut scsiusb: ScsiUsb<DeviceHandle<GlobalContext>>, file: Option<File>) -> Result<Self> {
+        let capacity = match scsiusb.init_mass_storage() {
+            Ok(capacity) => capacity,
             Err(err) => {
                 log::warn!("Error mass storage init: {err}, resetting device and retrying");
-                scsiusb.handle.reset()?;
+                scsiusb.reset_device()?;
                 scsiusb.init_mass_storage()?
             }
         };
-        if !([0x200, 0x400, 0x800, 0x1000].contains(&block_size)) {
+        if !([0x200, 0x400, 0x800, 0x1000].contains(&capacity.block_size)) {
             return Err(Error::Error("Unsupported block size".into()));
         }
         Ok(MassStorage {
             scsiusb: RwLock::new(scsiusb),
-            max_lba,
-            block_size,
-            dev_size,
+            max_lba: capacity.max_lba,
+            block_size: capacity.block_size,
+            dev_size: capacity.device_size(),
             pos: 0,
             _inner: file,
         })
@@ -122,9 +123,8 @@ impl MassStorage {
             .read_sectors(offset, count, block_size)?)
     }
 
-    pub fn scsi_write_10(&mut self, buffer: &mut [u8], offset: u64, count: u64) -> Result<u8> {
-        let ret = self
-            .scsiusb
+    pub fn scsi_write_10(&mut self, buffer: &[u8], offset: u64, count: u64) -> Result<()> {
+        self.scsiusb
             .write()
             .map_err(|err| io::Error::other(format!("lock error: {err}")))?
             .scsi_write_10(buffer, offset, count)?;
@@ -141,7 +141,7 @@ impl MassStorage {
         if buf_check != buffer[(buffer.len() - buf_check.len())..] {
             return Err(Error::Error("write check failed".into()));
         }
-        Ok(ret)
+        Ok(())
     }
 }
 
