@@ -6600,11 +6600,11 @@ dependencies = [
 
 [[package]]
 name = "usbsas-scsi"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
- "byteorder",
  "log",
  "rusb",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

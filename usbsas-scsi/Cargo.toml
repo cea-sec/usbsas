@@ -1,11 +1,11 @@
 [package]
 name = "usbsas-scsi"
 description = "usbsas-scsi"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]
-byteorder = "1.5"
 log = "0.4"
 rusb = { version = "0.9", features = ["vendored"] }
+thiserror = "2.0"
