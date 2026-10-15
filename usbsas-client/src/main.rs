@@ -13,11 +13,6 @@ fn main() -> iced::Result {
         matches.get_one::<u32>("height").unwrap().to_owned(),
     );
 
-    // see https://github.com/rust-windowing/winit/issues/2231
-    if env::var("WINIT_X11_SCALE_FACTOR").is_err() {
-        unsafe { env::set_var("WINIT_X11_SCALE_FACTOR", "1.0") }
-    };
-
     iced::application(GUI::new, GUI::update, GUI::view)
         .window_size((width as f32, height as f32))
         .subscription(GUI::subscription)
