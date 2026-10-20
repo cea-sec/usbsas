@@ -36,7 +36,7 @@ const MSC_PROTOCOL_CLASS_BULK_ONLY: u8 = 0x50;
 // Mass storage struct used by dev2scsi
 pub struct MassStorage {
     scsiusb: RwLock<ScsiUsb<DeviceHandle<GlobalContext>>>,
-    pub max_lba: u32,
+    pub max_lba: u64,
     pub block_size: u32,
     pub dev_size: u64,
     pub pos: u64,
@@ -127,17 +127,16 @@ impl MassStorage {
         self.scsiusb
             .write()
             .map_err(|err| io::Error::other(format!("lock error: {err}")))?
-            .scsi_write_10(buffer, offset, count)?;
+            .write_blocks(buffer, offset, count)?;
         // Read last sector of what we've just written and verify it's ok.
-        // XXX TODO FIXME Apparently, some devices requires reads between writes
-        // to avoid overwriting cache of previous write call. Read call will
-        // wait for the cache to be written before returning.
-        // Hint: Linux seems to do this, check its code.
+        // Apparently, some devices requires reads between writes to avoid
+        // overwriting cache of previous write call. Read call will wait for the
+        // cache to be written before returning.
         let mut buf_check = vec![0; self.block_size as usize];
         self.scsiusb
             .write()
             .map_err(|err| io::Error::other(format!("lock error: {err}")))?
-            .scsi_read_10(&mut buf_check, offset + count - 1, 1)?;
+            .read_blocks(&mut buf_check, offset + count - 1, 1)?;
         if buf_check != buffer[(buffer.len() - buf_check.len())..] {
             return Err(Error::Error("write check failed".into()));
         }

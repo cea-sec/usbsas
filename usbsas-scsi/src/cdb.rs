@@ -6,6 +6,10 @@ const INQUIRY: u8 = 0x12;
 const READ_CAPACITY_10: u8 = 0x25;
 const READ_10: u8 = 0x28;
 const WRITE_10: u8 = 0x2a;
+const READ_16: u8 = 0x88;
+const WRITE_16: u8 = 0x8a;
+const SERVICE_ACTION_IN_16: u8 = 0x9e;
+const SA_READ_CAPACITY_16: u8 = 0x10;
 
 /// A command descriptor block, padded to the 16 bytes a CBW can carry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +35,14 @@ impl Cdb {
         Self::new([opcode, 0, l0, l1, l2, l3, 0, b0, b1, 0])
     }
 
+    fn rw16(opcode: u8, lba: u64, blocks: u32) -> Self {
+        let mut cdb = [0; 16];
+        cdb[0] = opcode;
+        cdb[2..10].copy_from_slice(&lba.to_be_bytes());
+        cdb[10..14].copy_from_slice(&blocks.to_be_bytes());
+        Self::new(cdb)
+    }
+
     pub(crate) fn test_unit_ready() -> Self {
         Self::new([TEST_UNIT_READY, 0, 0, 0, 0, 0])
     }
@@ -53,6 +65,22 @@ impl Cdb {
 
     pub(crate) fn write_10(lba: u32, blocks: u16) -> Self {
         Self::rw10(WRITE_10, lba, blocks)
+    }
+
+    pub(crate) fn read_capacity_16(allocation_length: u32) -> Self {
+        let mut cdb = [0; 16];
+        cdb[0] = SERVICE_ACTION_IN_16;
+        cdb[1] = SA_READ_CAPACITY_16;
+        cdb[10..14].copy_from_slice(&allocation_length.to_be_bytes());
+        Self::new(cdb)
+    }
+
+    pub(crate) fn read_16(lba: u64, blocks: u32) -> Self {
+        Self::rw16(READ_16, lba, blocks)
+    }
+
+    pub(crate) fn write_16(lba: u64, blocks: u32) -> Self {
+        Self::rw16(WRITE_16, lba, blocks)
     }
 
     pub(crate) fn opcode(&self) -> u8 {
@@ -93,5 +121,26 @@ mod tests {
         assert!(cdb.padded()[10..].iter().all(|&b| b == 0));
         assert_eq!(Cdb::write_10(0, 1).opcode(), 0x2a);
         assert_eq!(Cdb::read_capacity_10().len(), 10);
+    }
+
+    #[test]
+    fn read_write_16() {
+        let cdb = Cdb::read_16(0x0102_0304_0506_0708, 0x090a_0b0c);
+        assert_eq!(cdb.len(), 16);
+        assert_eq!(
+            cdb.padded(),
+            &[0x88, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0, 0]
+        );
+        assert_eq!(Cdb::write_16(0, 0).opcode(), 0x8a);
+    }
+
+    #[test]
+    fn read_capacity_16() {
+        let cdb = Cdb::read_capacity_16(32);
+        assert_eq!(cdb.len(), 16);
+        assert_eq!(
+            cdb.padded(),
+            &[0x9e, 0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0]
+        );
     }
 }

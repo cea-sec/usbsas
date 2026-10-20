@@ -48,6 +48,10 @@ impl From<u8> for SenseKey {
 
 /// Additional sense code: logical unit not ready.
 pub const ASC_LUN_NOT_READY: u8 = 0x04;
+/// Additional sense code: invalid command operation code.
+pub const ASC_INVALID_OPCODE: u8 = 0x20;
+/// Additional sense code: invalid field in CDB.
+pub const ASC_INVALID_FIELD_IN_CDB: u8 = 0x24;
 
 /// Decoded sense data, independent of the response format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
