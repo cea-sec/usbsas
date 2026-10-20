@@ -1,8 +1,12 @@
 //! Exercises `ScsiUsb` against a simulated Bulk-Only mass storage device.
 
-use std::{cell::RefCell, collections::VecDeque, time::Duration};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    time::Duration,
+};
 
-use usbsas_scsi::{Error, ScsiUsb, SenseKey, UsbTransport};
+use usbsas_scsi::{Error, ScsiUsb, SenseKey, Support16, UsbTransport};
 
 const EP_IN: u8 = 0x81;
 const EP_OUT: u8 = 0x02;
@@ -12,23 +16,42 @@ const BLOCK: usize = 512;
 #[derive(Clone)]
 struct Lun {
     peripheral: u8,
-    disk: Vec<u8>,
+    /// Reported capacity in blocks. The medium is sparse: unwritten blocks
+    /// hold a pattern derived from their LBA.
+    blocks: u64,
+    written: HashMap<u64, Vec<u8>>,
+    /// Whether READ CAPACITY(16), READ(16) and WRITE(16) are implemented.
+    supports_16: bool,
+    write_protected: bool,
     /// TEST UNIT READY answers "becoming ready" this many times.
     not_ready_polls: u32,
     unit_attention: bool,
     medium_present: bool,
 }
 
+fn pattern(lba: u64) -> Vec<u8> {
+    let seed = (lba ^ (lba >> 32)) as u8;
+    (0..BLOCK).map(|i| seed ^ i as u8).collect()
+}
+
 impl Lun {
-    fn disk(blocks: usize) -> Self {
+    fn disk(blocks: u64) -> Self {
         Self {
             peripheral: 0x00,
-            disk: (0..blocks * BLOCK)
-                .map(|i| (i / BLOCK) as u8 ^ i as u8)
-                .collect(),
+            blocks,
+            written: HashMap::new(),
+            supports_16: false,
+            write_protected: false,
             not_ready_polls: 0,
             unit_attention: false,
             medium_present: true,
+        }
+    }
+
+    fn disk_16(blocks: u64) -> Self {
+        Self {
+            supports_16: true,
+            ..Self::disk(blocks)
         }
     }
 
@@ -38,12 +61,39 @@ impl Lun {
             ..Self::disk(0)
         }
     }
+
+    fn read(&self, lba: u64, count: u64) -> Vec<u8> {
+        (lba..lba + count)
+            .flat_map(|lba| {
+                self.written
+                    .get(&lba)
+                    .cloned()
+                    .unwrap_or_else(|| pattern(lba))
+            })
+            .collect()
+    }
+
+    fn write(&mut self, lba: u64, data: &[u8]) {
+        for (i, block) in data.chunks(BLOCK).enumerate() {
+            self.written.insert(lba + i as u64, block.to_vec());
+        }
+    }
+}
+
+/// How the device answers opcodes it doesn't implement.
+#[derive(Default, Clone, Copy)]
+enum UnknownOpcode {
+    /// CHECK CONDITION, ILLEGAL REQUEST / INVALID COMMAND OPERATION CODE.
+    #[default]
+    IllegalRequest,
+    /// Phase error, as some broken bridges do.
+    PhaseError,
 }
 
 struct PendingOut {
     tag: u32,
     lun: usize,
-    lba: usize,
+    lba: u64,
     expected: usize,
     received: Vec<u8>,
 }
@@ -52,6 +102,7 @@ struct PendingOut {
 struct State {
     luns: Vec<Lun>,
     stall_get_max_lun: bool,
+    unknown_opcode: UnknownOpcode,
     /// Bulk-in stream: data and CSWs, or injected errors.
     bulk_in: VecDeque<Result<Vec<u8>, rusb::Error>>,
     pending_out: Option<PendingOut>,
@@ -59,6 +110,8 @@ struct State {
     // Fault injection.
     csw_timeouts: u32,
     phase_error_next: bool,
+    /// Fail the next command (other than REQUEST SENSE) with UNIT ATTENTION.
+    unit_attention_next: bool,
     short_read_next: bool,
     // Observations.
     resets: u32,
@@ -86,6 +139,13 @@ impl State {
         self.csw(tag, residue, 1);
     }
 
+    fn phase_error(&mut self, tag: u32, len: usize, data_in: bool) {
+        if data_in && len > 0 {
+            self.bulk_in.push_back(Err(rusb::Error::Pipe));
+        }
+        self.csw(tag, len, 2);
+    }
+
     fn command(&mut self, cbw: &[u8]) {
         assert_eq!(cbw.len(), 31);
         assert_eq!(&cbw[0..4], b"USBC");
@@ -97,13 +157,21 @@ impl State {
         self.commands.push((lun_idx, cdb[0]));
 
         if std::mem::take(&mut self.phase_error_next) {
-            if data_in && len > 0 {
-                self.bulk_in.push_back(Err(rusb::Error::Pipe));
-            }
-            self.csw(tag, len, 2);
+            self.phase_error(tag, len, data_in);
+            return;
+        }
+        if cdb[0] != 0x03 && std::mem::take(&mut self.unit_attention_next) {
+            self.fail(tag, len, (0x6, 0x29, 0x00), data_in);
             return;
         }
         let lun = &mut self.luns[lun_idx];
+        if matches!(cdb[0], 0x9e | 0x88 | 0x8a) && !lun.supports_16 {
+            match self.unknown_opcode {
+                UnknownOpcode::IllegalRequest => self.fail(tag, len, (0x5, 0x20, 0x00), data_in),
+                UnknownOpcode::PhaseError => self.phase_error(tag, len, data_in),
+            }
+            return;
+        }
         match cdb[0] {
             0x12 => {
                 let mut data = vec![0; 36];
@@ -142,21 +210,51 @@ impl State {
                 self.csw(tag, 0, 0);
             }
             0x25 => {
-                let mut data = ((lun.disk.len() / BLOCK) as u32 - 1).to_be_bytes().to_vec();
+                let max_lba = (lun.blocks - 1).min(u64::from(u32::MAX)) as u32;
+                let mut data = max_lba.to_be_bytes().to_vec();
                 data.extend((BLOCK as u32).to_be_bytes());
                 self.bulk_in.push_back(Ok(data));
                 self.csw(tag, 0, 0);
             }
-            0x28 | 0x2a => {
-                let lba = u32::from_be_bytes(cdb[2..6].try_into().unwrap()) as usize;
-                let blocks = u16::from_be_bytes(cdb[7..9].try_into().unwrap()) as usize;
-                let (start, end) = (lba * BLOCK, (lba + blocks) * BLOCK);
-                if end > lun.disk.len() || blocks * BLOCK != len {
+            0x9e => {
+                assert_eq!(cdb[1], 0x10, "only READ CAPACITY(16) is simulated");
+                let alloc = u32::from_be_bytes(cdb[10..14].try_into().unwrap()) as usize;
+                let mut data = (lun.blocks - 1).to_be_bytes().to_vec();
+                data.extend((BLOCK as u32).to_be_bytes());
+                data.resize(32, 0);
+                data.truncate(alloc.min(len));
+                let sent = data.len();
+                self.bulk_in.push_back(Ok(data));
+                self.csw(tag, len - sent, 0);
+            }
+            0x28 | 0x2a | 0x88 | 0x8a => {
+                let (lba, blocks) = if cdb.len() == 16 {
+                    (
+                        u64::from_be_bytes(cdb[2..10].try_into().unwrap()),
+                        u64::from(u32::from_be_bytes(cdb[10..14].try_into().unwrap())),
+                    )
+                } else {
+                    (
+                        u64::from(u32::from_be_bytes(cdb[2..6].try_into().unwrap())),
+                        u64::from(u16::from_be_bytes(cdb[7..9].try_into().unwrap())),
+                    )
+                };
+                let write = matches!(cdb[0], 0x2a | 0x8a);
+                if lba + blocks > lun.blocks || blocks as usize * BLOCK != len {
                     // LBA out of range: stall the data stage.
                     self.fail(tag, len, (0x5, 0x21, 0x00), data_in);
                     return;
                 }
-                if !data_in {
+                if write && lun.write_protected {
+                    assert_eq!(len, 0, "write-protect simulated for empty writes only");
+                    self.fail(tag, 0, (0x7, 0x27, 0x00), false);
+                    return;
+                }
+                if blocks == 0 {
+                    self.csw(tag, 0, 0);
+                    return;
+                }
+                if write {
                     self.pending_out = Some(PendingOut {
                         tag,
                         lun: lun_idx,
@@ -166,7 +264,7 @@ impl State {
                     });
                     return;
                 }
-                let mut data = lun.disk[start..end].to_vec();
+                let mut data = lun.read(lba, blocks);
                 if std::mem::take(&mut self.short_read_next) {
                     // Device ends the data stage early with a short packet.
                     data.truncate(BLOCK + 100);
@@ -223,9 +321,7 @@ impl UsbTransport for SimulatedDevice {
         pending.received.extend_from_slice(buf);
         assert!(pending.received.len() <= pending.expected);
         if pending.received.len() == pending.expected {
-            let start = pending.lba * BLOCK;
-            state.luns[pending.lun].disk[start..start + pending.expected]
-                .copy_from_slice(&pending.received);
+            state.luns[pending.lun].write(pending.lba, &pending.received);
             state.csw(pending.tag, 0, 0);
         } else {
             state.pending_out = Some(pending);
@@ -338,11 +434,10 @@ fn init_without_ready_lun_fails() {
 #[test]
 fn read_sectors_spans_multiple_commands() {
     let blocks = 2 * usize::from(usbsas_scsi::MAX_SECTORS_PER_TRANSFER) + 10;
-    let mut scsi = scsi(vec![Lun::disk(blocks + 5)]);
+    let mut scsi = scsi(vec![Lun::disk(blocks as u64 + 5)]);
     scsi.init_mass_storage().unwrap();
     let data = scsi.read_sectors(3, blocks as u64, BLOCK).unwrap();
-    let disk = state(&scsi).luns[0].disk.clone();
-    assert_eq!(data, disk[3 * BLOCK..(3 + blocks) * BLOCK]);
+    assert_eq!(data, state(&scsi).luns[0].read(3, blocks as u64));
     let reads = state(&scsi).commands.iter().filter(|c| c.1 == 0x28).count();
     assert_eq!(reads, 3);
 }
@@ -447,5 +542,135 @@ fn argument_validation() {
     ));
     assert!(scsi.read_sectors(0, 0, BLOCK).unwrap().is_empty());
     // Nothing reached the device.
+    assert!(state(&scsi).commands.is_empty());
+}
+
+const TEN_BYTE_LIMIT: u64 = 1 << 32;
+
+fn opcodes(scsi: &ScsiUsb<SimulatedDevice>) -> Vec<u8> {
+    state(scsi).commands.iter().map(|c| c.1).collect()
+}
+
+#[test]
+fn small_device_never_sees_16_byte_commands() {
+    let mut scsi = scsi(vec![Lun::disk_16(1000)]);
+    scsi.init_mass_storage().unwrap();
+    assert!(!scsi.uses_16_byte_commands());
+    let payload = vec![0x5a; BLOCK];
+    scsi.write_blocks(&payload, 7, 1).unwrap();
+    assert_eq!(scsi.read_sectors(7, 1, BLOCK).unwrap(), payload);
+    assert!(
+        opcodes(&scsi)
+            .iter()
+            .all(|op| !matches!(op, 0x9e | 0x88 | 0x8a))
+    );
+}
+
+#[test]
+fn large_device_switches_to_16_byte_commands() {
+    let blocks = TEN_BYTE_LIMIT + 100;
+    let mut scsi = scsi(vec![Lun::disk_16(blocks)]);
+    let capacity = scsi.init_mass_storage().unwrap();
+    assert_eq!(capacity.max_lba, blocks - 1);
+    assert_eq!(capacity.device_size(), blocks * BLOCK as u64);
+    assert!(scsi.uses_16_byte_commands());
+
+    // Blocks beyond the 32-bit boundary, crossing it too.
+    let lba = TEN_BYTE_LIMIT - 2;
+    let payload: Vec<u8> = (0..4 * BLOCK).map(|i| (i % 253) as u8).collect();
+    scsi.write_blocks(&payload, lba, 4).unwrap();
+    assert_eq!(scsi.read_sectors(lba, 4, BLOCK).unwrap(), payload);
+    let last = scsi.read_sectors(blocks - 1, 1, BLOCK).unwrap();
+    assert_eq!(last, pattern(blocks - 1));
+
+    let ops = opcodes(&scsi);
+    assert!(ops.contains(&0x9e) && ops.contains(&0x88) && ops.contains(&0x8a));
+    assert!(!ops.contains(&0x28) && !ops.contains(&0x2a));
+}
+
+#[test]
+fn large_device_without_16_byte_support_falls_back() {
+    for unknown in [UnknownOpcode::IllegalRequest, UnknownOpcode::PhaseError] {
+        let mut scsi = scsi(vec![Lun::disk(TEN_BYTE_LIMIT + 100)]);
+        state(&scsi).unknown_opcode = unknown;
+        let capacity = scsi.init_mass_storage().unwrap();
+        assert_eq!(capacity.max_lba, u64::from(u32::MAX));
+        assert!(!scsi.uses_16_byte_commands());
+        // Still usable within the 32-bit range, and the pipe is in sync.
+        let data = scsi.read_sectors(TEN_BYTE_LIMIT - 1, 1, BLOCK).unwrap();
+        assert_eq!(data, pattern(TEN_BYTE_LIMIT - 1));
+        let mut buf = vec![0; BLOCK];
+        assert!(matches!(
+            scsi.read_blocks(&mut buf, TEN_BYTE_LIMIT, 1),
+            Err(Error::OutOfRange { what: "LBA", .. })
+        ));
+    }
+}
+
+#[test]
+fn detect_on_supporting_device() {
+    let mut scsi = scsi(vec![Lun::disk_16(1000)]);
+    scsi.init_mass_storage().unwrap();
+    let written_before = state(&scsi).luns[0].written.len();
+    let support = scsi.detect_16_byte_support().unwrap();
+    assert!(support.all());
+    // Detection doesn't switch, and doesn't touch the medium.
+    assert!(!scsi.uses_16_byte_commands());
+    assert_eq!(state(&scsi).luns[0].written.len(), written_before);
+
+    scsi.set_use_16_byte_commands(true);
+    let payload = vec![0xa5; 2 * BLOCK];
+    scsi.write_blocks(&payload, 10, 2).unwrap();
+    assert_eq!(scsi.read_sectors(10, 2, BLOCK).unwrap(), payload);
+}
+
+#[test]
+fn detect_on_unsupporting_device() {
+    for unknown in [UnknownOpcode::IllegalRequest, UnknownOpcode::PhaseError] {
+        let mut scsi = scsi(vec![Lun::disk(1000)]);
+        state(&scsi).unknown_opcode = unknown;
+        scsi.init_mass_storage().unwrap();
+        assert_eq!(scsi.detect_16_byte_support().unwrap(), Support16::default());
+        let resets = state(&scsi).resets;
+        match unknown {
+            UnknownOpcode::IllegalRequest => assert_eq!(resets, 0),
+            UnknownOpcode::PhaseError => assert_eq!(resets, 3),
+        }
+        // The device is still usable with 10-byte commands.
+        assert_eq!(scsi.read_sectors(1, 1, BLOCK).unwrap(), pattern(1));
+    }
+}
+
+#[test]
+fn detect_on_write_protected_device() {
+    let mut lun = Lun::disk_16(1000);
+    lun.write_protected = true;
+    let mut scsi = scsi(vec![lun]);
+    scsi.init_mass_storage().unwrap();
+    // DATA PROTECT means WRITE(16) was understood.
+    assert!(scsi.detect_16_byte_support().unwrap().all());
+}
+
+#[test]
+fn detect_retries_after_unit_attention() {
+    let mut scsi = scsi(vec![Lun::disk_16(1000)]);
+    scsi.init_mass_storage().unwrap();
+    state(&scsi).unit_attention_next = true;
+    assert!(scsi.detect_16_byte_support().unwrap().all());
+    let rc16 = opcodes(&scsi).iter().filter(|&&op| op == 0x9e).count();
+    assert_eq!(rc16, 2);
+}
+
+#[test]
+fn read_16_argument_validation() {
+    let mut scsi = scsi(vec![Lun::disk_16(8)]);
+    let buf = vec![0; BLOCK];
+    assert!(matches!(
+        scsi.scsi_write_16(&buf, 0, 1 << 32),
+        Err(Error::OutOfRange {
+            what: "block count",
+            ..
+        })
+    ));
     assert!(state(&scsi).commands.is_empty());
 }
