@@ -25,6 +25,7 @@ usbsas-utils = { path = "../usbsas-utils" }
 
 [features]
 authkrb = ["base64", "libgssapi"]
+native-tls = ["reqwest/native-tls"]
 default = ["authkrb"]
 
 [[bin]]
