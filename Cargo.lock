@@ -6117,17 +6117,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-stream"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3d06f0b082ba57c26b79407372e57cf2a1e28124f78e9479fe80322cf53420b"
-dependencies = [
- "futures-core",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
 name = "tokio-util"
 version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6424,7 +6413,7 @@ dependencies = [
 
 [[package]]
 name = "usbsas-client"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "bytesize",
  "clap",
@@ -6433,10 +6422,9 @@ dependencies = [
  "libc",
  "log",
  "serde_json",
+ "smol",
  "sysinfo",
  "time",
- "tokio",
- "tokio-stream",
  "usbsas-comm",
  "usbsas-config",
  "usbsas-proto",
@@ -6461,9 +6449,10 @@ dependencies = [
 
 [[package]]
 name = "usbsas-comm"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "byteorder",
+ "futures-lite",
  "pastey 0.2.3",
  "prost",
  "usbsas-proto",

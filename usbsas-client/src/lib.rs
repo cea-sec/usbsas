@@ -1,4 +1,5 @@
 use iced::{Task, time::Instant};
+use smol::{Async, lock::Mutex};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
@@ -6,8 +7,7 @@ use std::{
     path::Path,
     sync::Arc,
 };
-use tokio::sync::Mutex;
-use usbsas_comm::{Comm, ProtoReqCommon};
+use usbsas_comm::{ComRqAsyncUsbsas, CommAsync};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto::{
     self as proto,
@@ -21,7 +21,7 @@ mod update;
 mod view;
 
 type Devices = BTreeMap<u64, Device>;
-pub type ComRqUsbsas = Comm<proto::usbsas::Request, UnixStream, UnixStream>;
+pub type ComRqUsbsas = ComRqAsyncUsbsas<Async<UnixStream>, Async<UnixStream>>;
 
 fn devices_from_proto(mut devs_proto: Vec<proto::common::Device>) -> Devices {
     let mut devices = BTreeMap::new();
@@ -112,7 +112,7 @@ pub enum Message {
     SelectAll(Vec<String>),
     UnselectAll(Vec<String>),
     ListFiles,
-    Status(Status),
+    Status(u64, Status),
     Wipe(bool),
     DiskImg,
     LangSelect(LANG),
@@ -121,14 +121,40 @@ pub enum Message {
     UserInput(u8),
     ClearInput(bool),
     Reset,
+    ResetDone(u64),
+    Response(u64, Response),
+}
+
+#[derive(Debug, Clone)]
+pub enum SrcOpened {
+    Usb(Vec<proto::common::PartitionInfo>),
+    Network,
+    LocalDir,
+    Other,
+}
+
+#[derive(Debug, Clone)]
+pub enum Response {
+    Devices(Result<Vec<proto::common::Device>, String>),
+    UserId(Result<String, String>),
+    InitTransfer(Result<SrcOpened, String>),
+    OpenPartition(Result<(), String>),
+    ReadDir(String, Result<Vec<FileInfo>, String>),
+    StartStatus(Result<(), String>),
+    Report(Result<Option<TransferReport>, String>),
 }
 
 impl Drop for GUI {
     fn drop(&mut self) {
-        if let Some(comm) = &self.comm
-            && comm.blocking_lock().end().is_err()
-        {
-            log::error!("couldn't end usbsas properly");
+        if let Some(comm) = self.comm.take() {
+            match comm.try_lock() {
+                Some(mut guard) => {
+                    if smol::block_on(guard.end()).is_err() {
+                        log::error!("couldn't end usbsas properly");
+                    }
+                }
+                None => log::error!("request in flight, couldn't end usbsas properly"),
+            }
         };
     }
 }
@@ -189,6 +215,9 @@ pub fn client_clap() -> clap::Command {
 
 pub struct GUI {
     comm: Option<Arc<Mutex<ComRqUsbsas>>>,
+    generation: u64,
+    busy: bool,
+    polling: bool,
     state: State,
     devices: Devices,
     src_id: Option<u64>,
@@ -259,6 +288,9 @@ impl GUI {
         (
             Self {
                 comm: None,
+                generation: 0,
+                busy: false,
+                polling: false,
                 state: if *matches.get_one::<bool>("nosandbox").unwrap_or(&false) {
                     State::Connect
                 } else {
@@ -323,12 +355,17 @@ impl GUI {
 
     fn try_connect(&mut self) {
         if self.comm.is_none() {
-            match UnixStream::connect(&self.socket_path) {
-                Ok(stream) => {
-                    self.comm = Some(Arc::new(Mutex::new(Comm::new(
-                        stream.try_clone().unwrap(),
-                        stream,
-                    ))));
+            // connect() on a unix socket doesn't block, no need to make it async
+            let connect = || -> std::io::Result<ComRqUsbsas> {
+                let stream = UnixStream::connect(&self.socket_path)?;
+                Ok(CommAsync::new(
+                    Async::new(stream.try_clone()?)?,
+                    Async::new(stream)?,
+                ))
+            };
+            match connect() {
+                Ok(comm) => {
+                    self.comm = Some(Arc::new(Mutex::new(comm)));
                     self.state = State::Init;
                 }
                 Err(err) => {
@@ -344,16 +381,39 @@ impl GUI {
         }
     }
 
+    /// End the usbsas session asynchronously, the GUI state is reset when it's
+    /// done (`Message::ResetDone`).
     fn reset(&mut self) -> Task<Message> {
-        if let Some(comm) = self.comm.take() {
-            let mut guard = comm.blocking_lock();
-            if let Err(err) = guard.end() {
-                log::error!("couldn't end usbsas properly: {}", err);
-            }
-            if let Err(err) = guard.input().shutdown(std::net::Shutdown::Both) {
-                log::error!("couldn't shutdown socket: {}", err);
-            };
-        };
+        // From now on, responses of requests sent during the ending session
+        // must be ignored
+        self.generation = self.generation.wrapping_add(1);
+        self.busy = false;
+        self.polling = false;
+        let generation = self.generation;
+
+        match self.comm.take() {
+            Some(comm) => Task::perform(
+                async move {
+                    // Waits for a request still in flight before sending End
+                    let mut guard = comm.lock().await;
+                    if let Err(err) = guard.end().await {
+                        log::error!("couldn't end usbsas properly: {}", err);
+                    }
+                    if let Err(err) = guard.input().get_ref().shutdown(std::net::Shutdown::Both) {
+                        log::error!("couldn't shutdown socket: {}", err);
+                    };
+                },
+                move |_| Message::ResetDone(generation),
+            ),
+            None => Task::done(Message::ResetDone(generation)),
+        }
+    }
+
+    fn reset_done(&mut self, generation: u64) -> Task<Message> {
+        if generation != self.generation {
+            // A newer reset was requested meanwhile
+            return Task::none();
+        }
 
         // Delete out & temp files if empty
         let tar_path = format!(

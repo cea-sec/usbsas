@@ -18,6 +18,11 @@ use std::{
 };
 use usbsas_utils::{INPUT_PIPE_FD_VAR, MAX_PROTO_MESS_SIZE, OUTPUT_PIPE_FD_VAR};
 
+#[cfg(feature = "async")]
+mod comm_async;
+#[cfg(feature = "async")]
+pub use comm_async::*;
+
 pub trait FromEnv: Sized {
     type Err;
     fn from_env(name: &str) -> Result<Self, Self::Err>;

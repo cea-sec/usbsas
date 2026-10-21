@@ -1,12 +1,17 @@
 [package]
 name = "usbsas-comm"
 description = "usbsas-comm"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 license = "GPL-3.0"
 
+[features]
+# Async (runtime agnostic, futures-io based) CommAsync, used by the client
+async = ["dep:futures-lite"]
+
 [dependencies]
 byteorder = "1.5"
+futures-lite = { version = "2.6", optional = true }
 pastey = "0.2"
 prost = "0.14"
 usbsas-utils = { path = "../usbsas-utils" }
