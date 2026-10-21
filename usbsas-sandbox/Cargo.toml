@@ -6,7 +6,7 @@ edition = "2024"
 license = "GPL-3.0"
 
 [build-dependencies]
-cc = "1.8"
+cc = "1.9"
 
 [dependencies]
 landlock = "0.4"
