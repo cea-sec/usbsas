@@ -1,3 +1,5 @@
+//! Periodic events.
+
 use crate::{GUI, Message, State};
 use iced::{
     Subscription,
@@ -5,6 +7,8 @@ use iced::{
 };
 
 impl GUI {
+    /// Emit a `Message::Tick` every second in states that need to sandbox,
+    /// connect or poll usbsas (for devices or user id).
     pub fn subscription(&self) -> Subscription<Message> {
         let subs = match self.state {
             State::Connect

@@ -1,3 +1,21 @@
+//! usbsas graphical user interface.
+//!
+//! The client is an [iced] application that drives a `usbsas` server through
+//! its Unix domain socket. It doesn't access devices itself: every action
+//! (listing devices, reading files, transfers, wipes...) is a protobuf request
+//! sent to the server.
+//!
+//! It follows iced's architecture:
+//! - [`GUI`] holds the application state, its current screen being a `State`,
+//! - [`GUI::update`] handles [`Message`]s and returns [`Task`]s,
+//! - [`GUI::view`] renders the current `State`,
+//! - [`GUI::subscription`] emits a periodic [`Message::Tick`].
+//!
+//! Requests to the server never block the interface: they are run as async
+//! tasks and their results come back as [`Message::Response`]. Each session
+//! has a generation number, responses tagged with an older generation (sent
+//! before a reset) are dropped.
+
 use iced::{Task, time::Instant};
 use smol::{Async, lock::Mutex};
 use std::{
@@ -20,9 +38,13 @@ mod subscription;
 mod update;
 mod view;
 
+/// Devices reported by usbsas, indexed by their id.
 type Devices = BTreeMap<u64, Device>;
+/// Async requester used to talk to the usbsas server over its Unix socket.
 pub type ComRqUsbsas = ComRqAsyncUsbsas<Async<UnixStream>, Async<UnixStream>>;
 
+/// Convert the device list of a `ResponseDevices` into [`Devices`], entries
+/// without device are skipped.
 fn devices_from_proto(mut devs_proto: Vec<proto::common::Device>) -> Devices {
     let mut devices = BTreeMap::new();
     while let Some(dev_proto) = devs_proto.pop() {
@@ -33,15 +55,19 @@ fn devices_from_proto(mut devs_proto: Vec<proto::common::Device>) -> Devices {
     devices
 }
 
+/// Languages of the interface. Translations are embedded from
+/// `resources/i18n/*.json`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LANG {
     EN,
     FR,
 }
+/// Languages proposed in the language selector.
 static LANGS: &[LANG] = &[LANG::EN, LANG::FR];
 const LANG_FR_DATA: &str = include_str!("../resources/i18n/fr.json");
 const LANG_EN_DATA: &str = include_str!("../resources/i18n/en.json");
 
+/// Displayed as a flag in the language selector.
 impl std::fmt::Display for LANG {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -51,15 +77,20 @@ impl std::fmt::Display for LANG {
     }
 }
 
+/// File systems proposed for the destination device (transfer or wipe).
 static FSTYPES: &[FsType] = &[FsType::Ntfs, FsType::Exfat, FsType::Fat];
 
+/// Progress of a long running operation (transfer, wipe, disk image).
 #[derive(Debug, Clone)]
 pub enum Status {
+    /// Status update received from usbsas
     Progress(proto::common::ResponseStatus),
+    /// Error while receiving status, ends the operation
     Error(String),
 }
 
 impl Status {
+    /// Initial status, displayed until the first update is received.
     fn init() -> Self {
         Status::Progress(proto::common::ResponseStatus {
             done: false,
@@ -70,80 +101,145 @@ impl Status {
     }
 }
 
+/// Current step of the GUI, each one is rendered as a different screen.
+///
+/// The nominal flow of a transfer is:
+/// `Sandbox` → `Connect` → `Init` → `DevSelect` (→ `UserID`) (→ `DownloadPin`)
+/// → `PartSelect` → `ReadDir` → `Status` → `Done` → `Reload` → `Connect`...
 #[derive(Debug)]
 enum State {
+    /// The client must sandbox itself (on next tick)
     Sandbox,
+    /// Trying to connect to the usbsas socket (on each tick)
     Connect,
+    /// Connected, waiting for a USB device to be plugged
     Init,
+    /// Source and destination selection
     DevSelect,
+    /// Waiting for the user to identify (usbsas couldn't get a user id yet)
     UserID,
+    /// The source device has several partitions, the user must choose one
     PartSelect(Vec<proto::common::PartitionInfo>),
+    /// Browsing the source, files of the current directory
     ReadDir(Vec<FileInfo>),
+    /// Waiting for usbsas, the string is the i18n key of the text to display
     Wait(String),
+    /// Long running operation in progress
     Status(Status),
+    /// Wipe confirmation, `true` for a quick wipe
     Wipe(bool),
+    /// Disk image confirmation
     DiskImg,
+    /// Operation finished, report is displayed
     Done,
+    /// Network source selected, the user must enter the download PIN
     DownloadPin,
+    /// Tools menu (wipe, disk image, system info)
     Tools,
+    /// Frequently asked questions
     Faq,
+    /// System information
     SysInfo,
+    /// Session is ending (see [`GUI::reset`])
     Reload,
+    /// Unrecoverable error, the session must be reset
     Error(String),
 }
 
+/// Messages handled by [`GUI::update`], emitted by user interactions, the
+/// subscription or completed tasks.
 #[derive(Debug, Clone)]
 pub enum Message {
+    /// Show the FAQ
     Faq,
+    /// Show the tools menu
     Tools,
+    /// "Ok" / "Next" button, its effect depends on the current state
     Ok,
+    /// "Cancel" / "Back" button, its effect depends on the current state
     Nok,
+    /// Request the device list
     Devices,
+    /// Request the user id
     UserID,
+    /// Show system information
     SysInfo,
+    /// Select the source device
     SrcSelect(u64),
+    /// Select the destination device
     DstSelect(u64),
+    /// Open the partition at this index of the source device
     PartSelect(u32),
+    /// Start a transfer between the selected source and destination
     InitTransfer,
+    /// List the content of a directory of the source
     ReadDir(String),
+    /// Go to the parent of the current directory
     PreviousDir,
+    /// Add a path to the selection
     SelectFile(String),
+    /// Remove a path (and its children) from the selection
     UnSelectFile(String),
+    /// Select all files of the current directory
     SelectAll(Vec<String>),
+    /// Unselect all files of the current directory
     UnselectAll(Vec<String>),
+    /// Send the selected files to usbsas, starting the copy
     ListFiles,
+    /// Status update of the session with this generation
     Status(u64, Status),
+    /// Show wipe confirmation, `true` for a quick wipe
     Wipe(bool),
+    /// Show disk image confirmation
     DiskImg,
+    /// Change the interface language
     LangSelect(LANG),
+    /// Change the file system of the destination
     FsTypeSelect(FsType),
+    /// Periodic tick from [`GUI::subscription`]
     Tick(Instant),
+    /// Digit typed on the PIN pad
     UserInput(u8),
+    /// Clear the PIN, entirely if `true`, last digit otherwise
     ClearInput(bool),
+    /// End the current session
     Reset,
+    /// The session with this generation has ended
     ResetDone(u64),
+    /// Response of a request sent during the session with this generation
     Response(u64, Response),
 }
 
+/// Kind of source opened by a successful `InitTransfer` request, it decides
+/// the next step.
 #[derive(Debug, Clone)]
 pub enum SrcOpened {
+    /// USB device, with its partitions
     Usb(Vec<proto::common::PartitionInfo>),
+    /// Network source, files are downloaded directly
     Network,
+    /// Local directory, browsed like a USB partition
     LocalDir,
     Other,
 }
 
+/// Result of an async request sent to usbsas, delivered with
+/// [`Message::Response`].
 #[derive(Debug, Clone)]
 pub enum Response {
     Devices(Result<Vec<proto::common::Device>, String>),
     UserId(Result<String, String>),
     InitTransfer(Result<SrcOpened, String>),
     OpenPartition(Result<(), String>),
+    /// Content of the requested directory
     ReadDir(String, Result<Vec<FileInfo>, String>),
+    /// A long running operation has started, status updates must be read
     StartStatus(Result<(), String>),
+    /// Transfer report, received once the operation is done
     Report(Result<Option<TransferReport>, String>),
 }
 
+/// Try to end the usbsas session when the client exits.
 impl Drop for GUI {
     fn drop(&mut self) {
         if let Some(comm) = self.comm.take() {
@@ -159,6 +255,7 @@ impl Drop for GUI {
     }
 }
 
+/// Command line arguments of the client.
 pub fn client_clap() -> clap::Command {
     usbsas_utils::clap::new_usbsas_cmd("usbsas-client")
         .add_config_arg()
@@ -213,34 +310,54 @@ pub fn client_clap() -> clap::Command {
         )
 }
 
+/// The iced application.
 pub struct GUI {
+    /// Connection to usbsas, `None` until connected and during resets. Shared
+    /// with the tasks sending requests.
     comm: Option<Arc<Mutex<ComRqUsbsas>>>,
+    /// Incremented on each reset to discard messages of previous sessions
     generation: u64,
+    /// A user-triggered request is in flight
     busy: bool,
+    /// A devices request is in flight
     polling: bool,
     state: State,
     devices: Devices,
     src_id: Option<u64>,
     dst_id: Option<u64>,
     userid: Option<String>,
+    /// PIN entered by the user to download files from a network source
     download_pin: Option<String>,
+    /// Paths selected for the transfer (directories included)
     selected: HashSet<String>,
     current_dir: String,
+    /// Paths of the files in `current_dir`
     current_files: Vec<String>,
+    /// Steps already reached by the current operation, displayed as progress
     seen_status: BTreeSet<proto::common::Status>,
     version: String,
     config: usbsas_config::Config,
     report: Option<TransferReport>,
+    /// i18n key of the title of the status screen (wipe, disk image...)
     status_title: Option<String>,
     i18n: HashMap<LANG, HashMap<String, String>>,
     lang: LANG,
+    /// File system of the destination
     fstype: FsType,
+    /// Unique id of the session, also exported as `USBSAS_SESSION_ID` and
+    /// used in the names of the output files
     session_id: String,
     fullscreen: bool,
     socket_path: String,
 }
 
 impl GUI {
+    /// Build the initial state from the command line and the configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the configuration can't be read or parsed, if its `lang` is
+    /// unsupported or if the report directory can't be created.
     pub fn new() -> (Self, Task<Message>) {
         let matches = client_clap().get_matches();
         let config_path = matches.get_one::<String>("config").expect("config cmdline");
@@ -322,6 +439,9 @@ impl GUI {
 }
 
 impl GUI {
+    /// Restrict the client with landlock and seccomp, only the paths it needs
+    /// remain accessible. Called once, on the first tick, so that iced is
+    /// initialized before.
     fn sandbox(&mut self) {
         let mut paths_rw = vec!["/dev/dri", &self.socket_path];
         if let Some(report_conf) = &self.config.report
@@ -353,6 +473,8 @@ impl GUI {
         self.state = State::Connect;
     }
 
+    /// Try to connect to the usbsas socket, switching to `State::Init` on
+    /// success. Called on each tick until the server is available.
     fn try_connect(&mut self) {
         if self.comm.is_none() {
             // connect() on a unix socket doesn't block, no need to make it async
@@ -409,6 +531,9 @@ impl GUI {
         }
     }
 
+    /// Finish a reset started by [`GUI::reset`]: remove empty (or all, if
+    /// `keep_tmp_files` is false) output files of the session, clear the
+    /// session state and start a new session.
     fn reset_done(&mut self, generation: u64) -> Task<Message> {
         if generation != self.generation {
             // A newer reset was requested meanwhile
@@ -475,6 +600,7 @@ impl GUI {
         Task::none()
     }
 
+    /// Clear device selection without ending the session.
     fn soft_reset(&mut self) {
         self.src_id = None;
         self.dst_id = None;
