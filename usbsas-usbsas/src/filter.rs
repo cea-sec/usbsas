@@ -1,12 +1,21 @@
+//! File name filters, from the `filters` section of the configuration.
+//! Matching files are excluded from transfers.
+
 #[cfg(test)]
 use serde::{Deserialize, Serialize};
 use usbsas_config::Filter;
 
+/// A filter rule. A path matches if it satisfies every condition that is set
+/// (case insensitive).
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 pub struct Rule {
+    /// Path contains all these strings
     pub contain: Option<Vec<String>>,
+    /// Path starts with this string
     pub start: Option<String>,
+    /// Path ends with this string
     pub end: Option<String>,
+    /// Path is exactly this string
     pub exact: Option<String>,
 }
 
@@ -33,6 +42,7 @@ impl Rule {
         }
     }
 
+    /// Whether `input` matches this rule, the rule must be lowercase.
     fn match_(&self, input: &str) -> bool {
         let input = input.to_lowercase();
         if let Some(ref exact) = self.exact
@@ -61,6 +71,7 @@ impl Rule {
     }
 }
 
+/// A set of filter rules.
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 pub struct Rules {
     pub rules: Vec<Rule>,
@@ -75,13 +86,14 @@ impl From<Vec<Filter>> for Rules {
 }
 
 impl Rules {
+    /// Lowercase all rules, required before matching.
     pub fn into_lowercase(self) -> Self {
         Rules {
             rules: self.rules.into_iter().map(|f| f.into_lowercase()).collect(),
         }
     }
 
-    // Return true if a filename matches a rule
+    /// Return true if a filename matches a rule
     pub fn match_all(&self, input: &str) -> bool {
         for f in self.rules.iter() {
             if f.match_(input) {

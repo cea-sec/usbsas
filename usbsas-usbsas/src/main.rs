@@ -1,3 +1,7 @@
+//! usbsas server: creates the session's working files, spawns the children,
+//! sandboxes itself and serves requests from a client connected via a Unix
+//! socket (`-s`) or via pipes inherited from its parent.
+
 use anyhow::{Context, Result, bail};
 use log::{error, info};
 use std::{
@@ -17,6 +21,10 @@ use usbsas_usbsas::{
 };
 use usbsas_utils::clap::UsbsasClap;
 
+/// Run the state machine until `State::Exit`. On error, the error is sent to
+/// the client and the server waits for the end of the session.
+///
+/// `_tmp_files` is kept until the end to remove working files on exit.
 fn main_loop(
     mut comm: impl ProtoRespUsbsas,
     mut children: Children,

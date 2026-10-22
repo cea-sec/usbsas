@@ -1,3 +1,10 @@
+//! usbsas server, the parent process orchestrating every other usbsas process.
+//!
+//! The server is implemented as a state machine (see [`states`]): each state
+//! handles requests from the client and drives the children (see
+//! [`children`]) accordingly. This module contains the bookkeeping of a
+//! transfer and the generation of its report.
+
 pub mod children;
 use crate::children::Children;
 pub mod filter;
@@ -11,12 +18,18 @@ use usbsas_proto::common::{
     AnalyzeReport, FileInfoReport, FileType, FsType, TransferReport, UsbDevice, device::Device,
 };
 
+/// Available devices (USB, network, local directories, command), indexed by
+/// their id.
 type Devices = HashMap<u64, Device>;
 
+/// Files of a transfer.
 #[derive(Debug, Clone, Default)]
 struct TransferFiles {
+    /// Files and directories to transfer, indexed by path
     files: BTreeMap<String, FileInfo>,
+    /// Paths excluded by the configured filters
     filtered: Vec<String>,
+    /// Paths that couldn't be read
     errors: Vec<String>,
 }
 
@@ -33,6 +46,7 @@ impl TransferFiles {
         self.files.insert(path.to_string(), fi);
     }
 
+    /// Whether `path` was already processed (added, filtered or in error).
     fn contains(&self, path: &str) -> bool {
         self.files.contains_key(path)
             || self.errors.contains(&path.to_string())
@@ -43,6 +57,7 @@ impl TransferFiles {
         self.files.iter()
     }
 
+    /// Mark a file as failed during the transfer.
     fn set_error(&mut self, path: &str) {
         if let Some(fileinfo) = self.files.get_mut(path) {
             fileinfo.status = FileStatus::Error;
@@ -50,12 +65,14 @@ impl TransferFiles {
     }
 }
 
+/// Metadata of a file of the transfer.
 #[derive(Debug, Clone)]
 pub struct FileInfo {
     size: u64,
     ftype: FileType,
     timestamp: i64,
     status: FileStatus,
+    /// SHA-256 of the file content (hex), computed when read from the source
     cksum: Option<String>,
 }
 
@@ -83,28 +100,39 @@ impl From<&usbsas_proto::files::ResponseGetAttr> for FileInfo {
     }
 }
 
+/// Status of a file, updated by the analysis and the copy.
 #[derive(Debug, Clone, PartialEq)]
 enum FileStatus {
+    /// Not analyzed
     Unknown,
+    /// Analyzed and clean
     Clean,
+    /// Analyzed and dirty, won't be copied
     Dirty,
+    /// Couldn't be copied
     Error,
 }
 
+/// A file transfer in progress, passed from state to state.
 #[derive(Debug)]
 struct Transfer {
     src: Device,
     dst: Device,
     userid: String,
+    /// File system to create on a USB destination
     outfstype: Option<FsType>,
+    /// Maximum size of the files that can be written on the destination
     max_dst_size: Option<u64>,
+    /// Total size of the selected files (minus dirty ones after analysis)
     selected_size: Option<u64>,
+    /// Whether files must be analyzed before being written
     analyze: bool,
     files: TransferFiles,
     analyze_report: Option<AnalyzeReport>,
 }
 
 impl Transfer {
+    /// Build the report of this transfer with the given status.
     fn to_report(&self, status: &str) -> TransferReport {
         report(
             "usbsas_transfer",
@@ -118,6 +146,10 @@ impl Transfer {
     }
 }
 
+/// Build a report.
+///
+/// Only regular files that are neither dirty nor in error are listed in
+/// `file_names` / `files_info`; dirty files are listed in `rejected`.
 fn report(
     title: &str,
     status: &str,
@@ -201,6 +233,7 @@ fn report(
     }
 }
 
+/// Report of a disk image.
 fn report_diskimg(device: UsbDevice) -> TransferReport {
     crate::report(
         "diskimg",
@@ -213,6 +246,7 @@ fn report_diskimg(device: UsbDevice) -> TransferReport {
     )
 }
 
+/// Report of a wipe.
 fn report_wipe(device: UsbDevice) -> TransferReport {
     crate::report(
         "wipe",
@@ -225,6 +259,8 @@ fn report_wipe(device: UsbDevice) -> TransferReport {
     )
 }
 
+/// Hostname, current time and its formatted version (`YYYYMMDDhhmmssms`),
+/// used in reports.
 fn report_infos() -> (String, time::OffsetDateTime, String) {
     #[cfg(not(feature = "integration-tests"))]
     let (hostname, time) = {
@@ -253,6 +289,8 @@ fn report_infos() -> (String, time::OffsetDateTime, String) {
     (hostname, time, datetime)
 }
 
+/// Working files of the session, removed on drop (unless `keep`). The socket is
+/// always removed.
 pub struct TmpFiles {
     pub tar_path: String,
     pub clean_tar_path: String,
