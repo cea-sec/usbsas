@@ -1,3 +1,21 @@
+//! States of the usbsas server.
+//!
+//! Each state is a struct implementing [`RunState`]: `run()` consumes the
+//! state, handles the requests it expects (or performs its work) and returns
+//! the next [`State`]. Data needed later (configuration, `Transfer`...) is
+//! moved from state to state.
+//!
+//! ```text
+//! Init ─┬─ Wipe ─────────────────────────────────────────────────────┐
+//!       ├─ ImgDisk ──────────────────────────────────────────────────┤
+//!       ├─ OpenSrcUsb ─> BrowseSrc ─┐                                │
+//!       ├─ BrowseSrc ───────────────┼─> FileSelection                │
+//!       └─ DownloadSrc ─────────────┘    │                           │
+//!                                        ├─> Analyze ─> WriteDstFile ┤
+//!                                        ├─> WriteDstFile ───┐       │
+//!                                        └───────────────────┴─> TransferDst ─> End ─> Exit
+//! ```
+
 use crate::{
     Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport, filter::Rules,
 };
@@ -21,6 +39,7 @@ use usbsas_proto::{
 };
 use usbsas_utils::READ_FILE_MAX_SIZE;
 
+/// State of the server, see the module documentation for transitions.
 pub enum State {
     Init(InitState),
     OpenSrcUsb(OpenSrcUsbState),
@@ -33,10 +52,12 @@ pub enum State {
     ImgDisk(ImgDiskState),
     Wipe(WipeState),
     End(EndState),
+    /// Children are ended, the server exits
     Exit,
 }
 
 impl State {
+    /// Run the current state and return the next one.
     pub fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<Self> {
         match self {
             State::Init(s) => s.run(comm, children),
@@ -55,10 +76,13 @@ impl State {
     }
 }
 
-// Shared functions for states
+/// A state of the server, with request handlers shared between states.
 pub trait RunState {
+    /// Run the state until it transitions to the next one.
     fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State>;
 
+    /// Refresh plugged USB devices and send the device list to the client,
+    /// alternative (non USB) devices are included if `include_alt`.
     fn devices(
         &mut self,
         comm: &mut impl ProtoRespUsbsas,
@@ -91,6 +115,8 @@ pub trait RunState {
         Ok(())
     }
 
+    /// Get the user id from the identifier and send it to the client. Returns
+    /// `None` (and sends an error) if the user isn't identified.
     fn userid(
         &self,
         comm: &mut impl ProtoRespUsbsas,
@@ -112,6 +138,8 @@ pub trait RunState {
         Ok(Some(userid))
     }
 
+    /// Forward the bit vector of the sectors used by the new file system from
+    /// files2fs to fs2dev, so that only those are written to the device.
     fn forward_bitvec(&self, children: &mut Children) -> Result<()>
     where
         Self: Sized,
@@ -135,6 +163,7 @@ pub trait RunState {
         Ok(())
     }
 
+    /// Forward status updates of a child to the client until it's done.
     fn forward_status(
         &self,
         comm: &mut impl ProtoRespUsbsas,
@@ -155,6 +184,7 @@ pub trait RunState {
         Ok(())
     }
 
+    /// Write `report` as a JSON file at `path` with `writer`.
     fn write_report(
         &self,
         writer: &mut UsbsasChild<ComRqWriteDst>,
@@ -180,6 +210,8 @@ pub trait RunState {
     }
 }
 
+/// First state: waits for the client to identify the user, select devices and
+/// start an operation (transfer, wipe or disk image).
 pub struct InitState {
     pub config: Config,
     pub plugged_devices: Vec<UsbDevice>,
@@ -288,6 +320,8 @@ impl RunState for InitState {
 }
 
 impl InitState {
+    /// Check that a transfer request is valid and return the file system to
+    /// create on the destination (if it's a USB device).
     fn init_checks(
         &self,
         req: &proto::usbsas::RequestInitTransfer,
@@ -326,6 +360,9 @@ impl InitState {
         }
     }
 
+    /// Start a transfer: unlock fs2dev with the destination device (or `0` if
+    /// it isn't a USB device), decide whether files must be analyzed and
+    /// transition to the state opening the source.
     fn init_transfer(
         self,
         comm: &mut impl ProtoRespUsbsas,
@@ -422,6 +459,8 @@ impl InitState {
     }
 }
 
+/// Opens the source USB device, lists its partitions and opens the one chosen
+/// by the client.
 pub struct OpenSrcUsbState {
     config: Config,
     transfer: Transfer,
@@ -480,6 +519,8 @@ impl RunState for OpenSrcUsbState {
     }
 }
 
+/// Lets the client browse the source (`ReadDir`, `GetAttr`) until it selects
+/// files to transfer (`SelectFiles`).
 pub struct BrowseSrcState {
     config: Config,
     transfer: Transfer,
@@ -541,9 +582,12 @@ impl RunState for BrowseSrcState {
     }
 }
 
+/// Downloads the archive of the user from the source network into the session
+/// tar, all its files are selected.
 pub struct DownloadSrcState {
     config: Config,
     transfer: Transfer,
+    /// PIN given by the user, identifying the archive to download
     pin: String,
 }
 
@@ -576,9 +620,13 @@ impl RunState for DownloadSrcState {
     }
 }
 
+/// Expands and filters the selection, checks sizes, copies files from the source
+/// to the session tar, then unlocks `cmdexec` and `uploader` with the tar they
+/// will use (`2`: clean tar if files are analyzed, `1`: tar otherwise).
 pub struct FileSelectionState {
     config: Config,
     transfer: Transfer,
+    /// Paths left to process
     selected: VecDeque<String>,
 }
 
@@ -649,6 +697,9 @@ impl RunState for FileSelectionState {
 impl FileSelectionState {
     /// Expand tree of selected files and directories and compute total file size
     /// Also apply filter rules from configuration file
+    ///
+    /// Files larger than `max_file_size` (FAT destination) are set in error.
+    /// Parent directories of selected files are added if missing.
     fn selected_to_filtered_files(
         &mut self,
         children: &mut Children,
@@ -750,6 +801,8 @@ impl FileSelectionState {
         Ok(files_size)
     }
 
+    /// Copy directories then files from the source to the session tar, along
+    /// with a report (`config.json`).
     fn tar_src_files(
         &mut self,
         comm: &mut impl ProtoRespUsbsas,
@@ -815,6 +868,7 @@ impl FileSelectionState {
         Ok(())
     }
 
+    /// Copy a file from the source to the session tar, computing its SHA-256.
     fn file_to_tar(
         &mut self,
         comm: &mut impl ProtoRespUsbsas,
@@ -891,6 +945,8 @@ impl FileSelectionState {
     }
 }
 
+/// Sends the session tar to the analyzer and marks files as clean or dirty
+/// according to its report.
 pub struct AnalyzeState {
     config: Config,
     transfer: Transfer,
@@ -962,6 +1018,9 @@ impl RunState for AnalyzeState {
     }
 }
 
+/// Reads files back from the session tar and writes them into a new file system
+/// (USB destination) or into the clean tar (network / command destination).
+/// Dirty files are skipped.
 pub struct WriteDstFileState {
     config: Config,
     transfer: Transfer,
@@ -1070,6 +1129,7 @@ impl RunState for WriteDstFileState {
 }
 
 impl WriteDstFileState {
+    /// Copy a file from the session tar to the destination writer.
     fn file_to_dst(
         &self,
         comm: &mut impl ProtoRespUsbsas,
@@ -1133,6 +1193,9 @@ impl WriteDstFileState {
     }
 }
 
+/// Sends the result to its destination: writes the file system on the USB
+/// device, uploads the tar or executes the command. Then runs the post copy
+/// command if configured.
 pub struct TransferDstState {
     config: Config,
     transfer: Transfer,
@@ -1205,6 +1268,8 @@ impl TransferDstState {
     }
 }
 
+/// Copies every sector of a USB device to `usbsas_imgdisk_<id>.img` in
+/// `out_directory`.
 pub struct ImgDiskState {
     device: UsbDevice,
     config: Config,
@@ -1275,6 +1340,8 @@ impl RunState for ImgDiskState {
     }
 }
 
+/// Wipes a USB device (fills it with zeros unless `quick`) and writes a new
+/// empty file system on it.
 pub struct WipeState {
     device: UsbDevice,
     quick: bool,
@@ -1332,6 +1399,8 @@ impl RunState for WipeState {
     }
 }
 
+/// Last state: the operation is over (or failed), the client can still get
+/// the report and list devices until it sends `End`.
 pub struct EndState {
     pub report: Option<TransferReport>,
 }

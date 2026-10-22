@@ -1,3 +1,5 @@
+//! Child processes of usbsas.
+
 use anyhow::Result;
 use usbsas_comm::{
     ComRqAnalyzer, ComRqCmdExec, ComRqDownloader, ComRqFiles, ComRqFs2Dev, ComRqIdentifier,
@@ -5,13 +7,17 @@ use usbsas_comm::{
 };
 use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
 
+/// Every child process of a session, with the communication channel used to
+/// send them requests.
 pub struct Children {
     pub analyzer: UsbsasChild<ComRqAnalyzer>,
     pub identifier: UsbsasChild<ComRqIdentifier>,
     pub cmdexec: UsbsasChild<ComRqCmdExec>,
     pub downloader: UsbsasChild<ComRqDownloader>,
     pub files2fs: UsbsasChild<ComRqWriteDst>,
+    /// Writes source files into the session tar
     pub files2tar: UsbsasChild<ComRqWriteDst>,
+    /// Writes analyzed (clean) files into the session clean tar
     pub files2cleantar: UsbsasChild<ComRqWriteDst>,
     pub fs2dev: UsbsasChild<ComRqFs2Dev>,
     pub local2files: UsbsasChild<ComRqFiles>,
@@ -22,6 +28,12 @@ pub struct Children {
 }
 
 impl Children {
+    /// Spawn all children. `tar_path` and `fs_path` are the session's working
+    /// files.
+    ///
+    /// Children spawned with `wait_on_startup()` are locked: they must be
+    /// unlocked with [`ChildMngt::unlock_with`] before being used, `0` meaning
+    /// they won't be needed this session.
     pub fn spawn(config_path: &str, tar_path: &str, fs_path: &str) -> Result<Self> {
         log::trace!("spawn children");
         let identifier = UsbsasChildSpawner::new("usbsas-identifier").spawn::<ComRqIdentifier>()?;
@@ -84,6 +96,7 @@ impl Children {
         })
     }
 
+    /// All children, to apply an action on each of them.
     pub fn as_array_mut(&mut self) -> Vec<&mut dyn ChildMngt> {
         vec![
             &mut self.analyzer,
@@ -102,6 +115,8 @@ impl Children {
         ]
     }
 
+    /// End all children, wait for them to exit, then answer the client's `End`
+    /// request.
     pub fn end_wait_all(&mut self, comm: &mut impl ProtoRespUsbsas) -> Result<()> {
         log::trace!("ending children");
         for child in self.as_array_mut().iter_mut() {
