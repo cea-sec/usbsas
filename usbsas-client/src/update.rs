@@ -1,3 +1,5 @@
+//! Message handling: state transitions and requests to usbsas.
+
 use crate::{ComRqUsbsas, GUI, Message, Response, SrcOpened, State, Status};
 use iced::{
     Task,
@@ -8,6 +10,7 @@ use smol::lock::Mutex;
 use std::{fs, future::Future, path, sync::Arc};
 use usbsas_proto::{self as proto, common::device::Device};
 
+/// Unwrap a result or switch to `State::Error` and return from the handler.
 macro_rules! ok_or_err {
     ($s: ident, $e: expr) => {
         match $e {
@@ -45,6 +48,7 @@ fn recv_status(comm: Arc<Mutex<ComRqUsbsas>>) -> impl Stream<Item = Status> {
     })
 }
 
+/// Request the id of the user from usbsas.
 async fn req_userid(comm: Arc<Mutex<ComRqUsbsas>>) -> Response {
     let res = comm
         .lock()
@@ -55,6 +59,9 @@ async fn req_userid(comm: Arc<Mutex<ComRqUsbsas>>) -> Response {
 }
 
 impl GUI {
+    /// Remove `path` from the selection, and its children if
+    /// `unselect_children`. Its parent directories are unselected too since
+    /// they are no longer fully selected.
     fn unselect_path(&mut self, path: &str, unselect_children: bool) {
         self.selected.remove(path);
         if unselect_children {
@@ -99,6 +106,7 @@ impl GUI {
         Task::perform(req(comm), move |resp| Message::Response(generation, resp))
     }
 
+    /// Forward status updates of the current operation as `Message::Status`.
     fn status_stream(&self) -> Task<Message> {
         let generation = self.generation;
         match &self.comm {
@@ -232,6 +240,10 @@ impl GUI {
         Task::none()
     }
 
+    /// iced update function, see [`Message`] for the meaning of each message.
+    ///
+    /// When the client is in fullscreen mode, the window is also put back in
+    /// fullscreen if needed.
     pub fn update(&mut self, message: Message) -> Task<Message> {
         if let Message::Status(generation, _) = message
             && (generation != self.generation || !matches!(self.state, State::Status(_)))

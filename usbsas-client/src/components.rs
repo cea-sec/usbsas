@@ -1,3 +1,5 @@
+//! Shared widget styles and text sizes.
+
 use crate::Message;
 use iced::{
     Border, Color, Length, Renderer, Shadow, Theme,
@@ -5,12 +7,18 @@ use iced::{
     widget::{Button, button, text},
 };
 
+/// Text size of the top menu
 pub const MENU_SIZE: f32 = 30.0;
+/// Text size of titles
 pub const HEADER_SIZE: f32 = 20.0;
+/// Default text size
 pub const TXT_SIZE: f32 = 16.0;
+/// Text size of secondary information
 pub const OPT_SIZE: f32 = 13.0;
+/// Text size of the footer
 pub const FOOT_SIZE: f32 = 10.0;
 
+/// Primary button with rounded border.
 pub fn style_primary(theme: &Theme, status: button::Status) -> button::Style {
     let mut style = button::primary(theme, status);
     style.border = Border::default()
@@ -24,6 +32,7 @@ pub fn style_primary(theme: &Theme, status: button::Status) -> button::Style {
     style
 }
 
+/// Secondary button with rounded border.
 pub fn style_secondary(theme: &Theme, status: button::Status) -> button::Style {
     let mut style = button::secondary(theme, status);
     style.border = Border::default()
@@ -37,6 +46,7 @@ pub fn style_secondary(theme: &Theme, status: button::Status) -> button::Style {
     style
 }
 
+/// Round button of the PIN pad.
 pub fn style_numpad(theme: &Theme, status: button::Status) -> button::Style {
     let mut style = button::secondary(theme, status);
     style.border = Border::default()
@@ -51,6 +61,7 @@ pub fn style_numpad(theme: &Theme, status: button::Status) -> button::Style {
 }
 
 use iced::advanced::text::IntoFragment;
+/// Button of the PIN pad, filling its cell, sending `message` when pressed.
 pub fn button_numpad<'a>(
     content: impl IntoFragment<'a>,
     message: Message,

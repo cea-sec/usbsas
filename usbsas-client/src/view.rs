@@ -1,3 +1,5 @@
+//! Rendering of the interface.
+
 use crate::{
     Device, FSTYPES, GUI, LANGS, Message, State, Status,
     components::{
@@ -20,6 +22,9 @@ use sysinfo::System;
 use usbsas_proto::common::FileType;
 
 impl GUI {
+    /// iced view function. The window is made of a top menu (tools, FAQ,
+    /// language, hostname), a body depending on the current `State`, a
+    /// button bar (cancel / ok) and a footer.
     pub fn view(&self) -> iced::Element<'_, Message> {
         let logo = Container::new(
             Svg::new(Handle::from_memory(include_bytes!(
@@ -1199,6 +1204,8 @@ impl GUI {
             .into()
     }
 
+    /// Translation of the key `txt` (case insensitive) in the current
+    /// language.
     pub fn i18n_txt(&self, txt: &str) -> &str {
         self.i18n
             .get(&self.lang)
