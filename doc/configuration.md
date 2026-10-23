@@ -180,14 +180,14 @@ Example:
 contain = ["__macosx"]
 
 [[filters]]
-start = ["lorem ipsum"]
+start = "lorem ipsum"
 
 [[filters]]
 end = ".lnk"
-contain = "whatever"
+contain = ["whatever"]
 
 [[filters]]
-exact = ["autorun.inf"]
+exact = "autorun.inf"
 
 [[filters]]
 contain = ["thumbs.db"]

@@ -69,12 +69,6 @@ pub struct Filter {
     pub exact: Option<String>,
 }
 
-/// List of filters. Unused.
-#[derive(Debug, Deserialize)]
-pub struct PathFilter {
-    pub filters: Option<Vec<Filter>>,
-}
-
 /// Remote analyzer (`[analyzer]`). Only files from USB sources are analyzed.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Analyzer {
@@ -119,8 +113,6 @@ pub struct Config {
     #[serde(default = "default_out_dir")]
     pub out_directory: String,
     pub report: Option<Report>,
-    /// Unused
-    pub message: Option<String>,
     /// Title displayed in the client menu ("USBSAS" by default)
     pub window_title: Option<String>,
     /// Command destination
