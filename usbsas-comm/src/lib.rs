@@ -259,7 +259,6 @@ impl<U, R: Read, W: Write> SendRecv for Comm<U, R, W> {}
 /// // Send RequestDevices and receive a ResponseDevices
 /// let devices = comm.devices(proto::usbdev::RequestDevices {})?.devices;
 /// ```
-#[macro_export]
 macro_rules! protorequest {
     ($proto:ident,
      $($req:ident),+) => {
@@ -329,7 +328,6 @@ macro_rules! protorequest {
 ///   methods `a(ResponseA)`, `b(...)`... sending a response,
 /// - the [`ProtoRespCommon`] implementation (`status`, `error`, `end`,
 ///   `done`).
-#[macro_export]
 macro_rules! protoresponse {
     ($proto:ident,
      $($resp:ident),+) => {
