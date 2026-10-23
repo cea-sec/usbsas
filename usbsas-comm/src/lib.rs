@@ -2,6 +2,15 @@
 //!
 //! Protobuf messages are encoded / decoded here. Messages are all prefixed with
 //! the size of the message (64 bit LE).
+//!
+//! For each protocol `X` of `usbsas-proto`, [`protorequest!`] and
+//! [`protoresponse!`] generate:
+//! - `ComRqX` / `ComRpX`: [`Comm`] types for the requester (parent) and the
+//!   responder (child),
+//! - `ProtoReqX` / `ProtoRespX`: traits with one method per request /
+//!   response, on top of [`ProtoReqCommon`] / [`ProtoRespCommon`].
+//!
+//! The `async` feature adds `CommAsync`, used by the client.
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use pastey::paste;
@@ -23,10 +32,12 @@ mod comm_async;
 #[cfg(feature = "async")]
 pub use comm_async::*;
 
+/// Build a value from an environment variable.
 pub trait FromEnv: Sized {
     type Err;
     fn from_env(name: &str) -> Result<Self, Self::Err>;
 }
+/// Parse a file descriptor number from an environment variable.
 impl FromEnv for RawFd {
     type Err = io::Error;
     fn from_env(name: &str) -> Result<Self, Self::Err> {
@@ -36,6 +47,7 @@ impl FromEnv for RawFd {
     }
 }
 
+/// Build a communication channel from the read and write ends of pipes.
 pub trait FromFd {
     fn from_fd(read: OwnedFd, write: OwnedFd) -> Self;
 }
@@ -49,6 +61,8 @@ impl<U, R: Read + From<OwnedFd>, W: Write + From<OwnedFd>> FromFd for Comm<U, R,
     }
 }
 
+/// Get the raw file descriptors of a communication channel, e.g. to allow them
+/// in seccomp rules.
 pub trait ToFd {
     fn input_fd(&self) -> RawFd;
     fn output_fd(&self) -> RawFd;
@@ -72,6 +86,8 @@ pub struct Comm<U, R: Read, W: Write> {
 }
 
 impl<U, R: Read + AsRawFd + From<OwnedFd>, W: Write + AsRawFd + From<OwnedFd>> Comm<U, R, W> {
+    /// New channel reading responses (or requests) from `input` and writing
+    /// requests (or responses) to `output`.
     pub fn new(input: R, output: W) -> Self {
         Comm {
             input,
@@ -89,15 +105,19 @@ impl<U, R: Read + AsRawFd + From<OwnedFd>, W: Write + AsRawFd + From<OwnedFd>> C
         ))
     }
 
+    /// Input stream of the channel.
     pub fn input(&self) -> &R {
         &self.input
     }
 
+    /// Output stream of the channel.
     pub fn output(&self) -> &W {
         &self.output
     }
 }
 
+/// Raw write on the output stream, bypassing the protobuf framing (used to
+/// unlock children).
 impl<U, R: Read, W: Write> Write for Comm<U, R, W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.output.write(buf)
@@ -108,13 +128,16 @@ impl<U, R: Read, W: Write> Write for Comm<U, R, W> {
     }
 }
 
+/// Raw read on the input stream, bypassing the protobuf framing.
 impl<U, R: Read, W: Write> Read for Comm<U, R, W> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.input.read(buf)
     }
 }
 
+/// Send and receive length-prefixed protobuf messages.
 pub trait SendRecv: Read + Write {
+    /// Encode and send a message, prefixed with its length (`u64` LE).
     fn send<T: prost::Message>(&mut self, req: T) -> io::Result<()> {
         // Send length, on 8 bytes
         self.write_u64::<LittleEndian>(req.encoded_len() as u64)?;
@@ -128,6 +151,10 @@ pub trait SendRecv: Read + Write {
         Ok(())
     }
 
+    /// Receive and decode a message.
+    ///
+    /// Returns an error if the announced length is greater than
+    /// `MAX_PROTO_MESS_SIZE`.
     fn recv<T>(&mut self) -> io::Result<T>
     where
         T: prost::Message,
@@ -147,12 +174,16 @@ pub trait SendRecv: Read + Write {
 
 /// Common function that requester processes must implement
 pub trait ProtoReqCommon: SendRecv {
+    /// Send an `End` request and wait for the responder's `End` response.
     fn end(&mut self) -> std::io::Result<()>;
+    /// Receive a `Status` response, sent by the responder during a long
+    /// operation. A `Response::Error` is returned as an error.
     fn recv_status(&mut self) -> std::io::Result<usbsas_proto::common::ResponseStatus>;
 }
 
 /// Common functions that responder processes must implement
 pub trait ProtoRespCommon: SendRecv {
+    /// Send a progress status (`current` / `total`).
     fn status(
         &mut self,
         current: u64,
@@ -160,19 +191,29 @@ pub trait ProtoRespCommon: SendRecv {
         done: bool,
         status: usbsas_proto::common::Status,
     ) -> std::io::Result<()>;
+    /// Send an error response, received as an `io::Error` by the requester.
     fn error(&mut self, err: impl std::string::ToString) -> std::io::Result<()>;
+    /// Answer an `End` request.
     fn end(&mut self) -> std::io::Result<()>;
+    /// Send the final status of an operation (`done` set).
     fn done(&mut self, status: usbsas_proto::common::Status) -> std::io::Result<()>;
 }
 
 impl<U, R: Read, W: Write> SendRecv for Comm<U, R, W> {}
 
-/// This macro defines a trait and implements it on Comm<U> to facilitate
+/// This macro defines a trait and implements it on `Comm<U>` to facilitate
 /// sending a request and receiving its corresponding response.
+///
+/// For a protocol `X` and requests `A, B...`, it defines:
+/// - `ComRqX`: `Comm` sending `usbsas_proto::x::Request` on `File`s,
+/// - `ProtoReqX`: trait with methods `a(RequestA) -> ResponseA`, `b(...)`...
+///   which send the request and wait for the matching response (a
+///   `Response::Error` is returned as an `io::Error`),
+/// - the [`ProtoReqCommon`] implementation (`end`, `recv_status`).
 ///
 /// For example with usbdev:
 ///
-/// usbdev.proto3 message definition:
+/// usbdev.proto3 message definition (simplified):
 ///
 /// ```ignore
 ///
@@ -206,17 +247,18 @@ impl<U, R: Read, W: Write> SendRecv for Comm<U, R, W> {}
 ///
 /// ```
 ///
-/// In usbdev.rs:
+/// In this crate:
 /// ```rust,ignore
-/// protorequest!(Usbdev, Devices, End);
+/// protorequest!(UsbDev, Devices);
+/// ```
 ///
-/// let comm: CommUsbdev = Comm::from_env()?;
+/// In the parent of usbdev:
+/// ```rust,ignore
+/// let mut comm: ComRqUsbDev = /* from usbsas_process */;
 ///
 /// // Send RequestDevices and receive a ResponseDevices
-/// let devices = comm.devices()?.devices;
-///
+/// let devices = comm.devices(proto::usbdev::RequestDevices {})?.devices;
 /// ```
-#[macro_export]
 macro_rules! protorequest {
     ($proto:ident,
      $($req:ident),+) => {
@@ -279,7 +321,13 @@ macro_rules! protorequest {
 }
 
 /// Same as protorequest but for responses
-#[macro_export]
+///
+/// For a protocol `X` and responses `A, B...`, it defines:
+/// - `ComRpX`: `Comm` sending `usbsas_proto::x::Response` on `File`s,
+/// - `ProtoRespX`: trait with `recv_req()`, returning the received request, and
+///   methods `a(ResponseA)`, `b(...)`... sending a response,
+/// - the [`ProtoRespCommon`] implementation (`status`, `error`, `end`,
+///   `done`).
 macro_rules! protoresponse {
     ($proto:ident,
      $($resp:ident),+) => {

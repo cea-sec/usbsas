@@ -23,6 +23,7 @@ pub struct CommAsync<U, R, W> {
 }
 
 impl<U, R, W> CommAsync<U, R, W> {
+    /// New channel reading from `input` and writing to `output`.
     pub fn new(input: R, output: W) -> Self {
         CommAsync {
             input,
@@ -31,20 +32,25 @@ impl<U, R, W> CommAsync<U, R, W> {
         }
     }
 
+    /// Input stream of the channel.
     pub fn input(&self) -> &R {
         &self.input
     }
 
+    /// Output stream of the channel.
     pub fn output(&self) -> &W {
         &self.output
     }
 
+    /// Consume the channel and return its streams.
     pub fn into_inner(self) -> (R, W) {
         (self.input, self.output)
     }
 }
 
 impl<U, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CommAsync<U, R, W> {
+    /// Encode and send a message, prefixed with its length (`u64` LE). The
+    /// whole frame is written at once, then flushed.
     pub async fn send<T: prost::Message>(&mut self, req: T) -> io::Result<()> {
         let len = req.encoded_len();
         let mut buf = Vec::with_capacity(8 + len);
@@ -54,6 +60,8 @@ impl<U, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> CommAsync<U, R, W> {
         self.output.flush().await
     }
 
+    /// Receive and decode a message. Returns an error if the announced length
+    /// is greater than `MAX_PROTO_MESS_SIZE`.
     pub async fn recv<T>(&mut self) -> io::Result<T>
     where
         T: prost::Message + Default,
