@@ -13,12 +13,6 @@ import "common.proto3";
 message RequestEnd {
 };
 
-// Unused, the device is opened when dev2scsi is unlocked.
-message RequestOpenDevice {
-  uint32 vendorid = 1;
-  uint32 productid = 2;
-};
-
 message RequestPartitions {
 };
 
@@ -31,9 +25,9 @@ message RequestReadSectors {
 };
 
 message Request {
+  reserved 2; // removed opendevice
   oneof msg {
     RequestEnd End = 1;
-    RequestOpenDevice OpenDevice = 2;
     RequestPartitions Partitions = 3;
     RequestReadSectors ReadSectors = 4;
   }

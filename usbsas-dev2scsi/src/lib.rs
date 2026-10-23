@@ -173,10 +173,6 @@ impl DevOpenedState {
                     comm.end()?;
                     return Ok(State::End);
                 }
-                _ => {
-                    error!("Unexpected req");
-                    continue;
-                }
             }
         }
         Ok(State::PartitionsListed(PartitionsListedState {

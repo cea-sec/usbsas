@@ -42,11 +42,6 @@ message RequestOpenPartition {
   uint32 index = 1;
 };
 
-// Not handled by the server.
-message RequestOpenDevice {
-  common.UsbDevice device = 1;
-};
-
 // Get the attributes of a file of the source.
 message RequestGetAttr {
   string path = 1;
@@ -85,11 +80,11 @@ message RequestImgDisk {
 };
 
 message Request {
+  reserved 4; // removed opendevice
   oneof msg {
     RequestDevices Devices = 1;
     RequestUserId UserId = 2;
     RequestInitTransfer InitTransfer = 3;
-    RequestOpenDevice OpenDevice = 4;
     RequestPartitions Partitions = 5;
     RequestOpenPartition OpenPartition = 6;
     RequestReadDir ReadDir = 7;
@@ -114,11 +109,6 @@ message ResponseUserId {
 };
 
 message ResponseInitTransfer {
-};
-
-message ResponseOpenDevice {
-  uint64 sector_size = 1;
-  uint64 dev_size = 2;
 };
 
 message ResponsePartitions {
@@ -155,11 +145,11 @@ message ResponseWipe {
 };
 
 message Response {
+  reserved 4; // removed opendevice
   oneof msg {
     ResponseDevices Devices = 1;
     ResponseUserId UserId = 2;
     ResponseInitTransfer InitTransfer = 3;
-    ResponseOpenDevice OpenDevice = 4;
     ResponsePartitions Partitions = 5;
     ResponseOpenPartition OpenPartition = 6;
     ResponseReadDir ReadDir = 7;
