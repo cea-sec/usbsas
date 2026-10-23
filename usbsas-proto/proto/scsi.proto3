@@ -2,6 +2,10 @@ syntax = "proto3";
 package scsi;
 import "common.proto3";
 
+// Protocol between scsi2files and dev2scsi, which reads sectors of the USB
+// device. dev2scsi starts locked and opens the device when unlocked with its
+// bus and device numbers, then sends ResponseOpenDevice.
+
 
 
 /* Requests */
@@ -9,6 +13,7 @@ import "common.proto3";
 message RequestEnd {
 };
 
+// Unused, the device is opened when dev2scsi is unlocked.
 message RequestOpenDevice {
   uint32 vendorid = 1;
   uint32 productid = 2;
@@ -17,10 +22,11 @@ message RequestOpenDevice {
 message RequestPartitions {
 };
 
+// Read raw sectors.
 message RequestReadSectors {
-  /* in sector */
+  // First sector
   uint64 offset = 1;
-  /* in sector */
+  // Number of sectors
   uint64 count = 2;
 };
 
@@ -37,7 +43,9 @@ message Request {
 /* Responses */
 
 message ResponseOpenDevice {
+  // Sector size in bytes
   uint64 block_size = 1;
+  // Device size in bytes
   uint64 dev_size = 2;
 };
 

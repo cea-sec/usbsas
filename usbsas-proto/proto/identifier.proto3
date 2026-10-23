@@ -2,6 +2,8 @@ syntax = "proto3";
 package identifier;
 import "common.proto3";
 
+// Protocol of the identifier, which gets the id of the user.
+
 
 /* Requests */
 
@@ -20,6 +22,7 @@ message Request {
 
 /* Responses */
 message ResponseUserId {
+  // Empty if the user isn't identified
   string userid = 1;
 };
 

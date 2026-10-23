@@ -2,17 +2,24 @@ syntax = "proto3";
 package jsonparser;
 import public "common.proto3";
 
+// Protocol of the jsonparser, spawned by the analyzer to parse the JSON
+// responses of the remote server in a separate sandboxed process.
+
+// Response of the remote analyzer to an upload or a status request.
 message SrvResp {
   string status = 1;
+  // Analysis identifier
   optional string id = 2;
 };
 
 // Requests
 
+// Parse a server response.
 message RequestParseResp {
   bytes data = 1;
 };
 
+// Parse an analysis report.
 message RequestParseReport {
   bytes data = 1;
 };

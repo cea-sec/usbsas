@@ -2,12 +2,18 @@ syntax = "proto3";
 package downloader;
 import "common.proto3";
 
+// Protocol of the downloader, which downloads an archive from the source
+// network into the session tar.
+
 /* Requests */
 
+// Download the archive found with ArchiveInfos. Status responses follow.
 message RequestDownload {
 };
 
+// Get information about the archive to download.
 message RequestArchiveInfos {
+  // Path of the archive on the server (`<user id>/<pin>`)
   string path = 1;
 };
 
@@ -29,6 +35,7 @@ message ResponseDownload {
 }
 
 message ResponseArchiveInfos {
+  // Size in bytes
   uint64 size = 1;
 }
 

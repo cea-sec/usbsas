@@ -2,12 +2,18 @@ syntax = "proto3";
 package analyzer;
 import "common.proto3";
 
+// Protocol of the analyzer, which sends the session tar to a remote analyzer
+// (antivirus) and gets its report.
+
 /* Requests */
 
+// Upload the tar and wait for the analysis. Status responses follow.
 message RequestAnalyze {
+  // User id
   string id = 1;
 };
 
+// Get the analysis report.
 message RequestReport {
 };
 
@@ -29,6 +35,7 @@ message ResponseAnalyze {
 }
 
 message ResponseReport {
+  // Not set if the analysis failed
   common.AnalyzeReport report = 1;
 }
 

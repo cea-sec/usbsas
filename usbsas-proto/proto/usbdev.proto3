@@ -2,6 +2,8 @@ syntax = "proto3";
 package usbdev;
 import "common.proto3";
 
+// Protocol of usbdev, which lists plugged USB mass storage devices.
+
 /* Requests */
 
 message RequestEnd {

@@ -2,12 +2,18 @@ syntax = "proto3";
 package cmdexec;
 import "common.proto3";
 
+// Protocol of cmdexec, which executes the commands of the configuration on the
+// transfer output.
+
 /* Requests */
 
+// Execute the destination command on the tar.
 message RequestExec {
 };
 
+// Execute the post copy command.
 message RequestPostCopyExec {
+  // Output given to the command (tar or file system image)
   common.OutFileType outfiletype = 1;
 };
 
