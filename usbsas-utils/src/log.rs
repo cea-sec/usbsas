@@ -1,9 +1,17 @@
+//! Logger initialization.
+
 #[cfg(feature = "log-json")]
 use {
     env_logger::{Builder, Env},
     std::io::Write,
 };
 
+/// Initialize the logger, the level is read from `RUST_LOG` (`info` by
+/// default).
+///
+/// With the `log-json` feature, each record is a JSON object on its own line
+/// with the timestamp (RFC 3339), level, target, message and session id
+/// (`transfer_id`, from `USBSAS_SESSION_ID`).
 #[cfg(feature = "log-json")]
 pub fn init_logger() {
     let session_id: String = std::env::var("USBSAS_SESSION_ID").unwrap_or_else(|_| "0".into());
@@ -29,6 +37,12 @@ pub fn init_logger() {
     builder.init();
 }
 
+/// Initialize the logger, the level is read from `RUST_LOG` (`info` by
+/// default).
+///
+/// With the `log-json` feature, each record is a JSON object on its own line
+/// with the timestamp (RFC 3339), level, target, message and session id
+/// (`transfer_id`, from `USBSAS_SESSION_ID`).
 #[cfg(not(feature = "log-json"))]
 pub fn init_logger() {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info,http=error"));

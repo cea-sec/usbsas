@@ -1,7 +1,17 @@
+//! Command line arguments shared by usbsas binaries.
+
+/// Add common arguments to a [`clap::Command`].
 pub trait UsbsasClap {
+    /// `-c, --config <CONFIG_PATH>`: configuration file, defaults to
+    /// [`USBSAS_CONFIG`](crate::USBSAS_CONFIG).
     fn add_config_arg(self) -> Self;
+    /// `<FS_PATH>` (positional, required): output file system image.
     fn add_fs_path_arg(self) -> Self;
+    /// `<TAR_PATH>` (positional, required): output tar archive.
     fn add_tar_path_arg(self) -> Self;
+    /// `-s, --socket [SOCKET_DIR]`: use a Unix socket instead of pipes,
+    /// created in `SOCKET_DIR` ([`DEFAULT_SOCKET_DIR`](crate::DEFAULT_SOCKET_DIR)
+    /// if no value is given).
     fn add_socket_arg(self) -> Self;
 }
 
@@ -53,6 +63,7 @@ impl UsbsasClap for clap::Command {
     }
 }
 
+/// New command, to be completed with [`UsbsasClap`] methods.
 pub fn new_usbsas_cmd(name: impl Into<clap::builder::Str>) -> clap::Command {
     clap::Command::new(name)
 }
