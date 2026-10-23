@@ -406,7 +406,6 @@ protoresponse!(
     GetAttr,
     ImgDisk,
     InitTransfer,
-    OpenDevice,
     OpenPartition,
     Partitions,
     ReadDir,
@@ -443,7 +442,6 @@ protorequest!(
     GetAttr,
     ImgDisk,
     InitTransfer,
-    OpenDevice,
     OpenPartition,
     Partitions,
     ReadDir,
@@ -452,7 +450,7 @@ protorequest!(
     UserId,
     Wipe
 );
-protorequest!(Scsi, OpenDevice, Partitions, ReadSectors);
+protorequest!(Scsi, Partitions, ReadSectors);
 protorequest!(UsbDev, Devices);
 protorequest!(Uploader, Upload);
 protorequest!(

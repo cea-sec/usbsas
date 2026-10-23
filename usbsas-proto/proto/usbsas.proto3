@@ -2,67 +2,89 @@ syntax = "proto3";
 package usbsas;
 import public "common.proto3";
 
+// Protocol between applications (GUI, Python module...) and the usbsas server.
+
 /* Requests */
 
+// End the session, usbsas stops its children and exits.
 message RequestEnd {
 };
 
+// Get the id of the user (from the identifier).
 message RequestUserId {
 };
 
+// List available devices.
 message RequestDevices {
+  // Include non USB devices (networks, commands, local directories)
   bool include_alt = 1;
 };
 
+// List the partitions of the source USB device (after InitTransfer).
 message RequestPartitions {
 };
 
+// Start a transfer. The user must be identified first.
 message RequestInitTransfer {
+  // Id of the source device
   uint64 source = 1;
+  // Id of the destination device
   uint64 destination = 2;
+  // File system to create, required for a USB destination
   optional common.FsType fstype = 3;
+  // PIN identifying the archive to download, required for a network source
   optional string pin = 4;
 };
 
+// Open a partition of the source USB device.
 message RequestOpenPartition {
+  // Index in ResponsePartitions
   uint32 index = 1;
 };
 
-message RequestOpenDevice {
-  common.UsbDevice device = 1;
-};
-
+// Get the attributes of a file of the source.
 message RequestGetAttr {
   string path = 1;
 };
 
+// List a directory of the source.
 message RequestReadDir {
   string path = 1;
 };
 
+// Select the files and directories to transfer (directories are copied
+// recursively) and start copying them. Status responses follow.
 message RequestSelectFiles {
   repeated string selected = 4;
 };
 
+// Get the report of the operation, once it's done.
 message RequestReport {
 };
 
+// Wipe a USB device and create an empty file system on it. Status responses
+// follow.
 message RequestWipe {
+  // Id of the device
   uint64 id = 1;
+  // Only create the file system, don't fill the device with zeros
   bool quick = 2;
   common.FsType fstype = 3;
 };
 
+// Make an image of a USB device in the output directory. Status responses
+// follow.
 message RequestImgDisk {
+  // Id of the device
   uint64 id = 1;
 };
 
 message Request {
+  reserved 4; // removed opendevice
   oneof msg {
     RequestDevices Devices = 1;
     RequestUserId UserId = 2;
     RequestInitTransfer InitTransfer = 3;
-    RequestOpenDevice OpenDevice = 4;
     RequestPartitions Partitions = 5;
     RequestOpenPartition OpenPartition = 6;
     RequestReadDir ReadDir = 7;
@@ -89,11 +111,6 @@ message ResponseUserId {
 message ResponseInitTransfer {
 };
 
-message ResponseOpenDevice {
-  uint64 sector_size = 1;
-  uint64 dev_size = 2;
-};
-
 message ResponsePartitions {
   repeated common.PartitionInfo partitions = 1;
 };
@@ -112,10 +129,12 @@ message ResponseGetAttr {
 };
 
 message ResponseSelectFiles {
+  // Total size of the selected files, in bytes
   uint64 selected_size = 1;
 };
 
 message ResponseReport {
+  // Not set if no operation was done
   common.TransferReport report = 1;
 };
 
@@ -126,11 +145,11 @@ message ResponseWipe {
 };
 
 message Response {
+  reserved 4; // removed opendevice
   oneof msg {
     ResponseDevices Devices = 1;
     ResponseUserId UserId = 2;
     ResponseInitTransfer InitTransfer = 3;
-    ResponseOpenDevice OpenDevice = 4;
     ResponsePartitions Partitions = 5;
     ResponseOpenPartition OpenPartition = 6;
     ResponseReadDir ReadDir = 7;

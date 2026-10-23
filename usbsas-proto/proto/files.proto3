@@ -2,12 +2,9 @@ syntax = "proto3";
 package files;
 import "common.proto3";
 
-/*
-fuse_operations:
- - getattr
- - readdir
- - read
-*/
+// Protocol of the processes reading files from a source: scsi2files (USB
+// device), local2files (local directory) and tar2files (session tar).
+// Operations are modeled after FUSE (getattr, readdir, read).
 
 
 /* Requests */
@@ -15,19 +12,24 @@ fuse_operations:
 message RequestEnd {
 };
 
+// Open a USB device (scsi2files).
 message RequestOpenDevice {
   uint32 busnum = 1;
   uint32 devnum = 2;
 };
 
+// Open a local directory (local2files).
 message RequestOpenLocalDir {
   string path = 1;
 };
 
+// List the partitions of the opened device.
 message RequestPartitions {
 };
 
+// Open the file system of a partition.
 message RequestOpenPartition {
+  // Index in ResponsePartitions
   uint32 index = 1;
 };
 
@@ -39,14 +41,20 @@ message RequestReadDir {
   string path = 1;
 };
 
+// Read a part of a file.
 message RequestReadFile {
   string path = 1;
+  // Bytes to read, at most READ_FILE_MAX_SIZE (usbsas-utils)
   uint64 size = 2;
+  // Offset in bytes
   uint64 offset = 3;
 };
 
+// Read raw sectors of the opened device (disk image).
 message RequestReadSectors {
+  // First sector
   uint64 offset = 1;
+  // Number of sectors
   uint64 count = 2;
 };
 
@@ -67,7 +75,9 @@ message Request {
 
 /* Responses */
 message ResponseOpenDevice {
+  // Sector size in bytes
   uint64 block_size = 1;
+  // Device size in bytes
   uint64 dev_size = 2;
 };
 

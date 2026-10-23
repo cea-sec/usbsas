@@ -2,43 +2,59 @@ syntax = "proto3";
 package writedst;
 import "common.proto3";
 
+// Protocol of the processes writing files: files2tar (tar archive) and files2fs
+// (file system image).
+
 /* Requests */
 
 message RequestEnd {
 };
 
+// Create a new file system (files2fs).
 message RequestInit {
+  // Size of the destination device in bytes
   uint64 dev_size = 2;
   common.FsType fstype = 3;
 };
 
+// Start a new file. Directories must be created before their content.
 message RequestNewFile {
   string path = 1;
   uint64 size = 2;
   common.FileType ftype = 3;
+  // Modification time (Unix timestamp, seconds)
   int64 timestamp = 4;
 };
 
+// Write data in the current file.
 message RequestWriteFile {
   string path = 1;
+  // Offset in bytes
   uint64 offset = 2;
   bytes data = 3;
 };
 
+// Finish the current file.
 message RequestEndFile {
   string path = 1;
 };
 
+// Finalize the archive / file system.
 message RequestClose {
 };
 
+// Switch to raw mode (files2fs): data is written as is with WriteData,
+// used for disk images.
 message RequestWriteRaw {
 };
 
+// Append raw data (after WriteRaw).
 message RequestWriteData {
   bytes data = 1;
 };
 
+// Get the next chunk of the bit vector of the sectors used by the file system
+// (files2fs, after Close), so that only those are written to the device.
 message RequestBitVec {
 };
 
@@ -74,7 +90,9 @@ message ResponseClose {
 };
 
 message ResponseBitVec {
+  // One bit per sector
   bytes chunk = 1;
+  // This is the last chunk
   bool last = 2;
 };
 

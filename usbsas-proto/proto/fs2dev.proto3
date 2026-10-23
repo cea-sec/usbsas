@@ -2,21 +2,31 @@ syntax = "proto3";
 package fs2dev;
 import "common.proto3";
 
+// Protocol of fs2dev, the only process writing to the destination USB device.
+// It starts locked and opens the device when unlocked with its bus and device
+// numbers.
+
 
 /* Requests */
 
 message RequestEnd {
 };
 
+// Get the size of the device.
 message RequestDevSize {
 };
 
+// Write the file system image to the device (only the sectors set in the
+// loaded bit vector). Status responses follow.
 message RequestWriteFs {
 };
 
+// Fill the device with zeros. Status responses follow.
 message RequestWipe {
 };
 
+// Load a chunk of the bit vector of sectors to write (see
+// writedst.RequestBitVec).
 message RequestLoadBitVec {
   bytes chunk = 1;
   bool last = 2;
@@ -36,6 +46,7 @@ message Request {
 
 /* Responses */
 message ResponseDevSize {
+  // Size in bytes
   uint64 size = 1;
 };
 

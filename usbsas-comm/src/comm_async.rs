@@ -141,7 +141,6 @@ protorequest_async!(
     GetAttr,
     ImgDisk,
     InitTransfer,
-    OpenDevice,
     OpenPartition,
     Partitions,
     ReadDir,

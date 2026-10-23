@@ -70,7 +70,6 @@ class CommUsbsas(Comm):
         "GetAttr": proto_usbsas.RequestGetAttr,
         "ImgDisk": proto_usbsas.RequestImgDisk,
         "InitTransfer": proto_usbsas.RequestInitTransfer,
-        "OpenDevice": proto_usbsas.RequestOpenDevice,
         "OpenPartition": proto_usbsas.RequestOpenPartition,
         "Partitions": proto_usbsas.RequestPartitions,
         "ReadDir": proto_usbsas.RequestReadDir,
@@ -86,7 +85,6 @@ class CommUsbsas(Comm):
         "GetAttr": proto_usbsas.ResponseGetAttr,
         "ImgDisk": proto_usbsas.ResponseImgDisk,
         "InitTransfer": proto_usbsas.ResponseInitTransfer,
-        "OpenDevice": proto_usbsas.ResponseOpenDevice,
         "OpenPartition": proto_usbsas.ResponseOpenPartition,
         "Partitions": proto_usbsas.ResponsePartitions,
         "ReadDir": proto_usbsas.ResponseReadDir,
@@ -124,10 +122,6 @@ class CommUsbsas(Comm):
 
     def userid(self):
         self.send_req(proto_usbsas.RequestUserId())
-        return self.recv_resp()
-
-    def open_device(self, device):
-        self.send_req(proto_usbsas.RequestOpenDevice(device=device))
         return self.recv_resp()
 
     def init_transfer(self, src, dst, fstype=proto_common.FsType.NTFS, pin=None):

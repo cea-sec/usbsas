@@ -2,9 +2,14 @@ syntax = "proto3";
 package uploader;
 import public "common.proto3";
 
+// Protocol of the uploader, which uploads the session tar (or clean tar) to a
+// destination network.
+
 /* Requests */
 
+// Upload the tar. Status responses follow.
 message RequestUpload {
+  // User id
   string id = 1;
   common.Network network = 2;
 };
