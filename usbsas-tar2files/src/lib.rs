@@ -222,19 +222,11 @@ impl MainLoopState {
 
     fn readdir(&mut self, comm: &mut ComRpFiles, path: &str) -> Result<()> {
         debug!("req read_dir {path}");
-        let path = path.trim_start_matches('/');
+        let path = path.trim_matches('/');
         let filesinfo = self
             .metadata
             .iter()
-            .filter(|(entry, _)| {
-                entry.starts_with(path)
-                    && !entry
-                        .strip_prefix(path)
-                        .unwrap()
-                        .trim_start_matches('/')
-                        .contains('/')
-                    && entry != &path
-            })
+            .filter(|(entry, _)| parent_dir(entry) == path)
             .map(|(entry, attrs)| FileInfo {
                 path: entry.clone(),
                 ftype: attrs.ftype.into(),
@@ -245,6 +237,12 @@ impl MainLoopState {
 
         Ok(comm.readdir(proto::files::ResponseReadDir { filesinfo })?)
     }
+}
+
+/// Parent directory of an archive path (without leading or trailing '/'),
+/// `""` for the root.
+fn parent_dir(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(parent, _)| parent)
 }
 
 impl WaitEndState {
@@ -288,5 +286,18 @@ impl Tar2Files {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parent_dir;
+
+    #[test]
+    fn test_parent_dir() {
+        assert_eq!(parent_dir("a"), "");
+        assert_eq!(parent_dir("a/b"), "a");
+        assert_eq!(parent_dir("ab"), "");
+        assert_eq!(parent_dir("a/b/c"), "a/b");
     }
 }
