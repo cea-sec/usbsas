@@ -985,7 +985,15 @@ impl RunState for AnalyzeState {
                         }
                     }
                 }),
-                _ => panic!("unsupported"),
+                _ => {
+                    comm.error("Unsupported remote analyzer version")?;
+                    let report = self
+                        .transfer
+                        .to_report("Unsupported remote analyzer version");
+                    return Ok(State::End(EndState {
+                        report: Some(report),
+                    }));
+                }
             }
         } else {
             comm.error("Error analyzing files")?;
