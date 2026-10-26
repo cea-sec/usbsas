@@ -35,7 +35,8 @@ impl MockMassStorage {
         Ok(buf)
     }
 
-    pub fn scsi_write_10(&mut self, buffer: &[u8], offset: u64, _: u64) -> Result<(), io::Error> {
+    /// Write `buffer` at sector `offset`.
+    pub fn scsi_write(&mut self, buffer: &[u8], offset: u64, _: u64) -> Result<(), io::Error> {
         self.fakedev
             .seek(SeekFrom::Start(offset * self.block_size as u64))?;
         self.fakedev.write_all(buffer)

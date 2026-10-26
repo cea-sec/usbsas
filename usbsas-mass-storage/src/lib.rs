@@ -1,4 +1,8 @@
 //! Mass storage structs used by usbsas processes.
+//!
+//! - [`MassStorage`] accesses a USB device with SCSI commands (dev2scsi,
+//!   fs2dev).
+//! - [`MassStorageComm`] reads sectors from dev2scsi (scsi2files).
 
 use positioned_io2::ReadAt;
 use rusb::{DeviceHandle, Direction, GlobalContext, TransferType, UsbContext};
@@ -14,6 +18,7 @@ use usbsas_comm::{ComRqScsi, ProtoReqScsi};
 use usbsas_proto as proto;
 use usbsas_scsi::ScsiUsb;
 
+/// Errors of this crate.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -25,25 +30,37 @@ pub enum Error {
     #[error("{0}")]
     Error(String),
 }
+/// Result type of this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Reads of at most this number of sectors are cached by [`MassStorageComm`].
 pub const MAX_SECTORS_COUNT_CACHE: u64 = 8;
 const MSC_SUBCLASS_RBC: u8 = 0x1; // Reduced Block Commands
 const MSC_SUBCLASS_MMC5: u8 = 0x2; // Multi-Media Commands (CD/DVD)
 const MSC_SUBCLASS_SCSI_TR: u8 = 0x6; // SCSI transparent command set
 const MSC_PROTOCOL_CLASS_BULK_ONLY: u8 = 0x50;
 
-// Mass storage struct used by dev2scsi
+/// Mass storage struct used by dev2scsi
+///
+/// USB mass storage device accessed with SCSI commands over bulk transfers.
+/// Reads (`Read`, `ReadAt`) must be sector aligned.
 pub struct MassStorage {
     scsiusb: RwLock<ScsiUsb<DeviceHandle<GlobalContext>>>,
+    /// Last logical block address
     pub max_lba: u64,
+    /// Sector size in bytes
     pub block_size: u32,
+    /// Device size in bytes
     pub dev_size: u64,
+    /// Current position for `Read`
     pub pos: u64,
+    /// Opened device file, kept open as long as libusb uses it
     _inner: Option<File>,
 }
 
 impl MassStorage {
+    /// Initialize the device (reset and retry once on failure) and read its
+    /// capacity.
     fn new(mut scsiusb: ScsiUsb<DeviceHandle<GlobalContext>>, file: Option<File>) -> Result<Self> {
         let capacity = match scsiusb.init_mass_storage() {
             Ok(capacity) => capacity,
@@ -66,6 +83,9 @@ impl MassStorage {
         })
     }
 
+    /// Use an opened `/dev/bus/usb/BBB/DDD` file: find a bulk only mass storage
+    /// interface (SCSI transparent, RBC or MMC-5), detach the kernel driver,
+    /// claim the interface and initialize the device.
     pub fn from_opened_file(file: File) -> Result<Self> {
         rusb::disable_device_discovery()?;
         if !rusb::supports_detach_kernel_driver() {
@@ -115,6 +135,7 @@ impl MassStorage {
         Err(Error::Error("Couldn't init libusb with opened file".into()))
     }
 
+    /// Read `count` sectors starting at sector `offset`.
     pub fn read_sectors(&mut self, offset: u64, count: u64, block_size: usize) -> Result<Vec<u8>> {
         Ok(self
             .scsiusb
@@ -123,7 +144,9 @@ impl MassStorage {
             .read_sectors(offset, count, block_size)?)
     }
 
-    pub fn scsi_write_10(&mut self, buffer: &[u8], offset: u64, count: u64) -> Result<()> {
+    /// Write `count` sectors starting at sector `offset` then read back the
+    /// last one to check it.
+    pub fn scsi_write(&mut self, buffer: &[u8], offset: u64, count: u64) -> Result<()> {
         self.scsiusb
             .write()
             .map_err(|err| io::Error::other(format!("lock error: {err}")))?
@@ -224,22 +247,32 @@ impl ReadAt for MassStorage {
     }
 }
 
-// mass storage struct used by scsi2files
+/// mass storage struct used by scsi2files
+///
+/// Reads sectors from dev2scsi. Positions are relative to the start of the
+/// opened partition and don't need to be sector aligned.
 pub struct MassStorageComm {
+    /// Sector size in bytes
     pub block_size: u32,
+    /// Current position in the partition, in bytes
     pub seek: u64,
+    /// Device size in bytes
     pub dev_size: u64,
+    /// First sector of the opened partition
     pub partition_sector_start: u64,
-    // Byte length of the currently opened partition, needed to resolve
-    // SeekFrom::End
+    /// Byte length of the currently opened partition, needed to resolve
+    /// SeekFrom::End
     pub partition_size: u64,
+    /// Channel to dev2scsi
     // RwLock because we need to impl ReadAt which takes a non mut ref
     pub comm: Arc<RwLock<ComRqScsi>>,
-    // Small cache to avoid reading the same sectors multiple time
+    /// Small cache to avoid reading the same sectors multiple time
     pub cache: RwLock<lru::LruCache<(u64, u64), Vec<u8>>>,
 }
 
 impl MassStorageComm {
+    /// New reader using `comm` to talk to dev2scsi. Sizes and partition must
+    /// be set once known.
     pub fn new(comm: ComRqScsi) -> Self {
         MassStorageComm {
             block_size: 0,
@@ -256,12 +289,15 @@ impl MassStorageComm {
         }
     }
 
+    /// Lock the channel to dev2scsi.
     pub fn comm(&self) -> Result<std::sync::RwLockWriteGuard<'_, ComRqScsi>> {
         self.comm
             .write()
             .map_err(|err| Error::Error(format!("comm lock error: {err}")))
     }
 
+    /// Read `count` sectors starting at sector `offset` of the device (not of
+    /// the partition).
     pub fn read_sectors(&self, offset: u64, count: u64) -> io::Result<Vec<u8>> {
         // Don't cache data if we're reading a lot of sectors,
         // it's probably a file (only read once) and not FS stuff

@@ -243,7 +243,7 @@ impl CopyingState {
                 .take(pad as usize)
                 .for_each(|b| *b = 0);
 
-            self.mass_storage.scsi_write_10(
+            self.mass_storage.scsi_write(
                 &buffer[..size as usize + pad as usize],
                 sector_start,
                 sector_count,
@@ -283,8 +283,9 @@ impl WipingState {
                 sector_count = todo / SECTOR_SIZE;
                 buffer.truncate(todo as usize);
             }
+
             self.mass_storage
-                .scsi_write_10(&buffer, sector_index, sector_count)?;
+                .scsi_write(&buffer, sector_index, sector_count)?;
             current_size += buffer.len() as u64;
 
             todo -= buffer.len() as u64;
