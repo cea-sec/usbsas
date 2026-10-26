@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-/// Sense key
+/// Sense key, as defined by SPC (SCSI Primary Commands).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SenseKey {
     NoSense,
@@ -56,6 +56,7 @@ pub const ASC_INVALID_FIELD_IN_CDB: u8 = 0x24;
 /// Decoded sense data, independent of the response format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SenseData {
+    /// Sense key.
     pub key: SenseKey,
     /// Additional sense code.
     pub asc: u8,

@@ -2,6 +2,16 @@
 //!
 //! [`ScsiUsb`] drives a USB mass storage device directly through rusb (libusb
 //! rust bindings):
+//!
+//! - commands are wrapped in Command Block Wrappers (CBW) sent on the bulk out
+//!   endpoint, data moves on the bulk endpoints and the device answers with a
+//!   Command Status Wrapper (CSW),
+//! - [`ScsiUsb::init_mass_storage`] selects a ready logical unit and reads its
+//!   capacity, switching to 16-byte commands for large devices,
+//! - blocks are then read and written with READ / WRITE (10 or 16).
+//!
+//! The USB handle is abstracted by [`UsbTransport`] so that the protocol can be
+//! tested against a simulated device (see `tests/simulated_device.rs`).
 
 mod bot;
 mod cdb;
@@ -59,6 +69,7 @@ pub struct Capacity {
 }
 
 impl Capacity {
+    /// Number of blocks of the device.
     pub fn block_count(&self) -> u64 {
         self.max_lba.saturating_add(1)
     }
@@ -81,8 +92,11 @@ impl Capacity {
 /// [`ScsiUsb::detect_16_byte_support`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Support16 {
+    /// READ CAPACITY(16) is accepted
     pub read_capacity_16: bool,
+    /// READ(16) is accepted
     pub read_16: bool,
+    /// WRITE(16) is accepted
     pub write_16: bool,
 }
 
@@ -156,6 +170,7 @@ impl<H: UsbTransport> ScsiUsb<H> {
         }
     }
 
+    /// Underlying USB handle.
     pub fn handle(&self) -> &H {
         &self.handle
     }
