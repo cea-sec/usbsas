@@ -1,6 +1,6 @@
 # Barbacane — Document de conception (phase 0)
 
-Statut : **proposition, en attente de validation**. Aucun code applicatif n'est écrit.
+Statut : **validé** (voir §8 pour les décisions).
 
 Base étudiée : usbsas `usbsas-usbsas` 0.3.4, commit `69ebcf4` (dépôt courant).
 
@@ -146,7 +146,7 @@ l'étape 3 : la clé rebranchée/présente doit avoir le même VID/PID/série.
 Remarque : le transfert B reformate de toute façon ; le `Wipe` sert à
 l'effacement complet (zéros) des données d'origine, y compris l'espace libre.
 Le port d'entrée doit aussi être autorisé en sortie pour cette opération
-(`ports_dst` ⊇ port d'entrée) **ou** demander de déplacer la clé : à trancher (Q3).
+(`ports_dst` ⊇ port d'entrée) : la clé reste sur son port.
 
 ### 4.4 exFAT
 Déjà géré par `files2fs` (`FsType::EXFAT`). Rien à faire. Taille max de
@@ -156,9 +156,8 @@ fichier : la limite 4 Go ne s'applique qu'à FAT (`max_file_size` dans `states.r
 
 - Pour chaque fichier du tar : sha256, type réel (crate `infer` + `file`/libmagic optionnel), ClamAV, YARA.
 - Conteneur reconnu (signature magique, pas l'extension) → extraction sandboxée avec `7zz x` (formats : tout ce que 7-Zip ouvre), puis récursion.
-- **Zed** (Prim'X) : détection par signature d'en-tête (à établir sur échantillons, à fournir) → `DIRTY`, « conteneur Zed non pris en charge ».
 - Chiffré : `7zz l -slt` (`Encrypted = +`) ou code retour « Wrong password » → §4.1.
-- Limites (par transfert) : profondeur 5, 10 000 fichiers, 4 Go décompressés, ratio max (proposé 100:1 par conteneur), durée max par conteneur ; dépassement → conteneur `DIRTY` avec raison explicite, fichiers déjà validés conservés ? **→ Q4**.
+- Limites (par transfert) : profondeur 5, 10 000 fichiers, 4 Go décompressés, ratio max (proposé 100:1 par conteneur), durée max par conteneur ; dépassement → conteneur `DIRTY` avec raison explicite, fichiers déjà validés conservés ? → conteneur entier refusé.
 - Noms : normalisation, rejet de `..`, chemins absolus, liens symboliques/matériels, caractères de contrôle ; longueur max ; collisions de casse.
 - Verdict d'un **conteneur** pour usbsas : `CLEAN` seulement si lui et tout son contenu sont sains ; sinon `DIRTY` et ses enfants sains vont en sortie via §4.2.
 - Analyseur indisponible / clamd hors service → **tout refusé** (fail-closed).
@@ -179,13 +178,13 @@ dynamique. Le client sera un fork (autorisé par la consigne).
 | Champs ajoutés au rapport refusés par `AnalyzeReport` | rapport détaillé servi par l'API Barbacane, rapport usbsas minimal |
 | Différence de comportement usbsas entre versions | version épinglée, tests e2e mock en CI |
 | Clavier virtuel : observation par épaule | masquage des caractères, pas de journalisation |
-| RAM des HP/Dell cibles | à connaître (Q5) pour dimensionner tmpfs |
+| RAM des HP/Dell cibles | 16 Go : tmpfs 6 Go + 6 Go |
 
-## 7. Questions à valider
-1. **Option C (deux transferts, zéro patch) pour §4.2/4.3** : validée ? (sinon option A avec patch cœur.)
-2. **Organisation du dépôt** : le dépôt actuel `Titouanlvt/usbsas` est un fork d'usbsas, pas un dépôt `barbacane` avec `upstream/usbsas` en sous-module (§7 du cahier). Créer un dépôt `barbacane` séparé, ou réorganiser celui-ci ? Et quel tag usbsas épingler (le code est à 0.3.4 + commits de `main`) ?
-3. **Blanchir** : la clé inconnue reste-t-elle sur le port d'entrée (qui doit alors aussi être déclaré port de sortie), ou l'utilisateur la déplace-t-il sur le port de sortie avant l'effacement ?
-4. **Limite dépassée dans une archive** : on refuse tout le conteneur, ou on garde les fichiers sains déjà extraits avant le dépassement ? (proposition : refuser tout le conteneur, plus prévisible.)
-5. **Matériel** : RAM minimale des bornes (dimensionne le tmpfs de 4 Go+) ?
-6. **Zed** : pouvez-vous fournir des conteneurs Zed d'exemple pour établir la signature ?
-7. Présentation des fichiers extraits sur la clé : `a.zip.extrait/` vous convient ?
+## 7. Décisions (validées)
+1. §4.2/4.3 : **option C**, deux transferts via dossier de préparation, aucun patch du cœur.
+2. Dépôt : on garde ce fork. Le code usbsas reste **inchangé** à la racine (épinglé sur le commit upstream `69ebcf4`) ; tout Barbacane vit sous `barbacane/` (`analyzer/`, `client/`, `update/`, `system/`, `tests/`) avec son propre workspace Cargo. `docs/` à la racine. Toute divergence du code usbsas est listée dans `docs/ecarts-upstream.md`.
+3. Blanchir : la clé reste sur le port d'entrée, qui est donc aussi déclaré dans `ports_dst`.
+4. Limite dépassée dans une archive : **tout le conteneur est refusé**.
+5. Bornes : 16 Go de RAM → tmpfs de préparation 6 Go, tmpfs d'extraction 6 Go.
+6. **Zed abandonné** : aucune détection spécifique ; un conteneur Zed est traité comme un fichier inconnu (analysé, non extrait).
+7. Fichiers extraits d'une archive refusée : dossier `<archive>.extrait/` sur la clé de sortie.
