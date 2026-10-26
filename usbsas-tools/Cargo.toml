@@ -30,9 +30,9 @@ usbsas-utils = { path = "../usbsas-utils", optional = true }
 [features]
 devmonitor = ["udev", "mio"]
 imager = ["indicatif", "tempfile", "usbsas-config", "usbsas-utils"]
-fswriter = ["bitvec"]
+fswriter = ["bitvec", "indicatif", "usbsas-utils"]
 fuse-mount = ["fuse_mt", "libc", "time", "nix"]
-net = ["serde_json"]
+net = ["serde_json", "usbsas-config", "usbsas-utils"]
 default = ["imager", "fswriter", "fuse-mount", "net", "devmonitor"]
 
 [[bin]]
