@@ -1,3 +1,9 @@
+//! Analyzer process: uploads the session tar to the remote analyzer and polls
+//! the result.
+//!
+//! States: `Init` (read configuration, spawn jsonparser, sandbox) -> `Running`
+//! (`Analyze`, `Report`) -> `WaitEnd` -> `End`.
+
 use crate::FileReaderProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
@@ -16,6 +22,7 @@ use usbsas_proto::{
     jsonparser::SrvResp,
 };
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -150,6 +157,7 @@ impl RunningState {
         Ok(report)
     }
 
+    /// POST the tar to `<url>/<user id>`, the response gives the analysis id.
     fn upload(&mut self, comm: &mut ComRpAnalyzer) -> Result<SrvResp> {
         trace!("upload");
         let file = self.file.take().ok_or(Error::BadRequest)?;
@@ -179,6 +187,8 @@ impl RunningState {
         Ok(response)
     }
 
+    /// GET `<url>/<user id>/<analysis id>` every second until the status is
+    /// `scanned`, then parse the report.
     fn poll_result(&mut self) -> Result<AnalyzeReport> {
         trace!("poll result");
         // XXX TODO timeout
@@ -238,12 +248,14 @@ impl WaitEndState {
     }
 }
 
+/// Analyzer process.
 pub struct Analyzer {
     comm: ComRpAnalyzer,
     state: State,
 }
 
 impl Analyzer {
+    /// New analyzer of the tar at `tarpath`.
     pub fn new(comm: ComRpAnalyzer, tarpath: String, config_path: String) -> Result<Self> {
         let state = State::Init(InitState {
             tarpath,
@@ -252,6 +264,8 @@ impl Analyzer {
         Ok(Analyzer { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {

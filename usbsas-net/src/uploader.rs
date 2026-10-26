@@ -1,3 +1,9 @@
+//! Uploader process: uploads the session tar (or clean tar) to a destination
+//! network.
+//!
+//! States: `Init` (sandbox, wait for unlock value) -> `Running` (`Upload`) ->
+//! `WaitEnd` -> `End`.
+
 use crate::{Error, FileReaderProgress, HttpClient, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, trace};
@@ -8,6 +14,7 @@ use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{common::Status, uploader::request::Msg};
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -109,6 +116,7 @@ impl RunningState {
         }
     }
 
+    /// POST the tar to `<network url>/<user id>`.
     fn upload(
         &mut self,
         comm: &mut ComRpUploader,
@@ -173,12 +181,14 @@ impl WaitEndState {
     }
 }
 
+/// Uploader process.
 pub struct Uploader {
     comm: ComRpUploader,
     state: State,
 }
 
 impl Uploader {
+    /// New uploader of the tar at `tarpath` (or the clean tar next to it).
     pub fn new(comm: ComRpUploader, tarpath: String, config_path: String) -> Result<Self> {
         let state = State::Init(InitState {
             tarpath,
@@ -187,6 +197,8 @@ impl Uploader {
         Ok(Uploader { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {

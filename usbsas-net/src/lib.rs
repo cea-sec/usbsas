@@ -1,4 +1,8 @@
 //! usbsas's uploader, downloader and analyzer processes.
+//!
+//! Also the jsonparser, which parses the analyzer's responses in its own
+//! sandboxed process. HTTP requests are made with `reqwest`, with optional
+//! Kerberos authentication (`authkrb` feature).
 
 pub mod analyzer;
 pub mod downloader;
@@ -33,6 +37,7 @@ use usbsas_proto::common::Status;
 
 use thiserror::Error;
 
+/// Paths readable by the network processes (DNS, TLS, libraries...).
 const NET_PATHS_RO: &[&str] = &[
     "/etc/host.conf",
     "/etc/hosts",
@@ -47,6 +52,7 @@ const NET_PATHS_RO: &[&str] = &[
     "/lib/",
     "/var/lib/usbsas",
 ];
+/// Paths readable for Kerberos authentication.
 #[cfg(feature = "authkrb")]
 const KRB5_PATHS_RO: &[&str] = &[
     "/etc/gss",
@@ -54,9 +60,12 @@ const KRB5_PATHS_RO: &[&str] = &[
     "/etc/krb5.conf",
     "/etc/krb5.conf.d",
 ];
+/// Port of the Kerberos authentication server.
 #[cfg(feature = "authkrb")]
 const KRB_AS_PORT: u16 = 88;
 
+/// File reader sending `Status` responses to the parent (at most one per
+/// percent), used as upload body.
 struct FileReaderProgress<T> {
     comm: T,
     file: File,
@@ -80,6 +89,8 @@ impl<T: ProtoRespCommon> Read for FileReaderProgress<T> {
     }
 }
 
+/// File writer sending `Status` responses to the parent (at most one per
+/// percent), used for downloads.
 struct FileWriterProgress<T> {
     comm: T,
     file: File,
@@ -105,6 +116,7 @@ impl<T: ProtoRespCommon> Write for FileWriterProgress<T> {
     }
 }
 
+/// Errors of the network processes.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -148,6 +160,7 @@ pub enum Error {
     #[error("{0}")]
     Upload(String),
 }
+/// Result type of the network processes.
 pub type Result<T> = std::result::Result<T, Error>;
 
 // Wrapper around reqwest::Client to transparently perform kerberos authentication
@@ -172,6 +185,8 @@ impl HttpClient {
         })
     }
 
+    /// Authenticate with Kerberos (SPNEGO, mutual authentication) and send
+    /// the request again with the `Authorization` header.
     #[cfg(feature = "authkrb")]
     fn req_with_krb_auth(&mut self, method: reqwest::Method, url: &str) -> Result<Response> {
         let mut resp_ret: Option<Response> = None;
@@ -245,6 +260,7 @@ impl HttpClient {
         }
     }
 
+    /// GET request, authenticating if the server answers 401.
     fn get(&mut self, url: &str) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
@@ -256,6 +272,7 @@ impl HttpClient {
         Ok(resp)
     }
 
+    /// HEAD request, authenticating if the server answers 401.
     fn head(&mut self, url: &str) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
@@ -267,6 +284,7 @@ impl HttpClient {
         Ok(resp)
     }
 
+    /// POST request. With Kerberos, an OPTIONS request authenticates first.
     fn post(&mut self, url: &str, body: Body) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
