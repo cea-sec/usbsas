@@ -59,6 +59,9 @@ pub struct Scanner<'a> {
     pub limits: &'a Limits,
     pub job: &'a Job,
     pub work: PathBuf,
+    /// Lecture de la clé admin : les paquets `*.bcu` / `*.bcu.minisig` sont déposés ici, sans analyse
+    /// (leur signature est vérifiée par barbacane-admind).
+    pub import: Option<PathBuf>,
 }
 
 const TAR_DATA_DIR: &str = "data/";
@@ -104,6 +107,30 @@ impl Scanner<'_> {
         let mut budget = Budget { files: 0, size: 0 };
         let mut out = Vec::new();
         for (i, (path, local)) in files.into_iter().enumerate() {
+            if let Some(dir) = &self.import
+                && !path.contains('/')
+                && (path.ends_with(".bcu") || path.ends_with(".bcu.minisig"))
+            {
+                std::fs::create_dir_all(dir)?;
+                std::fs::copy(&local, dir.join(&path))?;
+                let (size, sha256) = hash(&local).unwrap_or((0, String::new()));
+                out.push(Entry {
+                    path,
+                    container: None,
+                    size,
+                    sha256,
+                    file_type: "paquet de mise à jour".into(),
+                    verdict: Verdict::Dirty,
+                    reason:
+                        "paquet de mise à jour : transmis au service d'administration, non copié"
+                            .into(),
+                    engine: None,
+                    signature: None,
+                    output: None,
+                    local,
+                });
+                continue;
+            }
             let mut node = self.node(&local, path.clone(), None, 0, &mut budget);
             assign_output(&mut node, path);
             flatten(node, &mut out);

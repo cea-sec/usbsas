@@ -31,6 +31,8 @@ struct App {
     engines: av::Engines,
     extractor: extract::Extractor,
     jobs: Mutex<HashMap<String, Arc<Job>>>,
+    /// La prochaine analyse est la lecture d'une clé admin (paquets de mise à jour)
+    import_armed: std::sync::atomic::AtomicBool,
 }
 
 type Shared = Arc<App>;
@@ -64,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
         engines,
         extractor,
         jobs: Mutex::new(HashMap::new()),
+        import_armed: Default::default(),
     });
     let router = Router::new()
         .route("/", get(|| async { "barbacane-analyzer" }))
@@ -75,6 +78,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/barbacane/v1/scans/{id}/password", post(password))
         .route("/barbacane/v1/scans/{id}/report", get(detailed))
         .route("/barbacane/v1/scans/{id}/stage", post(stage_req))
+        .route("/barbacane/v1/import/arm", post(arm_import))
         .with_state(app);
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     log::info!("écoute sur {listen}");
@@ -125,12 +129,16 @@ async fn upload(State(app): State<Shared>, Path(uid): Path<String>, body: Body) 
         jobs.insert(job.id.clone(), job.clone());
     }
     log::info!("analyse {} pour {uid}", job.id);
+    let import = app
+        .import_armed
+        .swap(false, std::sync::atomic::Ordering::SeqCst)
+        .then(|| app.conf.import_dir.clone());
     let (app2, job2) = (app.clone(), job.clone());
-    tokio::task::spawn_blocking(move || run_scan(&app2, &job2, &tar_path));
+    tokio::task::spawn_blocking(move || run_scan(&app2, &job2, &tar_path, import));
     Json(json!({"id": job.id, "status": "uploaded"})).into_response()
 }
 
-fn run_scan(app: &App, job: &Job, tar_path: &std::path::Path) {
+fn run_scan(app: &App, job: &Job, tar_path: &std::path::Path, import: Option<std::path::PathBuf>) {
     let av = app.engines.clamav_version();
     {
         let mut s = job.lock();
@@ -149,6 +157,7 @@ fn run_scan(app: &App, job: &Job, tar_path: &std::path::Path) {
         limits: &app.conf.limits,
         job,
         work: job.work.path().to_path_buf(),
+        import,
     };
     // Sans antivirus, rien ne passe : l'analyse échoue (usbsas avorte le transfert).
     let res = av.and_then(|_| scanner.run(tar_path));
@@ -273,6 +282,13 @@ async fn stage_req(
         Ok(Err(e)) => err(StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")),
         Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e),
     }
+}
+
+async fn arm_import(State(app): State<Shared>) -> Response {
+    app.import_armed
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    log::info!("prochaine lecture : clé administrateur (paquets de mise à jour)");
+    StatusCode::NO_CONTENT.into_response()
 }
 
 async fn status(State(app): State<Shared>) -> Response {

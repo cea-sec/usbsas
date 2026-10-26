@@ -22,6 +22,8 @@ pub struct Config {
     pub stage_dir: PathBuf,
     /// Rapports JSON détaillés conservés localement
     pub reports_dir: Option<PathBuf>,
+    /// Paquets de mise à jour lus sur la clé admin (après armement par barbacane-admind)
+    pub import_dir: PathBuf,
     /// Nombre de rapports locaux conservés (rotation)
     pub max_reports: usize,
     pub limits: Limits,
@@ -71,6 +73,7 @@ impl Default for Config {
             bwrap: Some("/usr/bin/bwrap".into()),
             stage_dir: "/var/lib/barbacane/sortie".into(),
             reports_dir: Some("/var/lib/barbacane/rapports".into()),
+            import_dir: "/var/lib/barbacane/import".into(),
             max_reports: 5000,
             limits: Limits::default(),
             server: None,

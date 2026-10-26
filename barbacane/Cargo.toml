@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["analyzer", "parcours"]
+members = ["analyzer", "parcours", "client", "admind"]
 
 [workspace.package]
 version = "0.1.0"

@@ -90,6 +90,7 @@ seven_zip = "{z}"
 bwrap = "{b}"
 stage_dir = "{st}"
 reports_dir = "{r}"
+import_dir = "{i}"
 [limits]
 max_files = 50
 max_total_size = 20000000
@@ -102,6 +103,7 @@ password_timeout = 2
             b = which(&["bwrap"]).display(),
             st = stage.display(),
             r = dir.join("rapports").display(),
+            i = dir.join("import").display(),
         ),
     )
     .unwrap();
@@ -406,6 +408,47 @@ fn clamd_absent_refuse_tout() {
         .unwrap();
     // usbsas avorte le transfert sur tout statut autre que « scanned ».
     assert_eq!(u["status"], "error");
+}
+
+#[test]
+fn import_cle_admin() {
+    let tmp = tempfile::tempdir().unwrap();
+    let cle = tmp.path().join("cle");
+    std::fs::create_dir(&cle).unwrap();
+    std::fs::write(cle.join("barbacane-maj-000002.bcu"), b"(\xb5/\xfd paquet").unwrap();
+    std::fs::write(cle.join("barbacane-maj-000002.bcu.minisig"), "sig").unwrap();
+    std::fs::write(cle.join("autre.txt"), "x").unwrap();
+    let tar = tmp.path().join("b.tar");
+    make_tar(&cle, &tar);
+    let a = start_analyzer(tmp.path(), 18044);
+    // Sans armement : rien n'est déposé.
+    scan(&a, &tar, &HashMap::new());
+    assert!(!tmp.path().join("import").exists());
+    let r = a
+        .http
+        .post(format!("{}/barbacane/v1/import/arm", a.url))
+        .send()
+        .unwrap();
+    assert!(r.status().is_success());
+    let id = scan(&a, &tar, &HashMap::new());
+    let imp = tmp.path().join("import");
+    assert!(
+        imp.join("barbacane-maj-000002.bcu").is_file()
+            && imp.join("barbacane-maj-000002.bcu.minisig").is_file()
+    );
+    assert!(!imp.join("autre.txt").exists());
+    let u: Value = a
+        .http
+        .get(format!("{}/api/scanbundle/borne1/{id}", a.url))
+        .send()
+        .unwrap()
+        .json()
+        .unwrap();
+    assert_eq!(
+        u["files"]["barbacane-maj-000002.bcu"]["status"], "DIRTY",
+        "jamais copié vers une clé de sortie"
+    );
+    assert_eq!(u["files"]["autre.txt"]["status"], "CLEAN");
 }
 
 fn walk(d: &Path) -> Vec<PathBuf> {

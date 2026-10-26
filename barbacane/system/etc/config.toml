@@ -26,6 +26,12 @@ path = "/var/lib/barbacane/sortie"
 description = "Fichiers sains"
 longdescr = "Fichiers sains préparés par Barbacane"
 
+# Export des journaux et rapports (mode administrateur), préparé par barbacane-admind
+[[src_local_dirs]]
+path = "/var/lib/barbacane/export"
+description = "Export"
+longdescr = "Journaux et rapports de la borne"
+
 # Le rapport Barbacane (texte + HTML) remplace celui d'usbsas sur la clé de sortie
 [report]
 write_dest = false

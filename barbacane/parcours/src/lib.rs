@@ -72,6 +72,9 @@ pub enum Event {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct PasswordRequest {
+    /// Analyse concernée (rempli par le suivi, absent de la réponse de l'analyseur)
+    #[serde(default)]
+    pub job: String,
     pub archive: String,
     pub attempt: u32,
     pub max_attempts: u32,
@@ -214,8 +217,8 @@ impl Analyzer {
 #[derive(Debug, Clone, Default)]
 pub struct Devices {
     pub usb: Vec<(u64, UsbDevice)>,
-    /// Dossier de préparation (`[[src_local_dirs]]`)
-    pub stage: Option<u64>,
+    /// Dossiers locaux (`[[src_local_dirs]]`) : identifiant, chemin
+    pub local_dirs: Vec<(u64, String)>,
     /// Destination « commande » utilisée pour l'analyse seule
     pub sink: Option<u64>,
 }
@@ -235,6 +238,14 @@ impl Devices {
             .find(|(_, d)| {
                 d.serial == src.serial && d.vendorid == src.vendorid && d.productid == src.productid
             })
+            .map(|(id, _)| *id)
+    }
+
+    /// Dossier local déclaré dans la configuration usbsas.
+    pub fn local_dir(&self, path: &str) -> Option<u64> {
+        self.local_dirs
+            .iter()
+            .find(|(_, p)| p.trim_end_matches('/') == path.trim_end_matches('/'))
             .map(|(id, _)| *id)
     }
 
@@ -267,7 +278,7 @@ pub fn devices(comm: &mut impl ProtoReqUsbsas) -> Result<Devices> {
     for d in list {
         match d.device {
             Some(Device::Usb(u)) => out.usb.push((d.id, u)),
-            Some(Device::LocalDir(_)) => out.stage = Some(d.id),
+            Some(Device::LocalDir(l)) => out.local_dirs.push((d.id, l.path)),
             Some(Device::Command(_)) => out.sink = Some(d.id),
             _ => (),
         }
@@ -287,6 +298,7 @@ pub fn default_partition(parts: &[PartitionInfo]) -> Option<u32> {
 }
 
 /// Résultat de l'analyse d'une clé.
+#[derive(Debug)]
 pub struct Analysis {
     pub uid: String,
     pub report: Report,
@@ -351,12 +363,16 @@ pub fn analyse(
                         total: p.total,
                         scanned: p.scanned,
                     });
-                    if p.password_request != asked {
-                        let _ = ev.send(match &p.password_request {
+                    let mut req = p.password_request;
+                    if let Some(r) = req.as_mut() {
+                        r.job = p.id.clone();
+                    }
+                    if req != asked {
+                        let _ = ev.send(match &req {
                             Some(r) => Event::Password(r.clone()),
                             None => Event::PasswordDone,
                         });
-                        asked = p.password_request;
+                        asked = req;
                     }
                 }
                 std::thread::sleep(Duration::from_millis(300));

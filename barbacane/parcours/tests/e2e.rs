@@ -296,7 +296,14 @@ fn run(env: &Env, wipe_same: bool) -> parcours::Analysis {
     let mut s = session(env);
     let devs = parcours::devices(&mut s.comm).unwrap();
     let dst = devs.destinations().next().unwrap().0;
-    parcours::write(&mut s.comm, devs.stage.unwrap(), dst, &tx).unwrap();
+    parcours::write(
+        &mut s.comm,
+        devs.local_dir(env.dir.join("sortie").to_str().unwrap())
+            .unwrap(),
+        dst,
+        &tx,
+    )
+    .unwrap();
     end(s);
     drop(tx);
     let evs = h.join().unwrap();

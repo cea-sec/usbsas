@@ -1,0 +1,21 @@
+[package]
+name = "barbacane-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+barbacane-parcours = { path = "../parcours" }
+usbsas-comm = { path = "../../usbsas-comm" }
+iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "thread-pool", "advanced", "svg", "smol", "wayland"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+toml = "1.1.8"
+log = "0.4.34"
+env_logger = "0.11.11"
+zeroize = "1.9.1"
+smol = "2.0.2"
+
+[features]
+# Développement : fenêtre X11 (Xvfb) pour les tests d'interface automatisés
+x11 = ["iced/x11"]
