@@ -1,5 +1,7 @@
 //! Very basic remote analyse / upload / download server for `usbsas` using `clamav`.
 //! Mainly used for example and integration tests.
+//!
+//! Listens on `127.0.0.1:8042`, see the README for the API.
 
 use actix_files::NamedFile;
 use actix_web::{App, HttpResponse, HttpServer, Responder, get, head, http::header, post, web};
@@ -22,18 +24,24 @@ use tokio::io::AsyncWriteExt;
 
 const TAR_DATA_DIR: &str = "data/";
 
+/// State of an analysis.
 struct AnalyzeStatus {
+    /// `processing`, `scanned` or `error`
     status: String,
+    /// `CLEAN` or `DIRTY`, by path
     files: HashMap<String, String>,
 }
 
+/// State shared by the request handlers.
 struct AppState {
     working_dir: Mutex<String>,
+    /// Analyses, by analysis id
     current_scans: Mutex<HashMap<String, AnalyzeStatus>>,
     clamav: Mutex<Clamav>,
 }
 
 impl AppState {
+    /// Extract the `data/` directory of `tar` and scan it with clamd.
     fn analyze(&self, bundle_id: &str, tar: &str) -> Result<(), actix_web::Error> {
         let tmpdir = tempfile::Builder::new()
             .prefix(&bundle_id)
@@ -106,6 +114,7 @@ impl AppState {
         Ok(())
     }
 
+    /// Store a request body in `<working dir>/<new id>.tar`.
     async fn recv_file(
         &self,
         mut body: web::Payload,
@@ -125,6 +134,7 @@ impl AppState {
     }
 }
 
+/// Receive a tar and analyze it in a thread.
 #[post("/api/scanbundle/{id}")]
 async fn scan_bundle(
     body: web::Payload,
@@ -159,6 +169,7 @@ async fn scan_bundle(
     )))
 }
 
+/// Status of an analysis, with the report once it's done.
 #[get("/api/scanbundle/{id}/{bundle_id}")]
 async fn scan_result(
     params: web::Path<(String, String)>,
@@ -222,6 +233,7 @@ async fn scan_result(
     }
 }
 
+/// Receive a tar.
 #[post("/api/uploadbundle/{id}")]
 async fn upload_bundle(
     body: web::Payload,
@@ -232,6 +244,7 @@ async fn upload_bundle(
     Ok(HttpResponse::Ok())
 }
 
+/// Find `<filename>.tar`, `.tar.gz` or `.gz`, return its path and size.
 fn find_bundle(filename: &str) -> Result<(String, u64), actix_web::Error> {
     for ext in ["tar", "tar.gz", "gz"] {
         let bundle_path = format!("{filename}.{ext}");
@@ -245,6 +258,7 @@ fn find_bundle(filename: &str) -> Result<(String, u64), actix_web::Error> {
     )))
 }
 
+/// Uncompressed size of an archive to download.
 #[head("/api/downloadbundle/{id}/{bundle_id}")]
 async fn head_bundle_size(
     params: web::Path<(String, String)>,
@@ -278,6 +292,7 @@ async fn head_bundle_size(
         .finish())
 }
 
+/// Download an archive (gzip encoded if compressed).
 #[get("/api/downloadbundle/{id}/{bundle_id}")]
 async fn download_bundle(
     params: web::Path<(String, String)>,
@@ -298,18 +313,22 @@ async fn download_bundle(
     Ok(named_file)
 }
 
+/// Stop clamd.
 #[get("/shutdown")]
 async fn shutdown(data: web::Data<AppState>) -> Result<impl Responder, actix_web::Error> {
     data.clamav.lock().unwrap().cmd("SHUTDOWN")?;
     Ok(HttpResponse::Ok())
 }
 
+/// clamd process and its socket.
 struct Clamav {
     _process: process::Child,
     socket_path: String,
 }
 
 impl Clamav {
+    /// Start clamd and wait for its socket (up to 60s, while the database
+    /// loads).
     fn new(working_path: &str) -> io::Result<Self> {
         let clamav_config_path = format!("{working_path}/clamd.conf");
         let clamav_socket_path = format!("{working_path}/clamd.socket");
@@ -383,6 +402,7 @@ impl Clamav {
         })
     }
 
+    /// Send a command to clamd and return its response.
     fn cmd(&mut self, cmd: &str) -> io::Result<String> {
         let mut socket = UnixStream::connect(&self.socket_path)?;
         let mut response = String::new();
@@ -403,6 +423,7 @@ impl Clamav {
         Ok((clam_ver, db_ver, db_date))
     }
 
+    /// Scan a directory, return the paths of the infected files.
     fn analyze(&mut self, path: &str) -> io::Result<Vec<String>> {
         let response = self.cmd(&format!("CONTSCAN {path}"))?;
         log::debug!("{response:#?}");
