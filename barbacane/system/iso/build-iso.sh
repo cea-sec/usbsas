@@ -57,6 +57,7 @@ EXTRAS="$ICI/choisir-disque.sh $ICI/fin-installation.sh $ICI/configurer.sh $T/do
 [ -n "$CLE_PUB" ] && { cp "$CLE_PUB" "$T/maj.pub"; EXTRAS="$EXTRAS $T/maj.pub"; }
 cat > "$T/barbacane.conf" <<CONF
 profiles="barbacane"
+ARCH="amd64"
 ARCHES="amd64"
 auto_profiles="barbacane"
 debian_mirror="http://deb.debian.org/debian/"
@@ -69,7 +70,7 @@ id -u barbacane-iso >/dev/null 2>&1 || useradd --system --home-dir "$T" barbacan
 chown -R barbacane-iso "$T"
 chmod 755 "$T"
 (cd "$T" && runuser -u barbacane-iso -- env HOME="$T" \
-    build-simple-cdd --verbose --conf barbacane.conf --arch amd64 --dist trixie --locale fr_FR --keyboard fr)
+    build-simple-cdd --verbose --conf barbacane.conf --dist trixie --locale fr_FR --keyboard fr)
 ISO="$(find "$T/images" -name "*.iso" | head -n1)"
 
 # Menu de démarrage unique (BIOS et UEFI) : installation automatique après 10 s
