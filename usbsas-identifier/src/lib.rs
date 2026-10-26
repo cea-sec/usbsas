@@ -1,9 +1,16 @@
 //! Dummy identifier
+//!
+//! usbsas process giving the id of the user. This implementation always
+//! returns the same id (`Tartempion`), it's meant to be replaced by one
+//! identifying actual users (badge reader, smart card...).
+//!
+//! States: `Init` (seccomp) -> `Running` (`UserId` requests) -> `End`.
 
 use thiserror::Error;
 use usbsas_comm::{ComRpIdentifier, ProtoRespCommon, ProtoRespIdentifier, ToFd};
 use usbsas_proto::{self as proto, identifier::request::Msg};
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -15,8 +22,10 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -36,6 +45,7 @@ impl State {
 struct InitState {}
 
 struct RunningState {
+    /// Id returned for every `UserId` request of the session
     current_id: Option<String>,
 }
 
@@ -63,6 +73,7 @@ impl RunningState {
         Ok(State::End)
     }
 
+    /// Get the id of the user, always the same during the session.
     fn get_id(&mut self) -> Result<String> {
         if let Some(id) = &self.current_id {
             Ok(id.to_string())
@@ -74,12 +85,14 @@ impl RunningState {
     }
 }
 
+/// Identifier process.
 pub struct Identifier {
     comm: ComRpIdentifier,
     state: State,
 }
 
 impl Identifier {
+    /// New identifier answering requests on `comm`.
     pub fn new(comm: ComRpIdentifier) -> Result<Self> {
         Ok(Identifier {
             comm,
@@ -87,6 +100,8 @@ impl Identifier {
         })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
