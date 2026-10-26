@@ -550,7 +550,9 @@ fn main() -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(sock, std::fs::Permissions::from_mode(0o660))?;
     if let Some(g) = gid_of(&ctx.conf.socket_group) {
-        std::os::unix::fs::chown(sock, None, Some(g))?;
+        if let Err(e) = std::os::unix::fs::chown(sock, None, Some(g)) {
+            log::warn!("groupe de la socket non appliqué : {e}");
+        }
     } else {
         log::warn!(
             "groupe {} introuvable : socket réservée à root",

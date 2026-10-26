@@ -10,6 +10,7 @@ cd "$OUT"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 
+# shellcheck disable=SC2016 # chaîne EICAR littérale
 EICAR='X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'
 printf '%s' "$EICAR" > "$T/eicar.com"
 echo "Bonjour, fichier sain." > "$T/sain.txt"

@@ -15,7 +15,7 @@ printf 'ClamAV-VDB:20 Oct 2026 08-00 +0000:27800:0:90:x:y:z:0' > "$T/src/clamav/
 
 cat > "$T/admind.toml" <<EOF
 socket = "$T/admin.sock"
-socket_group = "root"
+socket_group = "$(id -gn)"
 state_dir = "$T/etat"
 analyzer_config = "$T/analyzer.toml"
 analyzer_url = "http://127.0.0.1:9"

@@ -39,7 +39,7 @@ password_timeout = 600
 EOF
 cat > "$W/admind.toml" <<EOF
 socket = "$W/run/admin.sock"
-socket_group = "root"
+socket_group = "$(id -gn)"
 state_dir = "$W/etat"
 analyzer_config = "$W/analyzer.toml"
 analyzer_url = "http://127.0.0.1:18242"
