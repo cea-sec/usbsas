@@ -28,7 +28,7 @@ done
 [ "$(id -u)" -eq 0 ] || { echo "À lancer en root." >&2; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -y -q --no-install-recommends simple-cdd xorriso isolinux syslinux-utils \
+apt-get install -y -q --no-install-recommends simple-cdd distro-info-data xorriso isolinux syslinux-utils \
     grub-efi-amd64-bin grub-pc-bin mtools dosfstools cpio wget ca-certificates clamav-freshclam
 
 if [ -z "$DEBS" ]; then
