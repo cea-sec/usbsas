@@ -21,11 +21,18 @@ jobs:
             libssl-dev libkrb5-dev libseccomp-dev libudev-dev libusb-1.0-0-dev protobuf-compiler libdbus-1-dev \
             libwayland-dev libxkbcommon-dev libfuse3-dev build-essential
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      - uses: actions/cache@v4
+        with:
+          path: target/production
+          key: iso-${{ hashFiles('Cargo.lock', 'barbacane/Cargo.lock') }}
       - name: ISO
         run: |
+          apt-get install -y -q simple-cdd
+          # diagnostic : adresses téléchargées par simple-cdd
+          sed -i 's/^\(\s*\)request.urlretrieve(url/\1print("GET", url, flush=True); request.urlretrieve(url/' \
+            /usr/lib/python3/dist-packages/simple_cdd/tools/mirror_download.py
           . "$HOME/.cargo/env"
           barbacane/system/iso/build-iso.sh --sortie "$PWD/barbacane.iso"
-          rm -rf target
       - uses: actions/upload-artifact@v4
         with:
           name: barbacane-iso
