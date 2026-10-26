@@ -1,0 +1,23 @@
+# Paquets de la borne (dépendances résolues automatiquement)
+barbacane
+usbsas-server
+usbsas-hid
+clamav-daemon
+7zip
+7zip-rar
+bubblewrap
+cage
+nftables
+minisign
+zstd
+fonts-dejavu-core
+libegl1
+libgl1
+mesa-vulkan-drivers
+usbutils
+kbd
+locales
+# Matériel quelconque : microcodes et micrologiciels (graphique, contrôleurs)
+firmware-linux
+intel-microcode
+amd64-microcode

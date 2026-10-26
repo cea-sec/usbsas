@@ -158,8 +158,13 @@ impl Ctx {
                 (lock.until - now()) / 60 + 1
             );
         }
-        let stored = std::fs::read_to_string(self.path("pin"))
-            .context("aucun PIN configuré (barbacane-admind --set-pin)")?;
+        // Premier démarrage (installation par l'ISO) : le premier PIN saisi devient le PIN.
+        if !self.path("pin").exists() {
+            self.set_pin(pin)?;
+            log::info!("PIN administrateur initial défini");
+            return self.open_session();
+        }
+        let stored = std::fs::read_to_string(self.path("pin"))?;
         let ok = PasswordHash::new(stored.trim())
             .map(|h| {
                 argon2::Argon2::default()
@@ -185,6 +190,10 @@ impl Ctx {
             bail!(msg);
         }
         self.write_json("verrou.json", &Lock::default())?;
+        self.open_session()
+    }
+
+    fn open_session(&self) -> Result<String> {
         let mut b = [0u8; 32];
         getrandom::fill(&mut b).map_err(|e| anyhow!("{e}"))?;
         let token = hex::encode(b);
@@ -294,6 +303,7 @@ impl Ctx {
             "disk_free": free,
             "reports": count(&self.conf.reports_dir),
             "limits": self.limits(),
+            "pin_set": self.path("pin").exists(),
         })
     }
 

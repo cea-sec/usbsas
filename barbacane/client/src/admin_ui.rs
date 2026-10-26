@@ -313,7 +313,11 @@ pub fn view(app: &App) -> Element<'_, Msg> {
     let body: Element<Msg> = match &a.page {
         Page::Pin => column![
             titre("Mode administrateur"),
-            texte("Saisissez le PIN administrateur."),
+            texte(if app.etat.as_ref().is_some_and(|e| e["pin_set"] == false) {
+                "Premier démarrage : choisissez le PIN administrateur (6 chiffres minimum)."
+            } else {
+                "Saisissez le PIN administrateur."
+            }),
             container(text(a.input.shown()).size(34)).padding(12).width(Length::Fixed(360.0)).style(style::carte),
             a.input.view(|k| am(AdminMsg::Key(k))),
             msg,

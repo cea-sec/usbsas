@@ -1,0 +1,61 @@
+name: ISO
+
+on:
+  push:
+    paths:
+      - "barbacane/**"
+      - "usbsas-*/**"
+      - ".github/workflows/iso.yml"
+  workflow_dispatch:
+
+jobs:
+  construction:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - uses: actions/checkout@v4
+      - name: outils de compilation
+        run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends pkgconf clang cmake git dpkg-dev curl ca-certificates \
+            libssl-dev libkrb5-dev libseccomp-dev libudev-dev libusb-1.0-0-dev protobuf-compiler libdbus-1-dev \
+            libwayland-dev libxkbcommon-dev libfuse3-dev build-essential
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      - name: ISO
+        run: |
+          . "$HOME/.cargo/env"
+          barbacane/system/iso/build-iso.sh --sortie "$PWD/barbacane.iso"
+          rm -rf target
+      - uses: actions/upload-artifact@v4
+        with:
+          name: barbacane-iso
+          path: barbacane.iso
+          compression-level: 0
+          retention-days: 14
+
+  installation-qemu:
+    needs: construction
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: barbacane-iso
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf socat
+      - name: installation automatique puis premier démarrage
+        run: sudo barbacane/tests/iso/qemu.sh barbacane.iso vm
+      - name: captures (base64, pour lecture dans le journal)
+        if: always()
+        run: for f in vm/*.png; do echo "== $f"; base64 -w0 "$f"; echo; done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vm
+          path: |
+            vm/*.png
+            vm/*.log

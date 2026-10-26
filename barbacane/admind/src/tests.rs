@@ -43,6 +43,23 @@ fn req(c: &Ctx, v: Value) -> Result<Value> {
 }
 
 #[test]
+fn premier_pin() {
+    let t = tempfile::tempdir().unwrap();
+    let c = ctx(t.path());
+    assert_eq!(req(&c, json!({"op": "status"})).unwrap()["pin_set"], false);
+    assert!(
+        req(&c, json!({"op": "login", "pin": "12"})).is_err(),
+        "PIN trop court"
+    );
+    assert!(req(&c, json!({"op": "login", "pin": "246813"})).unwrap()["token"].is_string());
+    assert_eq!(req(&c, json!({"op": "status"})).unwrap()["pin_set"], true);
+    assert!(
+        req(&c, json!({"op": "login", "pin": "111111"})).is_err(),
+        "PIN fixé"
+    );
+}
+
+#[test]
 fn pin_et_verrouillage() {
     let t = tempfile::tempdir().unwrap();
     let c = ctx(t.path());

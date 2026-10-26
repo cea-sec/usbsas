@@ -1,5 +1,5 @@
 #!/bin/bash
-# Exécuté dans l'image (mkosi) après installation des paquets.
+# Exécuté dans le système installé (image mkosi ou ISO) après installation des paquets.
 set -euo pipefail
 install -m 644 /usr/share/barbacane/usbsas-config.toml /etc/usbsas/config.toml
 install -m 644 /usr/share/barbacane/nftables.conf /etc/nftables.conf
@@ -10,7 +10,7 @@ for s in networking NetworkManager systemd-networkd systemd-resolved wpa_supplic
 done
 if [ -n "${BARBACANE_PIN:-}" ]; then
     echo "$BARBACANE_PIN" | barbacane-admind --set-pin
-else
-    echo "ATTENTION : aucun PIN administrateur (variable BARBACANE_PIN)" >&2
 fi
+chown -R clamav:clamav /var/lib/clamav 2>/dev/null || true
+if command -v update-grub >/dev/null; then update-grub; fi
 [ -f /etc/barbacane/maj.pub ] || echo "ATTENTION : /etc/barbacane/maj.pub absent : mises à jour impossibles" >&2
