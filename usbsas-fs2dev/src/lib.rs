@@ -1,5 +1,12 @@
 //! usbsas process responsible for writing the file system on destination USB
 //! device. It can also wipe devices (with 0's).
+//!
+//! Only the sectors set in the bit vector received from usbsas (computed by
+//! files2fs) are written.
+//!
+//! States: `Init` (wait for unlock value, open device, sandbox) -> `DevOpened`
+//! -> `Wiping` -> `DevOpened`, or `DevOpened` -> `BitVecLoaded` -> `Copying` ->
+//! `WaitEnd` -> `End`.
 
 use bitvec::prelude::*;
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -25,6 +32,7 @@ use {
     usbsas_mock::mass_storage::MockMassStorage as MassStorage,
 };
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -42,13 +50,16 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Maximum sectors per SCSI write.
 // Some usb keys don't support bigger buffers
 // (Linux writes 240 sectors per scsi write(10) requests)
 const MAX_WRITE_SECTORS: usize = 240;
 const BUFFER_MAX_WRITE_SIZE: u64 = MAX_WRITE_SECTORS as u64 * SECTOR_SIZE;
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     DevOpened(DevOpenedState),
@@ -101,7 +112,10 @@ struct WipingState {
 
 struct WaitEndState;
 
-// Wrapper around BitVec to iterate over contiguous group of ones
+/// Wrapper around BitVec to iterate over contiguous group of ones
+///
+/// Each item is a `(first, last + 1)` range of sectors, at most
+/// `MAX_WRITE_SECTORS` long.
 struct BitVecIterOnes {
     pub bv: BitVec<u8, Lsb0>,
     pos: usize,
@@ -143,6 +157,8 @@ impl Iterator for BitVecIterOnes {
 }
 
 impl InitState {
+    /// Wait for the bus and device numbers of the destination (`0` if not
+    /// needed), open it and sandbox the process.
     fn run(self, comm: &mut ComRpFs2Dev) -> Result<State> {
         let busnum = comm.read_u32::<LittleEndian>()?;
         let devnum = comm.read_u32::<LittleEndian>()?;
@@ -399,17 +415,21 @@ impl WaitEndState {
     }
 }
 
+/// Destination device writer process.
 pub struct Fs2Dev {
     comm: ComRpFs2Dev,
     state: State,
 }
 
 impl Fs2Dev {
+    /// New writer of the image at `fs_fname` to the device given at unlock.
     pub fn new(comm: ComRpFs2Dev, fs_fname: String) -> Result<Self> {
         let state = State::Init(InitState { fs_fname });
         Ok(Fs2Dev { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
