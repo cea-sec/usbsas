@@ -6,6 +6,7 @@ use hadris_iso::read::{DirEntry, IsoImage};
 use std::io::{Read, Seek};
 use usbsas_proto::common::{FileInfo, FileType};
 
+/// ISO9660 reader.
 pub struct Iso9660<T: Read + Seek> {
     fs: IsoImage<T>,
     // Joliet names are UTF-16BE and need decoding differently from the other
