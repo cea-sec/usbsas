@@ -51,7 +51,9 @@ impl Children {
             .args(&["-c", config_path])
             .spawn::<ComRqUsbDev>()?;
         let scsi2files = UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<ComRqFiles>()?;
-        let local2files = UsbsasChildSpawner::new("usbsas-local2files").spawn::<ComRqFiles>()?;
+        let local2files = UsbsasChildSpawner::new("usbsas-local2files")
+            .args(&["-c", config_path])
+            .spawn::<ComRqFiles>()?;
         let files2tar = UsbsasChildSpawner::new("usbsas-files2tar")
             .arg(tar_path)
             .spawn::<ComRqWriteDst>()?;
