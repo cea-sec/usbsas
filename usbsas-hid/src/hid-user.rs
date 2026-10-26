@@ -26,15 +26,22 @@ enum LibusbClassCode {
     Hid = 0x03,
 }
 
+/// Opened HID device.
 pub struct UsbDevice {
+    /// libusb handle
     pub handle: DeviceHandle<Context>,
+    /// Claimed HID interface
     pub interface: u8,
+    /// Interrupt IN endpoint receiving the reports
     pub ep_in: u8,
+    /// Max packet size of `ep_in`
     pub ep_in_size: u16,
+    /// Opened `/dev/bus/usb` file, kept open for libusb
     dev_file: std::fs::File,
 }
 
 impl UsbDevice {
+    /// Wrap an opened device.
     pub fn new(
         handle: DeviceHandle<Context>,
         interface: u8,
@@ -62,6 +69,7 @@ bitfield::bitfield! {
 
 }
 
+/// Open `/dev/bus/usb/BBB/DDD` and claim its HID interface.
 fn open_device(busnum: u8, devnum: u8) -> Result<UsbDevice, rusb::Error> {
     rusb::disable_device_discovery()?;
     let libusb_ctx = Context::new()?;
@@ -416,6 +424,7 @@ enum HidUsage {
     Unknown(u16),
 }
 
+/// HID usage pages (HID Usage Tables specification).
 #[derive(Debug, Clone)]
 pub enum HidUsagePage {
     GenericDesktopControls,

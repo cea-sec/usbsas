@@ -107,7 +107,9 @@ struct InputEvent {
 /// Range of an absolute axis, taken from the HID report descriptor.
 #[derive(Debug, Clone, Copy)]
 pub struct AbsRange {
+    /// Minimum value
     pub min: i32,
+    /// Maximum value
     pub max: i32,
 }
 
