@@ -331,6 +331,7 @@ pub struct FatFile<'a, T> {
 }
 
 impl<'a, T> FatFile<'a, T> {
+    /// Wrap an opened `FIL`.
     pub fn new(inner: ff_c::FIL) -> Self {
         FatFile {
             inner,
@@ -339,20 +340,28 @@ impl<'a, T> FatFile<'a, T> {
     }
 }
 
+/// Type of a file.
 pub enum FileType {
+    /// Regular file
     REGULAR,
+    /// Directory
     DIRECTORY,
 }
 
 /// File information
 pub struct FileInfo {
+    /// File name
     pub name: String,
+    /// Size in bytes
     pub size: u64,
+    /// Modification time (Unix timestamp, seconds)
     pub timestamp: i64,
+    /// File type
     pub ftype: FileType,
 }
 
 impl FileInfo {
+    /// Whether the file is a directory.
     pub fn is_dir(&self) -> bool {
         matches!(self.ftype, FileType::DIRECTORY)
     }

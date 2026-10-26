@@ -2,6 +2,7 @@ use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// Communication with the parent, read / write / seek on the image.
 pub fn seccomp(fd_read: RawFd, fd_write: RawFd, out_fs_fd: RawFd) -> Result<()> {
     let mut ctx = seccomp::new_context_with_common_rules(
         vec![fd_read, out_fs_fd],

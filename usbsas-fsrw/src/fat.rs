@@ -192,6 +192,7 @@ fn attr_of(entry: &fatfs::DirEntry<impl fatfs::ReadWriteSeek>) -> (FileType, u64
     )
 }
 
+/// FAT12/16/32 reader.
 pub struct FatReader<T: Read + Seek> {
     fs: fatfs::FileSystem<BufStream<SharedReadIo<T>>>,
     inner: Rc<RefCell<Option<T>>>,
@@ -300,6 +301,8 @@ impl<T: Read + Seek> FSRead<T> for FatReader<T> {
     }
 }
 
+/// FAT writer, the FAT type (12, 16 or 32) is chosen by `fatfs` from the
+/// volume size.
 pub struct FatWriter<T: Read + Write + Seek> {
     fs: fatfs::FileSystem<BufStream<SharedWriteIo<T>>>,
     inner: Rc<RefCell<Option<T>>>,

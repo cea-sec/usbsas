@@ -1,6 +1,9 @@
 use crate::{Result, seccomp};
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// landlock (`paths_ro`, `paths_rw` and `paths_rm`, see [`crate::landlock`])
+/// and seccomp allowing what the GUI needs (Unix and netlink sockets, GPU
+/// access...), without executing programs.
 pub fn sandbox(
     paths_ro: Option<&[&str]>,
     paths_rw: Option<&[&str]>,

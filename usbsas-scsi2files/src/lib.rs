@@ -1,5 +1,10 @@
 //! scsi2files is a usbsas process that requests sectors to dev2scsi and parses
 //! file systems from data received.
+//!
+//! States: `Init` (spawn dev2scsi, sandbox) -> `ChildStarted` (`OpenDevice`) ->
+//! `DevOpened` (`Partitions`, `ReadSectors`) -> `PartitionsListed`
+//! (`OpenPartition`) -> `PartitionOpened` (`GetAttr`, `ReadDir`, `ReadFile`) ->
+//! `End`.
 
 use log::{error, trace};
 use std::{
@@ -19,6 +24,7 @@ use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, files::request::Msg};
 use usbsas_utils::READ_FILE_MAX_SIZE;
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -42,8 +48,10 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     ChildStarted(ChildStartedState),
@@ -106,6 +114,7 @@ struct PartitionOpenedState {
 }
 
 struct WaitEndState {
+    /// dev2scsi, to end it too if it was started
     child_comm: Option<Arc<RwLock<ComRqScsi>>>,
 }
 
@@ -135,6 +144,7 @@ impl ChildStartedState {
         }))
     }
 
+    /// Unlock dev2scsi with the device to open and forward its response.
     fn opendevice(&mut self, comm: &mut ComRpFiles, busnum: u32, devnum: u32) -> Result<()> {
         trace!("req opendevice");
         let buf = (u64::from(devnum) << 32) | u64::from(busnum);
@@ -229,6 +239,7 @@ impl PartitionsListedState {
         }
     }
 
+    /// Mount the file system of the partition at `index`.
     fn open_partition(
         mut self,
         comm: &mut ComRpFiles,
@@ -337,17 +348,21 @@ impl WaitEndState {
     }
 }
 
+/// Source file system reader process.
 pub struct Scsi2Files {
     comm: ComRpFiles,
     state: State,
 }
 
 impl Scsi2Files {
+    /// New reader, dev2scsi is spawned when the process starts.
     pub fn new(comm: ComRpFiles) -> Result<Self> {
         let state = State::Init(InitState {});
         Ok(Scsi2Files { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {

@@ -1,3 +1,7 @@
+//! HID dealer: starts a `hid-user` driver for each HID device plugged (on an
+//! allowed port if `ports_hid` is configured), and stops it when the device is
+//! unplugged.
+
 use mio::{Events, Interest, Poll, Token};
 use std::{
     collections::HashMap,
@@ -10,16 +14,19 @@ use std::{
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_utils::{USBSAS_BIN_PATH, clap::UsbsasClap};
 
+/// Running hid-user processes, by (bus, device) numbers.
 static HM_SONS: LazyLock<Mutex<HashMap<(u8, u8), Child>>> = LazyLock::new(|| {
     let hm = HashMap::new();
     Mutex::new(hm)
 });
 
+/// Event sent by the udev thread.
 enum DevEvent {
     Update(u8, u8),
     Remove(u8, u8),
 }
 
+/// Spawn hid-user for a device, with a minimal environment.
 fn run_son(busnum: u8, devnum: u8) -> Result<Child, std::io::Error> {
     let mut filtered_env: HashMap<String, String> = std::env::vars()
         .filter(|(k, _)| {
@@ -41,6 +48,7 @@ fn run_son(busnum: u8, devnum: u8) -> Result<Child, std::io::Error> {
         .spawn()
 }
 
+/// (Re)start the hid-user of a device.
 fn update_entry(busnum: u8, devnum: u8) {
     let mut sons = HM_SONS.lock().unwrap();
     let key = (busnum, devnum);
@@ -62,6 +70,7 @@ fn update_entry(busnum: u8, devnum: u8) {
     }
 }
 
+/// Stop the hid-user of an unplugged device.
 fn remove_entry(busnum: u8, devnum: u8) {
     log::debug!("Incoming remove for {busnum} {devnum}!");
 
@@ -77,6 +86,7 @@ fn remove_entry(busnum: u8, devnum: u8) {
     }
 }
 
+/// Reap hid-user processes that exited, every second.
 fn wait_sons() -> ! {
     loop {
         {
@@ -98,8 +108,8 @@ fn wait_sons() -> ! {
     }
 }
 
-// Check device is HID and is plugged on an allowed port
-// returns its (busnum, devnum)
+/// Check device is HID and is plugged on an allowed port
+/// returns its (busnum, devnum)
 fn checked_busnum_devnum(
     device: &udev::Device,
     ports_hid: &Option<Vec<Vec<u8>>>,
@@ -149,6 +159,7 @@ fn checked_busnum_devnum(
     Some((busnum, devnum))
 }
 
+/// Description of a device for logs.
 fn dev_info(device: &udev::Device) -> String {
     format!(
         "ProductID: {}, VendorId: {}, Manufacturer: '{}', Product: '{}', Serial: {}",

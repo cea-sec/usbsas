@@ -1,3 +1,9 @@
+//! JSON parser process: parses the responses of the remote analyzer for the
+//! analyzer process, so that it doesn't parse untrusted JSON itself.
+//!
+//! States: `Init` (seccomp) -> `Running` (`ParseResp`, `ParseReport`) ->
+//! `WaitEnd` -> `End`.
+
 use crate::{Error, Result};
 use log::{error, trace};
 use usbsas_comm::{ComRpJsonParser, ProtoRespCommon, ProtoRespJsonParser, ToFd};
@@ -7,6 +13,7 @@ use usbsas_proto::{
     jsonparser::{SrvResp, request::Msg},
 };
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -99,17 +106,21 @@ impl WaitEndState {
     }
 }
 
+/// JSON parser process.
 pub struct JsonParser {
     comm: ComRpJsonParser,
     state: State,
 }
 
 impl JsonParser {
+    /// New JSON parser.
     pub fn new(comm: ComRpJsonParser) -> Result<Self> {
         let state = State::Init(InitState {});
         Ok(JsonParser { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {

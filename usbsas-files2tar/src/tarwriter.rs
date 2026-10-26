@@ -4,6 +4,7 @@ use std::{io::Write, path::Path};
 use usbsas_proto::common::FileType;
 use usbsas_utils::{TAR_BLOCK_SIZE, TAR_DATA_DIR};
 
+/// Tar (ustar) [`ArchiveWriter`].
 pub(crate) struct TarWriter<W: Write> {
     builder: tar::Builder<W>,
     data_dir: String,
@@ -33,6 +34,8 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
         Ok(())
     }
 
+    /// Files are stored under the data directory, except metadata files.
+    /// Paths containing `..` are refused.
     fn newfile(&mut self, path: &str, ftype: FileType, size: u64, timestamp: i64) -> Result<()> {
         let mut path_string: String = path.trim_start_matches('/').into();
         if path_string.starts_with("../") || path_string.contains("/../") || path_string == ".." {
@@ -67,6 +70,7 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
         Ok(())
     }
 
+    /// Pad the file data to a tar block.
     fn endfile(&mut self, len_written: usize) -> Result<()> {
         // Pad to size of block
         let buf = [0; TAR_BLOCK_SIZE];

@@ -32,6 +32,7 @@ fn ftype(ft: Ext4FileType) -> FileType {
     }
 }
 
+/// ext4 reader. Symlinks and special files are reported as `Other`.
 pub struct Ext4<T> {
     fs: ext4_view::Ext4,
     inner: Rc<RefCell<Option<T>>>,

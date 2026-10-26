@@ -2,6 +2,7 @@ use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// Communication with the parent, read / seek on the archive if opened.
 pub fn seccomp(fd_read: RawFd, fd_write: RawFd, in_tar_fd: Option<RawFd>) -> Result<()> {
     let mut fds_read = vec![fd_read];
     if let Some(fd) = in_tar_fd {

@@ -1,4 +1,6 @@
 //! Master boot record parser
+//!
+//! Parses and writes the primary partition entries of an MBR.
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -16,23 +18,34 @@ pub const MBR_SIGNATURE: [u8; 2] = [0x55, 0xAA];
 /// pub const MBR_SIZE : usize = 512;
 /// ```
 pub const MBR_SIZE: usize = 512;
+/// First sector of the partition created by usbsas (1 MiB alignment with
+/// 512 bytes sectors)
 pub const SECTOR_START: u64 = 2048;
 
 /// mbr partition entry structure
 #[derive(Debug, Default)]
 pub struct MbrPartitionEntry {
+    /// 0x80 if the partition is bootable
     pub boot_indicator: u8,
+    /// CHS address of the first sector
     pub start_head: u8,
     pub start_sector: u8,
     pub start_cylinder: u8,
+    /// Partition type (e.g. 0x0c FAT32 LBA, 0x07 NTFS / exFAT)
     pub partition_type: u8,
+    /// CHS address of the last sector
     pub end_head: u8,
     pub end_sector: u8,
     pub end_cylinder: u8,
+    /// First sector
     pub start_in_lba: u32,
+    /// Number of sectors
     pub size_in_lba: u32,
 }
 
+/// Convert a LBA to the (head, sector, cylinder) bytes of a partition entry,
+/// with 255 heads and 63 sectors per track. LBAs beyond CHS addressing are
+/// encoded as the maximum value.
 fn lba_to_encoded_chs(lba: u32) -> (u8, u8, u8) {
     const HEADS_PER_CYLINDER: u32 = 255;
     const SECTORS_PER_TRACK: u32 = 63;
@@ -55,6 +68,8 @@ fn lba_to_encoded_chs(lba: u32) -> (u8, u8, u8) {
 }
 
 impl MbrPartitionEntry {
+    /// New entry of type `partition_type` starting at sector `start_in_lba`
+    /// and `size_in_lba` sectors long.
     pub fn new(partition_type: u8, start_in_lba: u32, size_in_lba: u32) -> Self {
         let (start_head, start_sector, start_cylinder) = lba_to_encoded_chs(start_in_lba);
         let (end_head, end_sector, end_cylinder) =
@@ -90,6 +105,7 @@ impl MbrPartitionEntry {
         }
     }
 
+    /// Serialize the entry (16 bytes).
     pub fn to_bytes(&self) -> io::Result<[u8; 16]> {
         let mut buf: [u8; 16] = [
             self.boot_indicator,
@@ -116,6 +132,8 @@ impl MbrPartitionEntry {
 }
 
 /// parse an mbr partition table
+///
+/// `buffer` is the first sector of the device. Empty entries are skipped.
 pub fn parse_partition_table(buffer: &[u8]) -> Result<Vec<MbrPartitionEntry>, io::Error> {
     if buffer[510..512] != MBR_SIGNATURE {
         return Err(io::Error::other("Bad mbr signature"));
@@ -131,6 +149,8 @@ pub fn parse_partition_table(buffer: &[u8]) -> Result<Vec<MbrPartitionEntry>, io
     Ok(partition_table)
 }
 
+/// Write a partition entry at the current position of `file` (entries start
+/// at offset 446 of the MBR).
 pub fn write_partition<T>(file: &mut T, partition: &MbrPartitionEntry) -> io::Result<()>
 where
     T: std::io::Seek + std::io::Write,

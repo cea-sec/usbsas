@@ -3,6 +3,7 @@ use syscallz::{Action, Cmp, Comparator, Syscall};
 
 use std::os::unix::io::RawFd;
 
+/// libusb on the HID device, write on the uinput device.
 pub fn seccomp(device_fd: RawFd, uinput_device: RawFd) -> Result<()> {
     let mut ctx = seccomp::new_context_with_common_rules(vec![], vec![])?;
 

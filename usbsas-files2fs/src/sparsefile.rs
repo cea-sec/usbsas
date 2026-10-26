@@ -1,8 +1,10 @@
 use bitvec::prelude::*;
 use std::io::{self, prelude::*};
 
+/// One bit per sector, set if the sector was written.
 pub type FileBitVec = BitVec<u8, Lsb0>;
 
+/// Wrapper around a file recording which sectors are written.
 pub struct SparseFile<T: Read + Write + Seek> {
     sector_size: u64,
     file: T,
@@ -10,6 +12,7 @@ pub struct SparseFile<T: Read + Write + Seek> {
 }
 
 impl<T: Read + Write + Seek> SparseFile<T> {
+    /// Wrap `file`, made of `sector_count` sectors of `sector_size` bytes.
     pub fn new(file: T, sector_size: u64, sector_count: usize) -> Result<SparseFile<T>, io::Error> {
         let mut bitvec = BitVec::<u8, Lsb0>::new();
         bitvec.resize(sector_count, false);
@@ -20,6 +23,7 @@ impl<T: Read + Write + Seek> SparseFile<T> {
         })
     }
 
+    /// Flush and close the file, return the bit vector of written sectors.
     pub fn get_bitvec(mut self) -> Result<FileBitVec, io::Error> {
         self.file.flush()?;
         drop(self.file);
@@ -33,6 +37,8 @@ impl<T: Read + Write + Seek> Read for SparseFile<T> {
     }
 }
 
+/// Writes mark the sectors they touch, writing past the last sector is an
+/// error.
 impl<T: Read + Write + Seek> Write for SparseFile<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let offset = self.file.stream_position()?;

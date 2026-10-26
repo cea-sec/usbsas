@@ -1,20 +1,44 @@
 //! Sandboxing helpers for usbsas processes.
+//!
+//! Each process has its own module applying its seccomp filter (and landlock
+//! rules if needed). Filters start from common rules (read / write on the
+//! given file descriptors, memory allocation without `PROT_EXEC`, logging on
+//! stderr...) and kill the process on any other syscall.
+//!
+//! Processes open the files they need first, then apply their filter before
+//! parsing any untrusted data.
 
+/// Sandbox of the GUI client (landlock + seccomp).
 pub mod client;
+/// seccomp filter of dev2scsi.
 pub mod dev2scsi;
+/// seccomp filter of files2fs.
 pub mod files2fs;
+/// seccomp filter of files2tar.
 pub mod files2tar;
+/// seccomp filter of fs2dev.
 pub mod fs2dev;
+/// seccomp filter of the fswriter tool.
 pub mod fswriter;
+/// seccomp filter of hid-user.
 pub mod hiduser;
+/// seccomp filter of the identifier.
 pub mod identifier;
+/// seccomp filter of the imager tool.
 pub mod imager;
+/// seccomp filter of the jsonparser.
 pub mod jsonparser;
+/// seccomp filter of local2files.
 pub mod local2files;
+/// Sandbox of the network processes (analyzer, downloader, uploader).
 pub mod net;
+/// seccomp filter of scsi2files.
 pub mod scsi2files;
+/// seccomp filter of tar2files.
 pub mod tar2files;
+/// seccomp filters of usbdev (main thread and udev thread).
 pub mod usbdev;
+/// Sandbox of the usbsas server.
 pub mod usbsas;
 
 pub(crate) mod seccomp;
@@ -25,6 +49,7 @@ use landlock::{
 };
 use thiserror::Error;
 
+/// Errors of this crate.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("syscallz error: {0}")]
@@ -42,6 +67,7 @@ type Result<T> = std::result::Result<T, Error>;
  * because it cannot develop macro.
  * see: https://github.com/rust-lang/rust-bindgen/issues/753
  */
+// `USBDEVFS_*` ioctl numbers, allowed for processes using libusb.
 unsafe extern "C" {
     pub fn usbdevfs_submiturb() -> u64;
     pub fn usbdevfs_reapurbndelay() -> u64;
@@ -53,6 +79,17 @@ unsafe extern "C" {
     pub fn usbdevfs_reset() -> u64;
 }
 
+/// Restrict file system and network access of the process with landlock.
+///
+/// - `paths_ro`: read only access,
+/// - `paths_rw`: full access,
+/// - `paths_x`: execution,
+/// - `paths_rm`: create and remove regular files,
+/// - `connect_ports`: allowed TCP ports for `connect()`.
+///
+/// Everything else is denied. Unless the `landlock-enforce` feature is
+/// enabled, rules are applied as much as the kernel supports (best effort) and
+/// a warning is logged if they can't be fully enforced.
 pub fn landlock(
     paths_ro: Option<&[&str]>,
     paths_rw: Option<&[&str]>,

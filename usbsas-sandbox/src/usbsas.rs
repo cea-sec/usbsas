@@ -2,13 +2,21 @@ use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// Unix socket of the server, when used.
 pub struct UsbsasSocket {
+    /// Listening socket
     pub listen: RawFd,
+    /// Connected socket, read side
     pub read: RawFd,
+    /// Connected socket, write side
     pub write: RawFd,
+    /// Path of the socket
     pub path: String,
 }
 
+/// seccomp: communication with the children (`fds_read` / `fds_write`) and the
+/// client, waiting children, and removing / renaming files restricted with
+/// landlock to `paths_rm` (output directory and socket).
 pub fn sandbox(
     fds_read: Vec<RawFd>,
     fds_write: Vec<RawFd>,

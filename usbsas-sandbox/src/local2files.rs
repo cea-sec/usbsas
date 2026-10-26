@@ -2,6 +2,8 @@ use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// Communication with the parent, and file system syscalls (opening files is
+/// restricted to the source directories with landlock).
 pub fn seccomp(fd_read: RawFd, fd_write: RawFd) -> Result<()> {
     let mut ctx = seccomp::new_context_with_common_rules(vec![fd_read], vec![fd_write])?;
 

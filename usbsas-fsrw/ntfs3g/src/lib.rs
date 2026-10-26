@@ -13,9 +13,11 @@ use std::{
 mod n3g_c;
 mod n3g_extern;
 
+/// `Read + Write + Seek`, the stream holding the file system.
 pub trait ReadWriteSeek: Read + Write + Seek {}
 impl<T: Read + Write + Seek> ReadWriteSeek for T {}
 
+/// New NTFS file system, created with [`Ntfs3g::mkntfs`].
 pub struct Ntfs3g<T> {
     vol: *mut n3g_c::ntfs_volume,
     inner_type: PhantomData<T>,
@@ -37,6 +39,8 @@ fn str2ntfsunicode(string: &str) -> Result<Vec<u16>> {
 }
 
 impl<T: Read + Write + Seek> Ntfs3g<T> {
+    /// Create an NTFS file system on `inner` (`sector_count` sectors of
+    /// `sector_size` bytes) and mount it.
     pub fn mkntfs(inner: T, sector_size: i64, sector_count: i64) -> Result<Self> {
         let inner_box: Box<Box<dyn ReadWriteSeek>> = Box::new(Box::new(inner));
         let priv_data = Box::into_raw(inner_box) as *mut c_void;
@@ -97,6 +101,7 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
         }
     }
 
+    /// Unmount the file system and return the underlying stream.
     pub fn into_inner(self) -> Result<T> {
         let inner: Box<Box<T>> =
             unsafe { Box::from_raw((*(*self.vol).dev).d_private as *mut Box<T>) };
@@ -176,6 +181,7 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
         })
     }
 
+    /// Create a directory, its parent must exist.
     pub fn new_dir(&mut self, path: &str, timestamp: i64) -> Result<()> {
         let (parent_dir, filename) = split_path_parent(path);
         let p_ni = self.inode_from_path(parent_dir)?;
@@ -216,6 +222,7 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
         Ok(())
     }
 
+    /// Remove a file.
     pub fn remove_file(&mut self, path: &str) -> Result<()> {
         let (parent_dir, filename) = split_path_parent(path);
         let p_ni = self.inode_from_path(parent_dir)?;
@@ -245,8 +252,11 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
     }
 }
 
+/// Data attribute of a file being written, closed when dropped.
 pub struct NtfsAttr<'a, T: Read + Write + Seek> {
+    /// ntfs-3g attribute
     pub attr: *mut n3g_c::ntfs_attr,
+    /// Current position
     pub pos: u64,
     _fs: PhantomData<&'a Ntfs3g<T>>,
 }

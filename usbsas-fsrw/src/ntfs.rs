@@ -8,6 +8,7 @@ use std::{
 };
 use usbsas_proto::common::{FileInfo, FileType, FsType};
 
+/// NTFS writer (ntfs-3g). Timestamps are set when files are created.
 pub struct NTFS3G<T> {
     volume: ntfs3g::Ntfs3g<T>,
 }
@@ -62,6 +63,7 @@ impl<T: Read + Write + Seek> FSWrite<T> for NTFS3G<T> {
 }
 
 // Use ntfs rust crate for reading fs
+/// NTFS reader. Timestamps are the creation time of files.
 pub struct NTFS<T> {
     reader: T,
     fs: ntfs::Ntfs,

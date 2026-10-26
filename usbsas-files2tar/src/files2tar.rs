@@ -6,6 +6,7 @@ use usbsas_comm::{ComRpWriteDst, ProtoRespCommon, ProtoRespWriteDst, ToFd};
 use usbsas_proto as proto;
 use usbsas_proto::{common::FileType, writedst::request::Msg};
 
+/// States of the process, see the crate documentation.
 enum State {
     Init(InitState),
     WaitNewFile(WaitNewFileState),
@@ -96,6 +97,7 @@ impl WaitNewFileState {
 struct WritingFileState {
     archive: Box<dyn ArchiveWriter>,
     len_written: usize,
+    /// Announced size of the file, writing more is an error
     total_size: usize,
 }
 
@@ -152,21 +154,26 @@ impl WaitEndState {
     }
 }
 
+/// Tar archive writer process.
 pub struct Files2Tar {
     comm: ComRpWriteDst,
     state: State,
 }
 
 impl Files2Tar {
+    /// New writer of the archive at `archive_path` (it must exist).
     pub fn new(comm: ComRpWriteDst, archive_path: String) -> Result<Self> {
         let state = State::Init(InitState { archive_path });
         Ok(Files2Tar { comm, state })
     }
+    /// New writer that only waits for `End`.
     pub fn new_end(comm: ComRpWriteDst) -> Result<Self> {
         let state = State::WaitEnd(WaitEndState {});
         Ok(Files2Tar { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {

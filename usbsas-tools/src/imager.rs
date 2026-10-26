@@ -35,6 +35,7 @@ enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
+/// dev2scsi and the output.
 struct Imager {
     dev2scsi: UsbsasChild<ComRqScsi>,
     writer: Box<dyn Write>,
@@ -43,6 +44,8 @@ struct Imager {
 }
 
 impl Imager {
+    /// Spawn dev2scsi and sandbox the tool. The output is `out_file`, or
+    /// stdout if `None`.
     fn new(out_file: Option<fs::File>, busnum: u32, devnum: u32) -> Result<Self> {
         let mut pipes_read = vec![];
         let mut pipes_write = vec![];
@@ -72,6 +75,7 @@ impl Imager {
         })
     }
 
+    /// Unlock dev2scsi with the device and copy all its sectors to the output.
     fn image_device(&mut self) -> Result<()> {
         // Unlock dev2scsi
         self.dev2scsi

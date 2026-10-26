@@ -1,6 +1,11 @@
 //! `usbsas`'s `tar2files` process. It is responsible for reading files in the
 //! temp tar archive. It answers to usbsas's `readdir`, `getattr`, `readfile`,
 //! etc. requests
+//!
+//! Only entries under `data/` and the `config.json` report are exposed.
+//!
+//! States: `Init` (wait for unlock value) -> `LoadMetadata` (read tar headers)
+//! -> `MainLoop` -> `End`.
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{debug, error, trace};
@@ -21,6 +26,7 @@ use usbsas_proto::{
 };
 use usbsas_utils::{READ_FILE_MAX_SIZE, TAR_DATA_DIR};
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -36,8 +42,10 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     LoadMetadata(LoadMetadataState),
@@ -58,11 +66,13 @@ impl State {
     }
 }
 
+/// Attributes of a file of the archive.
 #[derive(Debug)]
 struct Attrs {
     ftype: FileType,
     size: u64,
     timestamp: i64,
+    /// Offset of the file data in the archive
     offset: u64,
 }
 
@@ -75,6 +85,7 @@ struct LoadMetadataState {
 }
 
 struct MainLoopState {
+    /// Files of the archive, by path (without `data/` and leading '/')
     metadata: HashMap<String, Attrs>,
     archive: File,
 }
@@ -261,17 +272,21 @@ impl WaitEndState {
     }
 }
 
+/// Tar archive reader process.
 pub struct Tar2Files {
     comm: ComRpFiles,
     state: State,
 }
 
 impl Tar2Files {
+    /// New reader of the archive at `tarpath`.
     pub fn new(comm: ComRpFiles, tarpath: String) -> Result<Self> {
         let state = State::Init(InitState { tarpath });
         Ok(Tar2Files { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {

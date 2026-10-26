@@ -1,3 +1,9 @@
+//! Downloader process: downloads an archive from the source network into the
+//! session tar.
+//!
+//! States: `Init` (read configuration, sandbox) -> `Running` (`ArchiveInfos`,
+//! `Download`) -> `WaitEnd` -> `End`.
+
 use crate::FileWriterProgress;
 use crate::{Error, HttpClient, Result};
 use log::{error, trace};
@@ -8,6 +14,7 @@ use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{common::Status, downloader::request::Msg};
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -115,6 +122,8 @@ impl RunningState {
         }
     }
 
+    /// HEAD `<url>/<path>`, the uncompressed size of the archive is in the
+    /// `X-Uncompressed-Content-Length` header.
     fn archive_infos(&mut self, comm: &mut ComRpDownloader, path: &str) -> Result<u64> {
         trace!("req size");
         self.url = format!("{}/{}", self.url.trim_end_matches('/'), path);
@@ -146,6 +155,7 @@ impl RunningState {
         Ok(size)
     }
 
+    /// GET the archive found with `archive_infos()` into the tar.
     fn download(mut self, comm: &mut ComRpDownloader, filesize: u64) -> Result<()> {
         trace!("download");
         comm.download(proto::downloader::ResponseDownload {})?;
@@ -192,12 +202,14 @@ impl WaitEndState {
     }
 }
 
+/// Downloader process.
 pub struct Downloader {
     comm: ComRpDownloader,
     state: State,
 }
 
 impl Downloader {
+    /// New downloader writing to the tar at `tarpath`.
     pub fn new(comm: ComRpDownloader, tarpath: String, config_path: String) -> Result<Self> {
         let state = State::Init(InitState {
             tarpath,
@@ -206,6 +218,8 @@ impl Downloader {
         Ok(Downloader { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
