@@ -17,7 +17,12 @@ pub fn seccomp(fd_read: RawFd, fd_write: RawFd, in_tar_fd: Option<RawFd>) -> Res
             Syscall::lseek,
             #[cfg(target_arch = "arm")]
             Syscall::_llseek,
-            &[Comparator::new(0, Cmp::Eq, fd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(fd as u64),
+            )],
         )?;
     }
 

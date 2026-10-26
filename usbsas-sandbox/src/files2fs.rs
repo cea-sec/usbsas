@@ -15,7 +15,12 @@ pub fn seccomp(fd_read: RawFd, fd_write: RawFd, out_fs_fd: RawFd) -> Result<()> 
         Syscall::lseek,
         #[cfg(target_arch = "arm")]
         Syscall::_llseek,
-        &[Comparator::new(0, Cmp::Eq, out_fs_fd as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(out_fs_fd as u64),
+        )],
     )?;
 
     ctx.load()?;

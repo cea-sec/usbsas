@@ -14,13 +14,23 @@ pub fn sandbox(
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::socket,
-        &[Comparator::new(0, Cmp::Eq, libc::AF_UNIX as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(libc::AF_UNIX as u64),
+        )],
     )?;
     // socket NETLINK
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::socket,
-        &[Comparator::new(0, Cmp::Eq, libc::AF_NETLINK as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(libc::AF_NETLINK as u64),
+        )],
     )?;
 
     // Allow mprotect without PROT_EXEC

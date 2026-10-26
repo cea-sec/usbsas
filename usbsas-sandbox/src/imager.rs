@@ -14,7 +14,7 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 1, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -25,7 +25,7 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 1, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS2 as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -37,7 +37,7 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 2, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(2)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -49,7 +49,7 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 2, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(2)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TIOCGWINSZ as u64, None),
             #[cfg(not(target_env = "musl"))]

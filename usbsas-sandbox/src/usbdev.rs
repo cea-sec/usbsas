@@ -15,34 +15,64 @@ pub fn seccomp_thread(udev_socket: RawFd, poll_fd: RawFd) -> Result<()> {
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::setsockopt,
-        &[Comparator::new(0, Cmp::Eq, udev_socket as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(udev_socket as u64),
+        )],
     )?;
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::bind,
-        &[Comparator::new(0, Cmp::Eq, udev_socket as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(udev_socket as u64),
+        )],
     )?;
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::getsockname,
-        &[Comparator::new(0, Cmp::Eq, udev_socket as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(udev_socket as u64),
+        )],
     )?;
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::recvfrom,
-        &[Comparator::new(0, Cmp::Eq, udev_socket as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(udev_socket as u64),
+        )],
     )?;
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::recvmsg,
-        &[Comparator::new(0, Cmp::Eq, udev_socket as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(udev_socket as u64),
+        )],
     )?;
 
     // Allow some syscalls on the polling fd
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::epoll_ctl,
-        &[Comparator::new(0, Cmp::Eq, poll_fd as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(poll_fd as u64),
+        )],
     )?;
     ctx.set_rule_for_syscall(
         Action::Allow,
@@ -50,7 +80,12 @@ pub fn seccomp_thread(udev_socket: RawFd, poll_fd: RawFd) -> Result<()> {
         Syscall::epoll_wait,
         #[cfg(target_arch = "aarch64")]
         Syscall::epoll_pwait,
-        &[Comparator::new(0, Cmp::Eq, poll_fd as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(poll_fd as u64),
+        )],
     )?;
 
     // Allow mprotect without PROT_EXEC

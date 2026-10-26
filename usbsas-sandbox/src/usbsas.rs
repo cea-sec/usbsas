@@ -26,17 +26,32 @@ pub fn sandbox(
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::close,
-            &[Comparator::new(0, Cmp::Eq, sock.listen as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(sock.listen as u64),
+            )],
         )?;
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::recvfrom,
-            &[Comparator::new(0, Cmp::Eq, sock.read as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(sock.read as u64),
+            )],
         )?;
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::sendto,
-            &[Comparator::new(0, Cmp::Eq, sock.write as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(sock.write as u64),
+            )],
         )?;
     };
 
