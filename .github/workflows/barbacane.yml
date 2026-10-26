@@ -1,0 +1,29 @@
+name: Barbacane
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck barbacane/system/*.sh barbacane/tests/*.sh
+
+  phase1-mock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dépendances
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends pkgconf clang cmake \
+            libssl-dev libkrb5-dev libseccomp-dev libudev-dev libusb-1.0-0-dev \
+            protobuf-compiler libdbus-1-dev libfuse3-dev clamav-daemon
+      - name: transfert clé → clé (mock) avec EICAR
+        run: barbacane/tests/phase1-mock.sh

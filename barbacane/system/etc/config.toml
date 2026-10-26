@@ -1,0 +1,40 @@
+# Configuration usbsas de la borne Barbacane (installée en /etc/usbsas/config.toml)
+
+out_directory = "/var/lib/usbsas/tmp"
+keep_tmp_files = false
+lang = "fr"
+window_title = "Barbacane"
+
+# Analyseur local (phase 1 : usbsas-analyzer-server ; phase 2 : barbacane-analyzer)
+[analyzer]
+url = "http://127.0.0.1:8042/api/scanbundle"
+analyze_usb = true
+analyze_net = false
+analyze_cmd = true
+
+[report]
+write_dest = true
+write_local = "/var/lib/usbsas/reports"
+
+# Ports physiques : à relever sur chaque modèle avec usbsas-devmonitor (voir docs/installation.md).
+# Le port d'entrée figure aussi dans ports_dst (option « Blanchir »).
+#[usb_port_accesses]
+#ports_src = [ [1, 2] ]
+#ports_dst = [ [1, 2], [1, 3] ]
+#ports_hid = [ [1, 4] ]
+
+# Fichiers système inutiles ou dangereux, jamais copiés
+[[filters]]
+contain = ["__macosx"]
+[[filters]]
+contain = [".ds_store"]
+[[filters]]
+end = ".lnk"
+[[filters]]
+contain = ["autorun.inf"]
+[[filters]]
+contain = ["thumbs.db"]
+[[filters]]
+contain = ["desktop.ini"]
+[[filters]]
+contain = ["/$recycle.bin/"]
