@@ -7,6 +7,7 @@
 //! clamav/*.cvd|cld|cud   signatures ClamAV
 //! yara/*.yar|yara        règles YARA
 //! debs/*.deb             paquets Debian (OS, usbsas, Barbacane)
+//! cles/maj.pub           (facultatif) nouvelle clé publique de signature
 //! ```
 //! Ordre : signature du fichier entier → version strictement supérieure à la
 //! version installée (anti-retour arrière) → extraction → empreintes du
@@ -133,7 +134,7 @@ pub fn unpack(pkg: &Path, dst: &Path) -> Result<Manifest> {
         }
     }
     // Rien d'autre que le manifeste et les fichiers listés.
-    for dir in ["clamav", "yara", "debs"] {
+    for dir in ["clamav", "yara", "debs", "cles"] {
         if let Ok(rd) = std::fs::read_dir(dst.join(dir)) {
             for e in rd {
                 let rel = format!("{dir}/{}", e?.file_name().to_string_lossy());
@@ -277,6 +278,16 @@ pub fn apply(ctx: &Ctx) -> Result<Outcome> {
         }
         report += &format!("- paquets Debian : {} installé(s)\n", debs.len());
         reboot = true;
+    }
+    // Rotation de la clé de signature : la nouvelle clé publique arrive signée par l'ancienne.
+    let newkey = work.path().join("cles/maj.pub");
+    if newkey.is_file() {
+        minisign_verify::PublicKey::from_file(&newkey)
+            .map_err(|e| anyhow::anyhow!("nouvelle clé publique invalide : {e}"))?;
+        let tmp = c.update_pubkey.with_extension("pub.tmp");
+        std::fs::copy(&newkey, &tmp)?;
+        std::fs::rename(&tmp, &c.update_pubkey)?;
+        report += "- clé de signature des mises à jour remplacée\n";
     }
     ctx.set_update_version(m.version)?;
     let _ = std::fs::remove_file(&pkg);

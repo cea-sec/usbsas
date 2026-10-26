@@ -371,6 +371,10 @@ impl Ctx {
             out.join("etat.json"),
             serde_json::to_vec_pretty(&self.status())?,
         )?;
+        // État des paquets Debian : sert à calculer le prochain paquet de mise à jour.
+        if !self.conf.dry_run {
+            let _ = std::fs::copy("/var/lib/dpkg/status", out.join("dpkg-status"));
+        }
         // Lisible par usbsas (source « dossier local »).
         let _ = self.run(&["chmod", "-R", "a+rX", &dir.display().to_string()]);
         Ok(n + 2)

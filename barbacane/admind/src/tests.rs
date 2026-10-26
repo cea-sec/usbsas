@@ -173,7 +173,23 @@ fn paquet(
     extra: Option<(&str, &str)>,
     bad_hash: bool,
 ) -> PathBuf {
-    let src = dir.join(format!("src-{version}"));
+    paquet_x(dir, key, version, extra, bad_hash, None)
+}
+
+/// `cle` : nouvelle clé publique embarquée (rotation), listée dans le manifeste.
+fn paquet_x(
+    dir: &Path,
+    key: &Path,
+    version: u64,
+    extra: Option<(&str, &str)>,
+    bad_hash: bool,
+    cle: Option<&Path>,
+) -> PathBuf {
+    let src = dir.join(format!(
+        "src-{version}-{}",
+        key.file_name().unwrap().to_string_lossy()
+    ));
+    let _ = std::fs::remove_dir_all(&src);
     std::fs::create_dir_all(src.join("clamav")).unwrap();
     std::fs::create_dir_all(src.join("yara")).unwrap();
     std::fs::write(
@@ -182,8 +198,14 @@ fn paquet(
     )
     .unwrap();
     std::fs::write(src.join("yara/regles.yar"), "rule r { condition: false }").unwrap();
+    let mut rels = vec!["clamav/daily.cld", "yara/regles.yar"];
+    if let Some(c) = cle {
+        std::fs::create_dir_all(src.join("cles")).unwrap();
+        std::fs::copy(c, src.join("cles/maj.pub")).unwrap();
+        rels.push("cles/maj.pub");
+    }
     let mut files = serde_json::Map::new();
-    for rel in ["clamav/daily.cld", "yara/regles.yar"] {
+    for rel in rels {
         let mut h = Sha256::new();
         h.update(std::fs::read(src.join(rel)).unwrap());
         let mut hx = hex::encode(h.finalize());
@@ -381,4 +403,63 @@ fn retour_arriere_si_echec() {
         );
         assert_eq!(c.update_version(), 0);
     }
+}
+
+#[test]
+fn rotation_de_cle() {
+    let t = tempfile::tempdir().unwrap();
+    let c = ctx(t.path());
+    let tok = login(&c);
+    let k = t.path().join("k");
+    std::fs::create_dir_all(&k).unwrap();
+    for n in ["maj", "nouvelle"] {
+        let pubk = if n == "maj" {
+            c.conf.update_pubkey.clone()
+        } else {
+            k.join("nouvelle.pub")
+        };
+        let st = Command::new("minisign")
+            .args(["-G", "-W", "-p"])
+            .arg(pubk)
+            .arg("-s")
+            .arg(k.join(format!("{n}.key")))
+            .status()
+            .unwrap();
+        assert!(st.success());
+    }
+    let apply = |c: &Ctx| req(c, json!({"op": "apply_update", "token": tok}));
+    // Paquet signé par l'ancienne clé, apportant la nouvelle clé publique.
+    let p = paquet_x(
+        t.path(),
+        &k.join("maj.key"),
+        2,
+        None,
+        false,
+        Some(&k.join("nouvelle.pub")),
+    );
+    deposer(&c, &p);
+    assert!(
+        apply(&c).unwrap()["report"]
+            .as_str()
+            .unwrap()
+            .contains("clé de signature")
+    );
+    assert_eq!(
+        std::fs::read(&c.conf.update_pubkey).unwrap(),
+        std::fs::read(k.join("nouvelle.pub")).unwrap()
+    );
+    // L'ancienne clé n'est plus acceptée, la nouvelle l'est.
+    deposer(&c, &paquet(t.path(), &k.join("maj.key"), 3, None, false));
+    assert!(
+        apply(&c)
+            .unwrap_err()
+            .to_string()
+            .contains("signature invalide")
+    );
+    deposer(
+        &c,
+        &paquet(t.path(), &k.join("nouvelle.key"), 3, None, false),
+    );
+    apply(&c).unwrap();
+    assert_eq!(c.update_version(), 3);
 }

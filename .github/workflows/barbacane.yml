@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck barbacane/system/*.sh barbacane/tests/*.sh
+      - run: shellcheck barbacane/system/*.sh barbacane/tests/*.sh barbacane/tests/*/*.sh barbacane/update/*
 
   barbacane:
     runs-on: ubuntu-latest
@@ -27,7 +27,8 @@ jobs:
           sudo apt-get install -y -q --no-install-recommends pkgconf clang cmake \
             libssl-dev libkrb5-dev libseccomp-dev libudev-dev libusb-1.0-0-dev \
             protobuf-compiler libdbus-1-dev libfuse3-dev clamav-daemon 7zip bubblewrap \
-            zip genisoimage gcab msitools qemu-utils dosfstools mtools exfatprogs ntfs-3g fdisk
+            zip genisoimage gcab msitools qemu-utils dosfstools mtools exfatprogs ntfs-3g fdisk \
+            minisign zstd
           # bubblewrap sans setuid sur Ubuntu : autoriser les espaces de noms utilisateur
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
       - name: phase 1, transfert clé → clé usbsas (mock) avec EICAR
@@ -38,5 +39,7 @@ jobs:
         run: cd barbacane && cargo clippy --no-deps --all-targets -- -D warnings
       - name: tests (analyseur, archives, bout en bout mock)
         run: cd barbacane && cargo test
+      - name: mises à jour signées (préparation → application)
+        run: cd barbacane && cargo build -p barbacane-admind && tests/maj/maj.sh
       - name: audit
         run: cargo install --locked cargo-audit && cd barbacane && cargo audit
