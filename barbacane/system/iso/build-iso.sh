@@ -69,7 +69,7 @@ CONF
 id -u barbacane-iso >/dev/null 2>&1 || useradd --system --home-dir "$T" barbacane-iso
 chown -R barbacane-iso "$T"
 chmod 755 "$T"
-(cd "$T" && runuser -u barbacane-iso -- env HOME="$T" \
+(cd "$T" && runuser -u barbacane-iso -- env HOME="$T" ARCH=amd64 ARCHES=amd64 \
     build-simple-cdd --verbose --conf barbacane.conf --dist trixie --locale fr_FR --keyboard fr)
 ISO="$(find "$T/images" -name "*.iso" | head -n1)"
 
