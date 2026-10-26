@@ -107,6 +107,7 @@ impl RunningState {
                 comm.error(err)?;
             };
         }
+        comm.end()?;
         Ok(State::End)
     }
 
