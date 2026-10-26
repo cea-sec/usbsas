@@ -55,6 +55,12 @@ tar -cf "$T/donnees.tar" -C "$T/donnees" .
 sed -i 's/if a == "amd64" and "i386" not in self.env.get("ARCHES"):/if False:/' \
     /usr/bin/build-simple-cdd /usr/share/simple-cdd/build-simple-cdd
 
+# shortcut: debian-cd copie aussi le menu BIOS de l'installateur i386 : on lui donne celui d'amd64
+I386="$T/tmp/mirror/dists/trixie/main/installer-i386/current/images/cdrom"
+mkdir -p "$I386"
+wget -q -O "$I386/debian-cd_info.tar.gz" \
+    http://deb.debian.org/debian/dists/trixie/main/installer-amd64/current/images/cdrom/debian-cd_info.tar.gz
+
 # simple-cdd : dépôt hors ligne (paquets + dépendances) et installateur Debian
 cp -r "$ICI/profiles" "$T/"
 EXTRAS="$ICI/choisir-disque.sh $ICI/fin-installation.sh $ICI/configurer.sh $T/donnees.tar"
