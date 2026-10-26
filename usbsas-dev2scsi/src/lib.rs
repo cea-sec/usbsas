@@ -1,6 +1,8 @@
 //! dev2scsi process of usbsas. It is responsible for opening the input USB
 //! device, reading sectors from it and parsing its partition table.
 //!
+//! States: `Init` (wait for unlock value, open device, sandbox) -> `DevOpened`
+//! (`Partitions`, `ReadSectors`) -> `PartitionsListed` (`ReadSectors`) -> `End`.
 
 use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
@@ -21,6 +23,7 @@ use {
     usbsas_mock::mass_storage::MockMassStorage as MassStorage,
 };
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -43,12 +46,16 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
 // Max we need to read for ext4 check (other fs need less) and iso9660
+/// Bytes to read at the start of a partition to detect its file system
 const MAX_LEN_PART_HEADER: u64 = 0x488;
+/// Bytes to read (from offset 0x8000) to detect an ISO9660 image
 const MAX_LEN_ISO_HEADER: u64 = 0x8806;
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     DevOpened(DevOpenedState),
@@ -82,6 +89,8 @@ struct PartitionsListedState {
 struct WaitEndState {}
 
 impl InitState {
+    /// Wait for the bus and device numbers of the device (`0` to exit), open
+    /// it, sandbox the process and send `ResponseOpenDevice`.
     fn run(self, comm: &mut ComRpScsi) -> Result<State> {
         let mut buf = vec![0u8; 8];
         comm.read_exact(&mut buf)?;
@@ -180,6 +189,9 @@ impl DevOpenedState {
         }))
     }
 
+    /// List partitions (MBR or GPT) and detect their file system and label. A
+    /// device without partition table is a single partition. Returns an error
+    /// if no supported file system is found.
     fn partitions(&mut self, comm: &mut ComRpScsi) -> Result<()> {
         trace!("req partitions");
         let mut partitions = vec![];
@@ -408,17 +420,21 @@ impl WaitEndState {
     }
 }
 
+/// Source device reader process.
 pub struct Dev2Scsi {
     comm: ComRpScsi,
     state: State,
 }
 
 impl Dev2Scsi {
+    /// New reader, the device is given at unlock.
     pub fn new(comm: ComRpScsi) -> Result<Self> {
         let state = State::Init(InitState {});
         Ok(Dev2Scsi { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
