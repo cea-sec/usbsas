@@ -31,6 +31,7 @@ jobs:
           # diagnostic : adresses téléchargées par simple-cdd
           sed -i 's/^\(\s*\)request.urlretrieve(url/\1print("GET", url, flush=True); request.urlretrieve(url/' \
             /usr/lib/python3/dist-packages/simple_cdd/tools/mirror_download.py
+          grep -rn "i386\|ARCHES\|di_match\|installer-" /usr/bin/build-simple-cdd /usr/lib/python3/dist-packages/simple_cdd /usr/share/simple-cdd 2>/dev/null | grep -v "\.pyc" | head -60
           . "$HOME/.cargo/env"
           barbacane/system/iso/build-iso.sh --sortie "$PWD/barbacane.iso"
       - uses: actions/upload-artifact@v4
