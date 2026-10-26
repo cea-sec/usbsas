@@ -1,9 +1,13 @@
+//! Fake mass storage backed by a file.
+
 use positioned_io2::ReadAt;
 use std::{
     fs::File,
     io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
 };
 
+/// Replacement of `usbsas_mass_storage::MassStorage`, reading and writing a
+/// file with 512 bytes sectors.
 pub struct MockMassStorage {
     fakedev: File,
     pub block_size: u32,
@@ -12,6 +16,7 @@ pub struct MockMassStorage {
 }
 
 impl MockMassStorage {
+    /// Use `file` as the device.
     pub fn from_opened_file(file: File) -> Result<Self, io::Error> {
         let dev_size = file.metadata()?.len();
         Ok(MockMassStorage {
@@ -22,6 +27,7 @@ impl MockMassStorage {
         })
     }
 
+    /// Read `count` sectors starting at sector `offset`.
     pub fn read_sectors(
         &mut self,
         offset: u64,
