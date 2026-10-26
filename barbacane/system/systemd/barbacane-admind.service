@@ -1,0 +1,30 @@
+[Unit]
+Description=Barbacane : service d'administration (PIN, mises à jour, enrôlement)
+After=local-fs.target
+
+[Service]
+# root : applique les mises à jour (apt), redémarre les services, éteint la borne.
+ExecStart=/usr/bin/barbacane-admind -c /etc/barbacane/admind.toml
+Environment=RUST_LOG=info
+RuntimeDirectory=barbacane
+RuntimeDirectoryMode=0755
+StateDirectory=barbacane/admin barbacane/export barbacane/yara
+StateDirectoryMode=0750
+UMask=0022
+NoNewPrivileges=no
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+IPAddressAllow=localhost
+IPAddressDeny=any
+SystemCallArchitectures=native
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

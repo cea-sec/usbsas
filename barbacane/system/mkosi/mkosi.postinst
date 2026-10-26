@@ -1,0 +1,16 @@
+#!/bin/bash
+# Exécuté dans l'image (mkosi) après installation des paquets.
+set -euo pipefail
+install -m 644 /usr/share/barbacane/usbsas-config.toml /etc/usbsas/config.toml
+install -m 644 /usr/share/barbacane/nftables.conf /etc/nftables.conf
+systemctl enable nftables.service
+systemctl disable clamav-freshclam.service 2>/dev/null || true
+for s in networking NetworkManager systemd-networkd systemd-resolved wpa_supplicant ssh; do
+    systemctl mask "$s.service" 2>/dev/null || true
+done
+if [ -n "${BARBACANE_PIN:-}" ]; then
+    echo "$BARBACANE_PIN" | barbacane-admind --set-pin
+else
+    echo "ATTENTION : aucun PIN administrateur (variable BARBACANE_PIN)" >&2
+fi
+[ -f /etc/barbacane/maj.pub ] || echo "ATTENTION : /etc/barbacane/maj.pub absent : mises à jour impossibles" >&2

@@ -3,6 +3,7 @@ name = "barbacane-client"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Barbacane : interface, analyseur et administration de la borne"
 
 [dependencies]
 barbacane-parcours = { path = "../parcours" }
@@ -19,3 +20,42 @@ smol = "2.0.2"
 [features]
 # Développement : fenêtre X11 (Xvfb) pour les tests d'interface automatisés
 x11 = ["iced/x11"]
+
+# Paquet Debian « barbacane » : les trois binaires et l'intégration système.
+# Construction : cargo build --release && cargo deb -p barbacane-client --no-build
+[package.metadata.deb]
+name = "barbacane"
+maintainer = "Barbacane"
+copyright = "Barbacane"
+license-file = ["../../LICENSE", "0"]
+extended-description = "Borne autonome hors ligne d'analyse et de copie de clés USB, au-dessus d'usbsas."
+revision = "1"
+depends = "$auto, usbsas-server, cage, clamav-daemon, 7zip, bubblewrap, nftables, libwayland-egl1, fonts-dejavu-core"
+recommends = "usbsas-hid, 7zip-rar"
+provides = "usbsas-kiosk"
+section = "utility"
+priority = "optional"
+maintainer-scripts = "../system/deb/"
+conf-files = ["/etc/barbacane/analyzer.toml", "/etc/barbacane/client.toml", "/etc/barbacane/admind.toml"]
+assets = [
+  ["target/release/barbacane-client", "usr/bin/", "755"],
+  ["target/release/barbacane-analyzer", "usr/bin/", "755"],
+  ["target/release/barbacane-admind", "usr/bin/", "755"],
+  ["../system/etc/analyzer.toml", "etc/barbacane/", "644"],
+  ["../system/etc/client.toml", "etc/barbacane/", "644"],
+  ["../system/etc/admind.toml", "etc/barbacane/", "644"],
+  ["../system/etc/config.toml", "usr/share/barbacane/usbsas-config.toml", "644"],
+  ["../system/clamav/clamd-barbacane.conf", "usr/share/barbacane/", "644"],
+  ["../system/systemd/barbacane-analyzer.service", "usr/lib/systemd/system/", "644"],
+  ["../system/systemd/barbacane-admind.service", "usr/lib/systemd/system/", "644"],
+  ["../system/systemd/barbacane-kiosk.service", "usr/lib/systemd/system/", "644"],
+  ["../system/systemd/usbsas-server.service.d/barbacane.conf", "usr/lib/systemd/system/usbsas-server.service.d/", "644"],
+  ["../system/pam/barbacane-kiosk", "etc/pam.d/", "644"],
+  ["../system/modprobe/barbacane.conf", "etc/modprobe.d/", "644"],
+  ["../system/sysctl/90-barbacane.conf", "etc/sysctl.d/", "644"],
+  ["../system/nftables/nftables.conf", "usr/share/barbacane/", "644"],
+  ["../system/grub/barbacane.cfg", "etc/default/grub.d/", "644"],
+  ["../system/journald/barbacane.conf", "etc/systemd/journald.conf.d/", "644"],
+  ["../update/barbacane-update-prepare", "usr/share/barbacane/outils/", "755"],
+  ["../update/barbacane-update-keygen", "usr/share/barbacane/outils/", "755"],
+]

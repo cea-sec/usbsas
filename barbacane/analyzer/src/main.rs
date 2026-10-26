@@ -5,14 +5,15 @@ mod av;
 mod config;
 mod extract;
 mod job;
+mod relay;
 mod report;
 mod scan;
 mod stage;
 
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     body::Body,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -46,6 +47,23 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| "/etc/barbacane/analyzer.toml".into());
     let conf = config::Config::load(&conf_path)?;
     std::fs::create_dir_all(&conf.work_dir)?;
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    if let Some(r) = &conf.relay {
+        let router = relay::router(
+            r,
+            conf.stage_dir.clone(),
+            conf.import_dir.clone(),
+            conf.work_dir.clone(),
+        )?;
+        let listener = tokio::net::TcpListener::bind(&conf.listen).await?;
+        log::info!(
+            "relais : écoute sur {}, analyse par {}",
+            conf.listen,
+            r.upstream
+        );
+        axum::serve(listener, router).await?;
+        return Ok(());
+    }
     let engines = av::Engines::new(conf.clamd_socket.clone(), conf.yara_rules_dir.as_deref())?;
     match engines.clamav_version() {
         Ok(v) => log::info!("clamd joignable : {v:?}"),
@@ -57,10 +75,8 @@ async fn main() -> anyhow::Result<()> {
         timeout: Duration::from_secs(conf.limits.extract_timeout),
         memory: conf.limits.extract_memory,
     };
-    if conf.server.is_some() {
-        anyhow::bail!("mode serveur : pas encore disponible");
-    }
     let listen = conf.listen.clone();
+    let server = conf.server.clone();
     let app: Shared = Arc::new(App {
         conf,
         engines,
@@ -78,12 +94,109 @@ async fn main() -> anyhow::Result<()> {
         .route("/barbacane/v1/scans/{id}/password", post(password))
         .route("/barbacane/v1/scans/{id}/report", get(detailed))
         .route("/barbacane/v1/scans/{id}/stage", post(stage_req))
+        .route("/barbacane/v1/scans/{id}/files.tar", get(files_tar))
         .route("/barbacane/v1/import/arm", post(arm_import))
         .with_state(app);
-    let listener = tokio::net::TcpListener::bind(&listen).await?;
-    log::info!("écoute sur {listen}");
-    axum::serve(listener, router).await?;
+    match server {
+        None => {
+            let listener = tokio::net::TcpListener::bind(&listen).await?;
+            log::info!("écoute sur {listen}");
+            axum::serve(listener, router).await?;
+        }
+        Some(srv) => {
+            // Mode serveur : TLS obligatoire, chaque borne s'authentifie par son jeton.
+            let tokens = Arc::new(load_tokens(&srv.tokens_file)?);
+            let router = router.layer(axum::middleware::from_fn(move |req, next| {
+                auth(tokens.clone(), req, next)
+            }));
+            let tls =
+                axum_server::tls_rustls::RustlsConfig::from_pem_file(&srv.tls_cert, &srv.tls_key)
+                    .await?;
+            log::info!("mode serveur : écoute TLS sur {listen}");
+            axum_server::bind_rustls(listen.parse::<std::net::SocketAddr>()?, tls)
+                .serve(router.into_make_service())
+                .await?;
+        }
+    }
     Ok(())
+}
+
+/// Borne authentifiée (mode serveur).
+#[derive(Clone)]
+struct Borne(String);
+
+/// `<jeton> <nom de la borne>` par ligne ; lignes vides et `#` ignorées.
+fn load_tokens(p: &std::path::Path) -> anyhow::Result<Vec<(String, String)>> {
+    let mut v = Vec::new();
+    for l in std::fs::read_to_string(p)?.lines() {
+        let l = l.trim();
+        if l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        let (t, n) = l
+            .split_once(char::is_whitespace)
+            .ok_or_else(|| anyhow::anyhow!("ligne de jeton invalide"))?;
+        if t.len() < 32 {
+            anyhow::bail!("jeton trop court pour {n} (32 caractères minimum)");
+        }
+        v.push((t.to_string(), n.trim().to_string()));
+    }
+    Ok(v)
+}
+
+/// Comparaison en temps constant (longueurs publiques).
+fn same(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+async fn auth(
+    tokens: Arc<Vec<(String, String)>>,
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let given = req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .unwrap_or_default();
+    let mut found = None;
+    for (t, n) in tokens.iter() {
+        if same(t.as_bytes(), given.as_bytes()) {
+            found = Some(n.clone());
+        }
+    }
+    match found {
+        Some(n) => {
+            log::debug!("{n} : {} {}", req.method(), req.uri().path());
+            req.extensions_mut().insert(Borne(n));
+            next.run(req).await
+        }
+        None => {
+            log::warn!(
+                "requête refusée (jeton absent ou inconnu) : {}",
+                req.uri().path()
+            );
+            err(StatusCode::UNAUTHORIZED, "jeton absent ou inconnu")
+        }
+    }
+}
+
+/// Identifiant d'utilisateur propre à la borne (mode serveur : les bornes ne se voient pas).
+fn scoped(b: &Option<Extension<Borne>>, uid: &str) -> String {
+    match b {
+        Some(Extension(Borne(n))) => format!("{n}/{uid}"),
+        None => uid.to_string(),
+    }
+}
+
+/// Analyse visible par l'appelant (en mode serveur, seulement celles de sa borne).
+fn job_for(app: &App, id: &str, b: &Option<Extension<Borne>>) -> Option<Arc<Job>> {
+    let j = job(app, id)?;
+    match b {
+        Some(Extension(Borne(n))) if !j.uid.starts_with(&format!("{n}/")) => None,
+        _ => Some(j),
+    }
 }
 
 fn err(code: StatusCode, msg: impl ToString) -> Response {
@@ -99,7 +212,13 @@ fn job(app: &App, id: &str) -> Option<Arc<Job>> {
 }
 
 /// usbsas envoie le tar de session ; l'analyse démarre en tâche de fond.
-async fn upload(State(app): State<Shared>, Path(uid): Path<String>, body: Body) -> Response {
+async fn upload(
+    State(app): State<Shared>,
+    b: Option<Extension<Borne>>,
+    Path(uid): Path<String>,
+    body: Body,
+) -> Response {
+    let uid = scoped(&b, &uid);
     let work = match tempfile::Builder::new()
         .prefix("scan-")
         .tempdir_in(&app.conf.work_dir)
@@ -185,9 +304,10 @@ fn run_scan(app: &App, job: &Job, tar_path: &std::path::Path, import: Option<std
 
 async fn usbsas_result(
     State(app): State<Shared>,
+    b: Option<Extension<Borne>>,
     Path((_uid, id)): Path<(String, String)>,
 ) -> Response {
-    match job(&app, &id) {
+    match job_for(&app, &id, &b) {
         Some(j) => Json(report::usbsas(&j, &j.lock())).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
@@ -206,7 +326,12 @@ fn progress_json(j: &Job) -> serde_json::Value {
     })
 }
 
-async fn current(State(app): State<Shared>, Path(uid): Path<String>) -> Response {
+async fn current(
+    State(app): State<Shared>,
+    b: Option<Extension<Borne>>,
+    Path(uid): Path<String>,
+) -> Response {
+    let uid = scoped(&b, &uid);
     let j = app
         .jobs
         .lock()
@@ -220,8 +345,12 @@ async fn current(State(app): State<Shared>, Path(uid): Path<String>) -> Response
     }
 }
 
-async fn progress(State(app): State<Shared>, Path(id): Path<String>) -> Response {
-    match job(&app, &id) {
+async fn progress(
+    State(app): State<Shared>,
+    b: Option<Extension<Borne>>,
+    Path(id): Path<String>,
+) -> Response {
+    match job_for(&app, &id, &b) {
         Some(j) => Json(progress_json(&j)).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
@@ -236,10 +365,11 @@ struct PasswordBody {
 
 async fn password(
     State(app): State<Shared>,
+    borne: Option<Extension<Borne>>,
     Path(id): Path<String>,
     Json(b): Json<PasswordBody>,
 ) -> Response {
-    let Some(j) = job(&app, &id) else {
+    let Some(j) = job_for(&app, &id, &borne) else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let a = match (b.abandon, b.password) {
@@ -253,8 +383,12 @@ async fn password(
     }
 }
 
-async fn detailed(State(app): State<Shared>, Path(id): Path<String>) -> Response {
-    match job(&app, &id) {
+async fn detailed(
+    State(app): State<Shared>,
+    b: Option<Extension<Borne>>,
+    Path(id): Path<String>,
+) -> Response {
+    match job_for(&app, &id, &b) {
         Some(j) => Json(report::detailed(&j, &j.lock())).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
@@ -269,9 +403,13 @@ struct StageBody {
 /// Prépare le dossier lu par usbsas pour l'écriture sur la clé de sortie.
 async fn stage_req(
     State(app): State<Shared>,
+    borne: Option<Extension<Borne>>,
     Path(id): Path<String>,
     Json(b): Json<StageBody>,
 ) -> Response {
+    if borne.is_some() {
+        return err(StatusCode::FORBIDDEN, "mode serveur : utiliser files.tar");
+    }
     let Some(j) = job(&app, &id) else {
         return StatusCode::NOT_FOUND.into_response();
     };
@@ -284,11 +422,55 @@ async fn stage_req(
     }
 }
 
-async fn arm_import(State(app): State<Shared>) -> Response {
+async fn arm_import(State(app): State<Shared>, b: Option<Extension<Borne>>) -> Response {
+    if b.is_some() {
+        return err(
+            StatusCode::FORBIDDEN,
+            "mode serveur : la clé admin est lue par le relais de la borne",
+        );
+    }
     app.import_armed
         .store(true, std::sync::atomic::Ordering::SeqCst);
     log::info!("prochaine lecture : clé administrateur (paquets de mise à jour)");
     StatusCode::NO_CONTENT.into_response()
+}
+
+#[derive(Deserialize)]
+struct DeviceQuery {
+    device: String,
+}
+
+/// Arbre des fichiers sains + rapports, en tar (relais d'une borne en mode serveur).
+async fn files_tar(
+    State(app): State<Shared>,
+    b: Option<Extension<Borne>>,
+    Path(id): Path<String>,
+    Query(q): Query<DeviceQuery>,
+) -> Response {
+    let Some(j) = job_for(&app, &id, &b) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let path = j
+        .work
+        .path()
+        .join(format!("files-{}.tar", uuid::Uuid::new_v4()));
+    let p2 = path.clone();
+    match tokio::task::spawn_blocking(move || stage::write_tar(&p2, &j, &q.device)).await {
+        Ok(Ok(())) => (),
+        Ok(Err(e)) => return err(StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")),
+        Err(e) => return err(StatusCode::INTERNAL_SERVER_ERROR, e),
+    }
+    match tokio::fs::File::open(&path).await {
+        Ok(f) => {
+            // Le fichier reste lisible après suppression du nom (descripteur ouvert).
+            let _ = tokio::fs::remove_file(&path).await;
+            Response::builder()
+                .header(axum::http::header::CONTENT_TYPE, "application/x-tar")
+                .body(Body::from_stream(tokio_util::io::ReaderStream::new(f)))
+                .unwrap_or_else(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e))
+        }
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e),
+    }
 }
 
 async fn status(State(app): State<Shared>) -> Response {

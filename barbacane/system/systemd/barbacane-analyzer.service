@@ -12,7 +12,7 @@ SupplementaryGroups=clamav
 UMask=0027
 # Fichiers en cours d'analyse : en mémoire, taille bornée, effacés à l'arrêt
 TemporaryFileSystem=/var/lib/barbacane/analyzer:size=6G,mode=0700,uid=barbacane-analyzer,nr_inodes=200k
-StateDirectory=barbacane/rapports barbacane/sortie
+StateDirectory=barbacane/rapports barbacane/sortie barbacane/import
 StateDirectoryMode=0750
 MemoryMax=10G
 CPUQuota=300%
@@ -38,8 +38,9 @@ IPAddressAllow=localhost
 IPAddressDeny=any
 CapabilityBoundingSet=
 SystemCallArchitectures=native
+# bubblewrap : espaces de noms et montages dans son propre espace
 SystemCallFilter=@system-service @mount @sandbox
-SystemCallFilter=~@privileged @resources @obsolete
+SystemCallFilter=~@obsolete @raw-io @reboot @swap @module @clock @cpu-emulation @debug
 Restart=on-failure
 
 [Install]

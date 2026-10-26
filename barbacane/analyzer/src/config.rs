@@ -28,6 +28,7 @@ pub struct Config {
     pub max_reports: usize,
     pub limits: Limits,
     pub server: Option<Server>,
+    pub relay: Option<Relay>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -52,7 +53,6 @@ pub struct Limits {
 }
 
 /// Mode serveur partagé entre plusieurs SAS (désactivé si absent).
-#[allow(dead_code)] // lu en phase 8
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Server {
@@ -62,6 +62,18 @@ pub struct Server {
     pub tokens_file: PathBuf,
 }
 
+/// Borne reliée à un analyseur central (désactivé si absent).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Relay {
+    /// URL du serveur central, ex. `https://analyse.interne:8443`
+    pub upstream: String,
+    /// Jeton de la borne (une ligne)
+    pub token_file: PathBuf,
+    /// Certificat du serveur (ou de son AC) à épingler
+    pub ca_cert: Option<PathBuf>,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -69,7 +81,7 @@ impl Default for Config {
             work_dir: "/var/lib/barbacane/analyzer".into(),
             clamd_socket: "/run/clamav/clamd.ctl".into(),
             yara_rules_dir: Some("/var/lib/barbacane/yara".into()),
-            seven_zip: "/usr/bin/7zz".into(),
+            seven_zip: "/usr/bin/7z".into(),
             bwrap: Some("/usr/bin/bwrap".into()),
             stage_dir: "/var/lib/barbacane/sortie".into(),
             reports_dir: Some("/var/lib/barbacane/rapports".into()),
@@ -77,6 +89,7 @@ impl Default for Config {
             max_reports: 5000,
             limits: Limits::default(),
             server: None,
+            relay: None,
         }
     }
 }

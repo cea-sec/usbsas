@@ -1,0 +1,48 @@
+# Session kiosque : l'interface Barbacane seule, plein écran, dans cage (Wayland).
+# Inspiré de usbsas-client.service (doc/kiosk.md d'usbsas).
+[Unit]
+Description=Barbacane : interface kiosque
+After=systemd-user-sessions.service plymouth-quit-wait.service usbsas-server.service barbacane-analyzer.service
+Before=graphical.target
+ConditionPathExists=/dev/tty0
+Wants=dbus.socket systemd-logind.service
+After=dbus.socket systemd-logind.service
+Conflicts=getty@tty2.service
+After=getty@tty2.service
+
+[Service]
+Type=simple
+User=barbacane-kiosk
+WorkingDirectory=/var/lib/barbacane-kiosk
+RuntimeDirectory=barbacane-kiosk
+Environment="RUST_LOG=info,wgpu_hal=error,iced_winit=error,iced_wgpu=error,wgpu_core=error"
+Environment=XDG_RUNTIME_DIR=/run/barbacane-kiosk
+PAMName=barbacane-kiosk
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+UnsetEnvironment=TERM
+UtmpIdentifier=tty2
+UtmpMode=user
+StandardOutput=journal
+# Pas d'option -s : impossible de changer de console virtuelle depuis la session.
+ExecStart=/usr/bin/cage -d -- /usr/bin/barbacane-client -c /etc/barbacane/client.toml
+ExecStartPre=/usr/bin/chvt 2
+Restart=always
+RestartSec=1
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+IPAddressAllow=localhost
+IPAddressDeny=any
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=graphical.target

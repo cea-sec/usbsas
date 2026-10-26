@@ -7,35 +7,104 @@ use anyhow::{Result, bail};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
-/// Remplit `dir` (vidé au préalable). Renvoie le nombre de fichiers écrits.
-pub fn stage(dir: &Path, job: &Job, device: &str) -> Result<usize> {
+/// Contenu à écrire : chemin relatif de sortie → fichier local ou données.
+pub enum Source {
+    File(PathBuf),
+    Data(Vec<u8>),
+}
+
+/// Arbre final : fichiers sains (noms uniques, exFAT ignorant la casse) + rapports.
+pub fn plan(job: &Job, device: &str) -> Result<Vec<(PathBuf, Source)>> {
     let s = job.lock();
     if s.status != Status::Scanned {
         bail!("analyse non terminée");
     }
-    clear(dir)?;
-    // exFAT ignore la casse : deux noms ne différant que par la casse se renomment.
     let mut taken = HashMap::new();
-    let mut n = 0;
+    let mut out = Vec::new();
     for e in s.entries.iter() {
-        let Some(out) = &e.output else { continue };
-        let rel = unique(safe_rel(out)?, &mut taken);
+        let Some(o) = &e.output else { continue };
+        out.push((
+            unique(safe_rel(o)?, &mut taken),
+            Source::File(e.local.clone()),
+        ));
+    }
+    let stamp = s.started.strftime("%Y%m%d-%H%M%S").to_string();
+    out.push((
+        format!("rapport-barbacane-{stamp}.txt").into(),
+        Source::Data(report::text(job, &s, device).into_bytes()),
+    ));
+    out.push((
+        format!("rapport-barbacane-{stamp}.html").into(),
+        Source::Data(report::html(job, &s, device).into_bytes()),
+    ));
+    Ok(out)
+}
+
+/// Remplit `dir` (vidé au préalable). Renvoie le nombre de fichiers sains écrits.
+pub fn stage(dir: &Path, job: &Job, device: &str) -> Result<usize> {
+    let plan = plan(job, device)?;
+    clear(dir)?;
+    let mut n = 0;
+    for (rel, src) in plan {
         let dst = dir.join(&rel);
         if let Some(p) = dst.parent() {
             std::fs::create_dir_all(p)?;
         }
-        std::fs::copy(&e.local, &dst)?;
-        n += 1;
+        match src {
+            Source::File(f) => {
+                std::fs::copy(f, &dst)?;
+                n += 1;
+            }
+            Source::Data(d) => std::fs::write(&dst, d)?,
+        }
     }
-    let stamp = s.started.strftime("%Y%m%d-%H%M%S").to_string();
-    std::fs::write(
-        dir.join(format!("rapport-barbacane-{stamp}.txt")),
-        report::text(job, &s, device),
-    )?;
-    std::fs::write(
-        dir.join(format!("rapport-barbacane-{stamp}.html")),
-        report::html(job, &s, device),
-    )?;
+    Ok(n)
+}
+
+/// Même arbre, dans un tar (mode serveur : la borne le déballe dans son dossier de préparation).
+pub fn write_tar(path: &Path, job: &Job, device: &str) -> Result<()> {
+    let mut b = tar::Builder::new(std::fs::File::create(path)?);
+    for (rel, src) in plan(job, device)? {
+        let mut h = tar::Header::new_gnu();
+        h.set_mode(0o644);
+        match src {
+            Source::File(f) => {
+                let mut file = std::fs::File::open(f)?;
+                h.set_size(file.metadata()?.len());
+                b.append_data(&mut h, &rel, &mut file)?;
+            }
+            Source::Data(d) => {
+                h.set_size(d.len() as u64);
+                b.append_data(&mut h, &rel, d.as_slice())?;
+            }
+        }
+    }
+    b.finish()?;
+    Ok(())
+}
+
+/// Déballe un tar produit par [`write_tar`] (venu du serveur) dans `dir`, vidé au préalable.
+/// Seuls des fichiers ordinaires à chemin relatif sûr sont acceptés.
+pub fn unpack_tar(tar_path: &Path, dir: &Path) -> Result<usize> {
+    clear(dir)?;
+    let mut ar = tar::Archive::new(std::fs::File::open(tar_path)?);
+    let mut n = 0;
+    for e in ar.entries()? {
+        let mut e = e?;
+        if e.header().entry_type() != tar::EntryType::Regular {
+            bail!("entrée refusée dans l'archive du serveur");
+        }
+        let rel = safe_rel(&String::from_utf8_lossy(&e.path_bytes()))?;
+        let dst = dir.join(&rel);
+        if let Some(p) = dst.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        std::io::copy(&mut e, &mut std::fs::File::create(&dst)?)?;
+        if !rel.to_string_lossy().starts_with("rapport-barbacane-") || rel.components().count() > 1
+        {
+            n += 1;
+        }
+    }
     Ok(n)
 }
 

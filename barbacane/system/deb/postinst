@@ -1,0 +1,48 @@
+#!/bin/sh
+# Paquet barbacane : comptes, dossiers, réglages système, services.
+set -e
+
+if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
+    getent group barbacane >/dev/null || addgroup --system barbacane
+    getent group barbacane-kiosk >/dev/null || addgroup --system barbacane-kiosk
+    id -u barbacane-analyzer >/dev/null 2>&1 || \
+        adduser --system --ingroup barbacane --home /nonexistent --no-create-home barbacane-analyzer
+    id -u barbacane-kiosk >/dev/null 2>&1 || \
+        adduser --system --ingroup barbacane-kiosk --home /var/lib/barbacane-kiosk barbacane-kiosk
+    # Interface : socket usbsas (groupe usbsas), rendu graphique
+    for g in usbsas video render input; do
+        if getent group "$g" >/dev/null; then adduser --quiet barbacane-kiosk "$g"; fi
+    done
+    # usbsas lit les dossiers préparés par l'analyseur
+    if id -u usbsas >/dev/null 2>&1; then adduser --quiet usbsas barbacane; fi
+    # Analyseur : socket clamd
+    if getent group clamav >/dev/null; then adduser --quiet barbacane-analyzer clamav; fi
+
+    install -d -m 0755 /var/lib/barbacane /var/lib/barbacane/yara
+    install -d -m 0700 -o usbsas -g usbsas /var/lib/usbsas/tmp 2>/dev/null || true
+
+    # clamd : limites d'analyse imposées (fichier généré par debconf, réglages remplacés ligne à ligne)
+    if [ -f /etc/clamav/clamd.conf ]; then
+        grep -vE '^\s*(#|$)' /usr/share/barbacane/clamd-barbacane.conf | while read -r cle valeur; do
+            sed -i "/^$cle /d" /etc/clamav/clamd.conf
+            echo "$cle $valeur" >> /etc/clamav/clamd.conf
+        done
+    fi
+
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    sysctl --system >/dev/null 2>&1 || true
+    udevadm control --reload-rules >/dev/null 2>&1 || true
+    # Borne hors ligne : pas de mise à jour réseau des signatures
+    systemctl disable --now clamav-freshclam.service >/dev/null 2>&1 || true
+    for s in clamav-daemon nftables usbsas-server barbacane-analyzer barbacane-admind barbacane-kiosk hid-dealer; do
+        systemctl enable "$s.service" >/dev/null 2>&1 || true
+    done
+    systemctl mask getty@tty2.service autovt@tty2.service >/dev/null 2>&1 || true
+    systemctl set-default graphical.target >/dev/null 2>&1 || true
+    # Redémarrage des services après une mise à jour (si systemd tourne)
+    if [ -d /run/systemd/system ]; then
+        systemctl try-restart barbacane-analyzer.service barbacane-admind.service >/dev/null 2>&1 || true
+    fi
+fi
+
+#DEBHELPER#

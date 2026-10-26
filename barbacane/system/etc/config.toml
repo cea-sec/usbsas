@@ -32,6 +32,14 @@ path = "/var/lib/barbacane/export"
 description = "Export"
 longdescr = "Journaux et rapports de la borne"
 
+# Destination « partage réseau » : prévue, DÉSACTIVÉE (borne hors ligne).
+# usbsas sait envoyer les fichiers analysés vers un serveur (voir doc/configuration.md d'usbsas) ;
+# à activer seulement avec une architecture réseau validée.
+#[[networks]]
+#description = "Partage réseau"
+#longdescr = "Envoyer les fichiers sains sur le partage"
+#url = "https://partage.interne/api/uploadbundle"
+
 # Le rapport Barbacane (texte + HTML) remplace celui d'usbsas sur la clé de sortie
 [report]
 write_dest = false
