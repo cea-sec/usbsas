@@ -100,11 +100,43 @@ fn compile_yara(dir: &Path) -> Result<yara_x::Rules> {
         .filter(|p| matches!(p.extension().and_then(|e| e.to_str()), Some("yar" | "yara")))
         .collect();
     entries.sort();
+    let mut ok = 0;
     for p in entries {
-        let src = std::fs::read_to_string(&p)?;
-        compiler
-            .add_source(src.as_str())
-            .map_err(|e| anyhow::anyhow!("règles YARA {} : {e}", p.display()))?;
+        let src = match std::fs::read_to_string(&p) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("règles YARA {} ignorées : {e}", p.display());
+                continue;
+            }
+        };
+        // Un espace de noms par fichier : une règle invalide n'écarte que son fichier.
+        compiler.new_namespace(&p.file_stem().unwrap_or_default().to_string_lossy());
+        match compiler.add_source(src.as_str()) {
+            Ok(_) => ok += 1,
+            Err(e) => log::warn!("règles YARA {} ignorées : {e}", p.display()),
+        }
     }
+    log::info!("{ok} fichier(s) de règles YARA chargé(s)");
     Ok(compiler.build())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn regle_invalide_ignoree() {
+        let d = tempfile::tempdir().unwrap();
+        std::fs::write(
+            d.path().join("a.yar"),
+            "rule a { strings: $x = \"ABC\" condition: $x }",
+        )
+        .unwrap();
+        std::fs::write(
+            d.path().join("b.yar"),
+            "rule b { condition: filename == \"x\" }",
+        )
+        .unwrap();
+        let rules = super::compile_yara(d.path()).unwrap();
+        let mut sc = yara_x::Scanner::new(&rules);
+        assert_eq!(sc.scan(b"xxABCxx").unwrap().matching_rules().count(), 1);
+    }
 }

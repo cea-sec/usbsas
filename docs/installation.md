@@ -1,34 +1,162 @@
 # Installation d'une borne Barbacane
 
-> Document en cours : il sera complété à chaque phase (durcissement, kiosque, image `mkosi` en phase 7).
+Ce document permet d'installer une borne **de zéro**, soit par le script
+d'installation sur une Debian 13 fraîche, soit en flashant une image disque.
 
-## Phase 1 : socle usbsas
+## 1. Matériel et prérequis
 
-Sur une Debian 13 (trixie) minimale fraîchement installée, avec accès réseau **uniquement pendant l'installation** :
+| Élément | Exigence |
+|---|---|
+| Poste | HP ProDesk / Dell OptiPlex x86_64, UEFI, **16 Go de RAM** minimum |
+| Disque | 64 Go minimum (journaux, rapports, fichiers temporaires usbsas) |
+| Périphériques | écran + **souris USB** uniquement ; aucun clavier en production |
+| Ports USB | 1 port « entrée » (clé inconnue, aussi utilisé pour Blanchir), 1 port « sortie », 1 port souris |
+| Réseau | aucun en production ; un accès Internet est nécessaire **pendant** l'installation par script |
+
+Pour la préparation, prévoir aussi un **poste administrateur connecté** (Debian 13
+de préférence) qui génère les clés de signature et les paquets de mise à jour.
+
+## 2. Réglages BIOS / UEFI (à faire avant tout)
+
+1. Mettre à jour le BIOS du constructeur (HP : *HP PC Hardware Diagnostics* / Dell : *Dell Command | Update*) avant de couper le réseau.
+2. **Mot de passe administrateur BIOS** (HP : *Security → Create BIOS Administrator Password* ; Dell : *Security → Admin Password*). Le conserver avec les secrets de l'administration.
+3. **Ordre de démarrage** : disque interne uniquement ; désactiver le démarrage USB, réseau (PXE) et lecteur optique ; désactiver le menu de démarrage F9/F12 (HP : *Boot Options → USB Storage Boot* désactivé ; Dell : *Boot Configuration*, décocher *Enable USB Boot Support*, *Enable PXE*).
+4. **Secure Boot** activé (mode *Deployed* / sans clés de tiers personnalisées). Debian 13 démarre en Secure Boot avec `shim` signé (installation par script). L'image mkosi utilise systemd-boot non signé : soit désactiver Secure Boot, soit signer l'image (voir §6.3).
+5. Désactiver : Wake-on-LAN, *Intel AMT / vPro* (HP *Advanced → Remote Management* ; Dell *Intel AMT Capability : Disabled*), carte Wi-Fi et Bluetooth si l'option existe, ports Thunderbolt / *Thunderbolt Security Level : No Security* → désactivé.
+6. Activer la virtualisation d'E/S (VT-d / IOMMU) : protège contre les attaques DMA (le noyau est lancé avec `iommu=force`).
+7. Désactiver les ports USB non utilisés (si le BIOS le permet) et la **sortie** de veille par USB.
+8. Activer la détection d'ouverture du boîtier (*Chassis Intrusion*) si disponible.
+
+## 3. Installation par script (Debian 13)
+
+### 3.1 Debian minimale
+
+Installer Debian 13 (trixie) depuis l'image `netinst` :
+- partitionnement : disque entier, chiffrement non requis (aucune donnée sensible persistante : les fichiers analysés sont en mémoire) ;
+- **aucun environnement de bureau**, cocher seulement « utilitaires usuels du système » ;
+- ne pas installer de serveur SSH ;
+- compte `root` avec mot de passe fort (il ne servira plus une fois la borne en service).
+
+### 3.2 Récupérer le dépôt et lancer l'installation
+
+Préparer sur une clé (depuis le poste administrateur) :
+- la clé publique de mise à jour `barbacane-maj.pub` (voir [administration.md](administration.md#cles)) ;
+- facultatif : une base ClamAV (`main.cvd`, `daily.cvd`, `bytecode.cvd`) et des règles YARA ;
+- facultatif : les paquets déjà construits (`barbacane/system/build-debs.sh` sur le poste administrateur).
+
+Sur la borne, avec un clavier temporaire et le réseau :
 
 ```shell
+apt install git
 git clone <dépôt> barbacane && cd barbacane
-sudo barbacane/system/install.sh
+sudo barbacane/system/install.sh --pin --cle-publique /media/cle/barbacane-maj.pub \
+     [--clamav /media/cle/clamav] [--yara /media/cle/yara] [--debs /media/cle/paquets] \
+     --couper-reseau
 ```
 
-Le script (idempotent) :
-- installe les dépendances, Rust (rustup) et `cargo-deb` ;
-- construit et installe les paquets `usbsas-server` et `usbsas-analyzer-server` (analyseur ClamAV d'exemple, remplacé en phase 2) ;
-  le paquet `usbsas-server` crée l'utilisateur `usbsas`, la règle udev et bloque `usb_storage`/`uas` (`/etc/modprobe.d/usbsas.conf`) ;
-- installe `barbacane/system/etc/config.toml` en `/etc/usbsas/config.toml` ;
-- désactive `freshclam` et `clamav-daemon` (borne hors ligne ; clamd est lancé par l'analyseur).
+Le script (relançable sans risque) :
+1. active `contrib non-free` (paquet `7zip-rar` pour lire les archives RAR ; `--sans-rar` pour s'en passer) ;
+2. installe les dépendances (ClamAV, 7-Zip, bubblewrap, cage, nftables, minisign…) ;
+3. construit les paquets `usbsas-server`, `usbsas-hid`, `barbacane` si `--debs` n'est pas fourni (Rust installé si besoin) ;
+4. installe les paquets : le paquet `barbacane` crée les comptes, applique les réglages système et active les services ;
+5. pose `/etc/usbsas/config.toml` (première installation seulement), `/etc/nftables.conf`, la clé publique, les règles YARA ;
+6. installe la base ClamAV initiale (dossier fourni ou téléchargement unique) ;
+7. demande le **PIN administrateur** (6 chiffres minimum) ;
+8. avec `--couper-reseau` : désactive et masque tous les services réseau.
 
-### À faire à la main
-- **Base ClamAV** : copier `main.cvd`, `daily.cvd`, `bytecode.cvd` dans `/var/lib/clamav/` (en attendant les mises à jour signées, phase 6).
-- **Ports USB** : brancher une clé sur chaque port et relever son chemin avec `usbsas-devmonitor` (paquet `usbsas-tools`) ou `lsusb -t`,
-  puis renseigner `[usb_port_accesses]` dans `/etc/usbsas/config.toml`. Le port d'entrée doit figurer dans `ports_src` **et** `ports_dst` (option Blanchir).
-  Attention : un port USB 3 apparaît sur deux bus logiques (USB 2 et USB 3), déclarer les deux.
+### 3.3 Affecter les ports USB
 
-### Vérification sans matériel (mode mock)
+usbsas n'accepte les clés que sur les ports déclarés. Avant de débrancher le clavier :
 
 ```shell
-barbacane/tests/phase1-mock.sh
+sudo systemctl stop barbacane-kiosk
+watch -n1 lsusb -t
 ```
 
-Construit usbsas avec périphériques simulés par fichiers image et exécute les tests d'intégration :
-le transfert clé → clé doit rejeter `infected/eicar.com`.
+Brancher une clé successivement sur chaque port physique et noter le chemin
+affiché : numéro de bus puis numéros de port (ex. `Bus 001` → `Port 002` →
+chemin `[1, 2]` ; derrière un concentrateur interne `[1, 2, 5]`). L'outil
+`usbsas-devmonitor` (crate `usbsas-tools`) affiche directement ces chemins. **Un port USB 3 apparaît sur deux bus** (USB 2 et USB 3) :
+déclarer les deux chemins. Renseigner `/etc/usbsas/config.toml` :
+
+```toml
+[usb_port_accesses]
+ports_src = [ [1, 2], [2, 2] ]            # port d'entrée (bus USB 2 et USB 3)
+ports_dst = [ [1, 2], [2, 2], [1, 3], [2, 3] ]   # entrée (Blanchir) + sortie
+ports_hid = [ [1, 4] ]                     # souris
+```
+
+Étiqueter physiquement les ports (« ENTRÉE », « SORTIE », souris) et obturer les autres.
+
+### 3.4 Redémarrer
+
+```shell
+sudo reboot
+```
+
+La borne démarre directement sur l'interface Barbacane (console virtuelle 2,
+session `cage`). Le clavier est désactivé (pilote HID noyau bloqué, seule la
+souris est gérée par usbsas-hid en espace utilisateur).
+
+## 4. Vérifications après installation
+
+À faire une fois, avec une clé de test contenant le fichier EICAR, une archive
+zip mixte (EICAR + fichier sain) et une archive protégée par mot de passe :
+
+| Vérification | Résultat attendu |
+|---|---|
+| Démarrage | interface plein écran, aucun bureau, impossible d'en sortir |
+| Indicateur en haut à droite | « Signatures antivirales : N jour(s) » (pas d'alerte orange) |
+| Copier vers une clé | EICAR refusé, fichier sain de l'archive copié dans `<archive>.extrait/`, rapport texte + HTML sur la clé |
+| Archive protégée | demande du mot de passe au clavier virtuel ; « Ignorer » → archive refusée |
+| Blanchir | clé effacée puis réécrite avec les seuls fichiers sains |
+| Mode administrateur | bouton « Administration » en bas à droite, PIN, menu complet |
+| Réseau | `nft list ruleset` : politique `drop` ; `ip link` : aucune interface active hors `lo` |
+
+## 5. Comptes et services installés
+
+| Service | Compte | Rôle |
+|---|---|---|
+| `usbsas-server` | `usbsas` | lecture/écriture des clés en espace utilisateur (seccomp + landlock par processus) |
+| `hid-dealer` | `usbsas-hid` | souris en espace utilisateur |
+| `barbacane-analyzer` | `barbacane-analyzer` | analyse (ClamAV via clamd, YARA, archives dans bubblewrap) |
+| `clamav-daemon` | `clamav` | moteur ClamAV |
+| `barbacane-admind` | `root` | mode administrateur (PIN, mises à jour, export, arrêt) |
+| `barbacane-kiosk` | `barbacane-kiosk` | interface graphique dans `cage` |
+
+Fichiers de configuration : `/etc/usbsas/config.toml`, `/etc/barbacane/{analyzer,client,admind}.toml`,
+clé publique `/etc/barbacane/maj.pub`. Données : `/var/lib/barbacane/` (rapports, état admin, règles YARA).
+
+## 6. Image disque prête à flasher (mkosi)
+
+### 6.1 Construction (poste administrateur, Debian 13, mkosi ≥ 25)
+
+```shell
+barbacane/system/build-debs.sh                       # paquets → barbacane/system/mkosi/paquets/
+cp barbacane-maj.pub barbacane/system/mkosi/mkosi.extra/etc/barbacane/maj.pub
+# facultatif : base ClamAV initiale
+mkdir -p barbacane/system/mkosi/mkosi.extra/var/lib/clamav && cp clamav/*.cvd "$_"/
+cd barbacane/system/mkosi && BARBACANE_PIN=xxxxxx mkosi -f build
+```
+
+### 6.2 Flashage
+
+Démarrer la borne sur un support de maintenance (autorisé temporairement dans le
+BIOS), puis `dd if=barbacane.raw of=/dev/nvme0n1 bs=4M conv=fsync` ; ou retirer
+le disque et le flasher sur le poste administrateur. Rétablir ensuite les
+réglages BIOS du §2 et affecter les ports (§3.3, en démarrant temporairement
+avec un clavier : le blocage du clavier est appliqué au premier démarrage par usbsas-hid).
+
+### 6.3 Secure Boot avec l'image mkosi
+
+L'image embarque un noyau unifié (UKI) démarré par systemd-boot. Pour garder
+Secure Boot : générer une clé de signature (`mkosi genkey`), ajouter
+`SecureBoot=yes` et `SecureBootKey=`/`SecureBootCertificate=` dans `mkosi.conf`,
+et enregistrer le certificat dans le firmware (mode *Setup*, menu Secure Boot du BIOS).
+
+## 7. Limites connues de cette version
+
+- Le script et l'image ont été écrits pour Debian 13 mais **testés seulement en
+  partie** hors Debian 13 (environnement de développement sans accès aux
+  miroirs Debian) : valider sur une première borne avant déploiement.
+- La lecture des archives RAR nécessite `7zip-rar` (dépôt `non-free`).

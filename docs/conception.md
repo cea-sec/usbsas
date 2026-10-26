@@ -202,3 +202,20 @@ dynamique. Le client sera un fork (autorisé par la consigne).
 5. Bornes : 16 Go de RAM → tmpfs de préparation 6 Go, tmpfs d'extraction 6 Go.
 6. **Zed abandonné** : aucune détection spécifique ; un conteneur Zed est traité comme un fichier inconnu (analysé, non extrait).
 7. Fichiers extraits d'une archive refusée : dossier `<archive>.extrait/` sur la clé de sortie.
+
+## 8. Réalisation (état final des phases 1 à 8)
+
+| Composant | Réalisation |
+|---|---|
+| Analyse | `barbacane-analyzer` : protocole usbsas v2 (tar sous `data/`), 7-Zip dans bubblewrap (sans réseau, `--unshare-all`, limites mémoire / taille de fichier / CPU / durée), ClamAV par `INSTREAM`, YARA-X (un espace de noms par fichier de règles), type réel (contenu), sha256, rapports JSON / texte / HTML |
+| Archives | détection par octets magiques (zip, 7z, rar, gzip, bzip2, xz, zstd, iso/udf, cab, OLE/msi, vmdk, vhd(x), qcow, vdi, wim, cpio, arj, lzh, chm, xar, rpm, ar, squashfs, tar, gpt, ntfs, fat, ext…) ; chemins dangereux (`..`, absolus) → archive non copiée telle quelle, contenu sain extrait |
+| Mots de passe | l'analyseur reste « processing » pour usbsas et publie la question sur `/barbacane/v1/…` ; 3 essais, abandon, délai (§4.1) |
+| Copie fichier par fichier | deux transferts usbsas + dossier de préparation rempli par l'analyseur (§4.2, option C) ; `<archive>.extrait/` ; collisions de casse exFAT renommées |
+| Blanchir | analyse → confirmation → wipe usbsas (zéros) → réécriture exFAT ; réessai de l'écriture sans nouvelle analyse (§4.3) |
+| Interface | `barbacane-client` (iced, fork fonctionnel du client usbsas : même pile, écrans réécrits) : souris seule, clavier virtuel AZERTY, résumé « passé / refusé / pourquoi », indicateur d'âge des signatures |
+| Administration | `barbacane-admind` (root, socket Unix, groupe kiosque) : PIN Argon2id + verrouillage, jeton de session, enrôlement, limites, export (rapports, journal, état dpkg), mises à jour, arrêt |
+| Mises à jour | `.bcu` (tar.zst) + minisign, manifeste sha256, anti-retour arrière, restauration ClamAV/YARA, apt sans source réseau, rotation de clé ; lecture de la clé admin par usbsas (dépôt des `.bcu` par l'analyseur après armement) |
+| Système | paquet `barbacane`, unités durcies, kiosque `cage`, souris via `usbsas-hid`, modprobe / sysctl / nftables `drop`, paramètres noyau, `install.sh`, image `mkosi` |
+| Serveur | mode serveur (TLS, jetons, isolation par borne) + mode relais sur la borne (usbsas inchangé, certificat épinglé) |
+
+Écart au cœur d'usbsas : un seul, le correctif seccomp sur 32 bits (`docs/ecarts-upstream.md`).

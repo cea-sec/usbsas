@@ -51,7 +51,7 @@ apt-get update -q
 etape "Paquets d'exécution"
 apt-get install -y -q --no-install-recommends \
     clamav-daemon clamav-freshclam 7zip bubblewrap cage nftables minisign zstd \
-    fonts-dejavu-core libwayland-egl1 libegl1 libgl1 mesa-vulkan-drivers dbus systemd-sysv udev kbd
+    fonts-dejavu-core libwayland-egl1 libegl1 libgl1 mesa-vulkan-drivers dbus systemd-sysv udev kbd usbutils
 [ "$RAR" = 1 ] && { apt-get install -y -q 7zip-rar || attention "7zip-rar indisponible : archives RAR non lues."; }
 
 if [ -z "$DEBS" ]; then
