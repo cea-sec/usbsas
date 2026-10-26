@@ -37,6 +37,7 @@ fn system_time_from_timestamp(ts: i64) -> std::time::SystemTime {
 }
 
 #[derive(Clone)]
+/// Attributes of a file, converted to FUSE attributes.
 struct Entry {
     size: u64,
     ftype: fuse_mt::FileType,
@@ -68,11 +69,13 @@ impl From<&Entry> for fuse_mt::FileAttr {
     }
 }
 
+/// FUSE file system backed by scsi2files.
 struct UsbsasFS {
     scsi2files: RwLock<UsbsasChild<ComRqFiles>>,
 }
 
 impl UsbsasFS {
+    /// Spawn scsi2files, open the device and mount the partition `partnum`.
     fn new(busnum: u32, devnum: u32, partnum: u32) -> Result<Self> {
         log::debug!("Opening device {busnum} {devnum}");
         let mut scsi2files = UsbsasChildSpawner::new("usbsas-scsi2files").spawn::<ComRqFiles>()?;

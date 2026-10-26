@@ -32,12 +32,14 @@ enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
+/// fs2dev and the image to write.
 struct FsWriter {
     fs2dev: UsbsasChild<ComRqFs2Dev>,
     fs: File,
 }
 
 impl FsWriter {
+    /// Spawn fs2dev, sandbox the tool and unlock fs2dev with the device.
     fn new(fs_path: String, busnum: u32, devnum: u32) -> Result<Self> {
         let fs = File::open(&fs_path)?;
         let mut fs2dev = UsbsasChildSpawner::new("usbsas-fs2dev")
@@ -62,6 +64,7 @@ impl FsWriter {
         Ok(Self { fs2dev, fs })
     }
 
+    /// Check the image fits on the device and write all its sectors.
     fn write_fs(&mut self) -> Result<()> {
         // check fs size doesn't exceed dev size
         let fs_size = self.fs.seek(SeekFrom::End(0))?;

@@ -1,5 +1,6 @@
-/// Simple program that displays plugged & unplugged USB device with their
-/// logical path to configure USB ports restrictions in usbsas.
+//! Simple program that displays plugged & unplugged USB device with their
+//! logical path to configure USB ports restrictions in usbsas.
+
 use mio::{Events, Interest, Poll, Token};
 use thiserror::Error;
 

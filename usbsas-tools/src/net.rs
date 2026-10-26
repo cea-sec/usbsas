@@ -26,6 +26,8 @@ enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
+/// Upload `bundle_path` to a configured network (asks which one if there are
+/// several).
 fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let mut uploader = UsbsasChildSpawner::new("usbsas-uploader")
         .arg(bundle_path)
@@ -90,6 +92,7 @@ fn upload(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Send `bundle_path` to the configured analyzer and log the report.
 fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let mut analyzer = UsbsasChildSpawner::new("usbsas-analyzer")
         .arg(bundle_path)
@@ -123,6 +126,7 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Download `<id>/<bundle_path>` from the source network into `bundle_path`.
 fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let mut downloader = UsbsasChildSpawner::new("usbsas-downloader")
         .arg(bundle_path)
