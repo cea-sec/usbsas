@@ -1,0 +1,6 @@
+[advisories]
+# RUSTSEC-2023-0071 (rsa, attaque « Marvin ») : rsa n'est utilisé que par yara-x
+# (module PE, vérification de signatures Authenticode avec des clés PUBLIQUES).
+# L'attaque vise le déchiffrement / la signature avec une clé privée : non
+# applicable. Aucune version corrigée publiée ; à réexaminer à chaque mise à jour de yara-x.
+ignore = ["RUSTSEC-2023-0071"]
