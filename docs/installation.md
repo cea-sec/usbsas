@@ -27,7 +27,35 @@ de préférence) qui génère les clés de signature et les paquets de mise à j
 7. Désactiver les ports USB non utilisés (si le BIOS le permet) et la **sortie** de veille par USB.
 8. Activer la détection d'ouverture du boîtier (*Chassis Intrusion*) si disponible.
 
-## 3. Installation par script (Debian 13)
+## 3. Méthode recommandée : ISO d'installation hors ligne
+
+Une seule ISO installe n'importe quel poste x86_64 (UEFI ou BIOS), **sans réseau
+ni question**.
+
+**Construire l'ISO** (une fois, sur le poste administrateur connecté, en root, Debian 13
+ou conteneur `debian:trixie`) :
+
+```sh
+cp maj.pub barbacane/system/iso/maj.pub        # clé publique des mises à jour (recommandé)
+barbacane/system/iso/build-iso.sh --sortie barbacane.iso
+```
+
+La base ClamAV du jour est téléchargée et embarquée (`--clamav DOSSIER` pour en
+fournir une). La CI publie aussi une ISO de test (artefact `barbacane-iso`, sans clé de mise à jour).
+
+**Installer une borne** :
+1. Copier l'ISO sur une clé USB (`dd if=barbacane.iso of=/dev/sdX bs=4M`, ou Rufus / Etcher en mode « image DD »).
+2. Démarrer le poste sur la clé (F9 HP / F12 Dell ; démarrage USB autorisé le temps de l'installation).
+3. Le menu lance l'installation au bout de 10 s : **le plus grand disque interne est effacé**
+   (jamais un disque USB). Environ 10 minutes, puis redémarrage automatique.
+4. Retirer la clé. La borne démarre sur l'interface Barbacane.
+5. Cliquer sur l'accès administrateur et **choisir le PIN** (6 chiffres minimum) : le premier PIN saisi devient le PIN.
+6. Appliquer les réglages BIOS du §2 (désactiver le démarrage USB).
+
+Les ports USB n'ont pas à être configurés : par défaut tout port peut servir
+d'entrée ou de sortie. Les restreindre reste possible (§3.3).
+
+## 3 bis. Installation par script (Debian 13)
 
 ### 3.1 Debian minimale
 
@@ -64,9 +92,9 @@ Le script (relançable sans risque) :
 7. demande le **PIN administrateur** (6 chiffres minimum) ;
 8. avec `--couper-reseau` : désactive et masque tous les services réseau.
 
-### 3.3 Affecter les ports USB
+### 3.3 Affecter les ports USB (facultatif)
 
-usbsas n'accepte les clés que sur les ports déclarés. Avant de débrancher le clavier :
+Sans section `[usb_port_accesses]`, tout port est accepté. Pour restreindre chaque rôle à un port physique, avant de débrancher le clavier :
 
 ```shell
 sudo systemctl stop barbacane-kiosk
