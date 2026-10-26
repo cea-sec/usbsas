@@ -2,6 +2,8 @@ use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// Read / seek on the input image, communication with fs2dev, terminal for
+/// the progress bar.
 pub fn seccomp(fd_in_file: RawFd, comm_in: RawFd, comm_out: RawFd) -> Result<()> {
     let mut ctx =
         seccomp::new_context_with_common_rules(vec![fd_in_file, comm_in], vec![comm_out])?;

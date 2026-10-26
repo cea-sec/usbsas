@@ -1,6 +1,8 @@
 use crate::{Result, seccomp};
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// landlock (see [`crate::landlock`]) and seccomp allowing network access.
+/// TCP connections are restricted to `connect_ports` by landlock.
 pub fn sandbox(
     paths_ro: Option<&[&str]>,
     paths_rw: Option<&[&str]>,

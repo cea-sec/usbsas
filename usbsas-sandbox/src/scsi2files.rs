@@ -2,6 +2,7 @@ use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::Syscall;
 
+/// Communication with the parent and dev2scsi.
 pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
     let mut ctx = seccomp::new_context_with_common_rules(fds_read, fds_write)?;
 

@@ -2,6 +2,7 @@ use crate::{Result, seccomp};
 use std::os::unix::io::RawFd;
 use syscallz::{Action, Cmp, Comparator, Syscall};
 
+/// Communication with the parent, write / seek on the archive.
 pub fn seccomp(fd_read: RawFd, fd_write: RawFd, out_tar_fd: RawFd) -> Result<()> {
     let mut ctx =
         seccomp::new_context_with_common_rules(vec![fd_read], vec![fd_write, out_tar_fd])?;
