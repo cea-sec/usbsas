@@ -2,6 +2,13 @@
 //! unplugged USB devices.
 //!
 //! It uses udev monitoring system.
+//!
+//! Only mass storage devices (SCSI bulk only, or optical disk readers which are
+//! never destinations) are listed. With `usb_port_accesses` configured, devices
+//! are sources or destinations depending on the port they're plugged in.
+//!
+//! States: `Init` (sandbox, start the udev thread) -> `Running` (`Devices`) ->
+//! `End`.
 
 use log::{debug, error, info, trace};
 use mio::{Events, Interest, Poll, Token};
@@ -18,6 +25,7 @@ use usbsas_config::{UsbPortAccesses, conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{common::UsbDevice, usbdev::request::Msg};
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -45,6 +53,7 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
         Error::Poison
     }
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Thread for getting plugged devices at startup and handling udev events
@@ -122,7 +131,9 @@ fn handle_udev_events(
     }
 }
 
+/// Plugged devices, shared between the udev thread and the main thread.
 pub struct CurrentDevices {
+    /// Devices by sysfs path
     devices: HashMap<String, UsbDevice>,
     usb_port_accesses: Option<UsbPortAccesses>,
 }
@@ -135,6 +146,8 @@ impl CurrentDevices {
         }
     }
 
+    /// Add a device, unless it's plugged on a port that is neither a source
+    /// nor a destination port.
     fn add_device(&mut self, device: &udev::Device) -> Result<()> {
         let busnum = device
             .attribute_value("busnum")
@@ -260,6 +273,7 @@ impl CurrentDevices {
     }
 }
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -367,12 +381,15 @@ impl WaitEndState {
     }
 }
 
+/// USB devices listing process.
 pub struct UsbDev {
     comm: ComRpUsbDev,
     state: State,
 }
 
 impl UsbDev {
+    /// New lister, `config_path` is the configuration file (for
+    /// `usb_port_accesses`).
     pub fn new(comm: ComRpUsbDev, config_path: String) -> Result<Self> {
         Ok(UsbDev {
             comm,
@@ -380,6 +397,8 @@ impl UsbDev {
         })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
