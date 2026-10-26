@@ -1,3 +1,9 @@
+//! usbsas process reading files from a local directory used as a source
+//! (`src_local_dirs` in the configuration).
+//!
+//! States: `Init` (read configuration, sandbox, wait for `OpenLocalDir`) ->
+//! `Running` (`GetAttr`, `ReadDir`, `ReadFile`) -> `End`.
+
 use log::{error, trace};
 use std::{
     fs::{self, File},
@@ -12,6 +18,7 @@ use usbsas_proto::{
     files::request::Msg,
 };
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -25,8 +32,10 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -89,7 +98,9 @@ impl InitState {
 }
 
 struct RunningState {
+    /// Opened directory, request paths are relative to it
     basename: String,
+    /// Last read file, kept open for the next `ReadFile` on the same path
     opened_file: Option<(String, File)>,
 }
 
@@ -202,17 +213,22 @@ impl WaitEndState {
     }
 }
 
+/// Local directory reader process.
 pub struct Local2Files {
     comm: ComRpFiles,
     state: State,
 }
 
 impl Local2Files {
+    /// New reader, `config_path` is the configuration file listing the
+    /// allowed directories.
     pub fn new(comm: ComRpFiles, config_path: String) -> Result<Self> {
         let state = State::Init(InitState { config_path });
         Ok(Local2Files { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
