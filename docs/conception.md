@@ -180,6 +180,20 @@ dynamique. Le client sera un fork (autorisé par la consigne).
 | Clavier virtuel : observation par épaule | masquage des caractères, pas de journalisation |
 | RAM des HP/Dell cibles | 16 Go : tmpfs 6 Go + 6 Go |
 
+## 6 bis. Écarts de réalisation (phase 3)
+
+- **Pas de commande `barbacane-stage`** : c'est le client qui demande à l'analyseur
+  (`POST /barbacane/v1/scans/{id}/stage`) de remplir le dossier de préparation. La
+  destination « commande » du transfert A est `/bin/true` (aucune donnée lue).
+  Raison : si aucun fichier de la clé n'est sain (ex. une seule archive mixte), usbsas
+  arrête le transfert A (« Nothing to copy after analyzer ») avant la commande ; le
+  contenu sain extrait doit pourtant passer.
+- **Tar usbsas** : les fichiers sont sous `data/` (plus `config.json`), comme le traite
+  `usbsas-analyzer-server` ; l'analyseur fait de même.
+- La logique des parcours (analyse, préparation, écriture, effacement) est dans la
+  bibliothèque `barbacane/parcours`, testée de bout en bout en mode mock, et utilisée
+  par le client graphique.
+
 ## 7. Décisions (validées)
 1. §4.2/4.3 : **option C**, deux transferts via dossier de préparation, aucun patch du cœur.
 2. Dépôt : on garde ce fork. Le code usbsas reste **inchangé** à la racine (épinglé sur le commit upstream `69ebcf4`) ; tout Barbacane vit sous `barbacane/` (`analyzer/`, `client/`, `update/`, `system/`, `tests/`) avec son propre workspace Cargo. `docs/` à la racine. Toute divergence du code usbsas est listée dans `docs/ecarts-upstream.md`.

@@ -132,9 +132,14 @@ fn make_tar(src: &Path, dst: &Path) {
         .collect();
     names.sort();
     for n in names {
-        // usbsas écrit les chemins avec un « / » initial ; tar refuse les chemins absolus, l'analyseur les retire de toute façon.
-        b.append_path_with_name(src.join(&n), &n).unwrap();
+        b.append_path_with_name(src.join(&n), Path::new("data").join(&n))
+            .unwrap();
     }
+    // Fichier de métadonnées ajouté par usbsas, jamais analysé
+    let mut h = tar::Header::new_gnu();
+    h.set_size(2);
+    h.set_cksum();
+    b.append_data(&mut h, "config.json", &b"{}"[..]).unwrap();
     b.finish().unwrap();
 }
 

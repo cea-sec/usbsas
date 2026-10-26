@@ -61,6 +61,7 @@ pub struct Scanner<'a> {
     pub work: PathBuf,
 }
 
+const TAR_DATA_DIR: &str = "data/";
 const CLEAN_REASON: &str = "aucune menace détectée";
 
 impl Scanner<'_> {
@@ -78,16 +79,23 @@ impl Scanner<'_> {
                 e.header().entry_type(),
                 tar::EntryType::Regular | tar::EntryType::GNUSparse | tar::EntryType::Continuous
             ) {
-                log::warn!(
-                    "entrée tar ignorée ({:?}) : {}",
-                    e.header().entry_type(),
-                    String::from_utf8_lossy(&e.path_bytes())
-                );
+                if e.header().entry_type() != tar::EntryType::Directory {
+                    log::warn!(
+                        "entrée tar ignorée ({:?}) : {}",
+                        e.header().entry_type(),
+                        String::from_utf8_lossy(&e.path_bytes())
+                    );
+                }
                 continue;
             }
-            let path = String::from_utf8_lossy(&e.path_bytes())
+            // Comme usbsas-analyzer-server : seuls les fichiers sous `data/` sont à analyser
+            // (usbsas ajoute `config.json` à côté).
+            let raw = String::from_utf8_lossy(&e.path_bytes())
                 .trim_start_matches('/')
                 .to_string();
+            let Some(path) = raw.strip_prefix(TAR_DATA_DIR).map(str::to_string) else {
+                continue;
+            };
             let local = src.join(i.to_string());
             std::io::copy(&mut e, &mut std::fs::File::create(&local)?)?;
             files.push((path, local));

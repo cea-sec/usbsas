@@ -167,9 +167,10 @@ fn run_scan(app: &App, job: &Job, tar_path: &std::path::Path) {
         }
     }
     if let Some(dir) = &app.conf.reports_dir
-        && let Err(e) = stage::save_report(dir, app.conf.max_reports, job, &s) {
-            log::error!("rapport local : {e:#}");
-        }
+        && let Err(e) = stage::save_report(dir, app.conf.max_reports, job, &s)
+    {
+        log::error!("rapport local : {e:#}");
+    }
     log::info!("analyse {} terminée : {:?}", job.id, s.status);
 }
 
