@@ -5,6 +5,12 @@
 //! files2fs will keep track of the (non empty) sectors actually written in a
 //! bit vector, fs2dev will use this bit vector to avoid writing the whole file
 //! system on the destination device.
+//!
+//! It can also write raw data (disk images, `WriteRaw`).
+//!
+//! States: `Init` (open file, sandbox) -> `WaitFsInfos` -> `WaitNewFile` <->
+//! `WritingFile` -> `ForwardBitVec` (after `Close`) -> `WaitEnd` -> `End`, or
+//! `WaitFsInfos` -> `WriteRaw` -> `End`.
 
 use fscommon::StreamSlice;
 use log::{debug, error, trace, warn};
@@ -28,6 +34,7 @@ use usbsas_utils::SECTOR_SIZE;
 mod sparsefile;
 use sparsefile::{FileBitVec, SparseFile};
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -47,8 +54,10 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     WaitFsInfos(WaitFsInfosState),
@@ -139,6 +148,8 @@ impl WaitFsInfosState {
         Ok(newstate)
     }
 
+    /// Write the MBR (one partition starting at `SECTOR_START`) and create
+    /// the file system on the rest of the image.
     fn mkfs(
         self,
         comm: &mut ComRpWriteDst,
@@ -298,6 +309,8 @@ impl WritingFileState {
         Ok(State::WaitNewFile(WaitNewFileState { fs: self.fs }))
     }
 
+    /// Write a file from `WriteFile` requests. Writes must be sequential, the
+    /// file is removed on error.
     fn write_file(&mut self, comm: &mut ComRpWriteDst) -> Result<()> {
         trace!("writing file state");
         let mut file = self.fs.newfile(&self.path, self.timestamp)?;
@@ -413,17 +426,21 @@ impl WaitEndState {
     }
 }
 
+/// File system writer process.
 pub struct Files2Fs {
     comm: ComRpWriteDst,
     state: State,
 }
 
 impl Files2Fs {
+    /// New writer of the image at `fs_fname` (it must exist).
     pub fn new(comm: ComRpWriteDst, fs_fname: String) -> Result<Self> {
         let state = State::Init(InitState { fs_fname });
         Ok(Files2Fs { comm, state })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
