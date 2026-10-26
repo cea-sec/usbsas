@@ -138,9 +138,9 @@ pub enum Error {
     BadRequest,
     #[error("No conf")]
     NoConf,
-    #[error("Remote server error")]
-    BadResponse,
     #[error("Bad Response")]
+    BadResponse,
+    #[error("Remote server error")]
     Remote,
     #[error("State error")]
     State,
