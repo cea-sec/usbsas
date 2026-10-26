@@ -2,6 +2,11 @@
 //!
 //! This process will execute the target command specified in the configuration
 //! file with the output of the transfer as argument.
+//!
+//! It also executes the post copy command. This process isn't sandboxed.
+//!
+//! States: `Init` (wait for unlock value) -> `Running` (`Exec`,
+//! `PostCopyExec`) -> `End`, or `WaitEnd` if the process isn't needed.
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{error, info, trace};
@@ -12,6 +17,7 @@ use usbsas_config::{Command as CmdConf, PostCopy, conf_parse, conf_read};
 use usbsas_proto as proto;
 use usbsas_proto::{cmdexec::request::Msg, common::OutFileType};
 
+/// Errors of this process.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -27,8 +33,10 @@ pub enum Error {
     #[error("State error")]
     State,
 }
+/// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Replace `%SOURCE_FILE%` in `args` with `out_fname`.
 fn replace_arg_source(args: &[String], out_fname: &str) -> Vec<String> {
     args.iter()
         .map(|arg| match arg.as_ref() {
@@ -38,6 +46,7 @@ fn replace_arg_source(args: &[String], out_fname: &str) -> Vec<String> {
         .collect()
 }
 
+/// States of the process, see the module documentation.
 enum State {
     Init(InitState),
     Running(RunningState),
@@ -57,6 +66,7 @@ impl State {
 }
 
 struct InitState {
+    /// Tar of the transfer, replaced by the clean tar if unlocked with `2`
     out_tar: String,
     out_fs: String,
     config_path: String,
@@ -65,7 +75,9 @@ struct InitState {
 struct RunningState {
     out_tar: String,
     out_fs: String,
+    /// Destination command, taken when executed
     cmd: Option<CmdConf>,
+    /// Post copy command, taken when executed
     post_copy_cmd: Option<PostCopy>,
 }
 
@@ -144,6 +156,7 @@ impl RunningState {
         Ok(())
     }
 
+    /// Execute a command and wait for it, a non zero exit status is an error.
     fn exec_cmd(&self, binpath: String, args: Vec<String>) -> Result<()> {
         info!("executing {binpath} {args:?}");
         match Command::new(binpath)
@@ -192,12 +205,15 @@ impl WaitEndState {
     }
 }
 
+/// Command executor process.
 pub struct CmdExec {
     comm: ComRpCmdExec,
     state: State,
 }
 
 impl CmdExec {
+    /// New command executor. `out_tar` and `out_fs` are the session's tar and
+    /// file system image, `config_path` the configuration file.
     pub fn new(
         comm: ComRpCmdExec,
         out_tar: String,
@@ -214,6 +230,8 @@ impl CmdExec {
         })
     }
 
+    /// Run the process until it receives `End`. On error, the error is sent to
+    /// the parent and the process waits for `End`.
     pub fn main_loop(self) -> Result<()> {
         let (mut comm, mut state) = (self.comm, self.state);
         loop {
