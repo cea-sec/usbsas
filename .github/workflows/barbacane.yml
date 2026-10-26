@@ -27,3 +27,26 @@ jobs:
             protobuf-compiler libdbus-1-dev libfuse3-dev clamav-daemon
       - name: transfert clé → clé (mock) avec EICAR
         run: barbacane/tests/phase1-mock.sh
+
+  analyzer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: dépendances
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends clamav-daemon 7zip bubblewrap \
+            zip genisoimage gcab msitools qemu-utils dosfstools mtools
+          # bubblewrap sans setuid sur Ubuntu : autoriser les espaces de noms utilisateur
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: fmt
+        run: cd barbacane && cargo fmt --all --check
+      - name: clippy
+        run: cd barbacane && cargo clippy --all-targets -- -D warnings
+      - name: tests
+        run: cd barbacane && cargo test
+      - name: audit
+        run: cargo install --locked cargo-audit && cd barbacane && cargo audit
