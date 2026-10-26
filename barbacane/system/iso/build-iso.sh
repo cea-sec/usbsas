@@ -51,6 +51,10 @@ fi
 tar -cf "$T/donnees.tar" -C "$T/donnees" .
 [ -n "$CLE_PUB" ] || echo "ATTENTION : aucune clé publique de mise à jour : mises à jour impossibles sur les bornes." >&2
 
+# shortcut: simple-cdd télécharge encore l'installateur i386, supprimé de trixie ; à retirer quand simple-cdd sera corrigé
+sed -i 's/if a == "amd64" and "i386" not in self.env.get("ARCHES"):/if False:/' \
+    /usr/bin/build-simple-cdd /usr/share/simple-cdd/build-simple-cdd
+
 # simple-cdd : dépôt hors ligne (paquets + dépendances) et installateur Debian
 cp -r "$ICI/profiles" "$T/"
 EXTRAS="$ICI/choisir-disque.sh $ICI/fin-installation.sh $ICI/configurer.sh $T/donnees.tar"
