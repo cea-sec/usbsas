@@ -519,6 +519,12 @@ fn gid_of(group: &str) -> Option<u32> {
 fn main() -> Result<()> {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
     let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        println!(
+            "barbacane-admind [-c FICHIER.toml] [--set-pin]\n  --set-pin : lit un nouveau PIN (6 chiffres minimum) sur l'entrée standard\n  sans option : service d'administration (socket Unix)"
+        );
+        return Ok(());
+    }
     let conf_path = args
         .iter()
         .skip_while(|a| *a != "-c")

@@ -40,6 +40,10 @@ type Shared = Arc<App>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if std::env::args().any(|a| a == "-h" || a == "--help") {
+        println!("barbacane-analyzer [-c FICHIER.toml]  (défaut : /etc/barbacane/analyzer.toml)");
+        return Ok(());
+    }
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
     let conf_path = std::env::args()
         .skip_while(|a| a != "-c")

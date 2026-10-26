@@ -35,6 +35,14 @@ usbsas mock : Copier (avec mot de passe saisi au clavier virtuel), Blanchir
 (avec « Ignorer cette archive »), connexion admin au pavé numérique, enrôlement,
 export des journaux, mise à jour signée. Captures dans [`captures/`](captures/).
 
+## Paquets
+
+`barbacane/system/build-debs.sh` construit `usbsas-server`, `usbsas-hid` et
+`barbacane` (production, sans mock). Installés sur Ubuntu 24.04 (faute de
+Debian 13) : comptes et groupes créés, réglages clamd appliqués, unités,
+PAM, modprobe, sysctl en place. Les postinst d'usbsas échouent dans un conteneur
+sans `udevadm` (normal hors système complet).
+
 ## Non couvert ici
 
 - Installation réelle sur Debian 13 et matériel HP/Dell (miroirs Debian
