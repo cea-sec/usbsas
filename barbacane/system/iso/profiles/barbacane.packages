@@ -21,3 +21,6 @@ locales
 firmware-linux
 intel-microcode
 amd64-microcode
+# Requis par debian-cd
+tasksel
+tasksel-data
