@@ -20,7 +20,7 @@ xorriso -osirrox on -indev "$ISO" -extract /install.amd/vmlinuz "$W/vmlinuz" \
 params=$(awk '$1 == "linux" { $1 = ""; $2 = ""; print; exit }' "$W/grub.cfg")
 timeout 25m qemu-system-x86_64 "${commun[@]}" -no-reboot -serial "file:$W/installation.log" \
     -kernel "$W/vmlinuz" -initrd "$W/initrd.gz" -append "${params/---/console=ttyS0,115200 ---}" \
-    -drive "if=none,id=cle,format=raw,readonly=on,file=$ISO" -device "usb-storage,drive=cle,bootindex=0" \
+    -drive "if=none,id=cle,format=raw,readonly=on,file=$ISO" -device "usb-storage,drive=cle" \
     -monitor "unix:$W/mon-install.sock,server,nowait" &
 PID=$!
 # Captures régulières de l'installateur (diagnostic si blocage sur une question)
