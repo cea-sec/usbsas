@@ -80,7 +80,8 @@ id -u barbacane-iso >/dev/null 2>&1 || useradd --system --home-dir "$T" barbacan
 chown -R barbacane-iso "$T"
 chmod 755 "$T"
 (cd "$T" && runuser -u barbacane-iso -- env HOME="$T" ARCH=amd64 ARCHES=amd64 \
-    build-simple-cdd --verbose --conf barbacane.conf --dist trixie --locale fr_FR --keyboard fr)
+    build-simple-cdd --verbose --conf barbacane.conf --dist trixie --locale fr_FR --keyboard fr) \
+    || { tail -n 60 "$T"/tmp/log/build-debian-cd 2>/dev/null; exit 1; }
 ISO="$(find "$T/images" -name "*.iso" | head -n1)"
 
 # Menu de démarrage unique (BIOS et UEFI) : installation automatique après 10 s

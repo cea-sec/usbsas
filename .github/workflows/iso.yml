@@ -39,9 +39,6 @@ jobs:
           sed -i 's/^\(\s*\)request.urlretrieve(url/\1print("GET", url, flush=True); request.urlretrieve(url/' \
             /usr/lib/python3/dist-packages/simple_cdd/tools/mirror_download.py
           barbacane/system/iso/build-iso.sh --debs barbacane/system/mkosi/paquets --sortie "$PWD/barbacane.iso"
-      - name: diagnostic simple-cdd
-        if: failure()
-        run: grep -rn "i386\|ARCHES\|installer-" /usr/bin/build-simple-cdd /usr/lib/python3/dist-packages/simple_cdd /usr/share/simple-cdd 2>/dev/null | grep -v "\.pyc" | head -80
       - uses: actions/upload-artifact@v4
         with:
           name: barbacane-iso
