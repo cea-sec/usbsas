@@ -65,6 +65,7 @@ J=(journalctl -D "$W/racine/var/log/journal" --no-pager)
 for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server; do
     echo "-- $u"; "${J[@]}" -o cat -u "$u" | awk '!vu[$0]++' | tail -n 12
 done
+echo "-- kiosque (complet)"; "${J[@]}" -o short -u barbacane-kiosk | head -n 60
 echo "-- erreurs"; tail -n 40 "$W/erreurs.log"
 echo "-- droits"; ls -ld "$W/racine" "$W/racine/var/lib/barbacane" "$W/racine/var/lib/barbacane/yara"
 echo "-- base ClamAV"; ls -l "$W/racine/var/lib/clamav/"
