@@ -11,7 +11,7 @@ d'installation sur une Debian 13 fraîche, soit en flashant une image disque.
 | Disque | 64 Go minimum (journaux, rapports, fichiers temporaires usbsas) |
 | Périphériques | écran + **souris USB** uniquement ; aucun clavier en production |
 | Ports USB | 1 port « entrée » (clé inconnue, aussi utilisé pour Blanchir), 1 port « sortie », 1 port souris |
-| Réseau | aucun en production ; un accès Internet est nécessaire **pendant** l'installation par script |
+| Réseau | **jamais d'Internet, même à l'installation** : l'ISO est préparée sur un poste connecté puis copiée sur une clé USB |
 
 Pour la préparation, prévoir aussi un **poste administrateur connecté** (Debian 13
 de préférence) qui génère les clés de signature et les paquets de mise à jour.
