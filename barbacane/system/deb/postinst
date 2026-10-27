@@ -19,6 +19,10 @@ if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
     if getent group clamav >/dev/null; then adduser --quiet barbacane-analyzer clamav; fi
 
     install -d -m 0755 /var/lib/barbacane /var/lib/barbacane/yara
+    install -d /etc/systemd/system/barbacane-analyzer.service.d
+    printf '[Service]\nTemporaryFileSystem=/var/lib/barbacane/analyzer:size=6G,mode=0700,uid=%s,gid=%s,nr_inodes=200k\n' \
+        "$(id -u barbacane-analyzer)" "$(getent group barbacane | cut -d: -f3)" \
+        > /etc/systemd/system/barbacane-analyzer.service.d/tmpfs.conf
     install -d -m 0700 -o usbsas -g usbsas /var/lib/usbsas/tmp 2>/dev/null || true
 
     # clamd : limites d'analyse imposées (fichier généré par debconf, réglages remplacés ligne à ligne)

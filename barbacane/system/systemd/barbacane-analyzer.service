@@ -10,8 +10,8 @@ User=barbacane-analyzer
 Group=barbacane
 SupplementaryGroups=clamav
 UMask=0027
-# Fichiers en cours d'analyse : en mémoire, taille bornée, effacés à l'arrêt
-TemporaryFileSystem=/var/lib/barbacane/analyzer:size=6G,mode=0700,uid=barbacane-analyzer,nr_inodes=200k
+# Fichiers en cours d'analyse : en mémoire, taille bornée, effacés à l'arrêt.
+# TemporaryFileSystem= est posé par le postinst (tmpfs exige l'uid numérique du compte).
 StateDirectory=barbacane/rapports barbacane/sortie barbacane/import
 StateDirectoryMode=0750
 MemoryMax=10G
