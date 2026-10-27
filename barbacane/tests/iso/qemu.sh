@@ -81,6 +81,7 @@ for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server; do
 done
 echo "-- kiosque (complet)"; "${J[@]}" -o short -u barbacane-kiosk | head -n 60
 echo "-- diagnostic"; cat "$W/racine/var/log/diag.txt" || true
+echo "-- systemd / usbsas-server"; grep "usbsas-server.service" "$W/services.log" | head -n 30
 echo "-- erreurs"; tail -n 40 "$W/erreurs.log"
 echo "-- droits"; ls -ld "$W/racine" "$W/racine/var/lib/barbacane" "$W/racine/var/lib/barbacane/yara"
 echo "-- base ClamAV"; ls -l "$W/racine/var/lib/clamav/"
