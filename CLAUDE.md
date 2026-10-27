@@ -8,6 +8,7 @@ exploitation, administration, tests, ecarts-upstream).
 - Ne pas modifier le cœur d'usbsas (`usbsas-*/`) sans validation ; tout écart minimal
   et documenté dans `docs/ecarts-upstream.md`.
 - Rust, sécurité d'abord, petits commits, tests + CI. Interface et docs en français.
+- La borne n'est JAMAIS sur le réseau, même à l'installation : seule l'ISO est valable ; `install.sh` = maquette uniquement.
 - Branche de travail : `claude/affectionate-galileo-w0bjm2`.
 
 ## Vérifications locales

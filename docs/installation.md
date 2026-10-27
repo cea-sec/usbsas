@@ -18,7 +18,7 @@ de préférence) qui génère les clés de signature et les paquets de mise à j
 
 ## 2. Réglages BIOS / UEFI (à faire avant tout)
 
-1. Mettre à jour le BIOS du constructeur (HP : *HP PC Hardware Diagnostics* / Dell : *Dell Command | Update*) avant de couper le réseau.
+1. Mettre à jour le BIOS du constructeur (HP : *HP PC Hardware Diagnostics* / Dell : *Dell Command | Update*) depuis une clé USB (fichier téléchargé sur le poste administrateur), sans jamais brancher la borne au réseau.
 2. **Mot de passe administrateur BIOS** (HP : *Security → Create BIOS Administrator Password* ; Dell : *Security → Admin Password*). Le conserver avec les secrets de l'administration.
 3. **Ordre de démarrage** : disque interne uniquement ; désactiver le démarrage USB, réseau (PXE) et lecteur optique ; désactiver le menu de démarrage F9/F12 (HP : *Boot Options → USB Storage Boot* désactivé ; Dell : *Boot Configuration*, décocher *Enable USB Boot Support*, *Enable PXE*).
 4. **Secure Boot** activé (mode *Deployed* / sans clés de tiers personnalisées). Debian 13 démarre en Secure Boot avec `shim` signé (installation par script). L'image mkosi utilise systemd-boot non signé : soit désactiver Secure Boot, soit signer l'image (voir §6.3).
@@ -57,7 +57,10 @@ fournir une). La CI publie aussi une ISO de test (artefact `barbacane-iso`, sans
 Les ports USB n'ont pas à être configurés : par défaut tout port peut servir
 d'entrée ou de sortie. Les restreindre reste possible (§3.3).
 
-## 3 bis. Installation par script (Debian 13)
+## 3 bis. Installation par script (maquette ou développement uniquement)
+
+> **Interdit pour une borne en service** : cette méthode exige le réseau. Une borne
+> n'est **jamais** connectée, même pour l'installation : l'installer exclusivement avec l'ISO (§3).
 
 ### 3.1 Debian minimale
 
@@ -74,7 +77,7 @@ Préparer sur une clé (depuis le poste administrateur) :
 - facultatif : une base ClamAV (`main.cvd`, `daily.cvd`, `bytecode.cvd`) et des règles YARA ;
 - facultatif : les paquets déjà construits (`barbacane/system/build-debs.sh` sur le poste administrateur).
 
-Sur la borne, avec un clavier temporaire et le réseau :
+Sur la machine de maquette (connectée), avec un clavier :
 
 ```shell
 apt install git

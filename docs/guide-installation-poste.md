@@ -69,7 +69,7 @@ De retour dans le BIOS :
 1. **Désactiver le démarrage sur USB** et laisser uniquement le disque interne.
 2. Poser un **mot de passe administrateur BIOS**.
 3. Réactiver Secure Boot si possible.
-4. Ne pas brancher de câble réseau : la borne fonctionne entièrement hors ligne.
+4. **Ne jamais brancher de câble réseau**, ni à l'installation ni ensuite : la borne fonctionne entièrement hors ligne. Mise à jour du BIOS : par clé USB uniquement.
 
 ## Étape 7 — Vérifier
 
