@@ -13,7 +13,13 @@ commun=(-enable-kvm -cpu host -m 4096 -smp 2 -bios "$OVMF" -vga std -display non
     -device qemu-xhci)
 
 echo "== installation (sans intervention)"
+# Même noyau et mêmes paramètres que le menu de l'ISO, plus une console série :
+# l'installateur s'y affiche en texte (diagnostic lisible si une question bloque).
+xorriso -osirrox on -indev "$ISO" -extract /install.amd/vmlinuz "$W/vmlinuz" \
+    -extract /install.amd/initrd.gz "$W/initrd.gz" -extract /boot/grub/grub.cfg "$W/grub.cfg" >/dev/null 2>&1
+params=$(awk '$1 == "linux" { $1 = ""; $2 = ""; print; exit }' "$W/grub.cfg")
 timeout 50m qemu-system-x86_64 "${commun[@]}" -no-reboot -serial "file:$W/installation.log" \
+    -kernel "$W/vmlinuz" -initrd "$W/initrd.gz" -append "${params/---/console=ttyS0,115200 ---}" \
     -drive "if=none,id=cle,format=raw,readonly=on,file=$ISO" -device "usb-storage,drive=cle,bootindex=0" \
     -monitor "unix:$W/mon-install.sock,server,nowait" &
 PID=$!
@@ -22,7 +28,11 @@ while kill -0 $PID 2>/dev/null; do
     sleep 60
     echo "screendump $W/installateur.png -f png" | socat - "UNIX-CONNECT:$W/mon-install.sock" >/dev/null 2>&1 || true
 done
-wait $PID || { echo "ÉCHEC : installation interrompue (délai dépassé ?)" >&2; exit 1; }
+wait $PID || {
+    echo "ÉCHEC : installation interrompue (délai dépassé ?), fin de la console :" >&2
+    tail -c 4000 "$W/installation.log" | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' | tr -s '\r\n' '\n' | tail -n 40
+    exit 1
+}
 
 echo "== premier démarrage"
 qemu-system-x86_64 "${commun[@]}" -serial "file:$W/demarrage.log" \

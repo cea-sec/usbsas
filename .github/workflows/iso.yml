@@ -47,6 +47,7 @@ jobs:
   installation-qemu:
     needs: construction
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -57,12 +58,9 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
           sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf socat
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf socat xorriso
       - name: installation automatique puis premier démarrage
         run: sudo barbacane/tests/iso/qemu.sh barbacane.iso vm
-      - name: captures (base64, pour lecture dans le journal)
-        if: always()
-        run: for f in vm/*.png; do echo "== $f"; base64 -w0 "$f"; echo; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
