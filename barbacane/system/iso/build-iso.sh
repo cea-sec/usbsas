@@ -61,7 +61,7 @@ mkdir -p "$T/chroot/debs"
 cp "$DEBS"/usbsas-server_*.deb "$DEBS"/usbsas-hid_*.deb "$DEBS"/barbacane_*.deb "$T/chroot/debs/"
 chroot "$T/chroot" apt-get update -q
 mapfile -t PAQUETS < <(grep -vE '^\s*(#|$)|^(barbacane|usbsas-server|usbsas-hid)$' "$ICI/paquets.txt")
-chroot "$T/chroot" apt-get install -y -q --download-only --no-install-recommends "${PAQUETS[@]}" /debs/*.deb
+chroot "$T/chroot" sh -c 'apt-get install -y -q --download-only --no-install-recommends "$@" /debs/*.deb' sh "${PAQUETS[@]}"
 cp "$T"/chroot/var/cache/apt/archives/*.deb "$T"/chroot/debs/*.deb "$B/debs/"
 echo "$(find "$B/debs" -name '*.deb' | wc -l) paquets embarqués"
 
