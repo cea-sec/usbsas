@@ -11,7 +11,9 @@ on:
 jobs:
   construction:
     runs-on: ubuntu-latest
-    container: debian:trixie
+    container:
+      image: debian:trixie
+      options: --privileged
     steps:
       - uses: actions/checkout@v4
       - name: outils de compilation
@@ -34,10 +36,6 @@ jobs:
           key: iso-${{ hashFiles('Cargo.lock', 'barbacane/Cargo.lock') }}-${{ github.sha }}
       - name: ISO
         run: |
-          apt-get install -y -q simple-cdd
-          # diagnostic : adresses téléchargées par simple-cdd
-          sed -i 's/^\(\s*\)request.urlretrieve(url/\1print("GET", url, flush=True); request.urlretrieve(url/' \
-            /usr/lib/python3/dist-packages/simple_cdd/tools/mirror_download.py
           barbacane/system/iso/build-iso.sh --debs barbacane/system/mkosi/paquets --sortie "$PWD/barbacane.iso"
       - uses: actions/upload-artifact@v4
         with:

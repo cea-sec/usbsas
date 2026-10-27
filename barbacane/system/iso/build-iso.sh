@@ -1,18 +1,20 @@
 #!/bin/bash
-# Construit l'ISO d'installation hors ligne de la borne (Debian 13 + Barbacane).
+# Construit l'ISO d'installation hors ligne de la borne : ISO officielle Debian 13
+# « netinst » (système de base) + paquets Barbacane et toutes leurs dépendances.
 # À lancer en root sur Debian 13 (ou dans un conteneur debian:trixie), réseau requis
 # pendant la construction seulement. L'ISO installe sans aucune question ni réseau.
 #
 #   barbacane/system/iso/build-iso.sh [--debs DOSSIER] [--cle-publique maj.pub]
-#                                     [--clamav DOSSIER] [--yara DOSSIER] [--sortie FICHIER.iso]
+#                                     [--clamav DOSSIER] [--yara DOSSIER] [--netinst ISO] [--sortie FICHIER.iso]
 #     --debs          paquets usbsas-server, usbsas-hid, barbacane (défaut : construits par build-debs.sh)
 #     --cle-publique  clé minisign des mises à jour (défaut : barbacane/system/iso/maj.pub s'il existe)
 #     --clamav        base ClamAV initiale (défaut : téléchargée avec freshclam)
 #     --yara          règles YARA initiales
+#     --netinst       ISO netinst Debian 13 amd64 déjà téléchargée (défaut : dernière version, empreinte vérifiée)
 set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ICI/../../.." && pwd)"
-DEBS='' CLE_PUB='' CLAMAV='' YARA='' SORTIE="$PWD/barbacane.iso"
+DEBS='' CLE_PUB='' CLAMAV='' YARA='' NETINST='' SORTIE="$PWD/barbacane.iso"
 [ -f "$ICI/maj.pub" ] && CLE_PUB="$ICI/maj.pub"
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -20,16 +22,17 @@ while [ $# -gt 0 ]; do
         --cle-publique) CLE_PUB="$(realpath "$2")"; shift 2 ;;
         --clamav) CLAMAV="$(realpath "$2")"; shift 2 ;;
         --yara) YARA="$(realpath "$2")"; shift 2 ;;
+        --netinst) NETINST="$(realpath "$2")"; shift 2 ;;
         --sortie) SORTIE="$(realpath -m "$2")"; shift 2 ;;
-        -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
         *) echo "option inconnue : $1" >&2; exit 1 ;;
     esac
 done
 [ "$(id -u)" -eq 0 ] || { echo "À lancer en root." >&2; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
+MIROIR=http://deb.debian.org/debian
 apt-get update -q
-apt-get install -y -q --no-install-recommends simple-cdd distro-info-data xorriso isolinux syslinux-utils \
-    grub-efi-amd64-bin grub-pc-bin mtools dosfstools cpio wget ca-certificates clamav-freshclam
+apt-get install -y -q --no-install-recommends xorriso debootstrap wget ca-certificates clamav-freshclam
 
 if [ -z "$DEBS" ]; then
     "$REPO/barbacane/system/build-debs.sh"
@@ -38,6 +41,31 @@ fi
 
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
+B="$T/iso/barbacane"
+mkdir -p "$B/debs"
+
+echo "== ISO netinst Debian 13"
+if [ -z "$NETINST" ]; then
+    URL=https://cdimage.debian.org/debian-cd/current/amd64/iso-cd
+    wget -q -O "$T/SHA256SUMS" "$URL/SHA256SUMS"
+    NOM=$(awk '/-amd64-netinst\.iso$/ { print $2; exit }' "$T/SHA256SUMS")
+    wget -q -O "$T/$NOM" "$URL/$NOM"
+    (cd "$T" && grep " $NOM\$" SHA256SUMS | sha256sum -c -)
+    NETINST="$T/$NOM"
+fi
+
+echo "== Paquets et dépendances (résolus dans un système Debian 13 minimal)"
+debootstrap --variant=minbase trixie "$T/chroot" "$MIROIR" >/dev/null
+echo "deb $MIROIR trixie main contrib non-free non-free-firmware" > "$T/chroot/etc/apt/sources.list"
+mkdir -p "$T/chroot/debs"
+cp "$DEBS"/usbsas-server_*.deb "$DEBS"/usbsas-hid_*.deb "$DEBS"/barbacane_*.deb "$T/chroot/debs/"
+chroot "$T/chroot" apt-get update -q
+mapfile -t PAQUETS < <(grep -vE '^\s*(#|$)|^(barbacane|usbsas-server|usbsas-hid)$' "$ICI/paquets.txt")
+chroot "$T/chroot" apt-get install -y -q --download-only --no-install-recommends "${PAQUETS[@]}" /debs/*.deb
+cp "$T"/chroot/var/cache/apt/archives/*.deb "$T"/chroot/debs/*.deb "$B/debs/"
+echo "$(find "$B/debs" -name '*.deb' | wc -l) paquets embarqués"
+
+echo "== Données initiales"
 mkdir -p "$T/donnees/var/lib/clamav" "$T/donnees/var/lib/barbacane/yara"
 if [ -n "$CLAMAV" ]; then
     cp "$CLAMAV"/*.c[lv]d "$T/donnees/var/lib/clamav/"
@@ -48,44 +76,17 @@ else
         || echo "ATTENTION : base ClamAV non téléchargée, la borne refusera tout jusqu'à une mise à jour." >&2
 fi
 [ -n "$YARA" ] && cp "$YARA"/*.yar "$T/donnees/var/lib/barbacane/yara/"
-tar -cf "$T/donnees.tar" -C "$T/donnees" .
-[ -n "$CLE_PUB" ] || echo "ATTENTION : aucune clé publique de mise à jour : mises à jour impossibles sur les bornes." >&2
+tar -cf "$B/donnees.tar" -C "$T/donnees" .
+if [ -n "$CLE_PUB" ]; then
+    cp "$CLE_PUB" "$B/maj.pub"
+else
+    echo "ATTENTION : aucune clé publique de mise à jour : mises à jour impossibles sur les bornes." >&2
+fi
+cp "$ICI/preseed.cfg" "$ICI/choisir-disque.sh" "$ICI/fin-installation.sh" "$ICI/configurer.sh" "$B/"
 
-# shortcut: simple-cdd télécharge encore l'installateur i386, supprimé de trixie ; à retirer quand simple-cdd sera corrigé
-sed -i 's/if a == "amd64" and "i386" not in self.env.get("ARCHES"):/if False:/' \
-    /usr/bin/build-simple-cdd /usr/share/simple-cdd/build-simple-cdd
-
-# shortcut: debian-cd copie aussi le menu BIOS de l'installateur i386 : on lui donne celui d'amd64
-I386="$T/tmp/mirror/dists/trixie/main/installer-i386/current/images/cdrom"
-mkdir -p "$I386"
-wget -q -O "$I386/debian-cd_info.tar.gz" \
-    http://deb.debian.org/debian/dists/trixie/main/installer-amd64/current/images/cdrom/debian-cd_info.tar.gz
-
-# simple-cdd : dépôt hors ligne (paquets + dépendances) et installateur Debian
-cp -r "$ICI/profiles" "$T/"
-EXTRAS="$ICI/choisir-disque.sh $ICI/fin-installation.sh $ICI/configurer.sh $T/donnees.tar"
-[ -n "$CLE_PUB" ] && { cp "$CLE_PUB" "$T/maj.pub"; EXTRAS="$EXTRAS $T/maj.pub"; }
-cat > "$T/barbacane.conf" <<CONF
-profiles="barbacane"
-ARCH="amd64"
-ARCHES="amd64"
-auto_profiles="barbacane"
-debian_mirror="http://deb.debian.org/debian/"
-mirror_components="main contrib non-free non-free-firmware"
-local_packages="$DEBS"
-all_extras="$EXTRAS"
-CONF
-# build-simple-cdd refuse root : compte de construction dédié
-id -u barbacane-iso >/dev/null 2>&1 || useradd --system --home-dir "$T" barbacane-iso
-chown -R barbacane-iso "$T"
-chmod 755 "$T"
-(cd "$T" && runuser -u barbacane-iso -- env HOME="$T" ARCH=amd64 ARCHES=amd64 \
-    build-simple-cdd --verbose --conf barbacane.conf --dist trixie --locale fr_FR --keyboard fr) \
-    || { tail -n 60 "$T"/tmp/log/build-debian-cd 2>/dev/null; exit 1; }
-ISO="$(find "$T/images" -name "*.iso" | head -n1)"
-
+echo "== Assemblage"
 # Menu de démarrage unique (BIOS et UEFI) : installation automatique après 10 s
-PARAMS="auto=true priority=critical preseed/file=/cdrom/simple-cdd/barbacane.preseed locale=fr_FR.UTF-8 keymap=fr --- quiet"
+PARAMS="auto=true priority=critical preseed/file=/cdrom/barbacane/preseed.cfg locale=fr_FR.UTF-8 keymap=fr --- quiet"
 cat > "$T/grub.cfg" <<CFG
 set timeout=10
 set default=0
@@ -104,7 +105,7 @@ label barbacane
   append initrd=/install.amd/initrd.gz $PARAMS
 CFG
 rm -f "$SORTIE"
-xorriso -indev "$ISO" -outdev "$SORTIE" \
+xorriso -indev "$NETINST" -outdev "$SORTIE" -map "$B" /barbacane \
     -map "$T/grub.cfg" /boot/grub/grub.cfg -map "$T/isolinux.cfg" /isolinux/isolinux.cfg \
     -boot_image any replay
 ls -lh "$SORTIE"
