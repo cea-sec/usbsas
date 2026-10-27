@@ -31,7 +31,8 @@ UtmpMode=user
 StandardOutput=journal
 StandardError=journal
 # Pas d'option -s : impossible de changer de console virtuelle depuis la session.
-ExecStart=/usr/bin/cage -d -- /usr/bin/barbacane-client -c /etc/barbacane/client.toml
+# PAM (pam_systemd) remplace XDG_RUNTIME_DIR par /run/user/<uid>, en lecture seule ici (ProtectSystem=strict)
+ExecStart=/usr/bin/env XDG_RUNTIME_DIR=/run/barbacane-kiosk /usr/bin/cage -d -- /usr/bin/barbacane-client -c /etc/barbacane/client.toml
 ExecStartPre=/usr/bin/chvt 2
 Restart=always
 RestartSec=1
