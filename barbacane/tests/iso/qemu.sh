@@ -45,9 +45,15 @@ mount "$(lsblk -lnpo NAME,FSTYPE /dev/nbd0 | awk '$2 == "ext4" { print $1; exit 
 cat > "$W/rw/etc/systemd/system/diag.service" <<'FIN'
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'sleep 90; { ps -eo pid,user,stat,wchan:30,args; loginctl list-sessions; loginctl show-seat seat0; ls -l /dev/dri /dev/tty2 /run/barbacane-kiosk; cat /etc/barbacane/client.toml; journalctl -b -u systemd-logind --no-pager | tail -n 20; for p in $(pidof cage barbacane-client); do echo "== $p"; cat /proc/$p/stack; ls -l /proc/$p/fd; done; } > /var/log/diag.txt 2>&1'
+ExecStart=/bin/sh -c 'sleep 90; { ps -eo pid,user,stat,wchan:30,args; loginctl list-sessions; loginctl show-seat seat0; ls -l /dev/dri /dev/tty2 /run/barbacane-kiosk; cat /etc/barbacane/client.toml; journalctl -b -u systemd-logind --no-pager | tail -n 20; dmesg | tail -n 25; cat /run/barbacane-kiosk/client.err; for p in $(pidof cage barbacane-client); do echo "== $p"; cat /proc/$p/stack; ls -l /proc/$p/fd; done; } > /var/log/diag.txt 2>&1'
 [Install]
 WantedBy=multi-user.target
+FIN
+mkdir -p "$W/rw/etc/systemd/system/barbacane-kiosk.service.d"
+cat > "$W/rw/etc/systemd/system/barbacane-kiosk.service.d/diag.conf" <<'FIN'
+[Service]
+ExecStart=
+ExecStart=/usr/bin/cage -d -- /bin/sh -c '/usr/bin/barbacane-client -c /etc/barbacane/client.toml 2>/run/barbacane-kiosk/client.err; echo "fin du client : $?" >>/run/barbacane-kiosk/client.err; sleep 600'
 FIN
 ln -sf ../diag.service "$W/rw/etc/systemd/system/multi-user.target.wants/diag.service"
 umount "$W/rw"; qemu-nbd -d /dev/nbd0 >/dev/null; sleep 1
