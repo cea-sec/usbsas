@@ -10,6 +10,7 @@ mod report;
 mod scan;
 mod stage;
 
+use anyhow::Context;
 use axum::{
     Extension, Json, Router,
     body::Body,
@@ -49,8 +50,10 @@ async fn main() -> anyhow::Result<()> {
         .skip_while(|a| a != "-c")
         .nth(1)
         .unwrap_or_else(|| "/etc/barbacane/analyzer.toml".into());
-    let conf = config::Config::load(&conf_path)?;
-    std::fs::create_dir_all(&conf.work_dir)?;
+    let conf =
+        config::Config::load(&conf_path).with_context(|| format!("configuration {conf_path}"))?;
+    std::fs::create_dir_all(&conf.work_dir)
+        .with_context(|| format!("dossier de travail {}", conf.work_dir.display()))?;
     let _ = rustls::crypto::ring::default_provider().install_default();
     if let Some(r) = &conf.relay {
         let router = relay::router(
@@ -68,7 +71,8 @@ async fn main() -> anyhow::Result<()> {
         axum::serve(listener, router).await?;
         return Ok(());
     }
-    let engines = av::Engines::new(conf.clamd_socket.clone(), conf.yara_rules_dir.as_deref())?;
+    let engines = av::Engines::new(conf.clamd_socket.clone(), conf.yara_rules_dir.as_deref())
+        .context("règles YARA")?;
     match engines.clamav_version() {
         Ok(v) => log::info!("clamd joignable : {v:?}"),
         Err(e) => log::warn!("clamd injoignable pour l'instant : {e:#}"),
@@ -103,7 +107,9 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app);
     match server {
         None => {
-            let listener = tokio::net::TcpListener::bind(&listen).await?;
+            let listener = tokio::net::TcpListener::bind(&listen)
+                .await
+                .with_context(|| format!("écoute sur {listen}"))?;
             log::info!("écoute sur {listen}");
             axum::serve(listener, router).await?;
         }
