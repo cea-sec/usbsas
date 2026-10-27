@@ -39,8 +39,12 @@ exploitation, administration, tests, ecarts-upstream).
   `ca-certificates` (sans elles usbsas échoue en « reqwest builder error »),
   dossier YARA hors StateDirectory d'admind (systemd le remettait en 0750).
 
+- Écran noir sur vrai matériel corrigé : pam_systemd remplaçait XDG_RUNTIME_DIR par
+  /run/user/<uid> (lecture seule, ProtectSystem=strict) → cage « Unable to open Wayland
+  socket ». Rendu logiciel imposé (WLR_RENDERER=pixman, ICED_BACKEND=tiny-skia).
+  Le test QEMU vérifie maintenant l'écran (pixels non noirs) et contient une sonde diag.
+
 ## Reste à faire
-1. Vérifier l'interface à l'écran (capture `vm/ecran.png` dans l'artefact `vm`).
 2. Installation pilote sur vrai matériel HP/Dell avec vraies clés USB ; vérifier
    l'installateur en français sur écran réel et le démarrage graphique (cage).
 3. Image mkosi jamais construite.
