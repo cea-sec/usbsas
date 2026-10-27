@@ -64,6 +64,7 @@ for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server; do
     echo "-- $u"; "${J[@]}" -o cat -u "$u" | awk '!vu[$0]++' | tail -n 12
 done
 echo "-- erreurs"; tail -n 40 "$W/erreurs.log"
+echo "-- droits"; ls -ld "$W/racine" "$W/racine/var/lib/barbacane" "$W/racine/var/lib/barbacane/yara"
 echo "-- base ClamAV"; ls -l "$W/racine/var/lib/clamav/"
 ko=0
 for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server clamav-daemon; do

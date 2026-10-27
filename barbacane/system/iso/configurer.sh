@@ -12,6 +12,9 @@ if [ -n "${BARBACANE_PIN:-}" ]; then
     echo "$BARBACANE_PIN" | barbacane-admind --set-pin
 fi
 passwd -l root >/dev/null
+# Règles YARA lisibles par l'analyseur (données éventuellement extraites d'une archive)
+chmod 755 /var/lib/barbacane /var/lib/barbacane/yara
+chmod -R a+rX /var/lib/barbacane/yara
 chown -R clamav:clamav /var/lib/clamav 2>/dev/null || true
 if command -v update-grub >/dev/null; then update-grub; fi
 [ -f /etc/barbacane/maj.pub ] || echo "ATTENTION : /etc/barbacane/maj.pub absent : mises à jour impossibles" >&2
