@@ -74,4 +74,7 @@ for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server clama
         echo "ÉCHEC : $u" >&2; ko=1
     fi
 done
+# Restart=always masque un kiosque qui plante en boucle (écran noir).
+n=$(grep -c "Started barbacane-kiosk.service" "$W/services.log" || true)
+[ "$n" -le 2 ] || { echo "ÉCHEC : barbacane-kiosk redémarré $n fois" >&2; ko=1; }
 exit $ko

@@ -13,11 +13,16 @@ zstd
 fonts-dejavu-core
 libegl1
 libgl1
+# Pilotes graphiques Mesa (simples « Recommends » : absents sans eux, écran noir)
+libegl-mesa0
+libgl1-mesa-dri
+libgbm1
 mesa-vulkan-drivers
 usbutils
 kbd
 locales
 # Matériel quelconque : microcodes et micrologiciels (graphique, contrôleurs)
 firmware-linux
+firmware-linux-nonfree
 intel-microcode
 amd64-microcode
