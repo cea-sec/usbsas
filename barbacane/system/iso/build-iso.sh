@@ -32,7 +32,7 @@ done
 export DEBIAN_FRONTEND=noninteractive
 MIROIR=http://deb.debian.org/debian
 apt-get update -q
-apt-get install -y -q --no-install-recommends xorriso debootstrap wget ca-certificates clamav-freshclam
+apt-get install -y -q --no-install-recommends xorriso debootstrap wget ca-certificates openssl clamav-freshclam
 
 if [ -z "$DEBS" ]; then
     "$REPO/barbacane/system/build-debs.sh"
@@ -82,7 +82,9 @@ if [ -n "$CLE_PUB" ]; then
 else
     echo "ATTENTION : aucune clé publique de mise à jour : mises à jour impossibles sur les bornes." >&2
 fi
-cp "$ICI/preseed.cfg" "$ICI/choisir-disque.sh" "$ICI/fin-installation.sh" "$ICI/configurer.sh" "$B/"
+# L'installateur exige un mot de passe root : aléatoire, jamais conservé, compte verrouillé ensuite
+sed "s|@HACHE_ROOT@|$(head -c 32 /dev/urandom | base64 | openssl passwd -6 -stdin)|" "$ICI/preseed.cfg" > "$B/preseed.cfg"
+cp "$ICI/choisir-disque.sh" "$ICI/fin-installation.sh" "$ICI/configurer.sh" "$B/"
 
 echo "== Assemblage"
 # Menu de démarrage unique (BIOS et UEFI) : installation automatique après 10 s
