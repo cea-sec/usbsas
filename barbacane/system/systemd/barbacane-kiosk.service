@@ -17,6 +17,8 @@ WorkingDirectory=/var/lib/barbacane-kiosk
 RuntimeDirectory=barbacane-kiosk
 Environment="RUST_LOG=info,wgpu_hal=error,iced_winit=error,iced_wgpu=error,wgpu_core=error"
 Environment=XDG_RUNTIME_DIR=/run/barbacane-kiosk
+# Rendu logiciel : affiche sur tout poste (GPU récents sans pilote/micrologiciel compris).
+Environment=WLR_RENDERER=pixman ICED_BACKEND=tiny-skia
 PAMName=barbacane-kiosk
 TTYPath=/dev/tty2
 TTYReset=yes
