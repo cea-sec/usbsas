@@ -30,7 +30,8 @@ while kill -0 $PID 2>/dev/null; do
 done
 wait $PID || {
     echo "ÉCHEC : installation interrompue (délai dépassé ?), fin de la console :" >&2
-    tail -c 4000 "$W/installation.log" | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' | tr -s '\r\n' '\n' | tail -n 40
+    sed 's/\x1b\[[0-9;?]*[a-zA-Z]/\n/g' "$W/installation.log" | tr -s '\r\n' '\n' \
+        | grep -v 'installer)\|^\s*$' | awk '!vu[$0]++' | tail -n 60
     exit 1
 }
 
