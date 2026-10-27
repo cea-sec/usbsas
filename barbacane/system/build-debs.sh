@@ -4,6 +4,19 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$REPO/barbacane/system/mkosi/paquets"
+# Outils de compilation installés si absents (ex. conteneur debian:trixie vierge).
+# shellcheck disable=SC1091
+[ -f "${CARGO_HOME:-$HOME/.cargo}/env" ] && . "${CARGO_HOME:-$HOME/.cargo}/env"
+if ! command -v cargo >/dev/null; then
+    [ "$(id -u)" = 0 ] || { echo "cargo absent : installer Rust (https://rustup.rs) ou lancer en root" >&2; exit 1; }
+    apt-get update -q
+    apt-get install -y -q --no-install-recommends pkgconf clang cmake git dpkg-dev curl ca-certificates \
+        libssl-dev libkrb5-dev libseccomp-dev libudev-dev libusb-1.0-0-dev protobuf-compiler libdbus-1-dev \
+        libwayland-dev libxkbcommon-dev libfuse3-dev build-essential
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+    # shellcheck disable=SC1091
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
+fi
 command -v cargo-deb >/dev/null || cargo install --locked cargo-deb
 cd "$REPO"
 export USBSAS_BIN_PATH=/usr/libexec
