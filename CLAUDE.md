@@ -31,19 +31,16 @@ exploitation, administration, tests, ecarts-upstream).
   n'affiche pas le français, puis inspection du journal du disque installé).
 
 ## État au 27/10/2026
-- Installation automatique sous QEMU : OK de bout en bout. Services OK :
-  admind, kiosk, usbsas-server, clamav-daemon.
-- barbacane-analyzer : dernier correctif (dossier YARA retiré du StateDirectory
-  d'admind, qui le passait en 0750) poussé, run CI ISO n°29 non vérifié.
-  Si encore en échec : lire la section « -- barbacane-analyzer » du job installation-qemu.
-- Défauts déjà corrigés grâce au test QEMU : tmpfs de l'analyseur avec uid numérique
+- CI ISO verte (run n°29) : construction + installation automatique sous QEMU UEFI
+  + premier démarrage avec les 5 services OK (analyzer, admind, kiosk, usbsas-server, clamav).
+- Défauts corrigés grâce au test QEMU : tmpfs de l'analyseur avec uid numérique
   (drop-in écrit par `system/deb/postinst`), dépendances `libpam-systemd` et
-  `ca-certificates` (sans elles usbsas échoue en « reqwest builder error »).
+  `ca-certificates` (sans elles usbsas échoue en « reqwest builder error »),
+  dossier YARA hors StateDirectory d'admind (systemd le remettait en 0750).
 
 ## Reste à faire
-1. Faire passer le test QEMU au vert (les 5 services).
-2. Vérifier l'interface à l'écran (capture `vm/ecran.png` dans l'artefact `vm`).
-3. Installation pilote sur vrai matériel HP/Dell avec vraies clés USB ; vérifier
+1. Vérifier l'interface à l'écran (capture `vm/ecran.png` dans l'artefact `vm`).
+2. Installation pilote sur vrai matériel HP/Dell avec vraies clés USB ; vérifier
    l'installateur en français sur écran réel et le démarrage graphique (cage).
-4. Image mkosi jamais construite.
-5. Le drop-in tmpfs n'est pas supprimé à la purge du paquet (mineur).
+3. Image mkosi jamais construite.
+4. Le drop-in tmpfs n'est pas supprimé à la purge du paquet (mineur).
