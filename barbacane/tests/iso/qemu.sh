@@ -37,6 +37,21 @@ wait $PID || {
     exit 1
 }
 
+echo "== sonde de diagnostic (test uniquement)"
+modprobe nbd max_part=8
+qemu-nbd -c /dev/nbd0 "$W/disque.qcow2"; sleep 2
+mkdir -p "$W/rw"
+mount "$(lsblk -lnpo NAME,FSTYPE /dev/nbd0 | awk '$2 == "ext4" { print $1; exit }')" "$W/rw"
+cat > "$W/rw/etc/systemd/system/diag.service" <<'FIN'
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'sleep 90; { ps -eo pid,user,stat,wchan:30,args; loginctl list-sessions; loginctl show-seat seat0; ls -l /dev/dri /dev/tty2 /run/barbacane-kiosk; cat /etc/barbacane/client.toml; journalctl -b -u systemd-logind --no-pager | tail -n 20; for p in $(pidof cage barbacane-client); do echo "== $p"; cat /proc/$p/stack; ls -l /proc/$p/fd; done; } > /var/log/diag.txt 2>&1'
+[Install]
+WantedBy=multi-user.target
+FIN
+ln -sf ../diag.service "$W/rw/etc/systemd/system/multi-user.target.wants/diag.service"
+umount "$W/rw"; qemu-nbd -d /dev/nbd0 >/dev/null; sleep 1
+
 echo "== premier démarrage"
 qemu-system-x86_64 "${commun[@]}" -serial "file:$W/demarrage.log" \
     -monitor "unix:$W/mon.sock,server,nowait" &
@@ -51,7 +66,6 @@ kill $PID 2>/dev/null || true
 wait $PID 2>/dev/null || true
 
 echo "== inspection du disque installé"
-modprobe nbd max_part=8
 qemu-nbd -r -c /dev/nbd0 "$W/disque.qcow2"
 trap 'umount "$W/racine" 2>/dev/null || true; qemu-nbd -d /dev/nbd0 >/dev/null' EXIT
 sleep 2
@@ -66,6 +80,7 @@ for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server; do
     echo "-- $u"; "${J[@]}" -o cat -u "$u" | awk '!vu[$0]++' | tail -n 12
 done
 echo "-- kiosque (complet)"; "${J[@]}" -o short -u barbacane-kiosk | head -n 60
+echo "-- diagnostic"; cat "$W/racine/var/log/diag.txt" || true
 echo "-- erreurs"; tail -n 40 "$W/erreurs.log"
 echo "-- droits"; ls -ld "$W/racine" "$W/racine/var/lib/barbacane" "$W/racine/var/lib/barbacane/yara"
 echo "-- base ClamAV"; ls -l "$W/racine/var/lib/clamav/"
