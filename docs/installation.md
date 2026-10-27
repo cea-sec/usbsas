@@ -29,6 +29,8 @@ de préférence) qui génère les clés de signature et les paquets de mise à j
 
 ## 3. Méthode recommandée : ISO d'installation hors ligne
 
+Guide pas à pas pour l'opérateur : [guide-installation-poste.md](guide-installation-poste.md).
+
 Une seule ISO installe n'importe quel poste x86_64 (UEFI ou BIOS), **sans réseau
 ni question**.
 
