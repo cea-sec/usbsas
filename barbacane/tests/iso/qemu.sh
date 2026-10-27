@@ -88,7 +88,7 @@ echo "-- base ClamAV"; ls -l "$W/racine/var/lib/clamav/"
 ko=0
 for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server clamav-daemon; do
     # Seulement avant l'extinction de la VM (les erreurs d'arrêt ne comptent pas)
-    avant=$(awk -v u="Stopping $u.service" 'index($0, u) { exit } { print }' "$W/services.log")
+    avant=$(awk '/Stopping / { exit } { print }' "$W/services.log")
     if grep -q "Started $u.service" <<<"$avant" && ! grep -q "$u.service: Failed\|Failed to start $u" <<<"$avant"; then
         echo "OK : $u"
     else
