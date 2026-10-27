@@ -30,7 +30,7 @@ UtmpIdentifier=tty2
 UtmpMode=user
 StandardOutput=journal
 # Pas d'option -s : impossible de changer de console virtuelle depuis la session.
-ExecStart=/usr/bin/cage -d -- /usr/bin/barbacane-client -c /etc/barbacane/client.toml
+ExecStart=/usr/bin/cage -d -D -- /usr/bin/barbacane-client -c /etc/barbacane/client.toml
 ExecStartPre=/usr/bin/chvt 2
 Restart=always
 RestartSec=1

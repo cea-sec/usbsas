@@ -43,6 +43,8 @@ qemu-system-x86_64 "${commun[@]}" -serial "file:$W/demarrage.log" \
 PID=$!
 sleep 180
 echo "screendump $W/ecran.png -f png" | socat - "UNIX-CONNECT:$W/mon.sock"
+echo "screendump $W/ecran.ppm" | socat - "UNIX-CONNECT:$W/mon.sock"
+sleep 2
 echo system_powerdown | socat - "UNIX-CONNECT:$W/mon.sock"
 for _ in $(seq 60); do kill -0 $PID 2>/dev/null || break; sleep 2; done
 kill $PID 2>/dev/null || true
@@ -74,6 +76,15 @@ for u in barbacane-analyzer barbacane-admind barbacane-kiosk usbsas-server clama
         echo "ÉCHEC : $u" >&2; ko=1
     fi
 done
+# L'interface doit réellement s'afficher (écran non noir).
+clair=$(python3 -c '
+import sys
+d = open(sys.argv[1], "rb").read()
+_, l, h, _, px = d.split(maxsplit=4)
+print(sum(1 for i in range(0, len(px) - 2, 3) if sum(px[i:i + 3]) > 60) * 100 // (int(l) * int(h)))
+' "$W/ecran.ppm" 2>/dev/null || echo 0)
+echo "écran : $clair % de pixels non noirs"
+[ "$clair" -ge 5 ] || { echo "ÉCHEC : écran noir, l'interface ne s'affiche pas" >&2; ko=1; }
 # Restart=always masque un kiosque qui plante en boucle (écran noir).
 n=$(grep -c "Started barbacane-kiosk.service" "$W/services.log" || true)
 [ "$n" -le 2 ] || { echo "ÉCHEC : barbacane-kiosk redémarré $n fois" >&2; ko=1; }
