@@ -308,7 +308,7 @@ impl IntegrationTester {
         }
 
         assert_eq!(
-            sha256(&format!("{}/bundle_test.tar", self.av_dir))?,
+            sha256(&format!("{}/{}/bundle_test.tar", self.av_dir, id))?,
             hex!("e47b5ae1ce68b002f52c31322b21de629d0a24bc139205208b10e903da6ddb9a")
         );
 

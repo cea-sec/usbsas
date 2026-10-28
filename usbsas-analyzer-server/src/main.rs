@@ -1,493 +1,241 @@
-//! Very basic remote analyse / upload / download server for `usbsas` using `clamav`.
-//! Mainly used for example and integration tests.
+//! Remote analyze / upload / download server for `usbsas`, using `clamav`.
 //!
-//! Listens on `127.0.0.1:8042`, see the README for the API.
+//! This is the reference implementation of the network side of usbsas. It
+//! is used by the integration tests and as an example.
 
-use actix_files::NamedFile;
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, head, http::header, post, web};
-use clap::{Arg, Command};
-use futures::TryStreamExt;
-use serde_json::json;
-use std::{
-    collections::HashMap,
-    fs,
-    io::{self, Read, Seek, Write},
-    os::unix::net::UnixStream,
-    path::PathBuf,
-    process,
-    sync::Mutex,
-    thread,
-};
-use tar::{Archive, EntryType};
-use tempfile::TempDir;
-use tokio::io::AsyncWriteExt;
+mod api;
+mod clamav;
+mod error;
+mod scan;
+mod storage;
 
-const TAR_DATA_DIR: &str = "data/";
+use actix_web::{App, HttpServer, web};
+use clap::{Arg, ArgAction, Command, value_parser};
+use std::{io, path::PathBuf, sync::Arc, time::Duration};
 
-/// State of an analysis.
-struct AnalyzeStatus {
-    /// `processing`, `scanned` or `error`
-    status: String,
-    /// `CLEAN` or `DIRTY`, by path
-    files: HashMap<String, String>,
+/// Command line options.
+#[derive(Debug)]
+struct Args {
+    working_dir: Option<PathBuf>,
+    bind: String,
+    workers: Option<usize>,
+    max_concurrent_scans: Option<usize>,
+    max_bundle_size: Option<u64>,
+    result_ttl: u64,
+    clamd: PathBuf,
+    clamd_config: Option<PathBuf>,
+    clamd_start_timeout: u64,
+    scan_timeout: u64,
+    disable_shutdown: bool,
 }
 
-/// State shared by the request handlers.
-struct AppState {
-    working_dir: Mutex<String>,
-    /// Analyses, by analysis id
-    current_scans: Mutex<HashMap<String, AnalyzeStatus>>,
-    clamav: Mutex<Clamav>,
-}
-
-impl AppState {
-    /// Extract the `data/` directory of `tar` and scan it with clamd.
-    fn analyze(&self, bundle_id: &str, tar: &str) -> Result<(), actix_web::Error> {
-        let tmpdir = tempfile::Builder::new()
-            .prefix(&bundle_id)
-            .tempdir_in(PathBuf::from(&*self.working_dir.lock().unwrap()))?;
-        let mut archive = Archive::new(fs::File::open(tar)?);
-
-        let mut entries_paths = Vec::new();
-
-        for entry in archive.entries()? {
-            let mut entry = entry?;
-            let path = entry
-                .path()?
-                .to_path_buf()
-                .into_os_string()
-                .into_string()
-                .unwrap();
-            if !path.starts_with(TAR_DATA_DIR) {
-                continue;
-            }
-            if matches!(
-                entry.header().entry_type(),
-                EntryType::Regular | EntryType::Directory | EntryType::Symlink
-            ) {
-                entry.unpack_in(tmpdir.path())?;
-            }
-            if matches!(
-                entry.header().entry_type(),
-                EntryType::Regular | EntryType::Symlink
-            ) {
-                entries_paths.push(path.strip_prefix(TAR_DATA_DIR).unwrap().to_string());
-            }
-        }
-
-        if entries_paths.is_empty() {
-            log::error!("no files to analyze");
-            return Err(actix_web::error::ErrorNotFound(io::Error::new(
-                io::ErrorKind::NotFound,
-                "tar's \"data\" is empty or absent, no files to analyze",
-            )));
-        }
-
-        let base_path = tmpdir
-            .path()
-            .join(TAR_DATA_DIR)
-            .into_os_string()
-            .into_string()
-            .unwrap();
-        let mut dirty_paths = self.clamav.lock().unwrap().analyze(&base_path)?;
-
-        dirty_paths.iter_mut().for_each(|path| {
-            *path = path.strip_prefix(base_path.as_str()).unwrap().to_string();
-        });
-
-        let mut current_scans = self.current_scans.lock().unwrap();
-        let current_scan = current_scans.get_mut(bundle_id).unwrap();
-
-        entries_paths.iter().for_each(|path| {
-            if dirty_paths.contains(path) {
-                current_scan
-                    .files
-                    .insert(path.to_owned(), "DIRTY".to_string());
-            } else {
-                current_scan
-                    .files
-                    .insert(path.to_owned(), "CLEAN".to_string());
-            };
-        });
-
-        current_scan.status = "scanned".to_string();
-        Ok(())
+impl Args {
+    fn command() -> Command {
+        Command::new("usbsas-analyzer-server")
+            .about(
+                "usbsas remote server: analyze bundles with clamav, store uploaded bundles \
+                 and serve bundles to download",
+            )
+            .version(env!("CARGO_PKG_VERSION"))
+            .arg(
+                Arg::new("working-dir")
+                    .short('d')
+                    .long("working-dir")
+                    .value_name("WORKING-DIR")
+                    .value_parser(value_parser!(PathBuf))
+                    .help(
+                        "Working directory where bundles are stored (WORKING-DIR/USER/BUNDLE.tar). \
+                         Defaults to a temporary directory removed at exit",
+                    ),
+            )
+            .arg(
+                Arg::new("bind")
+                    .short('b')
+                    .long("bind")
+                    .value_name("ADDR:PORT")
+                    .default_value("127.0.0.1:8042")
+                    .help("Address to listen on"),
+            )
+            .arg(
+                Arg::new("workers")
+                    .long("workers")
+                    .value_name("N")
+                    .value_parser(value_parser!(usize))
+                    .help("Number of HTTP worker threads [default: number of CPUs]"),
+            )
+            .arg(
+                Arg::new("max-concurrent-scans")
+                    .long("max-concurrent-scans")
+                    .value_name("N")
+                    .value_parser(value_parser!(usize))
+                    .help(
+                        "Maximum number of analyses running at the same time, the others are \
+                         queued [default: number of CPUs]",
+                    ),
+            )
+            .arg(
+                Arg::new("max-bundle-size")
+                    .long("max-bundle-size")
+                    .value_name("BYTES")
+                    .value_parser(value_parser!(u64))
+                    .help("Maximum size of an uploaded bundle, in bytes [default: unlimited]"),
+            )
+            .arg(
+                Arg::new("result-ttl")
+                    .long("result-ttl")
+                    .value_name("SECONDS")
+                    .value_parser(value_parser!(u64))
+                    .default_value("3600")
+                    .help(
+                        "Seconds after which an analysis report that was never fetched is dropped",
+                    ),
+            )
+            .arg(
+                Arg::new("clamd")
+                    .long("clamd")
+                    .value_name("PATH")
+                    .value_parser(value_parser!(PathBuf))
+                    .default_value("clamd")
+                    .help("clamd binary"),
+            )
+            .arg(
+                Arg::new("clamd-config")
+                    .long("clamd-config")
+                    .value_name("FILE")
+                    .value_parser(value_parser!(PathBuf))
+                    .help(
+                        "Additional clamd configuration appended to the generated one \
+                         (e.g. \"MaxThreads\", \"MaxFileSize\", \"AlertExceedsMax yes\")",
+                    ),
+            )
+            .arg(
+                Arg::new("clamd-start-timeout")
+                    .long("clamd-start-timeout")
+                    .value_name("SECONDS")
+                    .value_parser(value_parser!(u64))
+                    .default_value("300")
+                    .help("Seconds to wait for clamd to load its database"),
+            )
+            .arg(
+                Arg::new("scan-timeout")
+                    .long("scan-timeout")
+                    .value_name("SECONDS")
+                    .value_parser(value_parser!(u64))
+                    .default_value("0")
+                    .help("Maximum duration of the scan of a bundle, in seconds (0: no limit)"),
+            )
+            .arg(
+                Arg::new("disable-shutdown")
+                    .long("disable-shutdown")
+                    .action(ArgAction::SetTrue)
+                    .help("Disable the GET /shutdown endpoint"),
+            )
     }
 
-    /// Store a request body in `<working dir>/<new id>.tar`.
-    async fn recv_file(
-        &self,
-        mut body: web::Payload,
-    ) -> Result<(String, String), actix_web::Error> {
-        #[cfg(not(feature = "integration-tests"))]
-        let bundle_id = uuid::Uuid::new_v4().simple().to_string();
-        #[cfg(feature = "integration-tests")]
-        let bundle_id = "bundle_test".into();
-        let out_file_name = format!("{}/{}.tar", self.working_dir.lock().unwrap(), bundle_id);
-        let mut out_file = tokio::fs::File::create(&out_file_name).await?;
-
-        while let Some(bytes) = body.try_next().await? {
-            out_file.write_all(&bytes).await?;
+    fn parse() -> Self {
+        let m = Self::command().get_matches();
+        // Options with a default value are always present.
+        let required = |name: &str| *m.get_one::<u64>(name).expect("default value");
+        Args {
+            working_dir: m.get_one::<PathBuf>("working-dir").cloned(),
+            bind: m.get_one::<String>("bind").expect("default value").clone(),
+            workers: m.get_one::<usize>("workers").copied(),
+            max_concurrent_scans: m.get_one::<usize>("max-concurrent-scans").copied(),
+            max_bundle_size: m.get_one::<u64>("max-bundle-size").copied(),
+            result_ttl: required("result-ttl"),
+            clamd: m
+                .get_one::<PathBuf>("clamd")
+                .expect("default value")
+                .clone(),
+            clamd_config: m.get_one::<PathBuf>("clamd-config").cloned(),
+            clamd_start_timeout: required("clamd-start-timeout"),
+            scan_timeout: required("scan-timeout"),
+            disable_shutdown: m.get_flag("disable-shutdown"),
         }
-        out_file.flush().await?;
-        Ok((bundle_id, out_file_name))
-    }
-}
-
-/// Receive a tar and analyze it in a thread.
-#[post("/api/scanbundle/{id}")]
-async fn scan_bundle(
-    body: web::Payload,
-    _id: web::Path<String>,
-    data: web::Data<AppState>,
-) -> Result<impl Responder, actix_web::Error> {
-    let (bundle_id, out_file_name) = data.recv_file(body).await?;
-
-    data.current_scans.lock().unwrap().insert(
-        bundle_id.clone(),
-        AnalyzeStatus {
-            status: "processing".to_string(),
-            files: HashMap::new(),
-        },
-    );
-
-    let bundle_id_clone = bundle_id.clone();
-    thread::spawn(move || {
-        if let Err(err) = data.analyze(&bundle_id_clone, &out_file_name) {
-            log::error!("{err}");
-            if let Some(status) = data.current_scans.lock().unwrap().get_mut(&bundle_id_clone) {
-                status.status = "error".to_string();
-            };
-        }
-    });
-
-    Ok(HttpResponse::Ok().json(json!(
-        {
-            "id": bundle_id,
-            "status": "uploaded"
-        }
-    )))
-}
-
-/// Status of an analysis, with the report once it's done.
-#[get("/api/scanbundle/{id}/{bundle_id}")]
-async fn scan_result(
-    params: web::Path<(String, String)>,
-    data: web::Data<AppState>,
-) -> Result<impl Responder, actix_web::Error> {
-    let (_, bundle_id) = params.into_inner();
-    let mut current_scans = data.current_scans.lock().unwrap();
-    if current_scans.contains_key(&bundle_id) {
-        let rep = if current_scans[&bundle_id].status == "scanned"
-            || current_scans[&bundle_id].status == "error"
-        {
-            let entry = current_scans.remove(&bundle_id).unwrap();
-            #[cfg(not(feature = "integration-tests"))]
-            let av_infos = {
-                let (clam_ver, db_ver, db_date) = data.clamav.lock().unwrap().version()?;
-                json!({
-                    "ClamAV": {
-                    "version": clam_ver,
-                    "database_version": db_ver,
-                    "database_timestamp": db_date,
-                    }
-                })
-            };
-            // Fixed timestamp to keep a deterministic filesystem hash
-            #[cfg(feature = "integration-tests")]
-            let av_infos = json!({
-                "ClamAV": {
-                    "version": "946767600",
-                    "database_version": "946767600",
-                    "database_timestamp": "946767600",
-                }
-            });
-            fs::remove_file(format!(
-                "{}/{}.tar",
-                data.working_dir.lock().unwrap(),
-                bundle_id
-            ))?;
-            #[cfg(feature = "integration-tests")]
-            let bundle_id = "0";
-            let files_status: HashMap<String, serde_json::Value> = entry
-                .files
-                .iter()
-                .map(|(key, val)| (key.clone(), json!({ "status": val })))
-                .collect();
-            json!({
-                "id": bundle_id,
-                "status": entry.status,
-                "version": 2,
-                "files": files_status,
-                "antivirus": av_infos
-            })
-        } else {
-            json!({
-                "id": bundle_id,
-                "status": current_scans[&bundle_id].status,
-            })
-        };
-        Ok(HttpResponse::Ok().json(rep))
-    } else {
-        Ok(HttpResponse::NotFound().finish())
-    }
-}
-
-/// Receive a tar.
-#[post("/api/uploadbundle/{id}")]
-async fn upload_bundle(
-    body: web::Payload,
-    _id: web::Path<String>,
-    data: web::Data<AppState>,
-) -> Result<impl Responder, actix_web::Error> {
-    let (_, _) = data.recv_file(body).await?;
-    Ok(HttpResponse::Ok())
-}
-
-/// Find `<filename>.tar`, `.tar.gz` or `.gz`, return its path and size.
-fn find_bundle(filename: &str) -> Result<(String, u64), actix_web::Error> {
-    for ext in ["tar", "tar.gz", "gz"] {
-        let bundle_path = format!("{filename}.{ext}");
-        if let Ok(metadata) = fs::metadata(&bundle_path) {
-            return Ok((bundle_path, metadata.len()));
-        }
-    }
-    Err(actix_web::error::ErrorNotFound(io::Error::new(
-        io::ErrorKind::NotFound,
-        "Bundle not found",
-    )))
-}
-
-/// Uncompressed size of an archive to download.
-#[head("/api/downloadbundle/{id}/{bundle_id}")]
-async fn head_bundle_size(
-    params: web::Path<(String, String)>,
-    data: web::Data<AppState>,
-) -> Result<impl Responder, actix_web::Error> {
-    let (id, bundle_id) = params.into_inner();
-    let (bundle_path, mut size) = find_bundle(&format!(
-        "{}/{}/{}",
-        data.working_dir.lock().unwrap(),
-        id,
-        bundle_id
-    ))?;
-
-    // usbsas expects uncompressed size of files with HEAD requests
-
-    // XXX FIXME Dirty hack 1:
-    // /!\ The following only work if the gzipped tar is < 4GB (as it's stored
-    // %4GB), but good enough for this integration tests server
-    if bundle_path.ends_with("gz") {
-        let mut f = fs::File::open(&bundle_path)?;
-        f.seek(io::SeekFrom::End(-4))?;
-        let mut buf = vec![0; 4];
-        f.read_exact(&mut buf)?;
-        size = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as u64;
-        log::debug!("filename: {bundle_path}, uncompressed size: {size}");
-    }
-    log::debug!("filename: {bundle_path}, size: {size}");
-
-    Ok(HttpResponse::Ok()
-        .insert_header(("X-Uncompressed-Content-Length", size))
-        .finish())
-}
-
-/// Download an archive (gzip encoded if compressed).
-#[get("/api/downloadbundle/{id}/{bundle_id}")]
-async fn download_bundle(
-    params: web::Path<(String, String)>,
-    data: web::Data<AppState>,
-) -> Result<impl Responder, actix_web::Error> {
-    let (id, bundle_id) = params.into_inner();
-    let (bundle_path, _) = find_bundle(&format!(
-        "{}/{}/{}",
-        data.working_dir.lock().unwrap(),
-        id,
-        bundle_id
-    ))?;
-    let named_file = if bundle_path.ends_with("gz") {
-        NamedFile::open(bundle_path)?.set_content_encoding(header::ContentEncoding::Gzip)
-    } else {
-        NamedFile::open(bundle_path)?
-    };
-    Ok(named_file)
-}
-
-/// Stop clamd.
-#[get("/shutdown")]
-async fn shutdown(data: web::Data<AppState>) -> Result<impl Responder, actix_web::Error> {
-    data.clamav.lock().unwrap().cmd("SHUTDOWN")?;
-    Ok(HttpResponse::Ok())
-}
-
-/// clamd process and its socket.
-struct Clamav {
-    _process: process::Child,
-    socket_path: String,
-}
-
-impl Clamav {
-    /// Start clamd and wait for its socket (up to 60s, while the database
-    /// loads).
-    fn new(working_path: &str) -> io::Result<Self> {
-        let clamav_config_path = format!("{working_path}/clamd.conf");
-        let clamav_socket_path = format!("{working_path}/clamd.socket");
-
-        #[cfg(not(feature = "integration-tests"))]
-        std::fs::write(
-            &clamav_config_path,
-            format!(
-                "TemporaryDirectory {working_path}\nLocalSocket {clamav_socket_path}\nForeground true\n",
-            ),
-        )?;
-
-        // Use dummy db for tests (faster loading, only detects eicar)
-        #[cfg(feature = "integration-tests")]
-        {
-            std::fs::write(
-                &clamav_config_path,
-                format!(
-                    "TemporaryDirectory {working_path}\nLocalSocket {clamav_socket_path}\nForeground true\nDatabaseDirectory {working_path}/db\n",
-                ),
-            )?;
-            let _ = fs::create_dir(format!("{working_path}/db"));
-            std::fs::write(
-                format!("{working_path}/db/test.ndb"),
-                "Eicar-Test-Signature:0:0:58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e444152442d414e544956495255532d544553542d46494c452124482b482a\nEicar-Test-Signature-1:0:*:574456504956416c51454651577a5263554670594e54516f554634704e304e444b5464394a45564a513046534c564e555155354551564a454c55464f56456c5753564a565579315552564e550a4c555a4a544555684a45677253436f3d0a",
-            )?;
-        }
-
-        log::debug!("start clamd");
-        let clamav_child = process::Command::new("clamd")
-            .env("PATH", "/bin:/sbin:/usr/bin:/usr/sbin")
-            .args(["--config", &clamav_config_path])
-            .spawn()?;
-
-        // Try opening the socket, this may take some times as the socket will
-        // only be created by clamd when the database is loaded.
-        let mut timeout_retry = 60;
-        let mut clamav_socket = loop {
-            log::trace!("attempt to connect to clamd socket");
-            match UnixStream::connect(&clamav_socket_path) {
-                Ok(socket) => break socket,
-                Err(err) => match err.kind() {
-                    std::io::ErrorKind::NotFound => {
-                        std::thread::sleep(std::time::Duration::from_secs(1));
-                        timeout_retry -= 1;
-                        if timeout_retry == 0 {
-                            return Err(err);
-                        } else {
-                            continue;
-                        }
-                    }
-                    _ => return Err(err),
-                },
-            }
-        };
-
-        let mut response = String::new();
-        clamav_socket.write_all(b"PING")?;
-        clamav_socket.read_to_string(&mut response)?;
-
-        if response.trim() != "PONG" {
-            log::error!("{response:#?}");
-            return Err(io::Error::other("Couldn't connect to clamd socket"));
-        }
-
-        log::debug!("clamd ping pong ok");
-
-        Ok(Clamav {
-            _process: clamav_child,
-            socket_path: clamav_socket_path,
-        })
-    }
-
-    /// Send a command to clamd and return its response.
-    fn cmd(&mut self, cmd: &str) -> io::Result<String> {
-        let mut socket = UnixStream::connect(&self.socket_path)?;
-        let mut response = String::new();
-        socket.write_all(cmd.as_bytes())?;
-        socket.read_to_string(&mut response)?;
-        Ok(response)
-    }
-
-    #[cfg(not(feature = "integration-tests"))]
-    fn version(&mut self) -> io::Result<(String, String, String)> {
-        let version = self.cmd("VERSION")?;
-        let versions: Vec<&str> = version.trim().split('/').collect();
-        let (clam_ver, db_ver, db_date) = (
-            versions[0].to_string(),
-            versions[1].to_string(),
-            versions[2].to_string(),
-        );
-        Ok((clam_ver, db_ver, db_date))
-    }
-
-    /// Scan a directory, return the paths of the infected files.
-    fn analyze(&mut self, path: &str) -> io::Result<Vec<String>> {
-        let response = self.cmd(&format!("CONTSCAN {path}"))?;
-        log::debug!("{response:#?}");
-        let mut dirty = Vec::new();
-        if response.ends_with("OK\n") {
-            return Ok(dirty);
-        }
-        for line in response.lines() {
-            match line.rfind(": ") {
-                Some(index) => dirty.push(line.split_at(index).0.to_string()),
-                None => continue,
-            }
-        }
-        Ok(dirty)
     }
 }
 
 #[actix_web::main]
 async fn main() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
+    let args = Args::parse();
 
-    let command = Command::new("usbsas-analyzer-server")
-        .about("simple usbsas remote server for integrations tests")
-        .version("0.2")
-        .arg(
-            Arg::new("working-dir")
-                .value_name("WORKING-DIR")
-                .short('d')
-                .long("working-dir")
-                .num_args(1)
-                .required(false),
-        );
+    let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
 
-    let matches = command.get_matches();
-
-    let (working_path, _temp_dir): (String, Option<TempDir>) =
-        if let Some(wp) = matches.get_one::<String>("working-dir") {
-            (wp.to_owned(), None)
-        } else {
-            let tmpdir = tempfile::Builder::new()
+    let (working_dir, _temp_dir) = match &args.working_dir {
+        Some(dir) => (dir.clone(), None),
+        None => {
+            let tmp = tempfile::Builder::new()
                 .prefix("usbsas-analyzer")
-                .tempdir_in("/tmp")
-                .unwrap();
-            let working_path = tmpdir.path().to_string_lossy().to_string();
-            (working_path, Some(tmpdir))
-        };
+                .tempdir()?;
+            log::warn!(
+                "no working directory given, using {} (removed at exit)",
+                tmp.path().display()
+            );
+            (tmp.path().to_path_buf(), Some(tmp))
+        }
+    };
 
-    let clamav = Clamav::new(&working_path)?;
-    let app_data = web::Data::new(AppState {
-        working_dir: Mutex::new(working_path),
-        current_scans: Mutex::new(HashMap::new()),
-        clamav: Mutex::new(clamav),
+    let storage = Arc::new(storage::Storage::new(&working_dir, args.max_bundle_size)?);
+    log::info!("working directory: {}", storage.root().display());
+
+    let clamav = {
+        let opts = clamav::ClamdOptions {
+            binary: args.clamd.clone(),
+            dir: storage.root().join(storage::CLAMD_DIR),
+            extra_config: args.clamd_config.clone(),
+            start_timeout: Duration::from_secs(args.clamd_start_timeout),
+            scan_timeout: (args.scan_timeout > 0).then(|| Duration::from_secs(args.scan_timeout)),
+        };
+        tokio::task::spawn_blocking(move || clamav::Clamav::start(opts))
+            .await
+            .map_err(io::Error::other)??
+    };
+
+    let scanner = Arc::new(scan::Scanner::new(
+        Arc::clone(&storage),
+        Arc::clone(&clamav),
+        args.max_concurrent_scans.unwrap_or(cpus),
+        Duration::from_secs(args.result_ttl),
+    ));
+
+    let state = web::Data::new(api::AppState {
+        storage,
+        scanner: Arc::clone(&scanner),
+        clamav: Arc::clone(&clamav),
+        shutdown_enabled: !args.disable_shutdown,
+        server: Default::default(),
     });
-    HttpServer::new(move || {
+
+    let app_state = state.clone();
+    let server = HttpServer::new(move || {
         App::new()
-            .app_data(app_data.clone())
-            .service(scan_bundle)
-            .service(scan_result)
-            .service(upload_bundle)
-            .service(head_bundle_size)
-            .service(download_bundle)
-            .service(shutdown)
+            .app_data(app_state.clone())
+            .configure(api::configure)
     })
-    .bind("127.0.0.1:8042")?
-    .run()
-    .await
+    .workers(args.workers.unwrap_or(cpus))
+    .bind(&args.bind)
+    .inspect_err(|err| {
+        log::error!("couldn't listen on {}: {err}", args.bind);
+        clamav.shutdown();
+    })?
+    .run();
+    let _ = state.server.set(server.handle());
+    log::info!("listening on {}", args.bind);
+
+    // Periodically drop the reports nobody fetched.
+    actix_web::rt::spawn(async move {
+        let mut interval = actix_web::rt::time::interval(Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            scanner.reap();
+        }
+    });
+
+    let res = server.await;
+    tokio::task::spawn_blocking(move || clamav.shutdown())
+        .await
+        .map_err(io::Error::other)?;
+    log::info!("stopped");
+    res
 }

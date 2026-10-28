@@ -3,9 +3,13 @@ Description=usbsas analyzer server
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/usbsas-analyzer-server
+# Bundles are stored in /var/lib/usbsas-analyzer-server/<user id>/
+ExecStart=/usr/bin/usbsas-analyzer-server --working-dir /var/lib/usbsas-analyzer-server --disable-shutdown
+StateDirectory=usbsas-analyzer-server
 Environment="RUST_LOG=info"
 User=usbsas
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
