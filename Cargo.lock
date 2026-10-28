@@ -6395,15 +6395,16 @@ dependencies = [
 
 [[package]]
 name = "usbsas-analyzer-server"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "actix-files",
  "actix-web",
  "clap",
  "env_logger",
- "futures",
+ "flate2",
+ "futures-util",
+ "libc",
  "log",
- "serde",
  "serde_json",
  "tar",
  "tempfile",
