@@ -17,7 +17,8 @@
 //! ```
 
 use crate::{
-    Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport, filter::Rules,
+    Children, Devices, FileInfo, FileStatus, Transfer, TransferFiles, TransferReport,
+    filter::Rules, path_depth,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use base16ct::HexDisplay;
@@ -556,18 +557,38 @@ impl RunState for BrowseSrcState {
         let selected = loop {
             match comm.recv_req()? {
                 Msg::ReadDir(req) => {
+                    if path_depth(&req.path) >= self.config.max_depth {
+                        warn!(
+                            "user tried to open '{}' beyond the maximum depth ({})",
+                            req.path, self.config.max_depth
+                        );
+                        comm.readdir(proto::usbsas::ResponseReadDir {
+                            filesinfo: Vec::new(),
+                            max_depth_reached: true,
+                        })?;
+                        continue;
+                    }
                     match src_reader
                         .comm
                         .readdir(proto::files::RequestReadDir { path: req.path })
                     {
                         Ok(res) => comm.readdir(proto::usbsas::ResponseReadDir {
                             filesinfo: res.filesinfo,
+                            max_depth_reached: false,
                         })?,
                         Err(err) => comm.error(err)?,
                     }
                     continue;
                 }
                 Msg::GetAttr(req) => {
+                    if path_depth(&req.path) > self.config.max_depth {
+                        warn!(
+                            "user tried to get attributes of '{}' beyond the maximum depth ({})",
+                            req.path, self.config.max_depth
+                        );
+                        comm.error("Maximum depth exceeded")?;
+                        continue;
+                    }
                     match src_reader
                         .comm
                         .getattr(proto::files::RequestGetAttr { path: req.path })
@@ -683,9 +704,10 @@ impl RunState for FileSelectionState {
                     _ => (files, dirs),
                 });
         info!(
-            "selection: {files_count} file(s) and {dirs_count} dir(s) ({selected_size}B), {} filtered, {} in error",
+            "selection: {files_count} file(s) and {dirs_count} dir(s) ({selected_size}B), {} filtered, {} in error, {} beyond max depth",
             self.transfer.files.filtered.len(),
-            self.transfer.files.errors.len()
+            self.transfer.files.errors.len(),
+            self.transfer.files.depth_exceeded.len()
         );
         if let Some(max_size) = self.transfer.max_dst_size
             && selected_size > max_size
@@ -774,6 +796,16 @@ impl FileSelectionState {
                 continue;
             }
 
+            let depth = path_depth(&entry);
+            if depth > self.config.max_depth {
+                warn!(
+                    "'{entry}' skipped, beyond the maximum depth ({})",
+                    self.config.max_depth
+                );
+                self.transfer.files.depth_exceeded.push(entry.clone());
+                continue;
+            }
+
             if rules.match_all(entry.trim_start_matches('/')) {
                 info!("'{entry}' excluded by filter rules");
                 self.transfer.files.filtered.push(entry.clone());
@@ -805,6 +837,16 @@ impl FileSelectionState {
                     match src_reader.comm.readdir(proto::files::RequestReadDir {
                         path: entry.clone(),
                     }) {
+                        Ok(rep) if depth >= self.config.max_depth => {
+                            // The directory is kept but not its content
+                            if !rep.filesinfo.is_empty() {
+                                warn!(
+                                    "content of '{entry}' skipped, maximum depth ({}) reached",
+                                    self.config.max_depth
+                                );
+                                self.transfer.files.depth_exceeded.push(entry.clone());
+                            }
+                        }
                         Ok(rep) => {
                             rep.filesinfo.iter().for_each(|file| {
                                 self.selected
@@ -1311,14 +1353,15 @@ impl RunState for TransferDstState {
         let report = self.transfer.to_report("success");
         comm.done(Status::AllDone)?;
         info!(
-            "transfer of user '{}' from {} to {} done: {} file(s) copied, {} filtered, {} rejected, {} in error",
+            "transfer of user '{}' from {} to {} done: {} file(s) copied, {} filtered, {} rejected, {} in error, {} beyond max depth",
             self.transfer.userid,
             self.transfer.src,
             self.transfer.dst,
             report.file_names.len(),
             report.filtered.len(),
             report.rejected.len(),
-            report.errors.len()
+            report.errors.len(),
+            report.depth_exceeded.len()
         );
         Ok(State::End(EndState {
             report: Some(report),

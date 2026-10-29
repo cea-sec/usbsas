@@ -1,0 +1,2 @@
+out_directory = "/tmp/usbsas-tests"
+max_depth = 2

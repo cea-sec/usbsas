@@ -8,6 +8,8 @@
     "fstype": "Destination filesystem type",
     "rejected": "Rejected by antivirus",
     "filtered": "Filtered files",
+    "depth_exceeded": "Folders whose content wasn't copied (maximum depth reached)",
+    "max_depth_reached": "Maximum folder depth reached, this folder can't be opened and its content won't be copied",
     "reset": "Reset",
     "error": "Error",
     "errors": "Errors",

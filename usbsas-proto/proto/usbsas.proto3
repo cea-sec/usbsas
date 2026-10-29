@@ -120,6 +120,7 @@ message ResponseOpenPartition {
 
 message ResponseReadDir {
   repeated common.FileInfo filesinfo = 1;
+  bool max_depth_reached = 2;
 };
 
 message ResponseGetAttr {

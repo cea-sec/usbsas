@@ -33,7 +33,7 @@ Every process reads the same file and only uses the sections it needs:
 | `command`                        | usbsas (destination), cmdexec                     |
 | `post_copy`                      | usbsas, cmdexec                                   |
 | `analyzer`                       | usbsas (whether to analyze), analyzer             |
-| `filters`                        | usbsas                                            |
+| `filters`, `max_depth`           | usbsas                                            |
 | `report.write_dest`              | usbsas (report written on the destination)        |
 | `report.write_local`             | client (report saved locally)                     |
 | `usb_port_accesses`              | usbdev (`ports_src`, `ports_dst`), hid-dealer (`ports_hid`) |

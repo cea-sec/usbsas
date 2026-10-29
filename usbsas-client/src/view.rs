@@ -643,35 +643,49 @@ impl GUI {
                         Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
                             .style(container::dark),
                     )
-                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
-                    .push(
-                        Row::new()
-                            .push(Checkbox::new(all_selected).on_toggle(|check| {
-                                if check {
-                                    Message::SelectAll(
-                                        files
-                                            .iter()
-                                            .map(|x| x.path.clone())
-                                            .collect::<Vec<String>>(),
-                                    )
-                                } else {
-                                    Message::UnselectAll(
-                                        files
-                                            .iter()
-                                            .map(|x| x.path.clone())
-                                            .collect::<Vec<String>>(),
-                                    )
-                                }
-                            }))
-                            .push(
-                                Space::new()
-                                    .width(Length::Fixed(10.0))
-                                    .height(Length::Shrink),
-                            )
-                            .push(back_button)
-                            .push(Space::new().width(Length::Fill).height(Length::Shrink))
-                            .align_y(Alignment::Center),
-                    );
+                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
+                if let Some(path) = &self.max_depth_warning {
+                    file_column = file_column
+                        .push(
+                            text(format!(
+                                "⚠ {} ({})",
+                                self.i18n_txt("max_depth_reached"),
+                                path.trim_start_matches('/')
+                            ))
+                            .size(TXT_SIZE)
+                            .shaping(text::Shaping::Advanced)
+                            .style(text::danger),
+                        )
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
+                }
+                file_column = file_column.push(
+                    Row::new()
+                        .push(Checkbox::new(all_selected).on_toggle(|check| {
+                            if check {
+                                Message::SelectAll(
+                                    files
+                                        .iter()
+                                        .map(|x| x.path.clone())
+                                        .collect::<Vec<String>>(),
+                                )
+                            } else {
+                                Message::UnselectAll(
+                                    files
+                                        .iter()
+                                        .map(|x| x.path.clone())
+                                        .collect::<Vec<String>>(),
+                                )
+                            }
+                        }))
+                        .push(
+                            Space::new()
+                                .width(Length::Fixed(10.0))
+                                .height(Length::Shrink),
+                        )
+                        .push(back_button)
+                        .push(Space::new().width(Length::Fill).height(Length::Shrink))
+                        .align_y(Alignment::Center),
+                );
                 let mut selected_col = Column::new()
                     .push(text(self.i18n_txt("selected_files")).size(HEADER_SIZE))
                     .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
@@ -991,6 +1005,26 @@ impl GUI {
                             )
                             .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
                         for fname in &report.filtered {
+                            col_report = col_report.push(
+                                text(fname.trim_start_matches('/'))
+                                    .size(TXT_SIZE)
+                                    .color(color_red),
+                            );
+                        }
+                    }
+                    if !report.depth_exceeded.is_empty() {
+                        col_report = col_report
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(15.0)))
+                            .push(text(self.i18n_txt("depth_exceeded")).size(HEADER_SIZE))
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
+                            .push(
+                                Container::new(
+                                    Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                                )
+                                .style(container::dark),
+                            )
+                            .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)));
+                        for fname in &report.depth_exceeded {
                             col_report = col_report.push(
                                 text(fname.trim_start_matches('/'))
                                     .size(TXT_SIZE)
