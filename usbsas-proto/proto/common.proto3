@@ -266,4 +266,6 @@ message TransferReport {
   // Files rejected by the analyzer
   repeated string rejected = 15;
   optional AnalyzeReport analyzereport = 16;
+  // Directories at the maximum depth whose content wasn't transferred
+  repeated string depth_exceeded = 17;
 };

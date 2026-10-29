@@ -31,6 +31,11 @@ fn main() {
     prost_build.message_attribute("common.Command", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.LocalDir", "#[derive(serde::Serialize)]");
     prost_build.message_attribute("common.TransferReport", "#[derive(serde::Serialize)]");
+    // Only in reports where the max depth was reached
+    prost_build.field_attribute(
+        "common.TransferReport.depth_exceeded",
+        "#[serde(skip_serializing_if = \"Vec::is_empty\")]",
+    );
     prost_build.message_attribute("common.DeviceReport", "#[derive(serde::Serialize)]");
     prost_build.message_attribute(
         "common.AnalyzeReport",

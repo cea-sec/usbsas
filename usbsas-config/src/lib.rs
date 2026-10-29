@@ -124,6 +124,9 @@ pub struct Config {
     /// Local directory sources
     pub src_local_dirs: Option<Vec<LocalDir>>,
     pub filters: Option<Vec<Filter>>,
+    /// Maximum depth of the files of a transfer source
+    #[serde(default = "default_max_depth")]
+    pub max_depth: usize,
     pub post_copy: Option<PostCopy>,
     pub analyzer: Option<Analyzer>,
     pub usb_port_accesses: Option<UsbPortAccesses>,
@@ -142,6 +145,10 @@ pub struct Config {
 
 fn default_out_dir() -> String {
     String::from("/tmp/usbsas")
+}
+
+fn default_max_depth() -> usize {
+    20
 }
 
 /// Read the configuration file.

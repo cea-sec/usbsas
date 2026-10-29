@@ -31,6 +31,9 @@ struct TransferFiles {
     filtered: Vec<String>,
     /// Paths that couldn't be read
     errors: Vec<String>,
+    /// Directories at the maximum depth whose content was skipped (or paths
+    /// deeper than the maximum depth)
+    depth_exceeded: Vec<String>,
 }
 
 impl TransferFiles {
@@ -39,6 +42,7 @@ impl TransferFiles {
             files: BTreeMap::new(),
             filtered: Vec::new(),
             errors: Vec::new(),
+            depth_exceeded: Vec::new(),
         }
     }
 
@@ -51,6 +55,7 @@ impl TransferFiles {
         self.files.contains_key(path)
             || self.errors.contains(&path.to_string())
             || self.filtered.contains(&path.to_string())
+            || self.depth_exceeded.contains(&path.to_string())
     }
 
     fn iter(&self) -> std::collections::btree_map::Iter<'_, std::string::String, FileInfo> {
@@ -63,6 +68,11 @@ impl TransferFiles {
             fileinfo.status = FileStatus::Error;
         }
     }
+}
+
+/// Depth of a path
+fn path_depth(path: &str) -> usize {
+    path.split('/').filter(|part| !part.is_empty()).count()
 }
 
 /// Metadata of a file of the transfer.
@@ -163,7 +173,7 @@ fn report(
     let transfer_id = env::var("USBSAS_SESSION_ID").unwrap_or("0".to_string());
     let mut files_info: BTreeMap<String, FileInfoReport> = BTreeMap::new();
     let mut file_names = Vec::new();
-    let (errors, filtered, rejected) = if let Some(tfiles) = transfer_files {
+    let (errors, filtered, rejected, depth_exceeded) = if let Some(tfiles) = transfer_files {
         tfiles
             .files
             .iter()
@@ -210,9 +220,10 @@ fn report(
                     }
                 })
                 .collect(),
+            tfiles.depth_exceeded.clone(),
         )
     } else {
-        (vec![], vec![], vec![])
+        (vec![], vec![], vec![], vec![])
     };
     TransferReport {
         title: format!("{title}_{datetime}_{transfer_id}"),
@@ -230,6 +241,7 @@ fn report(
         filtered,
         rejected,
         analyzereport,
+        depth_exceeded,
     }
 }
 
@@ -309,5 +321,20 @@ impl Drop for TmpFiles {
             let _ = fs::remove_file(&self.clean_tar_path);
             let _ = fs::remove_file(&self.fs_path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::path_depth;
+
+    #[test]
+    fn depth() {
+        assert_eq!(path_depth("/"), 0);
+        assert_eq!(path_depth(""), 0);
+        assert_eq!(path_depth("/a"), 1);
+        assert_eq!(path_depth("/a/b/c.txt"), 3);
+        assert_eq!(path_depth("a/b/"), 2);
+        assert_eq!(path_depth("//a//b"), 2);
     }
 }

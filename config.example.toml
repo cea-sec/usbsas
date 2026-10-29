@@ -6,6 +6,10 @@ out_directory = "/tmp/usbsas"
 # Keep temporary files (tar & filesystem)
 #keep_tmp_files = false
 
+# Maximum depth of the files of a transfer source. Deeper files can't be
+# browsed nor transferred. (Optional, default: 20)
+#max_depth = 20
+
 # GUI window title (Optional)
 #window_title = "USBSAS"
 

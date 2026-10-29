@@ -186,7 +186,15 @@ impl GUI {
                 return Task::done(Message::ReadDir("/".into()));
             }
             Response::ReadDir(path, res) => {
-                let filesinfo = ok_or_err!(self, res);
+                let resp = ok_or_err!(self, res);
+                if resp.max_depth_reached && matches!(self.state, State::ReadDir(_)) {
+                    // Stay in the current directory and warn the user
+                    log::warn!("max depth reached, can't open '{path}'");
+                    self.max_depth_warning = Some(path);
+                    return Task::none();
+                }
+                self.max_depth_warning = resp.max_depth_reached.then(|| path.clone());
+                let filesinfo = resp.filesinfo;
                 self.current_dir = path;
                 self.current_files = Vec::new();
                 filesinfo
@@ -456,7 +464,7 @@ impl GUI {
                         .await
                         .readdir(proto::usbsas::RequestReadDir { path: path.clone() })
                         .await;
-                    Response::ReadDir(path, res.map(|resp| resp.filesinfo).map_err(err_str))
+                    Response::ReadDir(path, res.map_err(err_str))
                 });
             }
             Message::PreviousDir => {

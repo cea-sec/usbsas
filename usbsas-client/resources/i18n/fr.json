@@ -8,6 +8,8 @@
     "fstype": "Système de fichier destination",
     "rejected": "Fichiers rejetés par l'antivirus",
     "filtered": "Fichiers filtrés",
+    "depth_exceeded": "Dossiers dont le contenu n'a pas été copié (profondeur maximale atteinte)",
+    "max_depth_reached": "Profondeur maximale de dossiers atteinte, ce dossier ne peut pas être ouvert et son contenu ne sera pas copié",
     "reset": "Reset",
     "error": "Erreur",
     "errors": "Erreurs",

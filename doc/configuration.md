@@ -193,6 +193,15 @@ exact = "autorun.inf"
 contain = ["thumbs.db"]
 ```
 
+### Maximum depth
+
+Maximum depth of the files of a transfer source, i.e. the number of components
+of their path (`/a/b/c.txt` is 3 deep). The default is 20.
+
+```toml
+max_depth = 20
+```
+
 ### <a name="graphicalinterface">Graphical interface</a>
 
 Change language, can either be English (`en`) or French (`fr`).
