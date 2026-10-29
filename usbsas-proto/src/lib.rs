@@ -46,6 +46,19 @@ pub mod common {
         }
     }
 
+    impl std::fmt::Display for device::Device {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            match self {
+                device::Device::Usb(usb) => write!(f, "USB device '{usb}'"),
+                device::Device::Network(net) => write!(f, "network '{}' ({})", net.title, net.url),
+                device::Device::Command(cmd) => write!(f, "command '{}' ({})", cmd.title, cmd.bin),
+                device::Device::LocalDir(dir) => {
+                    write!(f, "local dir '{}' ({})", dir.title, dir.path)
+                }
+            }
+        }
+    }
+
     impl device::Device {
         /// Whether the device can be used as a transfer source.
         pub fn is_src(&self) -> bool {

@@ -174,6 +174,7 @@ fn main() -> Result<()> {
             Some(Err(err)) => panic!("error listen incoming {err}"),
             None => panic!("shouldn't happen"),
         };
+        info!("client connected");
         let comm = Comm::new(stream.try_clone().context("clone stream")?, stream);
         let socket = usbsas_sandbox::usbsas::UsbsasSocket {
             listen: listener.as_raw_fd(),
