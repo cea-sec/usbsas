@@ -1,196 +1,172 @@
-# usbsas features & usage
+# usbsas user guide
 
-* [Graphical User Interface](#gui)
-* [Analyzer server](#asrv)
-* [Upload & download from remote server](#updown)
-* [HID](#hid)
-* [Python scripting](#python)
+usbsas is a station for safely copying files from an untrusted USB device to a
+trusted USB one or to a network. Files are copied without the station ever
+"opening" your device the usual way, and they can be checked by an antivirus
+before being copied.
+
+* [Before you start](#before)
+* [Transferring files](#transfer)
+* [Transfer report](#report)
 * [Tools](#tools)
-* [Reading disk images](#diskimage)
+* [Questions and problems](#faq)
 
-## <a name="gui">Graphical User Interface</a>
+## <a name="before">Before you start</a>
 
-The graphical client has been developed with the [kiosk](./kiosk.md) station in
-mind, e.g. simple full screen window that can't be closed or minimized to
-interact with other components of the system.
+- **Source device**: the device containing your files. USB keys and external
+  hard drives (USB mass storage) are supported, as well as CD / DVD readers.
+  Supported file systems are FAT, exFAT, NTFS, ext4 and ISO9660.
+- **Destination device**: the device receiving the files. **It is completely
+  erased**: everything on it is lost and replaced by the copied files. Save its
+  content beforehand if needed. Instead of a USB device, your station may also
+  offer to send the files to a network.
+- The station may only accept devices on some USB ports (for instance ports
+  labeled "source" and "destination"). If a device isn't detected, try another
+  port or ask your administrator.
+- Only the mouse (or the touch screen) is used. Keyboards don't work on the
+  station.
 
-It allows transferring files from USB to USB or remote host, wiping a USB device and
-making image of a USB device.
+## <a name="transfer">Transferring files</a>
 
-After [building](./build.md), start `usbsas` and the `client`:
+### 1. Plug your devices
 
-The GUI interacts with usbsas via a Unix domain socket so usbsas must be started
-with `-s` option.
+The welcome screen asks you to plug a device.
 
-```shell
-$ ./target/release/usbsas-usbsas -s
-```
+<p align="center"><img src="./res/usage01.png" width="100%"/></p>
 
-```shell
-$ ./target/release/usbsas-client
-```
+Plug the source device and, if you copy to a USB device, the destination
+device. They are listed once detected.
 
-[Here](./ui_usage.md) are some screenshots of the interface.
+<p align="center"><img src="./res/usage02.png" width="100%"/></p>
 
+### 2. Choose the source and the destination
 
-## <a name="asrv">Analyzer server</a>
+Select the device containing your files as the source, and the device (or
+network) receiving them as the destination. Double check: the destination is
+erased.
 
-analyzer-server included in this project is mainly used for tests and given as
-example, production use is not recommended. Files are analyzed with [Clam
-AntiVirus](https://www.clamav.net/)
+<p align="center"><img src="./res/usage03.png" width="100%"/></p>
 
-Scanning files is enabled or disabled in the [configuration
-file](./configuration.md#analyzer).
+For a USB destination, you can choose the file system it will be formatted with
+(NTFS by default). Choose FAT or exFAT if the destination must be read by a
+device that doesn't support NTFS (some TVs, cameras, car radios...). FAT can't
+store files larger than 4 GB.
 
-The archive containing files to analyze is first POSTed to "URL/[user_id]", the
-server should respond a unique analysis identifier. The analyzer process will
-then poll the remote server on "URL/[user_id]/[analyze_id]". The expected answer
-from the server is a JSON containing a status string, when the analysis is done,
-status should be "scanned" and the JSON response should include sanity status
-for all files, for example:
+<p align="center"><img src="./res/usage04.png" width="100%"/></p>
 
-```json
-{
-  "status": "scanned",
-  "id": "f092fb9a883b439eaf5c6e75bcdc646e",
-  "files": {
-    "SCSI Commands Reference Manual.pdf": {
-      "status": "CLEAN",
-      "sha256": "XXX"
-    },
-    "directories/a/man_rustc.txt": {
-      "status": "CLEAN",
-      "sha256": "XXX"
-    },
-    "eicar.com": {
-      "status": "DIRTY",
-      "sha256": "XXX"
-    }
-  },
-  "antivirus": {
-    "ClamAV": {
-        "version": "XXX",
-        "database_version": "XXX",
-        "database_timestamp": "XXX"
-    }
-  }
-}
-```
+Click **Continue**.
 
-This report can be written on the destination device (if enabled in the
-configuration file).
+If you are asked to identify yourself, do it as your station requires (badge,
+card...). If you chose to download files from a network, enter the export code
+you were given.
 
-It supports Kerberos mutual authentication if compiled with the `authkrb`
-feature (enabled by default) and a service name is present in the configuration
-file.
+### 3. Choose the partition
 
-## <a name="updown">Upload & download from remote server</a>
+If the source device has several partitions, choose the one containing your
+files. If it only has one, this step is skipped.
 
-Files read from a USB device can be sent to a remote server (in a tar archive).
-The archive is sent by a HTTP POST request at the URL:
-`https://HOST:PORT/api/uploadbundle/USERID`
+<p align="center"><img src="./res/usage05.png" width="100%"/></p>
 
-Files can also be downloaded from the remote server to be copied in a
-destination USB device.
-If this source is selected, the user is asked for a pin code and the archive
-will be downloaded from this URL:
-`https://HOST:PORT/api/downloadbundle/USERID/PIN`
+### 4. Select your files
 
+Browse the source device: click a folder to open it, the arrow to go back to
+the parent folder. Tick the files and folders to copy; ticking a folder copies
+everything it contains. The selected files are listed on the right, click the
+bin icon to remove one from the selection.
 
-See the [configuration file](./configuration.md#srcdst).
+<p align="center"><img src="./res/usage06.png" width="100%"/></p>
 
-## HID
+<p align="center"><img src="./res/usage07.png" width="100%"/></p>
 
-In order to protect against BadUSB devices, a minimal userland HID driver has
-also been implemented (`hid` kernel module can be disabled / removed). It only
-supports mouse left click (enough for selecting files to transfer in the UI),
-keystrokes sent by a malicious device (or any keyboard) won't be handled by the
-system.
+Some folders can be too deep to be opened: a warning is displayed, and their
+content isn't copied.
 
-More details [here](./kiosk.md#debhid).
+Click **Continue** to start the transfer.
 
+### 5. Wait for the end of the transfer
 
-## <a name="python">Python scripting</a>
+The station copies the files, has them analyzed if it is configured to, and
+writes them to the destination. Each step is displayed with its progress. It
+can take a while for large transfers: don't unplug the devices.
 
-Instead of using the GUI, usbsas can be controlled by a Python script with a
-module that ease protobuf communication. [Here](../python/README.md) is an example.
+<p align="center"><img src="./res/usage08.png" width="100%"/></p>
 
-## Tools
+### 6. Check the report and remove your devices
 
-Collection of tools built with usbsas components to show how it can be used as a
-framework.
+At the end, the report is displayed (see below). Remove your devices, then click
+**Reset** to get back to the welcome screen for the next user.
 
-### Mount a device
+<p align="center"><img src="./res/usage09.png" width="100%"/></p>
 
-`usbsas-fuse-mount` is a standalone tool to mount a USB Mass storage device
-(read-only) with fuse.
+You can click **Cancel** at most steps to stop and start over. Nothing is
+written to the destination before the last step of the transfer.
 
-```shell
-$ usbsas-fuse-mount --help
+## <a name="report">Transfer report</a>
 
-Mount a (fuse) filesystem with usbsas
+The report lists the files that were **not** copied, if any:
 
-USAGE:
-    usbsas-fuse-mount [OPTIONS] <busnum> <devnum> <mountpoint>
+- **Errors**: files that couldn't be read from the source or written to the
+  destination.
+- **Filtered files**: files excluded by the rules of the station (system files
+  like `thumbs.db` or `autorun.inf`, shortcuts...).
+- **Rejected by antivirus**: files the antivirus considered dangerous.
+- **Folders whose content wasn't copied**: folders too deep in the directory
+  tree.
 
-ARGS:
-    <busnum>        Bus number of the device to mount
-    <devnum>        Dev number of the device to mount
-    <mountpoint>    Path to mount the device
+The report may also be written on the destination device, as a
+`usbsas-report-<number>.json` file.
 
-OPTIONS:
-    -h, --help                  Print help information
-    -n, --part-num <PARTNUM>    Partition number to mount [default: 1]
-    -V, --version               Print version information
-```
+If a file you need was rejected or filtered, contact your administrator, don't
+try to copy it another way.
 
-### Imager
+## <a name="tools">Tools</a>
 
-Standalone tool to make an image of a USB Mass Storage device (like `dd`).
-```
-$ usbsas-imager  --help
+The **Tools** menu offers other operations on a USB device.
 
-Usage: usbsas-imager [OPTIONS] <BUSNUM> <DEVNUM>
+<p align="center"><img src="./res/usage10.png" width="100%"/></p>
 
-Arguments:
-  <BUSNUM>  Bus number of the output device
-  <DEVNUM>  Device number of the output device
+### Wipe a device
 
-Options:
-  -c, --config <config>  Path of the configuration file [default: /etc/usbsas/config.toml]
-  -o, --output <FILE>    Path of the output file
-  -O, --stdout           Output to stdout
-  -h, --help             Print help
-  -V, --version          Print version
-```
+Erase a USB device and create a new, empty file system on it (with the file
+system chosen at the bottom of the screen):
 
-### Filesystem writer
-Standalone tool to write a filesystem on a USB Mass Storage device (like `dd)`.
-```
-$ usbsas-fswriter --help
+- **Quick wipe**: only creates the new file system. Old data could still be
+  recovered with specialized tools.
+- **Secure wipe**: overwrites the whole device before creating the new file
+  system. It takes longer.
 
-Usage: usbsas-fswriter <FILE> <BUSNUM> <DEVNUM>
+Select the device to wipe and click **Continue**.
 
-Arguments:
-  <FILE>    Path of the input filesystem
-  <BUSNUM>  Bus number of the output device
-  <DEVNUM>  Device number of the output device
+<p align="center"><img src="./res/usage11.png" width="100%"/></p>
 
-Options:
-  -h, --help     Print help
-  -V, --version  Print version
-```
+<p align="center"><img src="./res/usage12.png" width="100%"/></p>
 
-### <a name="diskimage">Reading disk images / dumped devices</a>
+### Disk image
 
-The `mock` feature used for the integration tests also allows using usbsas with
-_fake_ (file-backed) USB devices. After building with this feature (`cargo build --features mock`),
-2 variables can be set:
+Save a complete copy of a device on the station, for your administrators to
+analyze it (for instance if you think the device is infected). Nothing is
+written to the device.
 
-```shell
-$ export USBSAS_MOCK_IN_DEV=/tmp/mock_input_dev.img
-$ export USBSAS_MOCK_OUT_DEV=/tmp/mock_output_dev.img
-$ usbsas-usbsas -s
-```
+### System information
 
-usbsas won't list real plugged devices but those in these variables instead.
+Information about the station, for your administrators.
+
+## <a name="faq">Questions and problems</a>
+
+The **FAQ** button answers the most common questions, and the language of the
+interface can be changed from the menu bar.
+
+**My device isn't detected.** Check that it's plugged in an allowed port. Only
+USB mass storage devices are supported: phones, cameras or MP3 players
+connected in "MTP" mode, for instance, aren't.
+
+**Why not just scan my device with an antivirus?** An antivirus only looks
+for known malware in files. A malicious USB device can also attack the computer
+it is plugged in (by pretending to be a keyboard, or exploiting the code that
+reads devices), or show clean files to the antivirus and other files to your
+computer. usbsas protects against these attacks as well, and the files copied
+to the destination are exactly the ones that were analyzed.
+
+**An error is displayed.** Click **Reset** and try again. If the error persists,
+the source device may be damaged or use an unsupported format: contact your
+administrator.

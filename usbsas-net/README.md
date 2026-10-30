@@ -9,7 +9,7 @@ usbsas processes talking to remote HTTP servers:
 | `usbsas-uploader`   | uploads the session tar (or clean tar) to a destination network   |
 | `usbsas-downloader` | downloads an archive from the source network into the session tar |
 
-The remote API is described in the [usage documentation](../doc/usage.md#asrv)
+The remote API is described in the [configuration documentation](../doc/configuration.md#remote)
 and implemented by `usbsas-analyzer-server`, used for tests.
 
 ## Usage

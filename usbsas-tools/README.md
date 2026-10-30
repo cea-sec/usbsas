@@ -1,8 +1,8 @@
 # usbsas-tools
 
 Standalone command line tools built from usbsas components. They show how the
-processes can be reused outside of a full usbsas transfer. See the [usage
-documentation](../doc/usage.md#tools) for their options.
+processes can be reused outside of a full usbsas transfer. See the [configuration
+documentation](../doc/configuration.md#tools) for their options.
 
 | Tool                 | Description                                                   | Processes used |
 |----------------------|---------------------------------------------------------------|----------------|
