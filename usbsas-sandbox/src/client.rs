@@ -64,6 +64,7 @@ pub fn sandbox(
     ctx.allow_syscall(Syscall::memfd_create)?;
     ctx.allow_syscall(Syscall::newfstatat)?;
     ctx.allow_syscall(Syscall::openat)?;
+    ctx.allow_syscall(Syscall::mkdir)?;
 
     #[cfg(not(target_arch = "aarch64"))]
     ctx.allow_syscall(Syscall::poll)?;
