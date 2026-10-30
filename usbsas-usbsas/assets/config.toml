@@ -1,0 +1,153 @@
+# usbsas configuration file
+
+# Directory where temp tar and fs will be stored. (Mandatory)
+out_directory = "/var/lib/usbsas/data"
+
+# Keep temporary files (tar & filesystem)
+keep_tmp_files = false
+
+# Maximum depth of the files of a transfer source. Deeper files can't be
+# browsed nor transferred. (Optional, default: 20)
+max_depth = 20
+
+# GUI window title (Optional)
+window_title = "USBSAS"
+
+# Default lang of GUI (en or fr)
+lang = "en"
+
+# Logo/image displayed next to hostname in upper right corner of GUI
+#menu_img = "/path/to/image"
+
+# Destination "network". (Optional)
+# Upload copied files (in a tar) to a remote network.
+# description, longdescr and url are mandatory, krb_service_name is optional.
+# If krb_service_name is specified, mutual HTTP authentication with Kerberos
+# will be performed with the remote server prior to upload.
+
+# [[networks]]
+# description = "Network XXX"
+# longdescr = "Send files on network XXX"
+# url = "http://127.0.0.1:8042/api/uploadbundle"
+# krb_service_name = "HTTP@your.domain"
+
+# [[networks]]
+# description = "Network YYY"
+# longdescr = "Send files on network YYY"
+# url = "http://127.0.0.1:8043/api/uploadbundle"
+# krb_service_name = "HTTP@your.domain"
+
+
+# Source "network". (Optional)
+# Download a bundle from a remote host, to write it to an USB device.
+# description, longdescr and url are mandatory, krb_service_name is optional.
+#[source_network]
+#description = "Source Network XXX"
+#longdescr = "Export files from network XXX"
+#url = "http://127.0.0.1:8042/api/downloadbundle"
+#krb_service_name = "HTTP@your.domain"
+
+
+# Export files from local filesystem (Optional)
+# Path must be readable by the user running usbsas
+
+#[[src_local_dirs]]
+#path = "/path/to/dir"
+#description = "Local export"
+#longdescr = "Export files from local directory XXX"
+
+
+# Destination "command". (Optional)
+# Execute a command.
+# "%SOURCE_FILE%" in command_args will be replaced with the filename of the
+# output tar before execution.
+#[command]
+#description = "Save files on disk"
+#longdescr = "Save out tar in /usbsas_data/"
+#command_bin = "/bin/cp"
+#command_args = [
+#    "%SOURCE_FILE%",
+#    "/usbsas_data/"
+#]
+
+
+# Remote analyzer server. (Optional)
+# Like for network destination below, kerberos authentication can be enabled.
+# An analyzer report can optionally be written on the destination device.
+# Analyzing files can be enabled/disabled based on destination (usb, net (upload)
+# or cmd (command), analysis only happens if source is usb.
+[analyzer]
+url = "http://127.0.0.1:8042/api/scanbundle"
+#krb_service_name = "HTTP@your.domain"
+analyze_usb = true
+analyze_net = false
+analyze_cmd = true
+# max time (in seconds) to wait for the analysis result (default: 1800 // 30 mins)
+#poll_timeout = 1800
+
+
+# Command to execute after a transfer. (Optional)
+# %SOURCE_FILE% is either a tar archive if destination is a network or the
+# filesystem of the USB destination.
+#[post_copy]
+#description = "Archive transfer"
+#command_bin = "/bin/cp"
+#command_args = [
+#	"%SOURCE_FILE%",
+#	"/usbsas_archive/"
+#]
+
+
+# USB ports allowed. (Optional)
+# Enforce USB topology for USB mass storage source, destination and/or HID
+# devices.
+# [4, 3] means: device should be plugged into Port 3 of Bus 4.
+# [3, 2, 5] means: There is a USB hub in the Port 2 of Bus 3 and the device
+#                  should be plugged into the Port 5 of the hub.
+# There can be more than 1 hub (e.g. [2, 3, 1, 2]).
+# usbsas-devmonitor or 'lsusb -t' can be used to find logical paths of physical
+# ports.
+# Multiple ports can be allowed.
+#[usb_port_accesses]
+#ports_src = [ [6, 2, 3, 1], [2, 3] ]
+#ports_dst = [ [4, 3] ]
+#ports_hid = [ [3, 3] ]
+
+# A transfer report can be written on the destination device. (Optional)
+# It can also be written on the local disk. (Optional)
+[report]
+write_dest = true
+#write_local = "/var/lib/usbsas/reports"
+
+
+
+# Filename filters. (Optional)
+# They should be written in lower case as their are tested case insensitive.
+# A file is filtered if a filter matches.
+# A filter matches if each of its components (contain/start/end) matches
+# A component matches if:
+# - contain: every strings in the filter are present in the filename
+# - start: the filenames startswith the string
+# - end: the filenames endswith the string
+# - exact: exact filename
+[[filters]]
+contain = ["__macosx"]
+
+[[filters]]
+contain = [".ds_store"]
+
+[[filters]]
+contain = [".lnk."]
+
+[[filters]]
+contain = [".lnk/"]
+
+[[filters]]
+end = ".lnk"
+contain = ["whatever"]
+
+[[filters]]
+exact = "autorun.inf"
+
+[[filters]]
+contain = ["thumbs.db"]
