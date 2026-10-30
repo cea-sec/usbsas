@@ -81,6 +81,9 @@ pub struct Analyzer {
     pub analyze_net: bool,
     /// Analyze files transferred to the command
     pub analyze_cmd: bool,
+    /// Max time to wait for the analysis result
+    #[serde(default = "default_analyzer_poll_timeout")]
+    pub poll_timeout: u64,
 }
 
 /// Restrict devices to USB ports (`[usb_port_accesses]`). A port is a list of
@@ -149,6 +152,10 @@ fn default_out_dir() -> String {
 
 fn default_max_depth() -> usize {
     20
+}
+
+fn default_analyzer_poll_timeout() -> u64 {
+    1800
 }
 
 /// Read the configuration file.
