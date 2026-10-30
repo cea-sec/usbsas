@@ -46,7 +46,7 @@ written in Rust.
 ## Documentation
 
 - [Architecture](doc/architecture.md)
-- [Features & usage](doc/usage.md)
+- [User guide](doc/usage.md)
 - [Build](doc/build.md)
 - [Configuration](doc/configuration.md)
 - [Kiosk deployment](doc/kiosk.md)
