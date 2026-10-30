@@ -154,6 +154,8 @@ pub enum Error {
     BadResponse,
     #[error("Remote server error")]
     Remote,
+    #[error("Analysis result not received after {0}s")]
+    AnalyzeTimeout(u64),
     #[error("State error")]
     State,
 

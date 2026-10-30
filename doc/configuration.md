@@ -120,7 +120,12 @@ url = "http://127.0.0.1:8042/api/scanbundle"
 analyze_usb = true
 analyze_net = false
 analyze_cmd = true
+poll_timeout = 1800
 ```
+
+`poll_timeout` is the maximum time, in seconds, to wait for the result of the
+analysis once the files are uploaded (1800 // 30 mins by default). If the result
+isn't available in time, the transfer is aborted.
 
 Analyzer report can be written on the destination device and locally
 

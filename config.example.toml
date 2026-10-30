@@ -82,6 +82,8 @@ url = "http://127.0.0.1:8042/api/scanbundle"
 analyze_usb = true
 analyze_net = false
 analyze_cmd = true
+# max time (in seconds) to wait for the analysis result (default: 1800 // 30 mins)
+#poll_timeout = 1800
 
 
 # Command to execute after a transfer. (Optional)
