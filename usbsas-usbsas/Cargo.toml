@@ -67,7 +67,7 @@ assets = [
   ["target/release/usbsas-tar2files", "usr/libexec/", "755"],
   ["target/release/usbsas-uploader", "usr/libexec/", "755"],
   ["target/release/usbsas-usbdev", "usr/libexec/", "755"],
-  ["../config.example.toml", "etc/usbsas/config.toml", "644"],
+  ["assets/config.toml", "etc/usbsas/config.toml", "644"],
   ["assets/99-usbsas.rules", "etc/udev/rules.d/", "644"],
   ["assets/usbsas.conf", "etc/modprobe.d/", "644"],
 ]
