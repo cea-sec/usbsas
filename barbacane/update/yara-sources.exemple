@@ -1,0 +1,8 @@
+# Sources de règles YARA pour barbacane-update-prepare (--yara-sources).
+# Une source par ligne : dépôt git (URL se terminant par .git) ou URL d'un fichier .yar.
+# Choisir des règles maintenues et adaptées : chaque détection refuse un fichier.
+# Les règles qui ne compilent pas sont retirées si l'outil « yr » (YARA-X) est installé.
+
+https://github.com/Neo23x0/signature-base.git
+# https://github.com/elastic/protections-artifacts.git
+# https://exemple.interne/regles/maison.yar

@@ -1,0 +1,47 @@
+[Unit]
+Description=Barbacane : analyseur de fichiers (ClamAV + YARA, archives)
+After=clamav-daemon.service
+Wants=clamav-daemon.service
+
+[Service]
+ExecStart=/usr/bin/barbacane-analyzer -c /etc/barbacane/analyzer.toml
+Environment=RUST_LOG=info
+User=barbacane-analyzer
+Group=barbacane
+SupplementaryGroups=clamav
+UMask=0027
+# Fichiers en cours d'analyse : en mémoire, taille bornée, effacés à l'arrêt.
+# TemporaryFileSystem= est posé par le postinst (tmpfs exige l'uid numérique du compte).
+StateDirectory=barbacane/rapports barbacane/sortie barbacane/import
+StateDirectoryMode=0750
+MemoryMax=10G
+CPUQuota=300%
+TasksMax=256
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# bubblewrap a besoin des espaces de noms utilisateur
+RestrictNamespaces=user mnt pid ipc net uts cgroup
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressAllow=localhost
+IPAddressDeny=any
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+# bubblewrap : espaces de noms et montages dans son propre espace
+SystemCallFilter=@system-service @mount @sandbox
+SystemCallFilter=~@obsolete @raw-io @reboot @swap @module @clock @cpu-emulation @debug
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

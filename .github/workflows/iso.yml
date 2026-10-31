@@ -1,0 +1,70 @@
+name: ISO
+
+on:
+  push:
+    paths:
+      - "barbacane/**"
+      - "usbsas-*/**"
+      - ".github/workflows/iso.yml"
+  workflow_dispatch:
+
+jobs:
+  construction:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: outils de compilation
+        run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends pkgconf clang cmake git dpkg-dev curl ca-certificates \
+            libssl-dev libkrb5-dev libseccomp-dev libudev-dev libusb-1.0-0-dev protobuf-compiler libdbus-1-dev \
+            libwayland-dev libxkbcommon-dev libfuse3-dev build-essential
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      - uses: actions/cache/restore@v4
+        with:
+          path: target/production
+          key: iso-${{ hashFiles('Cargo.lock', 'barbacane/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: iso-
+      - name: paquets
+        run: . "$HOME/.cargo/env" && barbacane/system/build-debs.sh
+      - uses: actions/cache/save@v4
+        with:
+          path: target/production
+          key: iso-${{ hashFiles('Cargo.lock', 'barbacane/Cargo.lock') }}-${{ github.sha }}
+      - name: ISO
+        run: |
+          barbacane/system/iso/build-iso.sh --debs barbacane/system/mkosi/paquets --sortie "$PWD/barbacane.iso"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: barbacane-iso
+          path: barbacane.iso
+          compression-level: 0
+          retention-days: 14
+
+  installation-qemu:
+    needs: construction
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: barbacane-iso
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf socat xorriso
+      - name: installation automatique puis premier démarrage
+        run: sudo barbacane/tests/iso/qemu.sh barbacane.iso vm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vm
+          path: |
+            vm/*.png
+            vm/*.log

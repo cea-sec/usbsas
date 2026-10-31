@@ -1,0 +1,69 @@
+# Configuration usbsas de la borne Barbacane (installée en /etc/usbsas/config.toml)
+
+out_directory = "/var/lib/usbsas/tmp"
+keep_tmp_files = false
+lang = "fr"
+window_title = "Barbacane"
+
+# barbacane-analyzer local
+[analyzer]
+url = "http://127.0.0.1:8042/api/scanbundle"
+analyze_usb = true
+analyze_net = false
+analyze_cmd = true
+
+# Transfert A (analyse) : destination « commande » sans effet ; l'analyseur prépare
+# ensuite le dossier de sortie, relu par le transfert B (voir docs/conception.md).
+[command]
+description = "Analyse"
+longdescr = "Analyse des fichiers sans copie"
+command_bin = "/bin/true"
+command_args = []
+
+# Transfert B : dossier de préparation rempli par barbacane-analyzer
+[[src_local_dirs]]
+path = "/var/lib/barbacane/sortie"
+description = "Fichiers sains"
+longdescr = "Fichiers sains préparés par Barbacane"
+
+# Export des journaux et rapports (mode administrateur), préparé par barbacane-admind
+[[src_local_dirs]]
+path = "/var/lib/barbacane/export"
+description = "Export"
+longdescr = "Journaux et rapports de la borne"
+
+# Destination « partage réseau » : prévue, DÉSACTIVÉE (borne hors ligne).
+# usbsas sait envoyer les fichiers analysés vers un serveur (voir doc/configuration.md d'usbsas) ;
+# à activer seulement avec une architecture réseau validée.
+#[[networks]]
+#description = "Partage réseau"
+#longdescr = "Envoyer les fichiers sains sur le partage"
+#url = "https://partage.interne/api/uploadbundle"
+
+# Le rapport Barbacane (texte + HTML) remplace celui d'usbsas sur la clé de sortie
+[report]
+write_dest = false
+write_local = "/var/lib/usbsas/reports"
+
+# Ports physiques : à relever sur chaque modèle avec usbsas-devmonitor (voir docs/installation.md).
+# Le port d'entrée figure aussi dans ports_dst (option « Blanchir »).
+#[usb_port_accesses]
+#ports_src = [ [1, 2] ]
+#ports_dst = [ [1, 2], [1, 3] ]
+#ports_hid = [ [1, 4] ]
+
+# Fichiers système inutiles ou dangereux, jamais copiés
+[[filters]]
+contain = ["__macosx"]
+[[filters]]
+contain = [".ds_store"]
+[[filters]]
+end = ".lnk"
+[[filters]]
+contain = ["autorun.inf"]
+[[filters]]
+contain = ["thumbs.db"]
+[[filters]]
+contain = ["desktop.ini"]
+[[filters]]
+contain = ["/$recycle.bin/"]

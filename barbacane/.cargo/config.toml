@@ -1,0 +1,4 @@
+[env]
+# Tests : binaires usbsas construits en mode mock à la racine du dépôt.
+# En production le client se connecte à la socket du service usbsas-server.
+USBSAS_BIN_PATH = { value = "../target/release", relative = true, force = false }

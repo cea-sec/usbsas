@@ -1,0 +1,10 @@
+# Configuration de l'interface (/etc/barbacane/client.toml)
+usbsas_socket = "/run/usbsas"
+analyzer_url = "http://127.0.0.1:8042"
+admin_socket = "/run/barbacane/admin.sock"
+stage_dir = "/var/lib/barbacane/sortie"
+export_dir = "/var/lib/barbacane/export"
+title = "Barbacane"
+signatures_max_age_days = 7
+# Identification par badge : prévue, non disponible
+badge = false

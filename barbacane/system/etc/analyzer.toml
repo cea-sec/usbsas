@@ -1,0 +1,21 @@
+# Configuration de barbacane-analyzer (/etc/barbacane/analyzer.toml)
+
+listen = "127.0.0.1:8042"
+work_dir = "/var/lib/barbacane/analyzer"     # tmpfs 6 Go (barbacane-analyzer.service)
+clamd_socket = "/run/clamav/clamd.ctl"
+yara_rules_dir = "/var/lib/barbacane/yara"
+seven_zip = "/usr/bin/7z"
+bwrap = "/usr/bin/bwrap"
+stage_dir = "/var/lib/barbacane/sortie"      # déclaré dans [[src_local_dirs]] d'usbsas
+reports_dir = "/var/lib/barbacane/rapports"
+max_reports = 5000
+
+[limits]
+max_depth = 5
+max_files = 10000
+max_total_size = 4294967296      # 4 Go
+max_ratio = 100
+extract_timeout = 300            # secondes
+extract_memory = 2147483648      # 2 Go
+password_timeout = 300           # secondes
+password_attempts = 3

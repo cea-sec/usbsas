@@ -1,0 +1,5 @@
+# Session graphique kiosque (pas d'authentification : lancée par systemd)
+auth     required pam_permit.so
+account  required pam_permit.so
+session  required pam_unix.so
+session  optional pam_systemd.so

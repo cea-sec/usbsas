@@ -20,7 +20,12 @@ pub(crate) fn new_context_with_common_rules(
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::read,
-            &[Comparator::new(0, Cmp::Eq, *fd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(*fd as u64),
+            )],
         )?;
     }
 
@@ -29,7 +34,12 @@ pub(crate) fn new_context_with_common_rules(
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::write,
-            &[Comparator::new(0, Cmp::Eq, *fd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(*fd as u64),
+            )],
         )?;
     }
 
@@ -38,7 +48,12 @@ pub(crate) fn new_context_with_common_rules(
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::close,
-            &[Comparator::new(0, Cmp::Eq, *fd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(*fd as u64),
+            )],
         )?;
     }
 
@@ -46,14 +61,24 @@ pub(crate) fn new_context_with_common_rules(
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::write,
-        &[Comparator::new(0, Cmp::Eq, 1, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(1),
+        )],
     )?;
 
     // Allow write to stderr
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::write,
-        &[Comparator::new(0, Cmp::Eq, 2, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(2),
+        )],
     )?;
 
     // Allow ioctl TCGETS & TCGETS2 on stderr needed by env_logger >= 0.11
@@ -61,7 +86,7 @@ pub(crate) fn new_context_with_common_rules(
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 2, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(2)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -72,7 +97,7 @@ pub(crate) fn new_context_with_common_rules(
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 2, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(2)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS2 as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -146,7 +171,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::close,
-        &[Comparator::new(0, Cmp::Eq, device_fd as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(device_fd as u64),
+        )],
     )?;
 
     // Allow some ioctls on device fd
@@ -154,7 +184,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(device_fd as u64),
+            ),
             Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_submiturb() }, None),
         ],
     )?;
@@ -162,7 +197,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(device_fd as u64),
+            ),
             Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_reapurbndelay() }, None),
         ],
     )?;
@@ -170,7 +210,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(device_fd as u64),
+            ),
             Comparator::new(
                 1,
                 Cmp::Eq,
@@ -183,7 +228,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(device_fd as u64),
+            ),
             Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_ioctl() }, None),
         ],
     )?;
@@ -191,7 +241,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(device_fd as u64),
+            ),
             Comparator::new(1, Cmp::Eq, unsafe { crate::usbdevfs_discardurb() }, None),
         ],
     )?;
@@ -199,7 +254,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(device_fd as u64),
+            ),
             Comparator::new(
                 1,
                 Cmp::Eq,
@@ -212,7 +272,12 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, device_fd as u64, None),
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(device_fd as u64),
+            ),
             Comparator::new(
                 1,
                 Cmp::Eq,
@@ -247,17 +312,32 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::read,
-            &[Comparator::new(0, Cmp::Eq, eventfd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(eventfd as u64),
+            )],
         )?;
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::write,
-            &[Comparator::new(0, Cmp::Eq, eventfd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(eventfd as u64),
+            )],
         )?;
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::close,
-            &[Comparator::new(0, Cmp::Eq, eventfd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(eventfd as u64),
+            )],
         )?;
     }
 
@@ -266,12 +346,22 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::timerfd_settime,
-            &[Comparator::new(0, Cmp::Eq, timerfd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(timerfd as u64),
+            )],
         )?;
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::close,
-            &[Comparator::new(0, Cmp::Eq, timerfd as u64, None)],
+            &[Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(timerfd as u64),
+            )],
         )?;
     }
 
