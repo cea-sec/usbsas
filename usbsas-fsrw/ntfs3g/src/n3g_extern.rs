@@ -1,6 +1,5 @@
 use crate::{ReadWriteSeek, n3g_c};
 use std::{
-    convert::TryFrom,
     io::{ErrorKind, SeekFrom},
     os::raw::{c_int, c_void},
 };
@@ -81,46 +80,67 @@ pub unsafe extern "C" fn ntfs_dev_lseek(
 pub unsafe extern "C" fn ntfs_dev_read(
     dev: *mut n3g_c::ntfs_device,
     buf: *mut c_void,
-    count: usize,
+    count: u64,
 ) -> i64 {
     let Some(stream) = (unsafe { stream(dev) }) else {
         return fail(libc::EINVAL);
     };
+    // ntfs-3g passes a signed count: a negative one would show up here as a
+    // huge value. Also bound it so the byte count fits in the return value.
+    let Some(count) = usize::try_from(count)
+        .ok()
+        .filter(|&count| i64::try_from(count).is_ok() && isize::try_from(count).is_ok())
+    else {
+        return fail(libc::EINVAL);
+    };
+    if count == 0 {
+        return 0;
+    }
+    if buf.is_null() {
+        return fail(libc::EFAULT);
+    }
 
     let mut data = vec![0; count];
-
     if let Err(err) = stream.read_exact(&mut data) {
         eprintln!("ntfs read error: {err}");
         return fail(io_errno(&err));
     };
-
-    if data.is_empty() {
-        return 0;
-    }
-
-    unsafe { std::ptr::copy(data.as_mut_ptr(), buf as *mut u8, data.len()) };
-
-    i64::try_from(count).unwrap_or_else(|_| fail(libc::EOVERFLOW))
+    unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf as *mut u8, count) };
+    // count fits in i64 (checked above)
+    count as i64
 }
 
+/// Write `count` bytes, returns `count` or -1.
+///
 /// # Safety
 ///
 /// See `stream()`. `buf` must be valid for reads of `count` bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ntfs_dev_write(
     dev: *mut n3g_c::ntfs_device,
-    buf: *mut c_void,
-    count: usize,
+    buf: *const c_void,
+    count: u64,
 ) -> i64 {
     let Some(stream) = (unsafe { stream(dev) }) else {
         return fail(libc::EINVAL);
     };
+    let Some(count) = usize::try_from(count)
+        .ok()
+        .filter(|&count| i64::try_from(count).is_ok() && isize::try_from(count).is_ok())
+    else {
+        return fail(libc::EINVAL);
+    };
+    if count == 0 {
+        return 0;
+    }
+    if buf.is_null() {
+        return fail(libc::EFAULT);
+    }
 
-    let slice = unsafe { std::slice::from_raw_parts(buf as *mut u8, count) };
-
-    if let Err(err) = stream.write_all(slice) {
+    let data = unsafe { std::slice::from_raw_parts(buf as *const u8, count) };
+    if let Err(err) = stream.write_all(data) {
         eprintln!("ntfs write error: {err}");
         return fail(io_errno(&err));
     }
-    i64::try_from(count).unwrap_or_else(|_| fail(libc::EOVERFLOW))
+    count as i64
 }
