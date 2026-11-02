@@ -24,6 +24,21 @@ static MKNTFS_LOCK: Mutex<()> = Mutex::new(());
 /// Name given to ntfs-3g for the device, unused since I/O are redirected.
 const DEV_NAME: &CStr = c"";
 
+/// Seconds between 1601-01-01 (NTFS epoch) and 1970-01-01 (UNIX epoch)
+const NTFS_EPOCH_OFFSET: i64 = 11_644_473_600;
+/// NTFS times are in 100ns intervals
+const NTFS_TICKS_PER_SEC: i64 = 10_000_000;
+
+/// Convert a UNIX timestamp to an NTFS time. Timestamps come from untrusted
+/// input: clamp them to what NTFS can represent (from 1601 up to i64::MAX
+/// ticks) instead of overflowing.
+fn unix_to_ntfs_time(timestamp: i64) -> u64 {
+    let min = -NTFS_EPOCH_OFFSET;
+    let max = i64::MAX / NTFS_TICKS_PER_SEC - NTFS_EPOCH_OFFSET;
+    // can't overflow and is >= 0 after clamping
+    ((timestamp.clamp(min, max) + NTFS_EPOCH_OFFSET) * NTFS_TICKS_PER_SEC) as u64
+}
+
 fn split_path_parent(path: &str) -> (&str, &str) {
     match path.rsplit_once('/') {
         Some(("", file)) => ("/", file),
@@ -87,9 +102,7 @@ impl Inode {
     }
 
     fn set_times(&mut self, timestamp: i64) {
-        // Ntfs timestamp is a 64-bit value representing the number of
-        // 100-nanosecond intervals since January 1, 1601 (UTC)
-        let ntfs_ts: u64 = ((timestamp + 11644473600) * 10 * 1000 * 1000) as u64;
+        let ntfs_ts = unix_to_ntfs_time(timestamp);
         unsafe {
             (*self.0).creation_time = ntfs_ts;
             (*self.0).last_data_change_time = ntfs_ts;
@@ -472,5 +485,19 @@ mod tests {
         for thread in threads {
             thread.join().unwrap();
         }
+    }
+
+    #[test]
+    fn timestamp_clamped() {
+        assert_eq!(unix_to_ntfs_time(0), 116_444_736_000_000_000);
+        assert_eq!(unix_to_ntfs_time(-NTFS_EPOCH_OFFSET), 0);
+        assert_eq!(unix_to_ntfs_time(i64::MIN), 0);
+        assert!(unix_to_ntfs_time(i64::MAX) <= i64::MAX as u64);
+        assert_eq!(unix_to_ntfs_time(i64::MAX), unix_to_ntfs_time(i64::MAX / 2));
+        let mut fs = Ntfs3g::mkntfs(new_disk(), SS, COUNT).unwrap();
+        fs.new_file("/min", i64::MIN).unwrap();
+        fs.new_file("/max", i64::MAX).unwrap();
+        fs.new_dir("/dmax", i64::MAX).unwrap();
+        fs.into_inner().unwrap();
     }
 }
