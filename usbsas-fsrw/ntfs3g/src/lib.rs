@@ -5,7 +5,7 @@
 use std::{
     convert::TryFrom,
     ffi::{CStr, CString},
-    io::{self, Error, ErrorKind, Read, Result, Seek, SeekFrom, Write},
+    io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write},
     marker::PhantomData,
     os::raw::{c_char, c_long, c_void},
     sync::Mutex,
@@ -348,21 +348,26 @@ pub struct NtfsAttr<'a, T: Read + Write + Seek> {
 
 impl<T: Read + Write + Seek> Write for NtfsAttr<'_, T> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let ret = unsafe {
             n3g_c::ntfs_attr_pwrite(
                 self.attr,
                 i64::try_from(self.pos)
-                    .map_err(|_| Error::new(ErrorKind::InvalidData, "tryfrom err"))?,
-                i64::try_from(buf.len())
-                    .map_err(|_| Error::new(ErrorKind::InvalidData, "tryfrom err"))?,
-                buf.as_ptr() as *mut ::std::os::raw::c_void,
+                    .map_err(|_| Error::new(ErrorKind::InvalidInput, "ntfs3g write pos"))?,
+                // slices are at most isize::MAX bytes
+                buf.len() as i64,
+                buf.as_ptr() as *const c_void,
             )
         };
-        if ret > 0 {
-            self.pos += ret as u64;
-            Ok(ret as usize)
-        } else {
-            Err(io::Error::other("NtfsAttr Write error"))
+        // ret <= buf.len()
+        match usize::try_from(ret) {
+            Ok(written) => {
+                self.pos += written as u64;
+                Ok(written)
+            }
+            Err(_) => Err(n3g_error("ntfs_attr_pwrite")),
         }
     }
 
