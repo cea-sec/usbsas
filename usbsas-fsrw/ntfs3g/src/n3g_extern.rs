@@ -73,6 +73,9 @@ pub unsafe extern "C" fn ntfs_dev_lseek(
     }
 }
 
+/// Read up to `count` bytes, like read(2): returns the number of bytes read
+/// (less than `count` only at the end of the stream) or -1.
+///
 /// # Safety
 ///
 /// See `stream()`. `buf` must be valid for writes of `count` bytes.
@@ -100,14 +103,26 @@ pub unsafe extern "C" fn ntfs_dev_read(
         return fail(libc::EFAULT);
     }
 
-    let mut data = vec![0; count];
-    if let Err(err) = stream.read_exact(&mut data) {
-        eprintln!("ntfs read error: {err}");
-        return fail(io_errno(&err));
-    };
-    unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), buf as *mut u8, count) };
-    // count fits in i64 (checked above)
-    count as i64
+    // buf may be uninitialized memory: zero it first so that a &mut [u8]
+    // over it is valid, then read in place.
+    let buf = buf as *mut u8;
+    unsafe { std::ptr::write_bytes(buf, 0, count) };
+    let data = unsafe { std::slice::from_raw_parts_mut(buf, count) };
+
+    let mut total = 0;
+    while total < count {
+        match stream.read(&mut data[total..]) {
+            Ok(0) => break,
+            Ok(n) => total += n,
+            Err(err) if err.kind() == ErrorKind::Interrupted => continue,
+            Err(err) => {
+                eprintln!("ntfs read error: {err}");
+                return fail(io_errno(&err));
+            }
+        }
+    }
+    // total <= count which fits in i64 (checked above)
+    total as i64
 }
 
 /// Write `count` bytes, returns `count` or -1.
