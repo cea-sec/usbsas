@@ -17,12 +17,6 @@ mod n3g_extern;
 pub trait ReadWriteSeek: Read + Write + Seek {}
 impl<T: Read + Write + Seek> ReadWriteSeek for T {}
 
-/// New NTFS file system, created with [`Ntfs3g::mkntfs`].
-pub struct Ntfs3g<T> {
-    vol: *mut n3g_c::ntfs_volume,
-    inner_type: PhantomData<T>,
-}
-
 fn split_path_parent(path: &str) -> (&str, &str) {
     match path.rsplit_once('/') {
         Some((parent, file)) => (parent, file),
@@ -38,12 +32,88 @@ fn str2ntfsunicode(string: &str) -> Result<Vec<u16>> {
     Ok(string_u16)
 }
 
+fn n3g_error(func: &str) -> Error {
+    let err = Error::last_os_error();
+    Error::new(err.kind(), format!("ntfs3g {func} error ({err})"))
+}
+
+/// New NTFS file system, created with [`Ntfs3g::mkntfs`].
+pub struct Ntfs3g<T> {
+    // Both pointers are owned by this struct and released in release().
+    // `vol` is null until mounted. `io` is the device's d_private: a thin
+    // pointer to a `Box<dyn ReadWriteSeek + '_>` (fat, hence the double box)
+    // whose concrete type is `T`. ntfs-3g keeps aliases to it and the
+    // callbacks mutate it, so it's kept as a raw pointer rather than a Box
+    // (which would assert unique ownership). Null once released.
+    vol: *mut n3g_c::ntfs_volume,
+    io: *mut c_void,
+    _inner: PhantomData<T>,
+}
+
+impl<T> Ntfs3g<T> {
+    /// Unmount, free ntfs-3g's state and give back T along with the result of
+    /// unmounting and flushing. Returns None if already released.
+    fn release(&mut self) -> Option<(T, Result<()>)> {
+        let io = std::mem::replace(&mut self.io, std::ptr::null_mut());
+        if io.is_null() {
+            return None;
+        }
+        let vol = std::mem::replace(&mut self.vol, std::ptr::null_mut());
+        // ntfs_umount() writes back dirty data through the callbacks, so it
+        // must run before `io` is reclaimed. It frees `vol` and its device
+        // even when it fails.
+        let mut res = if !vol.is_null() && unsafe { n3g_c::ntfs_umount(vol, n3g_c::BOOL_TRUE) } != 0
+        {
+            Err(n3g_error("ntfs_umount"))
+        } else {
+            Ok(())
+        };
+        // SAFETY: `io` comes from Box::into_raw in mkntfs(), ntfs-3g doesn't
+        // reference it anymore and it's released only once (io is now null).
+        // The `dyn ReadWriteSeek` was created from a `Box<T>` so the thin
+        // pointer cast is to the real type and from_raw deallocates with the
+        // original layout.
+        let inner = unsafe {
+            let outer: Box<Box<dyn ReadWriteSeek + '_>> =
+                Box::from_raw(io as *mut Box<dyn ReadWriteSeek>);
+            let mut stream: Box<dyn ReadWriteSeek + '_> = *outer;
+            if let Err(err) = stream.flush() {
+                res = res.and(Err(err));
+            }
+            *Box::from_raw(Box::into_raw(stream) as *mut T)
+        };
+        Some((inner, res))
+    }
+
+    /// Unmount the file system and return the underlying stream.
+    pub fn into_inner(mut self) -> Result<T> {
+        let (inner, res) = self
+            .release()
+            .ok_or_else(|| Error::other("ntfs3g: already released"))?;
+        res.map(|()| inner)
+    }
+}
+
+/// Unmount and free everything if `into_inner()` wasn't called
+impl<T> Drop for Ntfs3g<T> {
+    fn drop(&mut self) {
+        if let Some((_, Err(err))) = self.release() {
+            eprintln!("ntfs3g unmount on drop failed: {err}");
+        }
+    }
+}
+
 impl<T: Read + Write + Seek> Ntfs3g<T> {
     /// Create an NTFS file system on `inner` (`sector_count` sectors of
     /// `sector_size` bytes) and mount it.
     pub fn mkntfs(inner: T, sector_size: i64, sector_count: i64) -> Result<Self> {
-        let inner_box: Box<Box<dyn ReadWriteSeek>> = Box::new(Box::new(inner));
-        let priv_data = Box::into_raw(inner_box) as *mut c_void;
+        let stream: Box<dyn ReadWriteSeek + '_> = Box::new(inner);
+        // From here on, returning an error drops `fs` which frees everything
+        let mut fs = Ntfs3g {
+            vol: std::ptr::null_mut(),
+            io: Box::into_raw(Box::new(stream)) as *mut c_void,
+            _inner: PhantomData,
+        };
 
         let dev_name = CString::new("").unwrap();
         unsafe {
@@ -79,40 +149,23 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
             {
                 n3g_c::opts.dev_name = dev_name.as_ptr() as *mut u8;
             }
-            if n3g_c::mkntfs(std::ptr::addr_of_mut!(n3g_c::opts), priv_data) != 0 {
+            if n3g_c::mkntfs(std::ptr::addr_of_mut!(n3g_c::opts), fs.io) != 0 {
                 return Err(Error::other("ntfs3g mkntfs error"));
             }
         }
 
         #[cfg(not(any(target_arch = "arm", target_arch = "aarch64")))]
-        let vol = unsafe { n3g_c::ntfs_mount(dev_name.as_ptr() as *mut i8, 0, priv_data) };
+        {
+            fs.vol = unsafe { n3g_c::ntfs_mount(dev_name.as_ptr() as *mut i8, 0, fs.io) };
+        }
         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-        let vol = unsafe { n3g_c::ntfs_mount(dev_name.as_ptr() as *mut u8, 0, priv_data) };
-        if vol.is_null() {
-            Err(Error::other(format!(
-                "ntfs3g ntfs_mount error ({})",
-                Error::last_os_error()
-            )))
-        } else {
-            Ok(Ntfs3g {
-                vol,
-                inner_type: PhantomData,
-            })
+        {
+            fs.vol = unsafe { n3g_c::ntfs_mount(dev_name.as_ptr() as *mut u8, 0, fs.io) };
         }
-    }
-
-    /// Unmount the file system and return the underlying stream.
-    pub fn into_inner(self) -> Result<T> {
-        let inner: Box<Box<T>> =
-            unsafe { Box::from_raw((*(*self.vol).dev).d_private as *mut Box<T>) };
-        if unsafe { n3g_c::ntfs_umount(self.vol, n3g_c::BOOL_TRUE) } != 0 {
-            Err(Error::other(format!(
-                "ntfs3g ntfs_umount error ({})",
-                Error::last_os_error()
-            )))
-        } else {
-            Ok(*(*inner))
+        if fs.vol.is_null() {
+            return Err(n3g_error("ntfs_mount"));
         }
+        Ok(fs)
     }
 
     fn inode_from_path(&self, path: &str) -> Result<*mut n3g_c::ntfs_inode> {
@@ -337,5 +390,25 @@ impl<T: Read + Write + Seek> Drop for NtfsAttr<'_, T> {
                 eprintln!("Couldn't close ntfs inode");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    const SS: i64 = 512;
+    const COUNT: i64 = 32768; // 16 MiB
+
+    fn new_disk() -> Cursor<Vec<u8>> {
+        Cursor::new(vec![0; (SS * COUNT) as usize])
+    }
+
+    #[test]
+    fn drop_without_into_inner() {
+        let mut fs = Ntfs3g::mkntfs(new_disk(), SS, COUNT).unwrap();
+        fs.new_dir("/dir", 0).unwrap();
+        drop(fs);
     }
 }
