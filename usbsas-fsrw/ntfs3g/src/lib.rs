@@ -4,10 +4,10 @@
 
 use std::{
     convert::TryFrom,
-    ffi::CString,
+    ffi::{CStr, CString},
     io::{self, Error, ErrorKind, Read, Result, Seek, SeekFrom, Write},
     marker::PhantomData,
-    os::raw::c_void,
+    os::raw::{c_char, c_long, c_void},
 };
 
 mod n3g_c;
@@ -16,6 +16,9 @@ mod n3g_extern;
 /// `Read + Write + Seek`, the stream holding the file system.
 pub trait ReadWriteSeek: Read + Write + Seek {}
 impl<T: Read + Write + Seek> ReadWriteSeek for T {}
+
+/// Name given to ntfs-3g for the device, unused since I/O are redirected.
+const DEV_NAME: &CStr = c"";
 
 fn split_path_parent(path: &str) -> (&str, &str) {
     match path.rsplit_once('/') {
@@ -115,53 +118,32 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
             _inner: PhantomData,
         };
 
-        let dev_name = CString::new("").unwrap();
         unsafe {
+            // mkntfs() reads its options from the global `opts`
+            // (`opts2` is only checked for NULL).
             // See original mkntfs.c from ntfsprogs
-            std::ptr::write_bytes::<n3g_c::mkntfs_options>(
-                std::ptr::addr_of_mut!(n3g_c::opts),
-                0,
-                1,
-            );
-            n3g_c::opts.cluster_size = -1;
-            n3g_c::opts.mft_zone_multiplier = -1;
-            n3g_c::opts.with_uuid = n3g_c::BOOL_FALSE;
-            n3g_c::opts.use_epoch_time = n3g_c::BOOL_TRUE;
-            #[cfg(not(target_arch = "arm"))]
-            {
-                n3g_c::opts.sector_size = sector_size;
-            }
-            #[cfg(target_arch = "arm")]
-            {
-                n3g_c::opts.sector_size = i32::try_from(sector_size)
-                    .map_err(|_| Error::new(ErrorKind::InvalidData, "tryfrom err"))?;
-            }
-            n3g_c::opts.num_sectors = sector_count;
-            n3g_c::opts.part_start_sect = 0;
-            n3g_c::opts.heads = 1;
-            n3g_c::opts.sectors_per_track = 63;
-            n3g_c::opts.quick_format = n3g_c::BOOL_TRUE;
-            #[cfg(not(any(target_arch = "arm", target_arch = "aarch64")))]
-            {
-                n3g_c::opts.dev_name = dev_name.as_ptr() as *mut i8;
-            }
-            #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-            {
-                n3g_c::opts.dev_name = dev_name.as_ptr() as *mut u8;
-            }
-            if n3g_c::mkntfs(std::ptr::addr_of_mut!(n3g_c::opts), fs.io) != 0 {
+            let opts = &raw mut n3g_c::opts;
+            std::ptr::write_bytes(opts, 0, 1);
+            (*opts).cluster_size = -1;
+            (*opts).mft_zone_multiplier = -1;
+            (*opts).with_uuid = n3g_c::BOOL_FALSE;
+            (*opts).use_epoch_time = n3g_c::BOOL_TRUE;
+            (*opts).sector_size = c_long::try_from(sector_size)
+                .map_err(|_| Error::new(ErrorKind::InvalidInput, "ntfs3g invalid sector size"))?;
+            (*opts).num_sectors = sector_count;
+            (*opts).part_start_sect = 0;
+            (*opts).heads = 1;
+            (*opts).sectors_per_track = 63;
+            (*opts).quick_format = n3g_c::BOOL_TRUE;
+            (*opts).dev_name = DEV_NAME.as_ptr() as *mut c_char;
+            let ret = n3g_c::mkntfs(opts, fs.io);
+            std::ptr::write_bytes(opts, 0, 1);
+            if ret != 0 {
                 return Err(Error::other("ntfs3g mkntfs error"));
             }
         }
 
-        #[cfg(not(any(target_arch = "arm", target_arch = "aarch64")))]
-        {
-            fs.vol = unsafe { n3g_c::ntfs_mount(dev_name.as_ptr() as *mut i8, 0, fs.io) };
-        }
-        #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-        {
-            fs.vol = unsafe { n3g_c::ntfs_mount(dev_name.as_ptr() as *mut u8, 0, fs.io) };
-        }
+        fs.vol = unsafe { n3g_c::ntfs_mount(DEV_NAME.as_ptr(), 0, fs.io) };
         if fs.vol.is_null() {
             return Err(n3g_error("ntfs_mount"));
         }
