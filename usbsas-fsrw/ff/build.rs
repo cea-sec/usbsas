@@ -3,6 +3,9 @@ use std::path::PathBuf;
 
 // Generate bindings, build ff and link statically
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/wrapper.h");
+    println!("cargo:rerun-if-changed=src/ff");
     cc::Build::new()
         .compiler("clang")
         .files(&[
