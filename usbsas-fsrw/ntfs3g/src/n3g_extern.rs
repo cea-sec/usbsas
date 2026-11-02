@@ -55,13 +55,17 @@ pub unsafe extern "C" fn ntfs_dev_lseek(
     let Some(stream) = (unsafe { stream(dev) }) else {
         return fail(libc::EINVAL);
     };
-    if whence != libc::SEEK_SET {
-        return fail(libc::EINVAL);
-    }
-    let Ok(pos) = u64::try_from(pos) else {
-        return fail(libc::EINVAL);
+    let pos = match whence {
+        libc::SEEK_SET => match u64::try_from(pos) {
+            Ok(pos) => SeekFrom::Start(pos),
+            Err(_) => return fail(libc::EINVAL),
+        },
+        // used by mkntfs to skip bad sectors
+        libc::SEEK_CUR => SeekFrom::Current(pos),
+        libc::SEEK_END => SeekFrom::End(pos),
+        _ => return fail(libc::EINVAL),
     };
-    match stream.seek(SeekFrom::Start(pos)) {
+    match stream.seek(pos) {
         Ok(new_pos) => i64::try_from(new_pos).unwrap_or_else(|_| fail(libc::EOVERFLOW)),
         Err(err) => {
             eprintln!("ntfs seek error: {err}");
