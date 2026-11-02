@@ -44,6 +44,57 @@ fn n3g_error(func: &str) -> Error {
     Error::new(err.kind(), format!("ntfs3g {func} error ({err})"))
 }
 
+/// An opened ntfs-3g inode, closed on drop.
+struct Inode(*mut n3g_c::ntfs_inode);
+
+impl Inode {
+    /// Take ownership of the inode returned by an ntfs-3g function or fail
+    /// with errno.
+    fn from_raw(ni: *mut n3g_c::ntfs_inode, func: &str) -> Result<Self> {
+        if ni.is_null() {
+            Err(n3g_error(func))
+        } else {
+            Ok(Inode(ni))
+        }
+    }
+
+    /// Give back ownership (e.g. to a function that closes it).
+    fn into_raw(self) -> *mut n3g_c::ntfs_inode {
+        let ni = self.0;
+        std::mem::forget(self);
+        ni
+    }
+
+    fn set_times(&mut self, timestamp: i64) {
+        // Ntfs timestamp is a 64-bit value representing the number of
+        // 100-nanosecond intervals since January 1, 1601 (UTC)
+        let ntfs_ts: u64 = ((timestamp + 11644473600) * 10 * 1000 * 1000) as u64;
+        unsafe {
+            (*self.0).creation_time = ntfs_ts;
+            (*self.0).last_data_change_time = ntfs_ts;
+            (*self.0).last_mft_change_time = ntfs_ts;
+            (*self.0).last_access_time = ntfs_ts;
+        }
+    }
+
+    /// Close and report errors (the inode is written back on close).
+    fn close(self) -> Result<()> {
+        if unsafe { n3g_c::ntfs_inode_close(self.into_raw()) } != 0 {
+            Err(n3g_error("ntfs_inode_close"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Drop for Inode {
+    fn drop(&mut self) {
+        if unsafe { n3g_c::ntfs_inode_close(self.0) } != 0 {
+            eprintln!("Couldn't close ntfs inode");
+        }
+    }
+}
+
 /// New NTFS file system, created with [`Ntfs3g::mkntfs`].
 pub struct Ntfs3g<T> {
     // Both pointers are owned by this struct and released in release().
@@ -157,65 +208,57 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
         Ok(fs)
     }
 
-    fn inode_from_path(&self, path: &str) -> Result<*mut n3g_c::ntfs_inode> {
+    fn inode_from_path(&self, path: &str) -> Result<Inode> {
         let path_c = CString::new(path).unwrap();
-        let ni: *mut n3g_c::ntfs_inode = unsafe {
-            n3g_c::ntfs_pathname_to_inode(&mut *self.vol, std::ptr::null_mut(), path_c.as_ptr())
+        Inode::from_raw(
+            unsafe {
+                n3g_c::ntfs_pathname_to_inode(self.vol, std::ptr::null_mut(), path_c.as_ptr())
+            },
+            "ntfs_pathname_to_inode",
+        )
+    }
+
+    /// Create an inode of type `mode` named `path`, its parent must exist.
+    fn create(&mut self, path: &str, mode: u32) -> Result<Inode> {
+        let (parent_dir, filename) = split_path_parent(path);
+        let name = str2ntfsunicode(filename)?;
+        let p_ni = self.inode_from_path(parent_dir)?;
+        let ni = unsafe {
+            n3g_c::ntfs_create(
+                p_ni.0,
+                0,
+                name.as_ptr(),
+                // checked by str2ntfsunicode: <= 255
+                name.len() as u8,
+                mode,
+            )
         };
-        if ni.is_null() {
-            Err(Error::other(format!(
-                "ntfs3g ntfs_pathname_to_inode error ({})",
-                Error::last_os_error()
-            )))
-        } else {
-            Ok(ni)
-        }
+        // build the result (capturing errno) before closing the parent
+        let ni = Inode::from_raw(ni, "ntfs_create");
+        drop(p_ni);
+        ni
     }
 
     /// Create a new file and returns an NtfsAttr (that impl Write and Seek)
     pub fn new_file<'a>(&'a mut self, path: &str, timestamp: i64) -> Result<NtfsAttr<'a, T>> {
-        let (parent_dir, filename) = split_path_parent(path);
-        let p_ni = self.inode_from_path(parent_dir)?;
-        let path_u16 = str2ntfsunicode(filename)?;
-
-        let file_ni = unsafe {
-            n3g_c::ntfs_create(
-                p_ni,
-                0,
-                path_u16.as_ptr(),
-                path_u16.len() as u8,
-                n3g_c::S_IFREG,
-            )
-        };
-        unsafe { n3g_c::ntfs_inode_close(p_ni) };
-        if file_ni.is_null() {
-            return Err(Error::other(format!(
-                "ntfs3g ntfs_create error ({})",
-                Error::last_os_error()
-            )));
-        }
+        let mut file_ni = self.create(path, n3g_c::S_IFREG)?;
+        file_ni.set_times(timestamp);
 
         let file_na = unsafe {
-            n3g_c::ntfs_attr_open(file_ni, n3g_c::ATTR_TYPES_AT_DATA, std::ptr::null_mut(), 0)
+            n3g_c::ntfs_attr_open(
+                file_ni.0,
+                n3g_c::ATTR_TYPES_AT_DATA,
+                std::ptr::null_mut(),
+                0,
+            )
         };
         if file_na.is_null() {
-            return Err(Error::other(format!(
-                "ntfs3g ntfs_attr_open error ({})",
-                Error::last_os_error()
-            )));
+            // file_ni is closed on drop
+            return Err(n3g_error("ntfs_attr_open"));
         }
 
-        // Set timestamp.
-        // Ntfs timestamp is a 64-bit value representing the number of 100-nanosecond intervals
-        // since January 1, 1601 (UTC)
-        let ntfs_ts: u64 = ((timestamp + 11644473600) * 10 * 1000 * 1000) as u64;
-        unsafe {
-            (*file_ni).creation_time = ntfs_ts;
-            (*file_ni).last_data_change_time = ntfs_ts;
-            (*file_ni).last_mft_change_time = ntfs_ts;
-            (*file_ni).last_access_time = ntfs_ts;
-        }
-
+        // closed by NtfsAttr's drop, through (*attr).ni
+        file_ni.into_raw();
         Ok(NtfsAttr {
             attr: file_na,
             pos: 0,
@@ -225,69 +268,37 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
 
     /// Create a directory, its parent must exist.
     pub fn new_dir(&mut self, path: &str, timestamp: i64) -> Result<()> {
-        let (parent_dir, filename) = split_path_parent(path);
-        let p_ni = self.inode_from_path(parent_dir)?;
-        let path_u16 = str2ntfsunicode(filename)?;
-
-        let dir_ni = unsafe {
-            n3g_c::ntfs_create(
-                p_ni,
-                0,
-                path_u16.as_ptr(),
-                path_u16.len() as u8,
-                n3g_c::S_IFDIR,
-            )
+        let mut dir_ni = match self.create(path, n3g_c::S_IFDIR) {
+            Ok(dir_ni) => dir_ni,
+            Err(err) if err.kind() == ErrorKind::AlreadyExists => return Ok(()),
+            Err(err) => return Err(err),
         };
-        unsafe { n3g_c::ntfs_inode_close(p_ni) };
-        if dir_ni.is_null() {
-            if let ErrorKind::AlreadyExists = Error::last_os_error().kind() {
-                return Ok(());
-            } else {
-                return Err(Error::other(format!(
-                    "ntfs3g ntfs_create error ({})",
-                    Error::last_os_error()
-                )));
-            }
-        }
-
-        // Set timestamp
-        let ntfs_ts: u64 = ((timestamp + 11644473600) * 10 * 1000 * 1000) as u64;
-        unsafe {
-            (*dir_ni).creation_time = ntfs_ts;
-            (*dir_ni).last_data_change_time = ntfs_ts;
-            (*dir_ni).last_mft_change_time = ntfs_ts;
-            (*dir_ni).last_access_time = ntfs_ts;
-        }
-
-        unsafe { n3g_c::ntfs_inode_close(dir_ni) };
-
-        Ok(())
+        dir_ni.set_times(timestamp);
+        dir_ni.close()
     }
 
     /// Remove a file.
     pub fn remove_file(&mut self, path: &str) -> Result<()> {
         let (parent_dir, filename) = split_path_parent(path);
+        let name = str2ntfsunicode(filename)?;
+        let name_c = CString::new(filename)
+            .map_err(|err| Error::other(format!("ntfs cstring error ({err})")))?;
         let p_ni = self.inode_from_path(parent_dir)?;
         let ni = self.inode_from_path(path)?;
-        let path_u16 = str2ntfsunicode(filename)?;
-        let path_c = CString::new(filename)
-            .map_err(|err| Error::other(format!("ntfs cstring error ({err})")))?;
 
         if unsafe {
             n3g_c::ntfs_delete(
                 self.vol,
-                path_c.as_ptr(),
-                ni,
-                p_ni,
-                path_u16.as_ptr(),
-                path_u16.len() as u8,
+                name_c.as_ptr(),
+                ni.into_raw(),
+                p_ni.into_raw(),
+                name.as_ptr(),
+                // checked by str2ntfsunicode: <= 255
+                name.len() as u8,
             )
         } != 0
         {
-            return Err(Error::other(format!(
-                "ntfs3g ntfs_delete error ({})",
-                Error::last_os_error()
-            )));
+            return Err(n3g_error("ntfs_delete"));
         }
         Ok(())
     }
