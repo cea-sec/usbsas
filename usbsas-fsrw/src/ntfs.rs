@@ -96,24 +96,29 @@ fn ntfs_file_from_path<'a, T: Read + Seek>(
             continue;
         }
         // Cache current index
-        let mut found = false;
-        let index = cur_file.directory_index(reader)?;
-        let mut index_entries = index.entries();
-        while let Some(entry) = index_entries.next(reader) {
-            let entry = entry?.to_file(fs, reader)?;
-            let name_string = ntfs_name_from_file(&entry, reader)?;
-            if name_string == cur_path {
-                found = true;
+        let mut found = None;
+        {
+            let index = cur_file.directory_index(reader)?;
+            let mut index_entries = index.entries();
+            while let Some(entry) = index_entries.next(reader) {
+                let entry = entry?.to_file(fs, reader)?;
+                let name_string = ntfs_name_from_file(&entry, reader)?;
+                if name_string == cur_path {
+                    found = Some(entry.file_record_number());
+                }
+                file_cache.insert(
+                    format!("{absolute_cur_path}/{name_string}"),
+                    entry.file_record_number(),
+                );
             }
-            file_cache.insert(
-                format!("{absolute_cur_path}/{name_string}"),
-                entry.file_record_number(),
-            );
         }
-        if !found {
-            return Err(Error::FSError(format!("didn't find file '{path}'")));
-        } else {
-            absolute_cur_path = absolute_cur_path_new;
+        match found {
+            None => return Err(Error::FSError(format!("didn't find file '{path}'"))),
+            Some(file_record_number) => {
+                // descend into the component we just found
+                absolute_cur_path = absolute_cur_path_new;
+                cur_file = fs.file(reader, file_record_number)?;
+            }
         }
     }
 
@@ -283,5 +288,58 @@ impl<T: Read + Seek> FSRead<T> for NTFS<T> {
     fn unmount_fs(self: Box<Self>) -> Result<T> {
         drop(self.fs);
         Ok(self.reader)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    const SIZE: u64 = 16 * 1024 * 1024;
+
+    #[test]
+    fn roundtrip_ntfs3g_write_ntfs_read() {
+        let disk = Cursor::new(vec![0u8; SIZE as usize]);
+        let mut writer = Box::new(NTFS3G::mkfs(disk, 512, SIZE / 512, None).unwrap());
+        writer.newdir("/dir", 1_700_000_000).unwrap();
+        {
+            let mut file = writer.newfile("/dir/file.txt", 1_600_000_000).unwrap();
+            file.write_all(b"hello ntfs").unwrap();
+        }
+        // out of range timestamps are clamped, not overflowed
+        writer.newfile("/old", i64::MIN).unwrap();
+        writer.newfile("/new", i64::MAX).unwrap();
+        writer.newfile("/rm", 0).unwrap();
+        writer.removefile("/rm").unwrap();
+        let mut disk = writer.unmount_fs().unwrap();
+        disk.set_position(0);
+
+        let mut reader = NTFS::new(disk.clone(), 512).unwrap();
+        // nested path looked up before its parent dir was listed
+        assert_eq!(reader.get_attr("/dir/file.txt").unwrap().1, 10);
+        assert!(reader.get_attr("/dir/nope").is_err());
+        assert!(reader.get_attr("/nope/file.txt").is_err());
+
+        let mut reader = NTFS::new(disk, 512).unwrap();
+        let mut root: Vec<_> = reader
+            .read_dir("/")
+            .unwrap()
+            .into_iter()
+            .map(|f| f.path)
+            .collect();
+        root.sort();
+        assert_eq!(root, ["/dir", "/new", "/old"]);
+        let (ftype, size, ts) = reader.get_attr("/dir/file.txt").unwrap();
+        assert_eq!((ftype, size, ts), (FileType::Regular, 10, 1_600_000_000));
+        assert_eq!(reader.get_attr("/dir").unwrap().2, 1_700_000_000);
+        assert_eq!(reader.get_attr("/old").unwrap().2, -11_644_473_600);
+        assert!(reader.get_attr("/new").unwrap().2 > 900_000_000_000);
+        let mut buf = vec![0; 10];
+        assert_eq!(
+            reader.read_file("/dir/file.txt", &mut buf, 0, 10).unwrap(),
+            10
+        );
+        assert_eq!(&buf, b"hello ntfs");
     }
 }
