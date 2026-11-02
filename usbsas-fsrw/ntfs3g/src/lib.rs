@@ -291,10 +291,9 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
             return Err(n3g_error("ntfs_attr_open"));
         }
 
-        // closed by NtfsAttr's drop, through (*attr).ni
-        file_ni.into_raw();
         Ok(NtfsAttr {
             attr: file_na,
+            ni: file_ni.into_raw(),
             pos: 0,
             _fs: PhantomData,
         })
@@ -339,11 +338,12 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
 
 /// Data attribute of a file being written, closed when dropped.
 pub struct NtfsAttr<'a, T: Read + Write + Seek> {
-    /// ntfs-3g attribute
-    pub attr: *mut n3g_c::ntfs_attr,
-    /// Current position
-    pub pos: u64,
-    _fs: PhantomData<&'a Ntfs3g<T>>,
+    // ntfs-3g attribute and its inode, owned and closed on drop
+    attr: *mut n3g_c::ntfs_attr,
+    ni: *mut n3g_c::ntfs_inode,
+    // Current position
+    pos: u64,
+    _fs: PhantomData<&'a mut Ntfs3g<T>>,
 }
 
 impl<T: Read + Write + Seek> Write for NtfsAttr<'_, T> {
@@ -367,10 +367,10 @@ impl<T: Read + Write + Seek> Write for NtfsAttr<'_, T> {
     }
 
     fn flush(&mut self) -> Result<()> {
-        if unsafe { n3g_c::ntfs_inode_sync((*self.attr).ni) } == 0 {
+        if unsafe { n3g_c::ntfs_inode_sync(self.ni) } == 0 {
             Ok(())
         } else {
-            Err(Error::other("ntfs inode sync error"))
+            Err(n3g_error("ntfs_inode_sync"))
         }
     }
 }
@@ -413,15 +413,14 @@ impl<T: Read + Write + Seek> Seek for NtfsAttr<'_, T> {
 
 impl<T: Read + Write + Seek> Drop for NtfsAttr<'_, T> {
     fn drop(&mut self) {
-        self.flush().ok();
+        if let Err(err) = self.flush() {
+            eprintln!("{err}");
+        }
         unsafe {
-            let ni = (*self.attr).ni;
             n3g_c::ntfs_attr_pclose(self.attr);
             n3g_c::ntfs_attr_close(self.attr);
-            if n3g_c::ntfs_inode_close(ni) != 0 {
-                eprintln!("Couldn't close ntfs inode");
-            }
         }
+        drop(Inode(self.ni));
     }
 }
 
