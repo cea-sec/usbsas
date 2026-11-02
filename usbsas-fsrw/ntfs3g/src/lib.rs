@@ -3,7 +3,6 @@
 //! This crate only supports creating and writing a new NTFS file system.
 
 use std::{
-    convert::TryFrom,
     ffi::{CStr, CString},
     io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write},
     marker::PhantomData,
@@ -341,9 +340,16 @@ pub struct NtfsAttr<'a, T: Read + Write + Seek> {
     // ntfs-3g attribute and its inode, owned and closed on drop
     attr: *mut n3g_c::ntfs_attr,
     ni: *mut n3g_c::ntfs_inode,
-    // Current position
+    // Current position, in 0..=data_size
     pos: u64,
     _fs: PhantomData<&'a mut Ntfs3g<T>>,
+}
+
+impl<T: Read + Write + Seek> NtfsAttr<'_, T> {
+    fn data_size(&self) -> u64 {
+        // data_size is never negative
+        u64::try_from(unsafe { (*self.attr).data_size }).unwrap_or(0)
+    }
 }
 
 impl<T: Read + Write + Seek> Write for NtfsAttr<'_, T> {
@@ -381,37 +387,18 @@ impl<T: Read + Write + Seek> Write for NtfsAttr<'_, T> {
 }
 
 impl<T: Read + Write + Seek> Seek for NtfsAttr<'_, T> {
+    /// Seek within the data written so far (seeking past the end isn't
+    /// supported).
     fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        let data_size = unsafe { (*self.attr).data_size };
-        match pos {
-            SeekFrom::Start(start) => {
-                if start <= data_size as u64 {
-                    self.pos = start
-                } else {
-                    return Err(Error::other("ntfs inode seek error from start"));
-                }
-            }
-            SeekFrom::End(end) => {
-                if end <= data_size {
-                    self.pos = (data_size - end) as u64;
-                } else {
-                    return Err(Error::other("ntfs inode seek error from end"));
-                }
-            }
-            SeekFrom::Current(current) => {
-                if i64::try_from(self.pos)
-                    .map_err(|_| Error::new(ErrorKind::InvalidData, "tryfrom err"))?
-                    + current
-                    <= data_size
-                {
-                    self.pos = (i64::try_from(self.pos)
-                        .map_err(|_| Error::new(ErrorKind::InvalidData, "tryfrom err"))?
-                        + current) as u64
-                } else {
-                    return Err(Error::other("ntfs inode seek error from cur"));
-                }
-            }
+        let data_size = self.data_size();
+        let new_pos = match pos {
+            SeekFrom::Start(start) => Some(start),
+            SeekFrom::End(end) => data_size.checked_add_signed(end),
+            SeekFrom::Current(current) => self.pos.checked_add_signed(current),
         }
+        .filter(|&new_pos| new_pos <= data_size)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "ntfs3g invalid seek"))?;
+        self.pos = new_pos;
         Ok(self.pos)
     }
 }
@@ -439,6 +426,41 @@ mod tests {
 
     fn new_disk() -> Cursor<Vec<u8>> {
         Cursor::new(vec![0; (SS * COUNT) as usize])
+    }
+
+    #[test]
+    fn create_write_remove() {
+        let mut fs = Ntfs3g::mkntfs(new_disk(), SS, COUNT).unwrap();
+        fs.new_dir("/dir", 1_700_000_000).unwrap();
+        // already exists
+        fs.new_dir("/dir", 1_700_000_000).unwrap();
+        fs.new_dir("/dir/sub", 0).unwrap();
+        {
+            let mut file = fs.new_file("/dir/sub/file", 1_700_000_000).unwrap();
+            file.write_all(b"0123456789").unwrap();
+            assert_eq!(file.write(b"").unwrap(), 0);
+            assert_eq!(file.seek(SeekFrom::End(-4)).unwrap(), 6);
+            assert_eq!(file.seek(SeekFrom::Current(-2)).unwrap(), 4);
+            assert!(file.seek(SeekFrom::Current(-5)).is_err());
+            assert!(file.seek(SeekFrom::End(1)).is_err());
+            assert!(file.seek(SeekFrom::Start(11)).is_err());
+            file.seek(SeekFrom::Start(1)).unwrap();
+            file.write_all(b"ab").unwrap();
+        }
+        // file already exists
+        assert!(fs.new_file("/dir/sub/file", 0).is_err());
+        // parent doesn't exist
+        assert!(fs.new_file("/nope/file", 0).is_err());
+        fs.new_file("/tmp", 0).unwrap();
+        // remove twice: the 2nd must fail cleanly
+        fs.remove_file("/tmp").unwrap();
+        assert!(fs.remove_file("/tmp").is_err());
+        assert!(fs.remove_file("/nope/tmp").is_err());
+        // inodes can still be opened after the removes
+        fs.new_file("/tmp", 0).unwrap();
+        fs.remove_file("/tmp").unwrap();
+        let disk = fs.into_inner().unwrap();
+        assert_eq!(disk.get_ref().len(), (SS * COUNT) as usize);
     }
 
     #[test]
