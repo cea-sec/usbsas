@@ -26,17 +26,38 @@ const DEV_NAME: &CStr = c"";
 
 fn split_path_parent(path: &str) -> (&str, &str) {
     match path.rsplit_once('/') {
+        Some(("", file)) => ("/", file),
         Some((parent, file)) => (parent, file),
         None => ("/", path),
     }
 }
 
-fn str2ntfsunicode(string: &str) -> Result<Vec<u16>> {
-    let string_u16: Vec<u16> = string.encode_utf16().collect();
+/// Validate a file name and convert it to NTFS unicode. Names come from
+/// untrusted input and ntfs_create() doesn't check them.
+fn str2ntfsunicode(name: &str) -> Result<Vec<u16>> {
+    if name.is_empty() || name == "." || name == ".." || name.contains(['\0', '/']) {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("ntfs3g invalid ntfs name: {name:?}"),
+        ));
+    }
+    let string_u16: Vec<u16> = name.encode_utf16().collect();
     if string_u16.len() > n3g_c::NTFS_MAX_NAME_LEN as usize {
-        return Err(Error::other("ntfs3g invalid ntfs name"));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "ntfs3g ntfs name too long",
+        ));
     }
     Ok(string_u16)
+}
+
+fn to_cstring(string: &str) -> Result<CString> {
+    CString::new(string).map_err(|_| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            format!("ntfs3g invalid path: {string:?}"),
+        )
+    })
 }
 
 fn n3g_error(func: &str) -> Error {
@@ -209,7 +230,7 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
     }
 
     fn inode_from_path(&self, path: &str) -> Result<Inode> {
-        let path_c = CString::new(path).unwrap();
+        let path_c = to_cstring(path)?;
         Inode::from_raw(
             unsafe {
                 n3g_c::ntfs_pathname_to_inode(self.vol, std::ptr::null_mut(), path_c.as_ptr())
@@ -281,8 +302,7 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
     pub fn remove_file(&mut self, path: &str) -> Result<()> {
         let (parent_dir, filename) = split_path_parent(path);
         let name = str2ntfsunicode(filename)?;
-        let name_c = CString::new(filename)
-            .map_err(|err| Error::other(format!("ntfs cstring error ({err})")))?;
+        let name_c = to_cstring(filename)?;
         let p_ni = self.inode_from_path(parent_dir)?;
         let ni = self.inode_from_path(path)?;
 
@@ -402,6 +422,33 @@ mod tests {
 
     fn new_disk() -> Cursor<Vec<u8>> {
         Cursor::new(vec![0; (SS * COUNT) as usize])
+    }
+
+    #[test]
+    fn invalid_names() {
+        let mut fs = Ntfs3g::mkntfs(new_disk(), SS, COUNT).unwrap();
+        let long = "a".repeat(256);
+        for path in [
+            "/",
+            "/dir/",
+            "/.",
+            "/..",
+            "/a\0b",
+            "/a\0b/c",
+            &format!("/{long}"),
+        ] {
+            assert_eq!(
+                fs.new_file(path, 0).err().unwrap().kind(),
+                ErrorKind::InvalidInput,
+                "{path:?}"
+            );
+            assert!(fs.new_dir(path, 0).is_err(), "{path:?}");
+            assert!(fs.remove_file(path).is_err(), "{path:?}");
+        }
+        fs.new_file(&format!("/{}", "a".repeat(255)), 0).unwrap();
+        // relative paths are relative to the root
+        fs.new_file("rel", 0).unwrap();
+        fs.remove_file("/rel").unwrap();
     }
 
     #[test]
