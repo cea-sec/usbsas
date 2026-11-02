@@ -1,0 +1,39 @@
+Subject: [PATCH] mkntfs: reset global state in mkntfs_cleanup()
+
+Applied on top of usbsas.patch. mkntfs() is used as a library function and
+may be called several times in the same process: mkntfs_cleanup() freed the
+g_allocation list without resetting it (use after free / double free on the
+next call), leaked g_upcaseinfo and kept stale sizes and counters.
+
+---
+--- a/mkntfs.c
++++ b/mkntfs.c
+@@ -3164,6 +3164,7 @@
+	free(g_rl_mft);		g_rl_mft	= NULL;
+	free(g_rl_mft_bmp);	g_rl_mft_bmp	= NULL;
+	free(g_rl_mftmirr);	g_rl_mftmirr	= NULL;
++	free(g_upcaseinfo);	g_upcaseinfo	= NULL;
+
+	p = g_allocation;
+	while (p) {
+@@ -3171,6 +3172,22 @@
+		free(p);
+		p = q;
+	}
++	g_allocation = NULL;
++
++	/*
++	 * mkntfs() is used as a library function and may be called several
++	 * times in the same process: reset the remaining global state.
++	 */
++	g_mft_bitmap_byte_size = 0;
++	g_lcn_bitmap_byte_size = 0;
++	g_dynamic_buf_size = 0;
++	g_mft_size = 0;
++	g_mft_lcn = 0;
++	g_mftmirr_lcn = 0;
++	g_logfile_lcn = 0;
++	g_logfile_size = 0;
++	g_mft_zone_end = 0;
++	g_num_bad_blocks = 0;
+ }
