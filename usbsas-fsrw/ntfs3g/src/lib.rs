@@ -198,6 +198,18 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
     /// Create an NTFS file system on `inner` (`sector_count` sectors of
     /// `sector_size` bytes) and mount it.
     pub fn mkntfs(inner: T, sector_size: i64, sector_count: i64) -> Result<Self> {
+        if !(256..=4096).contains(&sector_size) || sector_size.count_ones() != 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("ntfs3g unsupported sector size: {sector_size}"),
+            ));
+        }
+        if sector_count <= 0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "ntfs3g invalid sector count",
+            ));
+        }
         let stream: Box<dyn ReadWriteSeek + '_> = Box::new(inner);
         // From here on, returning an error drops `fs` which frees everything
         let mut fs = Ntfs3g {
@@ -217,9 +229,8 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
                 (*opts).mft_zone_multiplier = -1;
                 (*opts).with_uuid = n3g_c::BOOL_FALSE;
                 (*opts).use_epoch_time = n3g_c::BOOL_TRUE;
-                (*opts).sector_size = c_long::try_from(sector_size).map_err(|_| {
-                    Error::new(ErrorKind::InvalidInput, "ntfs3g invalid sector size")
-                })?;
+                // checked above: fits in a c_long
+                (*opts).sector_size = sector_size as c_long;
                 (*opts).num_sectors = sector_count;
                 (*opts).part_start_sect = 0;
                 (*opts).heads = 1;
@@ -488,6 +499,24 @@ mod tests {
         // relative paths are relative to the root
         fs.new_file("rel", 0).unwrap();
         fs.remove_file("/rel").unwrap();
+    }
+
+    #[test]
+    fn invalid_params() {
+        assert!(Ntfs3g::mkntfs(new_disk(), 0, COUNT).is_err());
+        assert!(Ntfs3g::mkntfs(new_disk(), 1000, COUNT).is_err());
+        assert!(Ntfs3g::mkntfs(new_disk(), 8192, COUNT).is_err());
+        assert!(Ntfs3g::mkntfs(new_disk(), SS, 0).is_err());
+        assert!(Ntfs3g::mkntfs(new_disk(), SS, -1).is_err());
+        // stream too small for the requested size (a fixed size slice: a
+        // Cursor<Vec> would grow): write errors must be reported, not hang
+        let mut small = vec![0u8; 1024 * 1024];
+        assert!(Ntfs3g::mkntfs(Cursor::new(&mut small[..]), SS, COUNT).is_err());
+        // and the global mkntfs state is still usable afterwards
+        Ntfs3g::mkntfs(new_disk(), SS, COUNT)
+            .unwrap()
+            .into_inner()
+            .unwrap();
     }
 
     #[test]
