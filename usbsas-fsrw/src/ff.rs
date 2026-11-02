@@ -69,7 +69,7 @@ impl<T: Read + Seek> FSRead<T> for ExFatFsReader<T> {
 
     fn unmount_fs(self: Box<Self>) -> Result<T> {
         log::trace!("unmount_fs");
-        Ok(self.fs.into_inner_r()?)
+        Ok(self.fs.into_inner()?)
     }
 }
 
@@ -131,6 +131,6 @@ impl<T: Read + Write + Seek> FSWrite<T> for ExFatFsWriter<T> {
 
     fn unmount_fs(self: Box<Self>) -> Result<T> {
         log::trace!("unmount_fs");
-        Ok(self.fs.into_inner_rw()?)
+        Ok(self.fs.into_inner()?)
     }
 }
