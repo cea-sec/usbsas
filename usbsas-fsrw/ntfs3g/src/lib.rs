@@ -289,7 +289,6 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
                 Error::last_os_error()
             )));
         }
-        unsafe { n3g_c::ntfs_inode_close(p_ni) };
         Ok(())
     }
 }
