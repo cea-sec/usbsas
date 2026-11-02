@@ -29,10 +29,24 @@ pub use ff_c::{FM_EXFAT, FM_FAT32};
 
 const DRIVE: &str = "0:";
 
-fn str_to_utf16(string: &str) -> Vec<u16> {
+/// Convert a path to a NUL terminated UTF-16 string for ff. Paths come from
+/// untrusted input: an embedded NUL would silently truncate the path on the C
+/// side ("a\0b" would become "a"), so reject it.
+fn str_to_utf16(string: &str) -> io::Result<Vec<u16>> {
+    if string.contains('\0') {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("ff invalid path: {string:?}"),
+        ));
+    }
     let mut ret: Vec<u16> = string.encode_utf16().collect();
     ret.push(0);
-    ret
+    Ok(ret)
+}
+
+/// `DRIVE` as a NUL terminated UTF-16 string
+fn drive_utf16() -> Vec<u16> {
+    DRIVE.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 /// Earliest date representable in FAT: 1980-01-01 00:00:00 UTC
@@ -158,7 +172,7 @@ impl<T> FatFs<T> {
     }
 
     fn mount(&mut self) -> io::Result<()> {
-        let drive = str_to_utf16(DRIVE);
+        let drive = drive_utf16();
         if unsafe { ff_c::f_mount(self.fs.as_ptr(), drive.as_ptr(), 1) } != ff_c::FRESULT_FR_OK {
             return Err(io::Error::other("ff f_mount error"));
         }
@@ -177,7 +191,7 @@ impl<T> FatFs<T> {
         // to. f_mount(NULL) only fails on an invalid drive name. This is a
         // no-op if the mount failed before registering, and can't unregister
         // somebody else's volume since MountGuard makes us the only one.
-        let drive = str_to_utf16(DRIVE);
+        let drive = drive_utf16();
         if unsafe { ff_c::f_mount(std::ptr::null_mut(), drive.as_ptr(), 0) } != ff_c::FRESULT_FR_OK
         {
             eprintln!("f_mount (unmount) error");
@@ -235,7 +249,7 @@ impl<T: Read + Seek> FatFs<T> {
 
     /// Get file attributes from path
     pub fn get_attr(&self, path: &str) -> Result<FileInfo, io::Error> {
-        let path_u16 = str_to_utf16(path);
+        let path_u16 = str_to_utf16(path)?;
         let mut fno = ff_c::FILINFO::new();
         if unsafe { ff_c::f_stat(path_u16.as_ptr(), &mut fno) } != ff_c::FRESULT_FR_OK {
             return Err(io::Error::other("ff f_atrib error"));
@@ -259,7 +273,7 @@ impl<T: Read + Seek> FatFs<T> {
     /// Read directory from path
     pub fn read_dir(&self, path: &str) -> Result<Vec<FileInfo>, io::Error> {
         let mut dir = ff_c::DIR::new();
-        let path_u16 = str_to_utf16(path);
+        let path_u16 = str_to_utf16(path)?;
 
         if unsafe { ff_c::f_opendir(&mut dir, path_u16.as_ptr()) } != ff_c::FRESULT_FR_OK {
             return Err(io::Error::other("ff f_opendir error"));
@@ -320,7 +334,7 @@ impl<T: Read + Seek> FatFs<T> {
     ) -> Result<u64, io::Error> {
         let mut fp = ff_c::FIL::new();
         let mut bytes_read: ff_c::UINT = 0;
-        let path_u16 = str_to_utf16(path);
+        let path_u16 = str_to_utf16(path)?;
         let len = usize::try_from(bytes_to_read)
             .unwrap_or(usize::MAX)
             .min(buf.len());
@@ -367,7 +381,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
             Box::new(WrapperReadWrite::new(inner, sector_size)),
             IoKind::ReadWrite,
         )?;
-        let drive = str_to_utf16(DRIVE);
+        let drive = drive_utf16();
 
         let mkfs_params = ff_c::MKFS_PARM {
             // use S(uper)F(loppy)D(isk) param format to write fs directly
@@ -398,7 +412,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
 
     /// Create a new file on `path`. Returns a `Write`able `FatFile`.
     pub fn new_file<'a>(&'a mut self, path: &str) -> Result<FatFile<'a, T>, io::Error> {
-        let fname = str_to_utf16(path);
+        let fname = str_to_utf16(path)?;
         let mut fp = ff_c::FIL::new();
         if unsafe {
             ff_c::f_open(
@@ -415,7 +429,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
 
     /// Create a new directory on `path`
     pub fn new_dir(&mut self, path: &str) -> Result<(), io::Error> {
-        let dname = str_to_utf16(path);
+        let dname = str_to_utf16(path)?;
         match unsafe { ff_c::f_mkdir(dname.as_ptr()) } {
             ff_c::FRESULT_FR_OK | ff_c::FRESULT_FR_EXIST => Ok(()),
             _ => Err(io::Error::other("ff f_mkdir error")),
@@ -424,7 +438,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
 
     /// Remove file on `path`
     pub fn remove_file(&mut self, path: &str) -> Result<(), io::Error> {
-        let fname = str_to_utf16(path);
+        let fname = str_to_utf16(path)?;
         if unsafe { ff_c::f_unlink(fname.as_ptr()) } != ff_c::FRESULT_FR_OK {
             return Err(io::Error::other("ff f_mkdir error"));
         }
@@ -433,7 +447,7 @@ impl<T: Read + Write + Seek> FatFs<T> {
 
     /// Set UNIX timestamp on file `path`
     pub fn set_timestamp(&mut self, path: &str, timestamp: i64) -> Result<(), io::Error> {
-        let fname = str_to_utf16(path);
+        let fname = str_to_utf16(path)?;
         let mut fno = ff_c::FILINFO::new();
         (fno.fdate, fno.ftime) = timestamp_to_fat(timestamp);
         if unsafe { ff_c::f_utime(fname.as_ptr(), &fno) } != ff_c::FRESULT_FR_OK {
@@ -717,6 +731,29 @@ mod tests {
         let fs = FatFs::new(fs.into_inner().unwrap(), SS).unwrap();
         assert_eq!(fs.get_attr("/a").unwrap().timestamp, FAT_TIMESTAMP_MIN);
         assert_eq!(fs.get_attr("/b").unwrap().timestamp, FAT_TIMESTAMP_MAX);
+    }
+
+    #[test]
+    fn nul_in_path() {
+        let _l = lock();
+        let mut fs = FatFs::mkfs(new_disk(), SS, COUNT, FM_EXFAT as u8).unwrap();
+        fs.new_dir("/a").unwrap();
+        drop(fs.new_file("/f").unwrap());
+        let invalid =
+            |res: io::Result<()>| res.err().unwrap().kind() == io::ErrorKind::InvalidInput;
+        // without the check, these would be truncated to "/a" or "/f"
+        assert!(invalid(fs.new_file("/a\0b").map(drop)));
+        assert!(invalid(fs.new_dir("/a\0b")));
+        assert!(invalid(fs.new_dir("/b\0")));
+        assert!(invalid(fs.set_timestamp("/f\0x", 0)));
+        assert!(invalid(fs.remove_file("/f\0x")));
+        assert!(fs.read_dir("/").unwrap().len() == 2);
+        let fs = FatFs::new(fs.into_inner().unwrap(), SS).unwrap();
+        assert!(invalid(fs.get_attr("/f\0x").map(drop)));
+        assert!(invalid(fs.read_dir("/a\0").map(drop)));
+        assert!(invalid(fs.read_file("/f\0x", &mut [0; 1], 0, 1).map(drop)));
+        // f was not removed
+        assert!(fs.get_attr("/f").is_ok());
     }
 
     #[test]
