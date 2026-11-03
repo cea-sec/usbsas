@@ -24,6 +24,7 @@ use std::{
         unix::io::{AsRawFd, FromRawFd, RawFd},
     },
     str::FromStr,
+    sync::atomic::{AtomicBool, Ordering},
 };
 use usbsas_utils::{INPUT_PIPE_FD_VAR, MAX_PROTO_MESS_SIZE, OUTPUT_PIPE_FD_VAR};
 
@@ -41,10 +42,56 @@ pub trait FromEnv: Sized {
 impl FromEnv for RawFd {
     type Err = io::Error;
     fn from_env(name: &str) -> Result<Self, Self::Err> {
-        env::var(name)
-            .map_err(io::Error::other)
-            .and_then(|value| RawFd::from_str(&value).map_err(io::Error::other))
+        let value = env::var(name).map_err(|err| io::Error::other(format!("{name}: {err}")))?;
+        RawFd::from_str(&value)
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, format!("{name}: {err}")))
     }
+}
+
+/// Set once the pipes passed in the environment have been taken: they must
+/// have a single owner.
+static ENV_PIPES_TAKEN: AtomicBool = AtomicBool::new(false);
+
+/// Check that `fd` is an open file descriptor with the access mode `mode`
+/// (`O_RDONLY` or `O_WRONLY`).
+fn check_pipe_fd(fd: RawFd, mode: libc::c_int) -> io::Result<()> {
+    // -1 isn't a valid OwnedFd (UB), 0, 1, 2 are owned by std
+    if fd <= libc::STDERR_FILENO {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("invalid pipe fd {fd}"),
+        ));
+    }
+    // fails with EBADF if fd isn't open
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if flags == -1 {
+        return Err(io::Error::last_os_error());
+    }
+    if flags & libc::O_ACCMODE != mode {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("pipe fd {fd} has the wrong access mode"),
+        ));
+    }
+    Ok(())
+}
+
+/// Validate the pipes inherited from the parent and take ownership of them.
+unsafe fn take_pipe_fds(input: RawFd, output: RawFd) -> io::Result<(OwnedFd, OwnedFd)> {
+    if input == output {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "input and output pipes are the same fd",
+        ));
+    }
+    check_pipe_fd(input, libc::O_RDONLY)?;
+    check_pipe_fd(output, libc::O_WRONLY)?;
+    for fd in [input, output] {
+        if unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) } == -1 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    Ok(unsafe { (OwnedFd::from_raw_fd(input), OwnedFd::from_raw_fd(output)) })
 }
 
 /// Build a communication channel from the read and write ends of pipes.
@@ -96,13 +143,33 @@ impl<U, R: Read + AsRawFd + From<OwnedFd>, W: Write + AsRawFd + From<OwnedFd>> C
         }
     }
 
-    /// Instantiate `Comm` with file descriptors from environment variables
-    /// `INPUT_PIPE_FD_VAR` and `OUTPUT_PIPE_FD_VAR`.
+    /// Instantiate `Comm` with the pipes inherited from the parent, whose file
+    /// descriptors are in the environment variables `INPUT_PIPE_FD_VAR` and
+    /// `OUTPUT_PIPE_FD_VAR` (see `usbsas-process`).
+    ///
+    /// The file descriptors must be open pipes in the right direction, and
+    /// they are taken only once per process: calling this again returns an
+    /// error. They are set close-on-exec.
     pub fn from_env() -> io::Result<Comm<U, R, W>> {
-        Ok(Self::from_fd(
-            unsafe { OwnedFd::from_raw_fd(RawFd::from_env(INPUT_PIPE_FD_VAR)?) },
-            unsafe { OwnedFd::from_raw_fd(RawFd::from_env(OUTPUT_PIPE_FD_VAR)?) },
-        ))
+        let input = RawFd::from_env(INPUT_PIPE_FD_VAR)?;
+        let output = RawFd::from_env(OUTPUT_PIPE_FD_VAR)?;
+        if ENV_PIPES_TAKEN.swap(true, Ordering::SeqCst) {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "pipes from the environment already taken",
+            ));
+        }
+        // SAFETY: the fds come from the parent and nothing else takes
+        // ownership of them: from_env() is the only place reading these
+        // variables and it succeeds at most once per process.
+        match unsafe { take_pipe_fds(input, output) } {
+            Ok((input, output)) => Ok(Self::from_fd(input, output)),
+            Err(err) => {
+                // nothing was taken
+                ENV_PIPES_TAKEN.store(false, Ordering::SeqCst);
+                Err(err)
+            }
+        }
     }
 
     /// Input stream of the channel.
