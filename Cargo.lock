@@ -6454,6 +6454,7 @@ version = "0.2.2"
 dependencies = [
  "byteorder",
  "futures-lite",
+ "libc",
  "pastey 0.2.3",
  "prost",
  "usbsas-proto",

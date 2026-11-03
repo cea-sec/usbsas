@@ -12,6 +12,7 @@ async = ["dep:futures-lite"]
 [dependencies]
 byteorder = "1.5"
 futures-lite = { version = "2.6", optional = true }
+libc = "0.2"
 pastey = "0.2"
 prost = "0.14"
 usbsas-utils = { path = "../usbsas-utils" }
