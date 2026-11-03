@@ -34,6 +34,7 @@ use usbsas_proto::{
 use usbsas_utils::clap::UsbsasClap;
 
 mod components;
+mod spinner;
 mod subscription;
 mod update;
 mod view;
@@ -208,6 +209,7 @@ pub enum Message {
     ResetDone(u64),
     /// Response of a request sent during the session with this generation
     Response(u64, Response),
+    Frame(std::time::Instant),
 }
 
 /// Kind of source opened by a successful `InitTransfer` request, it decides
@@ -351,6 +353,7 @@ pub struct GUI {
     session_id: String,
     fullscreen: bool,
     socket_path: String,
+    spinner: spinner::Spinner,
 }
 
 impl GUI {
@@ -435,6 +438,7 @@ impl GUI {
                 session_id,
                 fullscreen: *matches.get_one::<bool>("fullscreen").unwrap_or(&false),
                 socket_path,
+                spinner: spinner::Spinner::new(200.0),
             },
             Task::none(),
         )

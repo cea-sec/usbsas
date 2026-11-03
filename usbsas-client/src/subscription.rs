@@ -22,7 +22,14 @@ impl GUI {
             | State::UserID => time::every(Duration::from_secs(1)).map(Message::Tick),
             _ => Subscription::none(),
         };
-
-        Subscription::batch(vec![subs])
+        let frames = match self.state {
+            State::Sandbox | State::Connect | State::Init | State::Reload
+                if self.comm.is_none() =>
+            {
+                iced::window::frames().map(Message::Frame)
+            }
+            _ => Subscription::none(),
+        };
+        Subscription::batch(vec![subs, frames])
     }
 }

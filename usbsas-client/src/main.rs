@@ -17,5 +17,6 @@ fn main() -> iced::Result {
     iced::application(GUI::new, GUI::update, GUI::view)
         .window_size((width as f32, height as f32))
         .subscription(GUI::subscription)
+        .antialiasing(true)
         .run()
 }
