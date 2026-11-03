@@ -12,7 +12,12 @@ pub fn seccomp(device_fd: RawFd, uinput_device: RawFd) -> Result<()> {
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::write,
-        &[Comparator::new(0, Cmp::Eq, uinput_device as u64, None)],
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(uinput_device as u64),
+        )],
     )?;
 
     ctx.allow_syscall(Syscall::poll)?;
@@ -21,7 +26,7 @@ pub fn seccomp(device_fd: RawFd, uinput_device: RawFd) -> Result<()> {
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 1, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS as u64, None),
             #[cfg(not(target_env = "musl"))]
@@ -32,7 +37,7 @@ pub fn seccomp(device_fd: RawFd, uinput_device: RawFd) -> Result<()> {
         Action::Allow,
         Syscall::ioctl,
         &[
-            Comparator::new(0, Cmp::Eq, 1, None),
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
             #[cfg(target_env = "musl")]
             Comparator::new(1, Cmp::Eq, libc::TCGETS2 as u64, None),
             #[cfg(not(target_env = "musl"))]
