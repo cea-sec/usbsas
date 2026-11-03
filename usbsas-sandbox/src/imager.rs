@@ -10,6 +10,8 @@ pub fn seccomp(fds_read: Vec<RawFd>, fds_write: Vec<RawFd>) -> Result<()> {
     fds_read.push(0);
     let mut ctx = seccomp::new_context_with_common_rules(fds_read, fds_write)?;
 
+    ctx.allow_syscall(Syscall::getrandom)?;
+
     // The following rules are for the progress bar
     // ioctl(1, TCGETS, ..)
     ctx.set_rule_for_syscall(
