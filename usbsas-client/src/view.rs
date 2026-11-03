@@ -95,20 +95,25 @@ impl GUI {
 
         let main = match &self.state {
             State::Sandbox | State::Connect | State::Init | State::Reload => {
-                let (txt, opacity) = if self.comm.is_some() {
-                    (self.i18n_txt("init"), 1.0_f32)
+                let txt = if self.comm.is_some() {
+                    self.i18n_txt("init")
                 } else {
-                    (self.i18n_txt("loading"), 0.5_f32)
+                    self.i18n_txt("loading")
                 };
-                let pane = Container::new(
-                    Svg::new(Handle::from_memory(include_bytes!(
-                        "../resources/img/init.svg"
-                    )))
-                    .content_fit(ContentFit::Contain)
-                    .opacity(opacity),
-                )
+                let pane = if self.comm.is_some() {
+                    Container::new(
+                        Svg::new(Handle::from_memory(include_bytes!(
+                            "../resources/img/init.svg"
+                        )))
+                        .content_fit(ContentFit::Contain),
+                    )
+                } else {
+                    // Still waiting for usbsas: show loading spinner
+                    Container::new(self.spinner.view())
+                }
                 .width(Length::Fill)
                 .height(Length::Fill)
+                .align_x(Alignment::Center)
                 .align_y(Alignment::Center);
                 let column = Column::new()
                     .push(Space::new().width(Length::Fill).height(Length::Fixed(30.0)))

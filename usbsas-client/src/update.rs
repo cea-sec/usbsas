@@ -537,6 +537,7 @@ impl GUI {
             Message::Reset => return self.reset(),
             Message::ResetDone(generation) => return self.reset_done(generation),
             Message::Response(generation, resp) => return self.response(generation, resp),
+            Message::Frame(now) => self.spinner.tick(now),
         }
 
         if self.fullscreen {
