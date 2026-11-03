@@ -221,10 +221,21 @@ impl GUI {
             }
             State::SysInfo => {
                 let mut col = Column::new().width(Length::Fill);
-
                 // System
-                let system = System::new_all();
-
+                let uptime_txt = match System::uptime() {
+                    Ok(uptime) => {
+                        let mut minutes = uptime.div_euclid(60);
+                        let seconds = uptime - 60 * minutes;
+                        let mut hours = minutes.div_euclid(60);
+                        minutes -= hours * 60;
+                        let days = hours.div_euclid(24);
+                        hours -= days * 24;
+                        format!(
+                            "up {days} day(s), {hours:2} hour(s), {minutes:2} minute(s), {seconds:2} second(s)"
+                        )
+                    }
+                    Err(_) => "can't get uptime".into(),
+                };
                 col = col
                     .push(text("System").size(HEADER_SIZE))
                     .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
@@ -267,25 +278,18 @@ impl GUI {
                         Row::new()
                             .width(Length::Fill)
                             .push(text("Uptime").width(Length::FillPortion(1)))
-                            .push({
-                                let uptime = System::uptime();
-                                let mut minutes = uptime.div_euclid(60);
-                                let seconds = uptime - 60 * minutes;
-                                let mut hours = minutes.div_euclid(60);
-                                minutes -= hours * 60;
-                                let days = hours.div_euclid(24);
-                                hours -= days * 24;
-                                text(format!("up {days} day(s), {hours:2} hour(s), {minutes:2} minute(s), {seconds:2} second(s)"))
-                                    .width(Length::FillPortion(4))
-                            }),
+                            .push(text(uptime_txt).width(Length::FillPortion(4))),
                     )
                     .push(
                         Row::new()
                             .width(Length::Fill)
                             .push(text("Load average").width(Length::FillPortion(1)))
                             .push(
-                                text(format!("{}%", System::load_average().one))
-                                    .width(Length::FillPortion(4)),
+                                text(match System::load_average() {
+                                    Ok(lavg) => format!("{}%", lavg.one),
+                                    Err(_) => "can't get load average".into(),
+                                })
+                                .width(Length::FillPortion(4)),
                             ),
                     )
                     .push(
@@ -293,99 +297,113 @@ impl GUI {
                             .width(Length::Fill)
                             .push(text("Memory").width(Length::FillPortion(1)))
                             .push(
-                                text(format!(
-                                    "used: {:5}, free: {:5}, total: {:5}",
-                                    ByteSize(system.used_memory()),
-                                    ByteSize(system.available_memory()),
-                                    ByteSize(system.total_memory())
-                                ))
+                                text(match System::new_all() {
+                                    Ok(system) => {
+                                        format!(
+                                            "used: {:5}, free: {:5}, total: {:5}",
+                                            ByteSize(system.used_memory()),
+                                            ByteSize(system.available_memory()),
+                                            ByteSize(system.total_memory())
+                                        )
+                                    }
+                                    Err(_) => "can't get mem info".into(),
+                                })
                                 .width(Length::FillPortion(4)),
                             ),
                     )
                     .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)));
 
                 // Storage
-                col = col
-                    .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
-                    .push(text("Storage").size(HEADER_SIZE))
-                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
-                    .push(
-                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
+                if let Ok(disks) = sysinfo::Disks::new_with_refreshed_list() {
+                    col = col
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
+                        .push(text("Storage").size(HEADER_SIZE))
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
+                        .push(
+                            Container::new(
+                                Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                            )
                             .style(container::dark),
-                    )
-                    .push(Space::new().width(Length::Fill).height(Length::Fixed(7.0)))
-                    .push(
-                        Row::new()
-                            .push(Space::new().width(Length::FillPortion(9)))
-                            .push(text("Used").width(Length::FillPortion(2)))
-                            .push(text("Free").width(Length::FillPortion(2)))
-                            .push(text("Total").width(Length::FillPortion(2))),
-                    );
+                        )
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(7.0)))
+                        .push(
+                            Row::new()
+                                .push(Space::new().width(Length::FillPortion(9)))
+                                .push(text("Used").width(Length::FillPortion(2)))
+                                .push(text("Free").width(Length::FillPortion(2)))
+                                .push(text("Total").width(Length::FillPortion(2))),
+                        );
 
-                for disk in sysinfo::Disks::new_with_refreshed_list().list() {
-                    col = col.push(
-                        Row::new()
-                            .width(Length::Fill)
-                            .push(
-                                text(format!("{}", disk.name().to_string_lossy()))
-                                    .width(Length::FillPortion(4)),
-                            )
-                            .push(
-                                text(format!("{}", disk.mount_point().to_string_lossy()))
-                                    .width(Length::FillPortion(4)),
-                            )
-                            .push(
-                                text(format!("{}", disk.file_system().to_string_lossy()))
-                                    .width(Length::FillPortion(1)),
-                            )
-                            .push(
-                                text(format!(
-                                    "{}",
-                                    ByteSize(disk.total_space() - disk.available_space())
-                                ))
-                                .width(Length::FillPortion(2)),
-                            )
-                            .push(
-                                text(format!("{}", ByteSize(disk.available_space())))
+                    for disk in &disks {
+                        col = col.push(
+                            Row::new()
+                                .width(Length::Fill)
+                                .push(
+                                    text(format!("{}", disk.name().to_string_lossy()))
+                                        .width(Length::FillPortion(4)),
+                                )
+                                .push(
+                                    text(format!("{}", disk.mount_point().to_string_lossy()))
+                                        .width(Length::FillPortion(4)),
+                                )
+                                .push(
+                                    text(format!("{}", disk.file_system().to_string_lossy()))
+                                        .width(Length::FillPortion(1)),
+                                )
+                                .push(
+                                    text(format!(
+                                        "{}",
+                                        ByteSize(disk.total_space() - disk.available_space())
+                                    ))
                                     .width(Length::FillPortion(2)),
-                            )
-                            .push(
-                                text(format!("{}", ByteSize(disk.total_space())))
-                                    .width(Length::FillPortion(2)),
-                            ),
-                    )
+                                )
+                                .push(
+                                    text(format!("{}", ByteSize(disk.available_space())))
+                                        .width(Length::FillPortion(2)),
+                                )
+                                .push(
+                                    text(format!("{}", ByteSize(disk.total_space())))
+                                        .width(Length::FillPortion(2)),
+                                ),
+                        )
+                    }
                 }
 
                 // Network
-                col = col
-                    .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
-                    .push(text("Network").size(HEADER_SIZE))
-                    .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
-                    .push(
-                        Container::new(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
+                //
+                if let Ok(networks) = sysinfo::Networks::new_with_refreshed_list() {
+                    col = col
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(20.0)))
+                        .push(text("Network").size(HEADER_SIZE))
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(10.0)))
+                        .push(
+                            Container::new(
+                                Space::new().width(Length::Fill).height(Length::Fixed(1.0)),
+                            )
                             .style(container::dark),
-                    )
-                    .push(Space::new().width(Length::Fill).height(Length::Fixed(7.0)));
-                // HashMap -> BTreeMap to have a sorted list
-                for (name, data) in sysinfo::Networks::new_with_refreshed_list()
-                    .list()
-                    .iter()
-                    .collect::<std::collections::BTreeMap<&String, &sysinfo::NetworkData>>(
-                ) {
-                    col = col.push({
-                        let mut row =
-                            Row::new().push(text(name.to_string()).width(Length::FillPortion(1)));
-                        let mut nets = data.ip_networks().to_vec();
-                        nets.sort();
-                        for ip in nets {
-                            row = row.push(
-                                text(format!("{}/{}", ip.addr, ip.prefix))
-                                    .width(Length::FillPortion(3)),
-                            );
-                        }
-                        row
-                    });
-                }
+                        )
+                        .push(Space::new().width(Length::Fill).height(Length::Fixed(7.0)));
+                    // HashMap -> BTreeMap to have a sorted list
+                    for (name, data) in &networks
+                        .iter()
+                        .map(|(a, b)| (a.to_str().unwrap_or("unknown"), b))
+                        .collect::<std::collections::BTreeMap<&str, &sysinfo::NetworkData>>()
+                    {
+                        col = col.push({
+                            let mut row = Row::new()
+                                .push(text(name.to_string()).width(Length::FillPortion(1)));
+                            let mut nets = data.ip_networks().to_vec();
+                            nets.sort();
+                            for ip in nets {
+                                row = row.push(
+                                    text(format!("{}/{}", ip.addr, ip.prefix))
+                                        .width(Length::FillPortion(3)),
+                                );
+                            }
+                            row
+                        });
+                    }
+                };
                 Container::new(scrollable(col))
             }
             State::UserID => Container::new(
