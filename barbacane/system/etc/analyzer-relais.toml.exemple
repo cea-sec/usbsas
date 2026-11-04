@@ -1,0 +1,12 @@
+# Borne utilisant un analyseur CENTRAL (/etc/barbacane/analyzer.toml de la borne).
+# usbsas et l'interface continuent de parler à 127.0.0.1:8042 ; le relais transmet en TLS.
+# Le pare-feu de la borne doit alors autoriser la seule connexion vers le serveur central.
+listen = "127.0.0.1:8042"
+work_dir = "/var/lib/barbacane/analyzer"
+stage_dir = "/var/lib/barbacane/sortie"
+import_dir = "/var/lib/barbacane/import"
+
+[relay]
+upstream = "https://analyse.interne:8443"
+token_file = "/etc/barbacane/jeton"
+ca_cert = "/etc/barbacane/tls/serveur.pem"

@@ -1,0 +1,14 @@
+#!/bin/bash
+# Génère une paire de clés minisign pour signer les mises à jour Barbacane.
+#   barbacane-update-keygen DOSSIER
+# Produit DOSSIER/barbacane-maj.key (SECRÈTE, protégée par phrase de passe,
+# à conserver hors ligne, jamais sur une borne) et DOSSIER/barbacane-maj.pub
+# (à installer sur les bornes : /etc/barbacane/maj.pub).
+set -euo pipefail
+D="${1:?usage : barbacane-update-keygen DOSSIER}"
+mkdir -p "$D"
+[ ! -e "$D/barbacane-maj.key" ] || { echo "ERREUR : $D/barbacane-maj.key existe déjà" >&2; exit 1; }
+umask 077
+minisign -G -p "$D/barbacane-maj.pub" -s "$D/barbacane-maj.key"
+echo "Clé publique : $D/barbacane-maj.pub ; empreinte :"
+tail -1 "$D/barbacane-maj.pub"

@@ -1,0 +1,12 @@
+# Configuration de barbacane-admind (/etc/barbacane/admind.toml)
+socket = "/run/barbacane/admin.sock"
+socket_group = "barbacane-kiosk"
+state_dir = "/var/lib/barbacane/admin"
+analyzer_config = "/etc/barbacane/analyzer.toml"
+analyzer_url = "http://127.0.0.1:8042"
+import_dir = "/var/lib/barbacane/import"
+export_dir = "/var/lib/barbacane/export"
+reports_dir = "/var/lib/barbacane/rapports"
+clamav_dir = "/var/lib/clamav"
+yara_dir = "/var/lib/barbacane/yara"
+update_pubkey = "/etc/barbacane/maj.pub"

@@ -1,0 +1,168 @@
+#!/bin/bash
+# Prépare un paquet de mise à jour hors ligne Barbacane (*.bcu + *.bcu.minisig),
+# sur un poste CONNECTÉ (Debian 13 de préférence, mêmes dépôts que la borne).
+#
+# Contenu possible :
+#   - signatures ClamAV (téléchargées avec freshclam, ou dossier fourni) ;
+#   - règles YARA (dépôts git / URL listés dans un fichier, ou dossier fourni) ;
+#   - paquets Debian : mises à jour des paquets installés sur la borne, calculées
+#     à partir de l'état exporté par la borne (dpkg-status, menu « Exporter ») ;
+#   - paquets supplémentaires (.deb usbsas / Barbacane construits) ;
+#   - nouvelle clé publique de signature (rotation).
+#
+# Usage :
+#   barbacane-update-prepare --cle secret.key --sortie DOSSIER [options]
+#     --version N              numéro de version (défaut : AAAAMMJJHHMM, croissant)
+#     --clamav DOSSIER         prendre les *.cvd/*.cld de ce dossier (pas de téléchargement)
+#     --sans-clamav            ne pas inclure de signatures ClamAV
+#     --yara-sources FICHIER   une source par ligne : URL git (https://…git) ou URL d'un fichier .yar
+#     --yara DOSSIER           règles locales (*.yar, *.yara)
+#     --etat-borne FICHIER     dpkg-status exporté par la borne : inclut les mises à jour Debian
+#     --debs DOSSIER           paquets .deb supplémentaires (usbsas, Barbacane)
+#     --nouvelle-cle FICHIER   clé publique minisign remplaçant l'actuelle après application
+#
+# La clé secrète ne doit JAMAIS être copiée sur la borne.
+set -euo pipefail
+
+die() { echo "ERREUR : $*" >&2; exit 1; }
+etape() { echo; echo "== $*"; }
+
+CLE='' SORTIE='' VERSION='' CLAMAV='' SANS_CLAMAV=0 YARA_SRC='' YARA_DIR='' ETAT='' DEBS='' NOUVELLE_CLE=''
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --cle) CLE="$2"; shift 2 ;;
+        --sortie) SORTIE="$2"; shift 2 ;;
+        --version) VERSION="$2"; shift 2 ;;
+        --clamav) CLAMAV="$2"; shift 2 ;;
+        --sans-clamav) SANS_CLAMAV=1; shift ;;
+        --yara-sources) YARA_SRC="$2"; shift 2 ;;
+        --yara) YARA_DIR="$2"; shift 2 ;;
+        --etat-borne) ETAT="$2"; shift 2 ;;
+        --debs) DEBS="$2"; shift 2 ;;
+        --nouvelle-cle) NOUVELLE_CLE="$2"; shift 2 ;;
+        -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
+        *) die "option inconnue : $1 (voir --help)" ;;
+    esac
+done
+[ -f "$CLE" ] || die "--cle : clé secrète minisign introuvable"
+[ -n "$SORTIE" ] || die "--sortie obligatoire"
+VERSION="${VERSION:-$(date -u +%Y%m%d%H%M)}"
+[[ "$VERSION" =~ ^[0-9]+$ ]] || die "--version doit être un entier"
+for outil in minisign tar zstd sha256sum; do command -v "$outil" >/dev/null || die "outil manquant : $outil"; done
+
+TRAVAIL="$(mktemp -d)"
+trap 'rm -rf "$TRAVAIL"' EXIT
+P="$TRAVAIL/paquet"
+mkdir -p "$P" "$SORTIE"
+
+if [ "$SANS_CLAMAV" = 0 ]; then
+    etape "Signatures ClamAV"
+    mkdir -p "$P/clamav"
+    if [ -n "$CLAMAV" ]; then
+        cp "$CLAMAV"/*.c[lv]d "$P/clamav/" 2>/dev/null || die "aucun .cvd/.cld dans $CLAMAV"
+    else
+        command -v freshclam >/dev/null || die "freshclam absent (apt install clamav-freshclam) ou utiliser --clamav"
+        mkdir -p "$TRAVAIL/db"
+        cat > "$TRAVAIL/freshclam.conf" <<EOF
+DatabaseDirectory $TRAVAIL/db
+DatabaseMirror database.clamav.net
+Foreground yes
+EOF
+        freshclam --config-file="$TRAVAIL/freshclam.conf" --user="$(id -un)" || die "téléchargement ClamAV échoué"
+        cp "$TRAVAIL"/db/*.c[lv]d "$P/clamav/"
+    fi
+    for f in "$P"/clamav/*; do
+        head -c 11 "$f" | grep -q '^ClamAV-VDB:' || die "$f n'est pas une base ClamAV"
+    done
+    ls -l "$P/clamav"
+fi
+
+if [ -n "$YARA_SRC$YARA_DIR" ]; then
+    etape "Règles YARA"
+    mkdir -p "$P/yara"
+    if [ -n "$YARA_DIR" ]; then
+        find "$YARA_DIR" -maxdepth 1 -type f \( -name '*.yar' -o -name '*.yara' \) -exec cp {} "$P/yara/" \;
+    fi
+    if [ -n "$YARA_SRC" ]; then
+        n=0
+        grep -vE '^\s*(#|$)' "$YARA_SRC" | while read -r src; do
+            n=$((n + 1))
+            nom="src$n-$(basename "$src" .git)"
+            if [[ "$src" == *.git ]]; then
+                git clone -q --depth 1 "$src" "$TRAVAIL/$nom" || die "clonage échoué : $src"
+                # Un fichier par règle, préfixé par la source pour éviter les collisions
+                find "$TRAVAIL/$nom" -type f \( -name '*.yar' -o -name '*.yara' \) | while read -r r; do
+                    cp "$r" "$P/yara/$nom-$(basename "$r")"
+                done
+            else
+                curl -fsSL "$src" -o "$P/yara/$nom.yar" || die "téléchargement échoué : $src"
+            fi
+        done
+    fi
+    # Vérification de compilation si l'outil YARA-X est présent (une règle invalide est retirée)
+    if command -v yr >/dev/null; then
+        for r in "$P"/yara/*; do
+            yr check "$r" >/dev/null 2>&1 || { echo "règle invalide retirée : $(basename "$r")"; rm -f "$r"; }
+        done
+    fi
+    echo "$(find "$P/yara" -type f | wc -l) fichier(s) de règles"
+fi
+
+if [ -n "$ETAT" ]; then
+    etape "Paquets Debian (mises à jour de la borne)"
+    [ -f "$ETAT" ] || die "--etat-borne : fichier introuvable"
+    command -v apt-get >/dev/null || die "apt-get requis (poste Debian)"
+    mkdir -p "$P/debs" "$TRAVAIL/apt/partial"
+    # apt raisonne sur l'état de la BORNE : seules ses mises à jour et leurs dépendances sont téléchargées.
+    APT=(apt-get -o "Dir::State::status=$ETAT" -o "Dir::Cache::archives=$TRAVAIL/apt" -o Debug::NoLocking=1)
+    "${APT[@]}" -qq --print-uris -y dist-upgrade > "$TRAVAIL/uris" || die "calcul des mises à jour échoué (apt-get update fait ?)"
+    if [ -s "$TRAVAIL/uris" ]; then
+        "${APT[@]}" -qq -y --download-only dist-upgrade || die "téléchargement des paquets échoué"
+        cp "$TRAVAIL"/apt/*.deb "$P/debs/"
+    fi
+    echo "$(find "$P/debs" -name '*.deb' | wc -l) paquet(s) Debian"
+fi
+
+if [ -n "$DEBS" ]; then
+    etape "Paquets supplémentaires"
+    mkdir -p "$P/debs"
+    cp "$DEBS"/*.deb "$P/debs/" || die "aucun .deb dans $DEBS"
+    for d in "$P"/debs/*.deb; do dpkg-deb --info "$d" >/dev/null 2>&1 || die "paquet invalide : $d"; done
+fi
+
+if [ -n "$NOUVELLE_CLE" ]; then
+    etape "Nouvelle clé publique"
+    mkdir -p "$P/cles"
+    grep -q '^untrusted comment:' "$NOUVELLE_CLE" || die "$NOUVELLE_CLE n'est pas une clé publique minisign"
+    cp "$NOUVELLE_CLE" "$P/cles/maj.pub"
+fi
+
+etape "Manifeste"
+(
+    cd "$P"
+    find . -type f ! -name manifest.json | sed 's|^\./||' | sort | while read -r f; do
+        printf '%s\t%s\n' "$f" "$(sha256sum "$f" | cut -d' ' -f1)"
+    done
+) > "$TRAVAIL/empreintes"
+[ -s "$TRAVAIL/empreintes" ] || die "paquet vide : rien à mettre à jour"
+python3 -I - "$TRAVAIL/empreintes" "$VERSION" > "$P/manifest.json" <<'PY'
+import json, sys, datetime
+files = dict(l.rstrip("\n").split("\t") for l in open(sys.argv[1]))
+print(json.dumps({"format": 1, "version": int(sys.argv[2]),
+                  "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                  "files": files}, indent=1))
+PY
+head -20 "$P/manifest.json"
+
+etape "Archive et signature"
+NOM="barbacane-maj-$VERSION.bcu"
+tar -C "$P" --owner=0 --group=0 --numeric-owner -cf - . | zstd -q -19 -T0 -o "$SORTIE/$NOM"
+minisign -S -s "$CLE" -m "$SORTIE/$NOM" -t "barbacane-maj version $VERSION" || die "signature échouée"
+PUB="${CLE%.key}.pub"
+if [ -f "$PUB" ]; then
+    minisign -V -p "$PUB" -m "$SORTIE/$NOM" >/dev/null || die "la signature ne se vérifie pas avec $PUB"
+fi
+ls -lh "$SORTIE/$NOM" "$SORTIE/$NOM.minisig"
+echo
+echo "Copiez $NOM et $NOM.minisig à la racine d'une clé USB, puis sur la borne :"
+echo "Administration → Mettre à jour → Lire et appliquer (clé sur le port d'entrée)."
