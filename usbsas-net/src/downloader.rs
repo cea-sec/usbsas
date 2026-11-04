@@ -136,9 +136,7 @@ impl RunningState {
             )));
         }
 
-        // Even if the archive is gzipped, we're expecting its uncompressed size
-        // here
-        // XXX TODO check enough space local
+        // Even if the archive is gzipped, we're expecting its uncompressed size here
         let size = resp
             .headers()
             .get("X-Uncompressed-Content-Length")
