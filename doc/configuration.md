@@ -288,6 +288,17 @@ port path of devices when they are plugged, `lsusb -t` can also be used. Keep
 in mind that USB 3 ports usually also handle USB 2: the same physical port
 corresponds to two buses, list both.
 
+Example:
+
+```
+$ ./target/debug/usbsas-devmonitor
+[INFO  usbsas_devmonitor] Add Mass Storage device (5, 12), on USB port: [5, 2, 3, 1]
+[INFO  usbsas_devmonitor] Add Mass Storage device (2, 2), on USB port: [2, 1]
+[INFO  usbsas_devmonitor] Add HID device (3, 6), on USB port: [3, 3]
+[INFO  usbsas_devmonitor] Remove device (2, 2)
+[INFO  usbsas_devmonitor] Add Mass Storage device (6, 5), on USB port: [6, 2, 2]
+```
+
 ### <a name="graphicalinterface">Graphical interface</a>
 
 ```toml
