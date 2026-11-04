@@ -287,7 +287,6 @@ pub(crate) fn apply_libusb_rules(ctx: &mut Context, device_fd: RawFd) -> Result<
         ],
     )?;
 
-    // XXX poll() takes as first arg an array of struct pollfd, can we use comparators for this ?
     #[cfg(not(target_arch = "aarch64"))]
     ctx.allow_syscall(Syscall::poll)?;
     #[cfg(target_arch = "aarch64")]

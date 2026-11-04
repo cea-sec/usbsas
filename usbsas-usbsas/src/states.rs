@@ -648,6 +648,7 @@ impl RunState for DownloadSrcState {
             .comm
             .archiveinfos(proto::downloader::RequestArchiveInfos { path: remote_path })?
             .size;
+
         if self
             .transfer
             .max_dst_size
@@ -657,6 +658,16 @@ impl RunState for DownloadSrcState {
                 "Files to download ({archive_size}B) would be larger than destination size, aborting transfer"
             );
         }
+        if self
+            .config
+            .available_space
+            .is_some_and(|size| archive_size > size)
+        {
+            bail!(
+                "Files to download ({archive_size}B) would be larger than available local space, aborting transfer"
+            );
+        }
+
         info!(
             "downloading archive of user '{}' ({archive_size}B) from {}",
             self.transfer.userid, self.transfer.src
