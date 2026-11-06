@@ -16,6 +16,26 @@ if [ "$1" = "configure" ] || [ "$1" = "reconfigure" ]; then
 
     systemctl mask getty@tty2.service
     systemctl mask autovt@tty2.service
+
+    # With PAMName=, pam_systemd moves cage to a session scope in the slice of
+    # the user, where the cgroup settings of the service don't apply. Keep in
+    # sync with the service.
+    client_slice_dir="/etc/systemd/system/user-$(id -u usbsas-client).slice.d"
+    mkdir -p "$client_slice_dir"
+    cat > "$client_slice_dir/50-usbsas-client.conf" <<EOF
+[Slice]
+MemoryHigh=1536M
+MemoryMax=2G
+MemorySwapMax=0
+TasksMax=512
+DevicePolicy=closed
+DeviceAllow=/dev/tty2 rw
+DeviceAllow=char-drm rw
+DeviceAllow=char-input rw
+EOF
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload
+    fi
 fi
 
 #DEBHELPER#
