@@ -2,6 +2,10 @@
 Description=USB HID dealer
 Wants=systemd-udevd.service
 After=systemd-udevd.service
+# DeviceAllow=char-usb_device is resolved when the service starts, only if
+# usbcore is already loaded.
+Wants=modprobe@usbcore.service
+After=modprobe@usbcore.service
 
 [Service]
 User=usbsas-hid
@@ -9,6 +13,58 @@ Type=simple
 Environment="RUST_LOG=info"
 ExecStart=/usr/libexec/hid-dealer
 Restart=always
+UMask=0077
+
+# Resources. There is one hid-user process per device: this also limits what
+# a device pretending to be a hub full of HID devices can do.
+MemoryHigh=64M
+MemoryMax=128M
+MemorySwapMax=0
+LimitCORE=0
+TasksMax=64
+
+# File system
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoExecPaths=/
+ExecPaths=/usr -/bin -/sbin -/lib -/lib64
+
+# Devices
+DevicePolicy=closed
+DeviceAllow=char-usb_device rw
+DeviceAllow=/dev/uinput rw
+
+# Kernel
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectProc=invisible
+
+# Privileges and processes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+PrivateIPC=yes
+RemoveIPC=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+# Network. PrivateNetwork= can't be used: udev events are only sent in the host
+# network namespace.
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+
+# Syscalls. usbsas processes sandbox themselves: landlock and seccomp aren't in
+# @system-service and must remain available.
+SystemCallArchitectures=native
+SystemCallFilter=@system-service landlock_create_ruleset landlock_add_rule landlock_restrict_self seccomp
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
 
 [Install]
 WantedBy=graphical.target usbsas-client.service
