@@ -7,7 +7,7 @@ Ce guide s'adresse à la personne qui prépare une borne. Durée : environ 30 mi
 
 | Élément | Remarque |
 |---|---|
-| Un PC x86_64 (HP, Dell…) | 8 Go de RAM minimum, disque interne ≥ 32 Go. **Le disque sera entièrement effacé.** |
+| Un PC x86_64 (HP, Dell…) | 16 Go de RAM minimum, disque interne ≥ 32 Go. **Le disque sera entièrement effacé.** |
 | Une clé USB ≥ 2 Go | Elle servira de support d'installation (son contenu sera effacé). |
 | Un poste administrateur connecté à Internet | Debian 13, ou n'importe quel Linux avec Docker, pour fabriquer l'ISO. |
 | Un écran tactile, ou un écran et une souris | Le clavier n'est utile qu'au réglage du BIOS. |
