@@ -394,7 +394,15 @@ pub fn view(app: &App) -> Element<'_, Msg> {
             }
             let plugged: Vec<UsbDevice> = app.devices.usb.iter().map(|(_, d)| d.clone()).collect();
             let mut add = Column::new().spacing(8);
+            let deja: Vec<serde_json::Value> = etat["enrolled"].as_array().cloned().unwrap_or_default();
             for d in plugged {
+                // Une clé déjà enrôlée n'est plus proposée.
+                if deja.iter().any(|k| k["serial"].as_str() == Some(d.serial.as_str())
+                    && k["vendorid"].as_u64() == Some(u64::from(d.vendorid))
+                    && k["productid"].as_u64() == Some(u64::from(d.productid)))
+                {
+                    continue;
+                }
                 add = add.push(bouton(&format!("Enrôler : {}", barbacane_parcours::describe(&d)), am(AdminMsg::Enroler(d)), style::primaire));
             }
             column![
@@ -405,11 +413,10 @@ pub fn view(app: &App) -> Element<'_, Msg> {
                 ]
                 .spacing(20)
                 .align_y(Alignment::Center),
-                container(scrollable(list).height(Length::Fixed(220.0)).width(Length::Fixed(1000.0))).padding(12).style(style::carte),
+                container(scrollable(list).height(Length::Fixed(120.0)).width(Length::Fixed(1000.0))).padding(12).style(style::carte),
                 petit("Pour enrôler une clé, branchez-la : elle apparaît ci-dessous."),
                 add,
-                msg,
-                retour,
+                row![msg, retour].spacing(20).align_y(Alignment::Center),
             ]
             .spacing(20)
             .align_x(Alignment::Center)

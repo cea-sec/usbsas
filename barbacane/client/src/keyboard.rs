@@ -84,7 +84,7 @@ impl Input {
             Layout::Digits => DIGITS,
         };
         let size = if self.layout == Layout::Digits {
-            70.0
+            60.0
         } else {
             54.0
         };

@@ -70,7 +70,7 @@ echo 246813 | "$B/target/debug/barbacane-admind" -c "$W/admind.toml" --set-pin >
     export USBSAS_MOCK_IN_DEV="$IN" USBSAS_MOCK_OUT_DEV="$OUT"
     while true; do setsid -w "$REPO/target/release/usbsas-usbsas" -c "$W/usbsas.toml" -s "$W/run" >> "$W/usbsas.log" 2>&1; sleep 0.2; done
 ) & echo $! >> "$W/pids"
-Xvfb :42 -screen 0 1600x1000x24 >/dev/null 2>&1 & echo $! >> "$W/pids"
+Xvfb :42 -screen 0 1280x768x24 >/dev/null 2>&1 & echo $! >> "$W/pids"
 sleep 2
 DISPLAY=:42 WGPU_BACKEND=gl "$B/target/debug/barbacane-client" -c "$W/client.toml" > "$W/client.log" 2>&1 & echo $! >> "$W/pids"
 echo "environnement prêt dans $W (arrêt : kill \$(cat $W/pids))"

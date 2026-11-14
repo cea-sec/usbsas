@@ -724,8 +724,9 @@ impl App {
         if !refused.is_empty() || !a.filtered.is_empty() {
             c = c.push(texte("Ce qui ne passe pas, et pourquoi :")).push(
                 container(
+                    // Hauteur bornée : les boutons doivent rester visibles en 1280×768.
                     scrollable(list)
-                        .height(Length::Fixed(300.0))
+                        .height(Length::Fixed(170.0))
                         .width(Length::Fixed(900.0)),
                 )
                 .padding(16)
@@ -859,13 +860,13 @@ fn grand_choix<'a>(t: &str, d: &str, m: Msg) -> Element<'a, Msg> {
 fn pastille<'a>(n: &str, l: &str, c: iced::Color) -> Element<'a, Msg> {
     container(
         column![
-            text(n.to_string()).size(54).color(c),
+            text(n.to_string()).size(44).color(c),
             text(l.to_string()).size(style::TEXTE_TAILLE)
         ]
         .align_x(Alignment::Center),
     )
     .center_x(Length::Fixed(320.0))
-    .padding(20)
+    .padding(12)
     .width(Length::Fixed(320.0))
     .style(style::carte)
     .into()
