@@ -1,0 +1,14 @@
+[workspace]
+resolver = "3"
+members = ["analyzer", "parcours", "client", "admind"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0"
+
+# Infos de débogage réduites : l'espace disque des builds de test reste raisonnable.
+[profile.dev]
+debug = "line-tables-only"
+[profile.dev.package."*"]
+debug = false
