@@ -6,7 +6,11 @@ set -e
 X=/cdrom/barbacane
 mkdir -p /target/var/cache/barbacane-debs
 cp $X/debs/*.deb /target/var/cache/barbacane-debs/
-in-target sh -c 'apt-get install -y -q --no-install-recommends /var/cache/barbacane-debs/*.deb'
+# Aucune source apt : sinon apt prend sur la source « cdrom: » ajoutée par l'installateur les
+# paquets aussi présents dans le netinst, et sa méthode cdrom attend indéfiniment le disque
+# (installation figée à 14 % de « Fin de l'installation »).
+in-target sh -c 'apt-get install -y -q --no-install-recommends -o Dir::Etc::SourceList=/dev/null \
+    -o Dir::Etc::SourceParts=/nonexistent /var/cache/barbacane-debs/*.deb'
 rm -rf /target/var/cache/barbacane-debs
 mkdir -p /target/etc/barbacane
 [ -f $X/maj.pub ] && cp $X/maj.pub /target/etc/barbacane/maj.pub
