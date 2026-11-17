@@ -14,6 +14,7 @@ pub use downloader::Downloader;
 pub use jsonparser::JsonParser;
 pub use uploader::Uploader;
 
+#[cfg(feature = "authkrb")]
 use base64::{Engine as _, engine as b64eng};
 #[cfg(feature = "authkrb")]
 use libgssapi::{
@@ -22,8 +23,9 @@ use libgssapi::{
     name::Name,
     oid::{GSS_MECH_KRB5, GSS_NT_HOSTBASED_SERVICE, OidSet},
 };
+#[cfg(feature = "authkrb")]
+use reqwest::{Method, StatusCode};
 use reqwest::{
-    Method, StatusCode,
     blocking::{Body, Client, Response},
     header::{HeaderMap, HeaderValue},
 };
@@ -266,24 +268,40 @@ impl HttpClient {
     fn get(&mut self, url: &str) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
-        let mut resp = self.client.get(url).headers(self.headers.clone()).send()?;
-        #[cfg(feature = "authkrb")]
-        if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
-            resp = self.req_with_krb_auth(Method::GET, url)?;
+
+        #[cfg(not(feature = "authkrb"))]
+        {
+            Ok(self.client.get(url).headers(self.headers.clone()).send()?)
         }
-        Ok(resp)
+
+        #[cfg(feature = "authkrb")]
+        {
+            let mut resp = self.client.get(url).headers(self.headers.clone()).send()?;
+            if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
+                resp = self.req_with_krb_auth(Method::GET, url)?;
+            }
+            Ok(resp)
+        }
     }
 
     /// HEAD request, authenticating if the server answers 401.
     fn head(&mut self, url: &str) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
-        let mut resp = self.client.head(url).headers(self.headers.clone()).send()?;
-        #[cfg(feature = "authkrb")]
-        if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
-            resp = self.req_with_krb_auth(Method::HEAD, url)?;
+
+        #[cfg(not(feature = "authkrb"))]
+        {
+            Ok(self.client.head(url).headers(self.headers.clone()).send()?)
         }
-        Ok(resp)
+
+        #[cfg(feature = "authkrb")]
+        {
+            let mut resp = self.client.head(url).headers(self.headers.clone()).send()?;
+            if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
+                resp = self.req_with_krb_auth(Method::HEAD, url)?;
+            }
+            Ok(resp)
+        }
     }
 
     /// POST request. With Kerberos, an OPTIONS request authenticates first.
