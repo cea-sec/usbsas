@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 actix-files = "0.7"
-actix-web = { version = "4.18", default-features = false, features = ["macros", "compress-gzip"] }
+actix-web = { version = "4.20", default-features = false, features = ["macros", "compress-gzip"] }
 clap = "4.6"
 env_logger = "0.11"
 flate2 = "1.1"
