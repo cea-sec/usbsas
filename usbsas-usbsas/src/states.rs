@@ -38,7 +38,7 @@ use usbsas_proto::{
     common::{FileType, FsType, Network, OutFileType, Status, UsbDevice, device::Device},
     usbsas::request::Msg,
 };
-use usbsas_utils::READ_FILE_MAX_SIZE;
+use usbsas_utils::{MAX_PROTO_MESS_SIZE, READ_FILE_MAX_SIZE};
 
 /// State of the server, see the module documentation for transitions.
 pub enum State {
@@ -201,11 +201,16 @@ pub trait RunState {
             ftype: FileType::Metadata.into(),
             timestamp: report.timestamp,
         })?;
-        writer.comm.writefile(proto::writedst::RequestWriteFile {
-            path: path.clone(),
-            offset: 0,
-            data: report_data,
-        })?;
+
+        let mut offset = 0u64;
+        for chunk in report_data.chunks(MAX_PROTO_MESS_SIZE as usize) {
+            writer.comm.writefile(proto::writedst::RequestWriteFile {
+                path: path.clone(),
+                offset,
+                data: chunk.to_vec(),
+            })?;
+            offset += chunk.len() as u64;
+        }
         writer
             .comm
             .endfile(proto::writedst::RequestEndFile { path })?;
