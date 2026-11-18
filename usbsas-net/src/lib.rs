@@ -167,6 +167,10 @@ pub enum Error {
 /// Result type of the network processes.
 pub type Result<T> = std::result::Result<T, Error>;
 
+// in bytes/s, slowest supported link
+const MIN_THROUGHPUT: u64 = 256 * 1024;
+const BASE_TIMEOUT: Duration = Duration::from_secs(30);
+
 // Wrapper around reqwest::Client to transparently perform kerberos authentication
 pub(crate) struct HttpClient {
     client: Client,
@@ -179,7 +183,8 @@ impl HttpClient {
     fn new(#[cfg(feature = "authkrb")] krb_service_name: Option<String>) -> Result<Self> {
         let client = Client::builder()
             .gzip(true)
-            .connect_timeout(Duration::from_secs(30))
+            .connect_timeout(BASE_TIMEOUT)
+            .tcp_user_timeout(BASE_TIMEOUT)
             .build()?;
         Ok(Self {
             client,
@@ -305,7 +310,7 @@ impl HttpClient {
     }
 
     /// POST request. With Kerberos, an OPTIONS request authenticates first.
-    fn post(&mut self, url: &str, body: Body) -> Result<Response> {
+    fn post(&mut self, url: &str, body: Body, size: u64) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
         // First try a OPTIONS on url to avoid uploading (potentially large) body
@@ -321,10 +326,14 @@ impl HttpClient {
                 self.req_with_krb_auth(Method::OPTIONS, url)?;
             }
         }
+
+        // Estimate timeout value based on size and eventual slow link
+        let timeout = BASE_TIMEOUT + Duration::from_secs(size / MIN_THROUGHPUT);
         Ok(self
             .client
             .post(url)
             .headers(self.headers.clone())
+            .timeout(timeout)
             .body(body)
             .send()?)
     }

@@ -149,7 +149,7 @@ impl RunningState {
 
         let body = Body::sized(filereaderprogress, filesize);
 
-        let resp = http_client.post(&url, body)?;
+        let resp = http_client.post(&url, body, filesize)?;
         if !resp.status().is_success() {
             return Err(Error::Upload(format!(
                 "Unknown status code {:?}",
