@@ -146,8 +146,9 @@ impl RunningState {
             Ok(res) => {
                 trace!("upload for scan result: {:#?}", res);
                 if res.status == "uploaded" {
-                    // XXX TODO uploaded but not id returned
-                    let id = res.id.ok_or(Error::BadRequest)?;
+                    let id = res.id.ok_or(Error::Upload(
+                        "data uploaded but no analysis ID returned".to_string(),
+                    ))?;
                     self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
                 }
             }
