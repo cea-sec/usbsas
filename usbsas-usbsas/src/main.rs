@@ -3,20 +3,25 @@
 //! socket (`-s`) or via pipes inherited from its parent.
 
 use anyhow::{Context, Result, bail};
-use log::{error, info};
+use log::{error, info, warn};
+use nix::sys::epoll::{Epoll, EpollCreateFlags};
 use std::{
     env,
     fs::{self, File, Permissions},
+    mem::forget,
     os::{
         fd::AsRawFd,
         unix::{fs::PermissionsExt, net::UnixListener},
     },
+    process::exit,
+    sync::atomic::Ordering,
 };
 use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespUsbsas, ToFd};
 use usbsas_config::{Config, conf_parse, conf_read};
 use usbsas_usbsas::{
     TmpFiles,
-    children::Children,
+    children::{Children, END_SUCCESS},
+    socket::wait_for_socket_shutdown,
     states::{EndState, InitState, State},
 };
 use usbsas_utils::clap::UsbsasClap;
@@ -162,7 +167,7 @@ fn main() -> Result<()> {
         }
         let socket_path = format!("{}/usbsas.sock", dir.trim_end_matches('/'));
         if let Ok(true) = std::path::Path::new(&socket_path).try_exists() {
-            log::warn!("socket already exists, probably residual, removing it");
+            warn!("socket already exists, probably residual, removing it");
             fs::remove_file(&socket_path).expect("remove socket");
         };
         let listener = UnixListener::bind(&socket_path).context("bind")?;
@@ -175,19 +180,52 @@ fn main() -> Result<()> {
             None => panic!("shouldn't happen"),
         };
         info!("client connected");
-        let comm = Comm::new(stream.try_clone().context("clone stream")?, stream);
+        let comm = Comm::new(
+            stream.try_clone().context("clone stream")?,
+            stream.try_clone().context("clone stream")?,
+        );
+        tmpfiles.socket_path = Some(socket_path.clone());
+
+        // Create an epoll(7) thread to terminate the process and its children (thanks to
+        // `prctl(PR_SET_PDEATHSIG)`), should the client shut down or close its comm and
+        // the main thread not already be answering an `End` request
+        let epoll = Epoll::new(EpollCreateFlags::EPOLL_CLOEXEC)?;
+        let tmpfiles_handle = tmpfiles.clone();
+        let _ = std::thread::spawn(move || {
+
+            let epoll_res = wait_for_socket_shutdown(&stream, epoll);
+            if let Err(ref err) = epoll_res {
+                error!("while epolling for client socket shutdown: {err}");
+            }
+            if END_SUCCESS.load(Ordering::Relaxed) {
+                info!("main thread is already ending properly: stopping epoll thread");
+                forget(tmpfiles_handle);
+                return;
+            }
+            warn!(
+                "{}epoll thread handles the end sequence",
+                if epoll_res.is_ok() {
+                    "client socket was shutdown, "
+                } else {
+                    ""
+                }
+            );
+            drop(stream);
+            drop(tmpfiles_handle);
+            exit(1);
+        });
+
         let socket = usbsas_sandbox::usbsas::UsbsasSocket {
             listen: listener.as_raw_fd(),
             read: comm.input_fd(),
             write: comm.output_fd(),
-            path: socket_path.clone(),
+            path: socket_path,
         };
         pipes_read.push(socket.read);
         pipes_write.push(socket.write);
         let paths_rm: Option<&[&str]> = Some(&[config.out_directory.as_str(), dir]);
         usbsas_sandbox::usbsas::sandbox(pipes_read, pipes_write, Some(socket), paths_rm)
             .context("seccomp")?;
-        tmpfiles.socket_path = Some(socket_path);
         main_loop(comm, children, config, tmpfiles).context("main loop")
     } else {
         let comm: ComRpUsbsas = Comm::from_env()?;

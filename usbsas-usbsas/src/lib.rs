@@ -6,6 +6,7 @@
 //! transfer and the generation of its report.
 
 pub mod children;
+pub mod socket;
 use crate::children::Children;
 pub mod filter;
 pub mod states;
@@ -303,6 +304,7 @@ fn report_infos() -> (String, time::OffsetDateTime, String) {
 
 /// Working files of the session, removed on drop (unless `keep`). The socket is
 /// always removed.
+#[derive(Clone)]
 pub struct TmpFiles {
     pub tar_path: String,
     pub clean_tar_path: String,
