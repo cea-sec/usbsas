@@ -178,7 +178,7 @@ impl RunningState {
         };
         let body = Body::sized(filereaderprogress, filesize);
         trace!("upload to {}", self.url);
-        let resp = self.http_client.post(&self.url, body)?;
+        let resp = self.http_client.post(&self.url, body, filesize)?;
         if !resp.status().is_success() {
             return Err(Error::Remote);
         }
