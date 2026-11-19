@@ -16,14 +16,15 @@
 //! has a generation number, responses tagged with an older generation (sent
 //! before a reset) are dropped.
 
-use iced::{Task, time::Instant};
-use smol::{Async, lock::Mutex};
+use iced::{Task, futures::FutureExt as _, time::Instant};
+use smol::{Async, Timer, future::FutureExt as _, lock::Mutex};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     os::unix::net::UnixStream,
     path::Path,
     sync::Arc,
+    time::Duration,
 };
 use usbsas_comm::{ComRqAsyncUsbsas, CommAsync};
 use usbsas_config::{conf_parse, conf_read};
@@ -244,7 +245,7 @@ pub enum Response {
 /// Try to end the usbsas session when the client exits.
 impl Drop for GUI {
     fn drop(&mut self) {
-        if let Some(comm) = self.comm.take() {
+        if let Some((comm, _)) = self.comm.take() {
             match comm.try_lock() {
                 Some(mut guard) => {
                     if smol::block_on(guard.end()).is_err() {
@@ -314,9 +315,11 @@ pub fn client_clap() -> clap::Command {
 
 /// The iced application.
 pub struct GUI {
-    /// Connection to usbsas, `None` until connected and during resets. Shared
-    /// with the tasks sending requests.
-    comm: Option<Arc<Mutex<ComRqUsbsas>>>,
+    /// `None` until connected and during resets.
+    /// 0: Connection to usbsas, shared with the tasks sending requests.
+    /// 1: Owned socket, allows for a shutdown of the socket after the timeout for a potentially
+    ///    blocked `comm` has expired, thus signaling the server that a reset is going on.
+    comm: Option<(Arc<Mutex<ComRqUsbsas>>, UnixStream)>,
     /// Incremented on each reset to discard messages of previous sessions
     generation: u64,
     /// A user-triggered request is in flight
@@ -485,16 +488,19 @@ impl GUI {
     fn try_connect(&mut self) {
         if self.comm.is_none() {
             // connect() on a unix socket doesn't block, no need to make it async
-            let connect = || -> std::io::Result<ComRqUsbsas> {
+            let connect = || -> std::io::Result<(ComRqUsbsas, UnixStream)> {
                 let stream = UnixStream::connect(&self.socket_path)?;
-                Ok(CommAsync::new(
-                    Async::new(stream.try_clone()?)?,
-                    Async::new(stream)?,
+                Ok((
+                    CommAsync::new(
+                        Async::new(stream.try_clone()?)?,
+                        Async::new(stream.try_clone()?)?,
+                    ),
+                    stream,
                 ))
             };
             match connect() {
-                Ok(comm) => {
-                    self.comm = Some(Arc::new(Mutex::new(comm)));
+                Ok((comm, stream)) => {
+                    self.comm = Some((Arc::new(Mutex::new(comm)), stream));
                     self.state = State::Init;
                 }
                 Err(err) => {
@@ -521,15 +527,45 @@ impl GUI {
         let generation = self.generation;
 
         match self.comm.take() {
-            Some(comm) => Task::perform(
+            Some((comm, shutdown_handle)) => Task::perform(
                 async move {
-                    // Waits for a request still in flight before sending End
-                    let mut guard = comm.lock().await;
-                    if let Err(err) = guard.end().await {
-                        log::error!("couldn't end usbsas properly: {}", err);
+                    // Waits for a request still in flight before sending End, shutting socket down
+                    // on timeout
+                    const TIMEOUT: Duration = Duration::from_millis(5000);
+                    let comm_or_shutdown = comm
+                        .lock()
+                        .map(Ok)
+                        .or(async {
+                            Timer::after(TIMEOUT).await;
+                            log::warn!("shutting the socket down after waiting for in flight request timed out");
+                            shutdown_handle.shutdown(std::net::Shutdown::Both)?;
+                            Err::<_, std::io::Error>(std::io::ErrorKind::TimedOut.into())
+                        })
+                        .await;
+
+                    let mut guard = match comm_or_shutdown {
+                        Ok(comm) => comm,
+                        Err(err) => {
+                            if err.kind() != std::io::ErrorKind::TimedOut {
+                                log::error!("couldn't shutdown socket: {err}");
+                            }
+                            return;
+                        }
+                    };
+
+                    if let Err(err) = guard
+                        .end()
+                        .or(async {
+                            Timer::after(TIMEOUT).await;
+                            Err(std::io::ErrorKind::TimedOut.into())
+                        })
+                        .await
+                    {
+                        log::error!("couldn't end usbsas properly: {err}");
                     }
+
                     if let Err(err) = guard.input().get_ref().shutdown(std::net::Shutdown::Both) {
-                        log::error!("couldn't shutdown socket: {}", err);
+                        log::error!("couldn't shutdown socket: {err}");
                     };
                 },
                 move |_| Message::ResetDone(generation),
