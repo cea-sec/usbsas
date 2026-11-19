@@ -6,6 +6,7 @@
 //! transfer and the generation of its report.
 
 pub mod children;
+pub mod socket;
 use crate::children::Children;
 pub mod filter;
 pub mod states;

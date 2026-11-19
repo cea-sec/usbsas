@@ -3,7 +3,14 @@
 //! socket (`-s`) or via pipes inherited from its parent.
 
 use anyhow::{Context, Result, bail};
-use log::{error, info};
+use log::{error, info, warn};
+use nix::{
+    sys::signal::{
+        self,
+        Signal::{SIGKILL, SIGTERM},
+    },
+    unistd::Pid,
+};
 use std::{
     env,
     fs::{self, File, Permissions},
@@ -11,12 +18,15 @@ use std::{
         fd::AsRawFd,
         unix::{fs::PermissionsExt, net::UnixListener},
     },
+    thread::sleep,
+    time::Duration,
 };
 use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespUsbsas, ToFd};
 use usbsas_config::{Config, conf_parse, conf_read};
 use usbsas_usbsas::{
     TmpFiles,
     children::Children,
+    socket::wait_for_socket_shutdown,
     states::{EndState, InitState, State},
 };
 use usbsas_utils::clap::UsbsasClap;
@@ -162,7 +172,7 @@ fn main() -> Result<()> {
         }
         let socket_path = format!("{}/usbsas.sock", dir.trim_end_matches('/'));
         if let Ok(true) = std::path::Path::new(&socket_path).try_exists() {
-            log::warn!("socket already exists, probably residual, removing it");
+            warn!("socket already exists, probably residual, removing it");
             fs::remove_file(&socket_path).expect("remove socket");
         };
         let listener = UnixListener::bind(&socket_path).context("bind")?;
@@ -175,7 +185,37 @@ fn main() -> Result<()> {
             None => panic!("shouldn't happen"),
         };
         info!("client connected");
-        let comm = Comm::new(stream.try_clone().context("clone stream")?, stream);
+        let comm = Comm::new(
+            stream.try_clone().context("clone stream")?,
+            stream.try_clone().context("clone stream")?,
+        );
+
+        // Create an epoll(7) thread to terminate the process and its children if the client socket is shutdown
+        let pid = std::process::id();
+        let _ = std::thread::spawn(move || {
+            if let Err(e) = wait_for_socket_shutdown(&stream) {
+                error!("while epolling for client socket shutdown: {}", e);
+            }
+            warn!("client socket was shutdown: sending SIGTERM to main thread");
+
+            let mut tries = 0;
+            while let Err(e) = signal::kill(Pid::from_raw(pid as i32), SIGTERM)
+                && tries < 10
+            {
+                error!(
+                    "epoll thread coudln't kill the main thread with SIGTERM: {e}. Retrying in 1s..."
+                );
+                tries += 1;
+                sleep(Duration::from_secs(1));
+            }
+            while let Err(e) = signal::kill(Pid::from_raw(pid as i32), SIGKILL) {
+                error!(
+                    "epoll thread coudln't kill the main thread with SIGKILL: {e}. Retrying in 1s..."
+                );
+                sleep(Duration::from_secs(1));
+            }
+        });
+
         let socket = usbsas_sandbox::usbsas::UsbsasSocket {
             listen: listener.as_raw_fd(),
             read: comm.input_fd(),
