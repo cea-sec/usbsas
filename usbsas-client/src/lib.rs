@@ -17,13 +17,14 @@
 //! before a reset) are dropped.
 
 use iced::{Task, time::Instant};
-use smol::{Async, lock::Mutex};
+use smol::{Async, Timer, future::FutureExt, lock::Mutex};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     os::unix::net::UnixStream,
     path::Path,
     sync::Arc,
+    time::Duration,
 };
 use usbsas_comm::{ComRqAsyncUsbsas, CommAsync};
 use usbsas_config::{conf_parse, conf_read};
@@ -524,10 +525,20 @@ impl GUI {
             Some(comm) => Task::perform(
                 async move {
                     // Waits for a request still in flight before sending End
+                    // XXX: handle case where comm's buffer is full and the main process waits on it
                     let mut guard = comm.lock().await;
-                    if let Err(err) = guard.end().await {
+
+                    if let Err(err) = guard
+                        .end()
+                        .or(async {
+                            Timer::after(Duration::from_secs(5)).await;
+                            Err(std::io::ErrorKind::TimedOut.into())
+                        })
+                        .await
+                    {
                         log::error!("couldn't end usbsas properly: {}", err);
                     }
+
                     if let Err(err) = guard.input().get_ref().shutdown(std::net::Shutdown::Both) {
                         log::error!("couldn't shutdown socket: {}", err);
                     };
