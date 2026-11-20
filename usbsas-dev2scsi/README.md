@@ -32,6 +32,13 @@ without being asked.
 | `ReadSectors` | raw sectors (`offset` and `count` in sectors)  |
 | `End`         | exit                                           |
 
+Every request gets a response, an error if it is unexpected (e.g. a second
+`Partitions` once they are listed). Reads beyond the end of the device, or
+larger than a message (`MAX_PROTO_MESS_SIZE`), are refused.
+
+If the device can't be opened, or after an error, the process only waits for
+`End`.
+
 ## Sandbox
 
 seccomp, with access only to the device opened at unlock.
