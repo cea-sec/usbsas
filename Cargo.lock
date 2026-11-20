@@ -6517,7 +6517,6 @@ version = "0.1.5"
 dependencies = [
  "bitvec",
  "byteorder",
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
