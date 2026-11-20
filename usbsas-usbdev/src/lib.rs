@@ -267,7 +267,7 @@ impl CurrentDevices {
             .devices
             .remove(&device.syspath().to_string_lossy().to_string())
         {
-            debug!("see you {}-{}", dev.busnum, dev.devnum);
+            info!("see you {}-{}", dev.busnum, dev.devnum);
         }
         Ok(())
     }
