@@ -5007,7 +5007,6 @@ checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
 dependencies = [
  "base64 0.23.1",
  "bytes",
- "encoding_rs",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -5020,7 +5019,6 @@ dependencies = [
  "hyper-util",
  "js-sys",
  "log",
- "mime",
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
@@ -5028,8 +5026,6 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
- "serde",
- "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
@@ -6619,7 +6615,6 @@ version = "0.3.2"
 dependencies = [
  "base64 0.23.1",
  "byteorder",
- "env_logger",
  "libgssapi",
  "log",
  "reqwest",
