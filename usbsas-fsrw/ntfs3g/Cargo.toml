@@ -6,7 +6,7 @@ edition = "2024"
 license = "GPL-3.0"
 
 [build-dependencies]
-bindgen = "0.73"
+bindgen = { version = "0.73", default-features = false, features = ["runtime"] }
 cc = "1.11"
 
 [dependencies]

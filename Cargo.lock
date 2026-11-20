@@ -675,8 +675,6 @@ dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "log",
- "prettyplease 0.3.0",
  "proc-macro2",
  "quote",
  "regex",
