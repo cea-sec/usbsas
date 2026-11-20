@@ -191,7 +191,25 @@ fn main() -> Result<()> {
         // the main thread not already be answering an `End` request
         let epoll = Epoll::new(EpollCreateFlags::EPOLL_CLOEXEC)?;
         let tmpfiles_handle = tmpfiles.clone();
+        let paths_rm_owned: [String; 2] = [config.out_directory.clone(), dir.clone()];
         let _ = std::thread::spawn(move || {
+            let paths_rm = paths_rm_owned
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            let sandbox_res = usbsas_sandbox::usbsas::sandbox_epoll_thread(
+                stream.as_raw_fd(),
+                epoll.0.as_raw_fd(),
+                Some(paths_rm.as_slice()),
+            )
+            .context("seccomp");
+            if let Err(err) = sandbox_res {
+                error!("epoll thread sandbox couldn't be enforced: {err}");
+                drop(stream);
+                drop(epoll);
+                drop(tmpfiles_handle);
+                exit(1);
+            }
 
             let epoll_res = wait_for_socket_shutdown(&stream, epoll);
             if let Err(ref err) = epoll_res {

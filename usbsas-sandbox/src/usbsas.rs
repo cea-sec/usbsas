@@ -76,3 +76,103 @@ pub fn sandbox(
 
     Ok(())
 }
+
+/// seccomp: communication with the socket and the epoll fd,
+/// kill on children pgid with SIGKILL
+pub fn sandbox_epoll_thread(
+    socket_fd: RawFd,
+    epoll_fd: RawFd,
+    paths_rm: Option<&[&str]>,
+) -> Result<()> {
+    let mut ctx = seccomp::new_context_with_common_rules(vec![], vec![])?;
+
+    // epoll-related syscalls
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::epoll_ctl,
+        &[
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(epoll_fd as u64)),
+            Comparator::new(
+                1,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(libc::EPOLL_CTL_ADD as u64),
+            ),
+            Comparator::new(
+                2,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(socket_fd as u64),
+            ),
+        ],
+    )?;
+    #[cfg(target_env = "gnu")]
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        #[cfg(not(target_arch = "aarch64"))]
+        Syscall::epoll_wait,
+        #[cfg(target_arch = "aarch64")]
+        Syscall::epoll_pwait,
+        &[
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(epoll_fd as u64)),
+            Comparator::new(2, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
+            Comparator::new(3, Cmp::MaskedEq, u64::from(u32::MAX), Some(-1i32 as u64)),
+        ],
+    )?;
+    #[cfg(target_env = "musl")]
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::epoll_pwait,
+        &[
+            Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(epoll_fd as u64)),
+            Comparator::new(2, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
+            Comparator::new(3, Cmp::MaskedEq, u64::from(u32::MAX), Some(-1i32 as u64)),
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::close,
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(epoll_fd as u64),
+        )],
+    )?;
+
+    // Also allow our own socket fd to be closed
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::close,
+        &[Comparator::new(
+            0,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(socket_fd as u64),
+        )],
+    )?;
+
+    // probably stems from rust optimizations
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::madvise,
+        &[Comparator::new(
+            2,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(libc::MADV_DONTNEED as u64),
+        )],
+    )?;
+
+    // Allow unlinking and restrict with landlock
+    #[cfg(not(target_arch = "aarch64"))]
+    ctx.allow_syscall(Syscall::unlink)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::unlinkat)?;
+
+    crate::landlock(None, None, None, paths_rm, None)?;
+
+    ctx.load()?;
+
+    Ok(())
+}
