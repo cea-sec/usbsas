@@ -6,9 +6,8 @@ edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]
-env_logger = "0.11"
 log = "0.4"
-tar = "0.4"
+tar = { version = "0.4", default-features = false }
 thiserror = "2.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-proto = { path = "../usbsas-proto" }
