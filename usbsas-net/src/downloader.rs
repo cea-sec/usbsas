@@ -50,6 +50,7 @@ impl InitState {
     fn run(self, _comm: &mut ComRpDownloader) -> Result<State> {
         let config = conf_parse(&conf_read(&self.config_path)?)?;
         let net_conf = config.source_network.ok_or(Error::NoConf)?;
+        crate::check_url(&net_conf.url)?;
         let port = Url::parse(&net_conf.url)?
             .port_or_known_default()
             .ok_or(url::ParseError::InvalidPort)?;

@@ -19,6 +19,12 @@ out_directory = "/tmp/usbsas"
 # Logo/image displayed next to hostname in upper right corner of GUI
 #menu_img = "/path/to/image"
 
+# Network URLs (networks, source_network and analyzer):
+# Only https URLs are allowed, with TLS >= 1.3. Plain http (and TLS < 1.3) is
+# only accepted if usbsas is built with the "usbsas-net/allow-http" feature,
+# which is meant for tests and must not be enabled in production. The
+# 127.0.0.1 http URLs below are examples for test builds.
+
 # Destination "network". (Optional)
 # Upload copied files (in a tar) to a remote network.
 # description, longdescr and url are mandatory, krb_service_name is optional.

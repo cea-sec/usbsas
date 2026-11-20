@@ -162,6 +162,8 @@ pub enum Error {
     State,
     #[error("{0}")]
     Upload(String),
+    #[error("Insecure URL in configuration: '{0}', only https is allowed")]
+    InsecureUrl(String),
 }
 /// Result type of the network processes.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -170,6 +172,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 const MIN_THROUGHPUT: u64 = 256 * 1024;
 const BASE_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_REDIRECTS: usize = 3;
+
+/// Check that a configured URL uses https. Plain http is only accepted when
+/// built with the `allow-http` feature.
+pub(crate) fn check_url(url: &str) -> Result<()> {
+    if url::Url::parse(url)?.scheme() == "https" || cfg!(feature = "allow-http") {
+        Ok(())
+    } else {
+        Err(Error::InsecureUrl(url.to_string()))
+    }
+}
 
 // Wrapper around reqwest::Client to transparently perform kerberos authentication
 pub(crate) struct HttpClient {
@@ -341,5 +353,22 @@ impl HttpClient {
             .timeout(timeout)
             .body(body)
             .send()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn url_scheme() {
+        assert!(check_url("https://example.org/api").is_ok());
+        assert!(check_url("not an url").is_err());
+        let http = check_url("http://example.org/api");
+        if cfg!(feature = "allow-http") {
+            assert!(http.is_ok());
+        } else {
+            assert!(matches!(http, Err(Error::InsecureUrl(_))));
+        }
     }
 }

@@ -68,6 +68,7 @@ impl InitState {
             log::warn!("No analyzer conf, parking");
             return Ok(State::WaitEnd(WaitEndState {}));
         };
+        crate::check_url(&conf.url)?;
         let port = Url::parse(&conf.url)?
             .port_or_known_default()
             .ok_or(url::ParseError::InvalidPort)?;

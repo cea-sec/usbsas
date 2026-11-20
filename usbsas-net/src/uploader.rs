@@ -52,7 +52,7 @@ impl InitState {
         let mut connect_ports = Vec::new();
         #[cfg(feature = "authkrb")]
         connect_ports.push(crate::KRB_AS_PORT);
-        if let Some(networks) = config.networks {
+        if let Some(networks) = &config.networks {
             for network in networks {
                 connect_ports.push(
                     Url::parse(&network.url)?
@@ -91,6 +91,10 @@ impl InitState {
                 error!("bad unlock value");
                 return Ok(State::WaitEnd(WaitEndState {}));
             }
+        }
+
+        for network in config.networks.iter().flatten() {
+            crate::check_url(&network.url)?;
         }
 
         let file = File::open(self.tarpath)?;
