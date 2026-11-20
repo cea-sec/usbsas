@@ -680,6 +680,22 @@ fn mbr_ext3_partition() {
 }
 
 #[test]
+fn mbr_partition_out_of_device() {
+    // a partition (bad table or truncated image) beyond the end of the device
+    // doesn't prevent listing the others
+    let mut img = Img::new(2 * MIB);
+    img.mbr(&[(0x0c, 2048, 2048), (0x0c, 100_000, 2048)])
+        .fat32(2048 * SECTOR, b"OK         ");
+    assert_eq!(
+        list(&img.build()).unwrap(),
+        [
+            part(0x0c, 2048, MIB as u64, "OK", "FAT"),
+            part(0x0c, 100_000, MIB as u64, "Unknown", "Unknown"),
+        ]
+    );
+}
+
+#[test]
 fn mbr_invalid_status_is_no_table() {
     // invalid status byte: not a partition table, e.g. FAT boot code
     let mut img = Img::new(MIB);

@@ -130,6 +130,65 @@ fn handle_read_sectors(
     Ok(())
 }
 
+/// Detect the file system of `part` from `data`, its first
+/// `MAX_LEN_PART_HEADER` bytes, and read its label.
+fn detect_fs(part: &mut PartitionInfo, data: &[u8]) {
+    // FAT12 / FAT16
+    if let Ok("FAT") = str::from_utf8(&data[0x36..0x39]) {
+        part.type_str = "FAT".into();
+        if let Ok(name) = str::from_utf8(&data[0x2B..0x36]) {
+            part.name_str = name.into();
+        };
+        if part.ptype == 0 {
+            part.ptype = 0x6;
+        }
+    }
+    // FAT32
+    else if let Ok("FAT") = str::from_utf8(&data[0x52..0x55]) {
+        part.type_str = "FAT".into();
+        if let Ok(name) = str::from_utf8(&data[0x47..0x52]) {
+            part.name_str = name.into();
+        };
+        if part.ptype == 0 {
+            part.ptype = 0xb;
+        }
+    }
+    // EXFAT
+    else if let Ok("EXF") = str::from_utf8(&data[0x3..0x6]) {
+        part.type_str = "EXFAT".into();
+        if part.ptype == 0 {
+            part.ptype = 0x7;
+        }
+    }
+    // NTFS
+    else if let Ok("NTFS") = str::from_utf8(&data[0x3..0x7]) {
+        part.type_str = "NTFS".into();
+        // Reading NTFS volume name requires to parse the fs, we're not
+        // doing this here.
+        if part.ptype == 0 {
+            part.ptype = 0x7;
+        }
+    }
+    // Linux/Ext
+    else if let [0x53, 0xEF] = data[0x438..0x43A] {
+        // ext4 check (as the unix 'file' cmd does)
+        if LittleEndian::read_u32(&data[0x460..0x464]) > 63 {
+            part.type_str = "Linux/Ext".into();
+            // Ext4 Volume Label
+            if let Ok(name) = str::from_utf8(&data[1024 + 0x78..1024 + 0x88]) {
+                part.name_str = name.into();
+            };
+            if part.ptype == 0 {
+                part.ptype = 0x83;
+            }
+        }
+        // ext2 & 3 not supported
+        else {
+            part.ptype = 0;
+        }
+    }
+}
+
 impl InitState {
     /// Wait for the bus and device numbers of the device (`0` to exit), open
     /// it, sandbox the process and send `ResponseOpenDevice`.
@@ -297,72 +356,14 @@ impl DevOpenedState {
             });
         }
 
-        // Compute number of sectors to read to performs checks
-        let mut sectors_to_read = MAX_LEN_PART_HEADER / block_size;
-        if MAX_LEN_PART_HEADER.rem_euclid(block_size) > 0 {
-            sectors_to_read += 1;
-        }
         // Try to find name and also fs type if no bootsector was found
+        let sectors_to_read = MAX_LEN_PART_HEADER.div_ceil(block_size);
         for part in partitions.iter_mut() {
-            let data = self.usb_mass_storage.read_sectors(
-                part.start,
-                sectors_to_read,
-                block_size as usize,
-            )?;
-
-            // FAT12 / FAT16
-            if let Ok("FAT") = str::from_utf8(data[0x36..0x39].into()) {
-                part.type_str = "FAT".into();
-                if let Ok(name) = str::from_utf8(data[0x2B..0x36].into()) {
-                    part.name_str = name.into();
-                };
-                if part.ptype == 0 {
-                    part.ptype = 0x6;
-                }
-            }
-            // FAT32
-            else if let Ok("FAT") = str::from_utf8(data[0x52..0x55].into()) {
-                part.type_str = "FAT".into();
-                if let Ok(name) = str::from_utf8(data[0x47..0x52].into()) {
-                    part.name_str = name.into();
-                };
-                if part.ptype == 0 {
-                    part.ptype = 0xb;
-                }
-            }
-            // EXFAT
-            else if let Ok("EXF") = str::from_utf8(data[0x3..0x6].into()) {
-                part.type_str = "EXFAT".into();
-                if part.ptype == 0 {
-                    part.ptype = 0x7;
-                }
-            }
-            // NTFS
-            else if let Ok("NTFS") = str::from_utf8(data[0x3..0x7].into()) {
-                part.type_str = "NTFS".into();
-                // Reading NTFS volume name requires to parse the fs, we're not
-                // doing this here.
-                if part.ptype == 0 {
-                    part.ptype = 0x7;
-                }
-            }
-            // Linux/Ext
-            else if let [0x53, 0xEF] = data[0x438..0x43A] {
-                // ext4 check (as the unix 'file' cmd does)
-                if LittleEndian::read_u32(&data[0x460..0x464]) > 63 {
-                    part.type_str = "Linux/Ext".into();
-                    // Ext4 Volume Label
-                    if let Ok(name) = str::from_utf8(data[1024 + 0x78..1024 + 0x88].into()) {
-                        part.name_str = name.into();
-                    };
-                    if part.ptype == 0 {
-                        part.ptype = 0x83;
-                    }
-                }
-                // ext2 & 3 not supported
-                else {
-                    part.ptype = 0;
-                }
+            // A partition that can't be read (e.g. beyond the end of the
+            // device) is listed with an unknown file system
+            match read_sectors(&mut self.usb_mass_storage, part.start, sectors_to_read) {
+                Ok(data) => detect_fs(part, &data),
+                Err(err) => warn!("couldn't read partition at sector {}: {err}", part.start),
             }
             // Trim 0 and leading / trailing whitespaces
             part.name_str = part.name_str.trim_end_matches(char::from(0)).trim().into();
@@ -375,7 +376,7 @@ impl DevOpenedState {
         // sectors to read
         if partitions.len() == 1 && partitions[0].ptype == 0 {
             // Check for 'CD001' at 0x8001 and 0x8801
-            sectors_to_read = MAX_LEN_ISO_HEADER / block_size;
+            let mut sectors_to_read = MAX_LEN_ISO_HEADER / block_size;
             if MAX_LEN_ISO_HEADER.rem_euclid(block_size) > 0 {
                 sectors_to_read += 1;
             }
