@@ -13,8 +13,10 @@ use std::{
     sync::{
         OnceLock,
         atomic::{AtomicUsize, Ordering},
+        mpsc,
     },
     thread::{self, JoinHandle},
+    time::Duration,
 };
 use usbsas_comm::{ComRqScsi, Comm, ProtoReqCommon, ProtoReqScsi, SendRecv};
 use usbsas_proto::scsi::{
@@ -285,6 +287,17 @@ impl Running {
     }
 }
 
+/// Run `f` in a thread and fail if it doesn't return in time (instead of
+/// blocking the test suite forever).
+fn timeout<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = tx.send(f());
+    });
+    rx.recv_timeout(Duration::from_secs(10))
+        .expect("no response from dev2scsi")
+}
+
 /// List the partitions of `img` then end the process.
 fn list_bs(img: &[u8], block_size: u32) -> io::Result<Vec<PartitionInfo>> {
     let mut dev2scsi = Running::opened_bs(img, block_size);
@@ -370,6 +383,20 @@ fn read_sectors() {
     let last = (img.len() / SECTOR) as u64 - 1;
     assert_eq!(dev2scsi.read(last, 1).unwrap(), img[img.len() - SECTOR..]);
     assert!(dev2scsi.read(0, 0).unwrap().is_empty());
+    dev2scsi.end();
+}
+
+#[test]
+fn partitions_only_once() {
+    let img = mock_in_dev();
+    let mut dev2scsi = Running::opened(img);
+    dev2scsi.partitions().unwrap();
+    let mut dev2scsi = timeout(move || {
+        let err = dev2scsi.partitions().unwrap_err();
+        assert_eq!(err.to_string(), "unexpected request");
+        dev2scsi
+    });
+    assert_eq!(dev2scsi.read(0, 1).unwrap(), img[..SECTOR]);
     dev2scsi.end();
 }
 

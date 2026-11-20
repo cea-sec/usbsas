@@ -394,9 +394,9 @@ impl PartitionsListedState {
                     comm.end()?;
                     break;
                 }
-                _ => {
-                    error!("Unexpected req");
-                    continue;
+                Msg::Partitions(_) => {
+                    error!("partitions already listed");
+                    comm.error("unexpected request")?;
                 }
             }
         }
