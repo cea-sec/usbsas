@@ -62,6 +62,9 @@ const LEN_ISO_HEADER: u64 = 0x806;
 /// Max bytes read in one request: the response must fit in a message (with
 /// room for the protobuf framing of the response).
 const MAX_READ_SIZE: u64 = MAX_PROTO_MESS_SIZE - 64;
+/// Max bytes bootsector may read at once (the GPT entries table is 16KiB
+/// usually, its size comes from the device)
+const MAX_PARTITION_TABLE_READ: u64 = 1024 * 1024;
 /// Sector size bootsector assumes for MBR entries
 const MBR_SECTOR_SIZE: u64 = 512;
 
@@ -151,6 +154,12 @@ impl ReadAt for SectorReader<'_> {
     }
 
     fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<()> {
+        if buf.len() as u64 > MAX_PARTITION_TABLE_READ {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "partition table too large",
+            ));
+        }
         let skip = pos % self.block_size;
         let len = (skip + buf.len() as u64).div_ceil(self.block_size) * self.block_size;
         let mut data = vec![0; len as usize];

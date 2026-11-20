@@ -45,6 +45,10 @@ impl Img {
         self.put(offset, &val.to_le_bytes())
     }
 
+    fn put_u64(&mut self, offset: usize, val: u64) -> &mut Self {
+        self.put(offset, &val.to_le_bytes())
+    }
+
     /// FAT12/16 boot sector at `offset`. The volume serial is in front of the
     /// label and isn't valid UTF-8 on purpose.
     fn fat16(&mut self, offset: usize, label: &[u8; 11]) -> &mut Self {
@@ -811,6 +815,23 @@ fn gpt_4k_sectors() {
 }
 
 #[test]
+fn gpt_table_too_large() {
+    // 16384 entries: 2MiB table, not read, as if there was no table
+    let mut img = Img::new(4 * MIB);
+    img.gpt(SECTOR, &[(4200, 6143, "data")])
+        .fat32(0, b"WHOLE      ")
+        .put_u32(SECTOR + 0x50, 16384)
+        .put_u64(SECTOR + 0x28, 4200)
+        .put_u32(SECTOR + 0x10, 0);
+    let crc = crc32(&img.0[SECTOR..SECTOR + 92]);
+    img.put_u32(SECTOR + 0x10, crc);
+    assert_eq!(
+        list(&img.build()).unwrap(),
+        [part(0xb, 0, 4 * MIB as u64, "WHOLE", "FAT")]
+    );
+}
+
+#[test]
 fn sector_reader_unaligned() {
     let img = mock_in_dev();
     let dev = TmpDev::new(img);
@@ -843,5 +864,7 @@ fn sector_reader_unaligned() {
                 .read_exact_at(img.len() as u64 - 10, &mut [0; 20])
                 .is_err()
         );
+        let mut buf = vec![0; MAX_PARTITION_TABLE_READ as usize + 1];
+        assert!(reader.read_exact_at(0, &mut buf).is_err());
     }
 }
