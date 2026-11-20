@@ -69,7 +69,9 @@ Install a minimal **Debian 13 (trixie)**:
 
 The working files of usbsas (`/var/lib/usbsas` by default) contain the users'
 files during transfers: keep them on the encrypted disk, or in memory (tmpfs, if
-the station has enough memory: about twice the size of the largest transfer).
+the station has enough memory: about twice the size of the largest transfer). A
+tmpfs counts as memory of the service, whose limits must be raised accordingly
+(see [services hardening](./configuration.md#serviceshardening)).
 
 ## <a name="installation">usbsas installation</a>
 

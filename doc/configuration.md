@@ -411,6 +411,42 @@ The packages install these systemd services (none is enabled by default):
 | `hid-dealer` | `usbsas-hid` | `usbsas-hid` | The user space HID driver |
 | `usbsas-analyzer-server` | `usbsas-analyzer-server` | `usbsas` | The demo analyzer server |
 
+### <a name="serviceshardening">Services hardening</a>
+
+On top of the sandbox of each process, `usbsas-server`, `usbsas-client` and
+`hid-dealer` are confined by systemd: read only file system, no capabilities,
+restricted devices, address families and syscalls, no swap nor core dumps, and
+memory and tasks limits.
+
+
+Some configurations need these settings to be adapted, with a drop-in
+(`systemctl edit <service>`):
+
+```ini
+# usbsas-server: out_directory and [post_copy] destination outside of /var/lib/usbsas
+[Service]
+ReadWritePaths=/path/to/out_directory /usbsas_archive
+```
+
+| Configuration | Service | Setting |
+|---------------|---------|---------|
+| `out_directory`, or a directory written by `[command]` or `[post_copy]`, outside of `/var/lib/usbsas` and `/usbsas_data` | `usbsas-server` | `ReadWritePaths=` |
+| `out_directory` on a tmpfs: its content counts as memory of the service | `usbsas-server` | `MemoryHigh=` and `MemoryMax=` above twice the size of the largest transfer |
+| `src_local_dirs` or a program of `[command]` or `[post_copy]` in `/home` or `/root` | `usbsas-server` | `ProtectHome=read-only` |
+| Program of `[command]` or `[post_copy]` outside of `/usr` | `usbsas-server` | `ExecPaths=` |
+| Program of `[command]` or `[post_copy]` using a JIT compiler | `usbsas-server` | `MemoryDenyWriteExecute=no` |
+| `write_local` outside of `/var/lib/usbsas/reports` | `usbsas-client` | `ReadWritePaths=` |
+| `menu_img` in `/home` or `/root` | `usbsas-client` | Move the image, for instance in `/etc/usbsas` |
+| Proprietary GPU driver, with other device nodes than `/dev/dri` | `usbsas-client` | `DeviceAllow=` |
+
+`usbsas-client` is an exception for memory, tasks and devices: `pam_systemd`
+moves its processes to a session scope of the slice of the `usbsas-client` user,
+out of the service. The settings that apply to them are the ones of
+`/etc/systemd/system/user-<uid>.slice.d/50-usbsas-client.conf`, written when the
+package is installed. Change them with another drop-in of this directory, whose
+name sorts after this one (`systemctl status usbsas-client` shows where the
+processes are). The file is overwritten when the package is upgraded.
+
 ### Logs
 
 All usbsas processes log on stderr, collected by journald with the services
