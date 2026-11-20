@@ -690,6 +690,29 @@ fn mbr_ext3_partition() {
 }
 
 #[test]
+fn mbr_single_unknown_partition_iso9660() {
+    // e.g. an ISO9660 image in a partition: checked from the partition start
+    let mut img = Img::new(4 * MIB);
+    img.mbr(&[(0x17, 2048, 4096)]).iso(2048 * SECTOR);
+    assert_eq!(
+        list(&img.build()).unwrap(),
+        [part(0xFF, 2048, 2 * MIB as u64, "Unknown", "ISO9660")]
+    );
+}
+
+#[test]
+fn mbr_single_partition_not_iso9660() {
+    // ISO9660 descriptor at the start of the device, not in the partition
+    let mut img = Img::new(4 * MIB);
+    img.mbr(&[(0x17, 2048, 4096)]).iso(0);
+    let err = list(&img.build()).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "partition error: No supported filesystem found"
+    );
+}
+
+#[test]
 fn mbr_partition_out_of_device() {
     // a partition (bad table or truncated image) beyond the end of the device
     // doesn't prevent listing the others

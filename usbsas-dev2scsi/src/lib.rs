@@ -283,21 +283,25 @@ impl DevOpenedState {
         }))
     }
 
-    /// Whether the device is an ISO9660 image.
-    fn is_iso9660(&mut self) -> bool {
+    /// Whether the partition starting at sector `start` is an ISO9660 image.
+    fn is_iso9660(&mut self, start: u64) -> bool {
         let block_size = u64::from(self.usb_mass_storage.block_size);
-        let count = LEN_ISO_HEADER.div_ceil(block_size);
-        let data = match read_sectors(
-            &mut self.usb_mass_storage,
-            ISO_DESCRIPTORS_OFFSET / block_size,
-            count,
-        ) {
+        let Some(pos) = start
+            .checked_mul(block_size)
+            .and_then(|pos| pos.checked_add(ISO_DESCRIPTORS_OFFSET))
+        else {
+            return false;
+        };
+        let skip = pos % block_size;
+        let count = (skip + LEN_ISO_HEADER).div_ceil(block_size);
+        let data = match read_sectors(&mut self.usb_mass_storage, pos / block_size, count) {
             Ok(data) => data,
             Err(err) => {
                 warn!("couldn't read iso9660 header: {err}");
                 return false;
             }
         };
+        let data = &data[skip as usize..];
         const ISO_MAGIC: &[u8] = b"CD001";
         ISO_MAGIC == &data[0x1..0x6] || ISO_MAGIC == &data[0x801..0x806]
     }
@@ -397,7 +401,7 @@ impl DevOpenedState {
         // If we didn't find anything supported, last try with ISO9660 which requires different
         // sectors to read
         if partitions.len() == 1 && partitions[0].ptype == 0 {
-            if self.is_iso9660() {
+            if self.is_iso9660(partitions[0].start) {
                 partitions[0].type_str = "ISO9660".into();
                 // use this ptype since there isn't any for iso and we
                 // should never support this one
