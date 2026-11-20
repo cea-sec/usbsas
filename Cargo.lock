@@ -6472,7 +6472,6 @@ version = "0.1.4"
 dependencies = [
  "bootsector",
  "byteorder",
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
