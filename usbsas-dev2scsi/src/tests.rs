@@ -740,6 +740,22 @@ fn mbr_invalid_status_is_no_table() {
     );
 }
 
+#[test]
+fn mbr_4k_sectors() {
+    let bs = 4096;
+    let mut img = Img::new(8 * MIB);
+    img.mbr(&[(0x0c, 256, 256), (0x07, 512, 512)])
+        .fat32(256 * bs, b"FOURK      ")
+        .exfat(512 * bs);
+    assert_eq!(
+        list_bs(&img.build(), bs as u32).unwrap(),
+        [
+            part(0x0c, 256, MIB as u64, "FOURK", "FAT"),
+            part(0x07, 512, 2 * MIB as u64, "Unknown", "EXFAT"),
+        ]
+    );
+}
+
 // GPT
 
 #[test]
@@ -780,4 +796,52 @@ fn gpt_bad_crc_is_no_table() {
     // the protective MBR is all bootsector returns: no partition
     let err = list(&img.build()).unwrap_err();
     assert!(err.to_string().starts_with("partition error"), "{err}");
+}
+
+#[test]
+fn gpt_4k_sectors() {
+    let bs = 4096;
+    let mut img = Img::new(8 * MIB);
+    img.gpt(bs, &[(256, 511, "four k")])
+        .fat32(256 * bs, b"FOURK      ");
+    assert_eq!(
+        list_bs(&img.build(), bs as u32).unwrap(),
+        [part(0xb, 256, MIB as u64, "FOURK", "FAT")]
+    );
+}
+
+#[test]
+fn sector_reader_unaligned() {
+    let img = mock_in_dev();
+    let dev = TmpDev::new(img);
+    for block_size in [512u32, 4096] {
+        let mut ums = MassStorage::from_opened_file(dev.open()).unwrap();
+        ums.block_size = block_size;
+        let reader = SectorReader {
+            dev: &ums,
+            block_size: u64::from(block_size),
+        };
+        // MBR and FAT boot sector
+        let fat = 18432 * SECTOR;
+        for (pos, len) in [
+            (0, 512),
+            (0, 1),
+            (100, 1000),
+            (fat - 2, 4),
+            (fat + 3, 8),
+            (fat + 4095, 2),
+            (fat + 8192, 4096),
+            (0, 0),
+        ] {
+            let mut buf = vec![0; len];
+            reader.read_exact_at(pos as u64, &mut buf).unwrap();
+            assert_eq!(buf, img[pos..pos + len], "{block_size} {pos} {len}");
+        }
+        // beyond the end of the device
+        assert!(
+            reader
+                .read_exact_at(img.len() as u64 - 10, &mut [0; 20])
+                .is_err()
+        );
+    }
 }

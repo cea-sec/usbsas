@@ -6441,6 +6441,7 @@ dependencies = [
  "byteorder",
  "flate2",
  "log",
+ "positioned-io2",
  "thiserror 2.0.21",
  "usbsas-comm",
  "usbsas-mass-storage",

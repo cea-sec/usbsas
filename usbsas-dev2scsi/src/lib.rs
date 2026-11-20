@@ -6,7 +6,8 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
-use std::{convert::TryFrom, io::prelude::*, str};
+use positioned_io2::ReadAt;
+use std::{convert::TryFrom, io, io::prelude::*, str};
 use thiserror::Error;
 use usbsas_comm::{ComRpScsi, ProtoRespCommon, ProtoRespScsi};
 use usbsas_proto as proto;
@@ -61,6 +62,8 @@ const LEN_ISO_HEADER: u64 = 0x806;
 /// Max bytes read in one request: the response must fit in a message (with
 /// room for the protobuf framing of the response).
 const MAX_READ_SIZE: u64 = MAX_PROTO_MESS_SIZE - 64;
+/// Sector size bootsector assumes for MBR entries
+const MBR_SECTOR_SIZE: u64 = 512;
 
 /// States of the process, see the module documentation.
 enum State {
@@ -131,6 +134,50 @@ fn handle_read_sectors(
         }
     }
     Ok(())
+}
+
+/// `ReadAt` for bootsector: the device only reads whole sectors, but
+/// bootsector reads 512 bytes for the MBR (less than a sector on devices with
+/// larger ones) and the GPT table may not be a multiple of the sector size.
+struct SectorReader<'a> {
+    dev: &'a MassStorage,
+    block_size: u64,
+}
+
+impl ReadAt for SectorReader<'_> {
+    fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
+        self.read_exact_at(pos, buf)?;
+        Ok(buf.len())
+    }
+
+    fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<()> {
+        let skip = pos % self.block_size;
+        let len = (skip + buf.len() as u64).div_ceil(self.block_size) * self.block_size;
+        let mut data = vec![0; len as usize];
+        self.dev.read_exact_at(pos - skip, &mut data)?;
+        buf.copy_from_slice(&data[skip as usize..skip as usize + buf.len()]);
+        Ok(())
+    }
+}
+
+/// MBR partition type, `0` if unsupported.
+fn mbr_ptype(type_code: u8) -> u32 {
+    match type_code {
+        0x1 | // FAT12
+        0x4 | // FAT16 <32M
+        0x6 | // FAT16
+        0x7 | // NTFS / EXFAT
+        0xb | // W95 FAT32
+        0xc | // W95 FAT32 (LBA)
+        0xe | // W95 FAT16 (LBA)
+        0xf | // W95 Ext'd (LBA)
+        0x83  // Linux
+            => u32::from(type_code),
+        _ => {
+            warn!("Unsupported partition type: {type_code}");
+            0
+        }
+    }
 }
 
 /// Detect the file system of `part` from `data`, its first
@@ -283,6 +330,59 @@ impl DevOpenedState {
         }))
     }
 
+    /// Partitions of the partition table (MBR or GPT), empty if there is no
+    /// (valid) table.
+    fn partition_table(&self) -> Result<Vec<PartitionInfo>> {
+        let block_size = u64::from(self.usb_mass_storage.block_size);
+        let options = bootsector::Options {
+            sector_size: bootsector::SectorSize::Known(u16::try_from(block_size)?),
+            ..Default::default()
+        };
+        let reader = SectorReader {
+            dev: &self.usb_mass_storage,
+            block_size,
+        };
+
+        let bootsec_parts = match bootsector::list_partitions(reader, &options) {
+            Ok(parts) => parts,
+            Err(err) => {
+                warn!("error listing partitions (maybe no mbr ?): {err}");
+                return Ok(vec![]);
+            }
+        };
+
+        let mut partitions = vec![];
+        for part in bootsec_parts.iter() {
+            let (first_byte, len, ptype, name_str) = match &part.attributes {
+                bootsector::Attributes::GPT { name, .. } => {
+                    (part.first_byte, part.len, 0, name.clone())
+                }
+                // bootsector assumes 512 bytes sectors for MBR entries, they
+                // are in sectors of the device
+                bootsector::Attributes::MBR { type_code, .. } => (
+                    part.first_byte / MBR_SECTOR_SIZE * block_size,
+                    part.len / MBR_SECTOR_SIZE * block_size,
+                    mbr_ptype(*type_code),
+                    "Unknown".into(),
+                ),
+            };
+            if first_byte % block_size != 0 {
+                return Err(Error::Partition("part start % block_size != 0".to_string()));
+            }
+            if len % block_size != 0 {
+                return Err(Error::Partition("part len % block_size != 0".to_string()));
+            }
+            partitions.push(PartitionInfo {
+                ptype,
+                start: first_byte / block_size,
+                size: len,
+                name_str,
+                type_str: "Unknown".into(),
+            });
+        }
+        Ok(partitions)
+    }
+
     /// Whether the partition starting at sector `start` is an ISO9660 image.
     fn is_iso9660(&mut self, start: u64) -> bool {
         let block_size = u64::from(self.usb_mass_storage.block_size);
@@ -311,64 +411,8 @@ impl DevOpenedState {
     /// if no supported file system is found.
     fn partitions(&mut self, comm: &mut ComRpScsi) -> Result<()> {
         trace!("req partitions");
-        let mut partitions = vec![];
-        let block_size = self.usb_mass_storage.block_size as u64;
-        let options = bootsector::Options {
-            sector_size: bootsector::SectorSize::Known(u16::try_from(block_size)?),
-            ..Default::default()
-        };
-
-        match bootsector::list_partitions(&mut self.usb_mass_storage, &options) {
-            Ok(bootsec_parts) => {
-                for part in bootsec_parts.iter() {
-                    if part.first_byte % block_size != 0 {
-                        return Err(Error::Partition("part start % block_size != 0".to_string()));
-                    }
-                    if part.len % block_size != 0 {
-                        return Err(Error::Partition("part len % block_size != 0".to_string()));
-                    }
-                    match &part.attributes {
-                        bootsector::Attributes::GPT { name, .. } => {
-                            partitions.push(PartitionInfo {
-                                ptype: 0,
-                                start: part.first_byte / block_size,
-                                size: part.len,
-                                name_str: name.clone(),
-                                type_str: "Unknown".into(),
-                            });
-                        }
-                        bootsector::Attributes::MBR { type_code, .. } => {
-                            let ptype = match type_code {
-                                0x1 | // FAT12
-                                0x4 | // FAT16 <32M
-                                0x6 | // FAT16
-                                0x7 | // NTFS / EXFAT
-                                0xb | // W95 FAT32
-                                0xc | // W95 FAT32 (LBA)
-                                0xe | // W95 FAT16 (LBA)
-                                0xf | // W95 Ext'd (LBA)
-                                0x83  // Linux
-                                    => *type_code as u32,
-                                _ => {
-                                    warn!("Unsupported partition type: {type_code}");
-                                    0
-                                }
-                            };
-                            partitions.push(PartitionInfo {
-                                ptype,
-                                start: part.first_byte / block_size,
-                                size: part.len,
-                                name_str: "Unknown".into(),
-                                type_str: "Unknown".into(),
-                            });
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                warn!("error listing partitions (maybe no mbr ?): {err}");
-            }
-        };
+        let block_size = u64::from(self.usb_mass_storage.block_size);
+        let mut partitions = self.partition_table()?;
 
         // If bootsector didn't return any partition, a filesystem may be written directly on the
         // device without partition table, try to find it below
