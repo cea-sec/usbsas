@@ -18,8 +18,7 @@ use std::{
         fd::AsRawFd,
         unix::{fs::PermissionsExt, net::UnixListener},
     },
-    thread::sleep,
-    time::Duration,
+    process::exit,
 };
 use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespUsbsas, ToFd};
 use usbsas_config::{Config, conf_parse, conf_read};
@@ -190,33 +189,61 @@ fn main() -> Result<()> {
             stream.try_clone().context("clone stream")?,
         );
 
-        // Create an epoll(7) thread to terminate the process and its children if the client socket is shutdown
-        let pid = std::process::id();
+        // Create an epoll(7) thread to terminate the process' children (thus the main thread) if
+        // the client shuts down its socket
+        let children_pids = [
+            ("analyzer", children.analyzer.child.id()),
+            ("identifier", children.identifier.child.id()),
+            ("cmdexec", children.cmdexec.child.id()),
+            ("downloader", children.downloader.child.id()),
+            ("files2fs", children.files2fs.child.id()),
+            ("files2tar", children.files2tar.child.id()),
+            ("files2cleantar", children.files2cleantar.child.id()),
+            ("local2files", children.local2files.child.id()),
+            ("fs2dev", children.fs2dev.child.id()),
+            ("scsi2files", children.scsi2files.child.id()),
+            ("tar2files", children.tar2files.child.id()),
+            ("uploader", children.uploader.child.id()),
+            ("usbdev", children.usbdev.child.id()),
+        ];
         let _ = std::thread::spawn(move || {
-            if let Err(e) = usbsas_sandbox::usbsas::sandbox_epoll_thread(&[pid], stream.as_raw_fd()).context("seccomp") {
-                warn!("epoll thread sandbox couldn't be enforced: {}", e);
+            let sandbox_res = usbsas_sandbox::usbsas::sandbox_epoll_thread(
+                &children_pids.map(|(_name, pid)| pid),
+                stream.as_raw_fd(),
+            )
+            .context("seccomp");
+            if let Err(err) = sandbox_res {
+                error!("epoll thread sandbox couldn't be enforced: {err}");
+                exit(1);
             }
 
-            if let Err(e) = wait_for_socket_shutdown(&stream) {
-                error!("while epolling for client socket shutdown: {}", e);
+            if let Err(err) = wait_for_socket_shutdown(&stream) {
+                error!("while epolling for client socket shutdown: {err}");
             }
-            warn!("client socket was shutdown: sending SIGTERM to main thread");
+            warn!("client socket was shutdown, ending registered children...");
 
-            let mut tries = 0;
-            while let Err(e) = signal::kill(Pid::from_raw(pid as i32), SIGTERM)
-                && tries < 10
-            {
-                error!(
-                    "epoll thread coudln't kill the main thread with SIGTERM: {e}. Retrying in 1s..."
-                );
-                tries += 1;
-                sleep(Duration::from_secs(1));
-            }
-            while let Err(e) = signal::kill(Pid::from_raw(pid as i32), SIGKILL) {
-                error!(
-                    "epoll thread coudln't kill the main thread with SIGKILL: {e}. Retrying in 1s..."
-                );
-                sleep(Duration::from_secs(1));
+            for (name, pid) in children_pids {
+                info!("sending SIGTERM to {}", name);
+                if let Err(err) = signal::kill(Pid::from_raw(pid as i32), SIGTERM) {
+                    warn!("epoll thread's SIGTERM didn't reach {name}: {err}.");
+                }
+                match std::fs::exists(format!("/proc/{}", pid)) {
+                    Ok(false) => return,
+                    Ok(true) => warn!(
+                        "epoll thread's SIGTERM didn't end {name} succesfully. Retrying with SIGKILL..."
+                    ),
+                    Err(err) => error!("couldn't check if {name} still existed: {err}"),
+                }
+                if let Err(err) = signal::kill(Pid::from_raw(pid as i32), SIGKILL) {
+                    warn!("epoll thread's SIGKILL didn't reach {name}: {err}.");
+                }
+                match std::fs::exists(format!("/proc/{}", pid)) {
+                    Ok(false) => (),
+                    Ok(true) => warn!(
+                        "epoll thread's SIGKILL didn't end {name} succesfully. Giving up on them."
+                    ),
+                    Err(err) => error!("couldn't check if {name} still existed: {err}"),
+                }
             }
         });
 

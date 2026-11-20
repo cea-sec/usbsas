@@ -131,4 +131,23 @@ impl Children {
         comm.end()?;
         Ok(())
     }
+
+    /// Gets all children process ids
+    pub fn get_pids(&self) -> Vec<u32> {
+        vec![
+            self.analyzer.child.id(),
+            self.identifier.child.id(),
+            self.cmdexec.child.id(),
+            self.downloader.child.id(),
+            self.files2fs.child.id(),
+            self.files2tar.child.id(),
+            self.files2cleantar.child.id(),
+            self.fs2dev.child.id(),
+            self.local2files.child.id(),
+            self.scsi2files.child.id(),
+            self.tar2files.child.id(),
+            self.uploader.child.id(),
+            self.usbdev.child.id(),
+        ]
+    }
 }

@@ -79,10 +79,7 @@ pub fn sandbox(
 
 /// seccomp: communication with the socket and the epoll fd,
 /// kill on children pids with SIG(TERM|INT)
-pub fn sandbox_epoll_thread(
-    killable_pids: &[u32],
-    socket_fd: RawFd,
-) -> Result<()> {
+pub fn sandbox_epoll_thread(killable_pids: &[u32], socket_fd: RawFd) -> Result<()> {
     let mut ctx = seccomp::new_context_with_common_rules(vec![], vec![])?;
 
     // epoll-related syscalls
@@ -102,7 +99,7 @@ pub fn sandbox_epoll_thread(
                 Cmp::MaskedEq,
                 u64::from(u32::MAX),
                 Some(socket_fd as u64),
-            )
+            ),
         ],
     )?;
     ctx.set_rule_for_syscall(
@@ -112,18 +109,8 @@ pub fn sandbox_epoll_thread(
         #[cfg(target_arch = "aarch64")]
         Syscall::epoll_pwait,
         &[
-            Comparator::new(
-                2,
-                Cmp::MaskedEq,
-                u64::from(u32::MAX),
-                Some(1),
-            ),
-            Comparator::new(
-                3,
-                Cmp::MaskedEq,
-                u64::from(u32::MAX),
-                Some(-1i32 as u64),
-            )
+            Comparator::new(2, Cmp::MaskedEq, u64::from(u32::MAX), Some(1)),
+            Comparator::new(3, Cmp::MaskedEq, u64::from(u32::MAX), Some(-1i32 as u64)),
         ],
     )?;
 
@@ -142,7 +129,7 @@ pub fn sandbox_epoll_thread(
                 Cmp::MaskedEq,
                 u64::from(u32::MAX),
                 Some(libc::SHUT_RDWR as u64),
-            )
+            ),
         ],
     )?;
 
@@ -155,17 +142,12 @@ pub fn sandbox_epoll_thread(
             Action::Allow,
             Syscall::kill,
             &[
-                Comparator::new(
-                    0,
-                    Cmp::MaskedEq,
-                    u64::from(u32::MAX),
-                    Some(*pid as u64)
-                ),
+                Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(*pid as u64)),
                 Comparator::new(
                     1,
                     Cmp::MaskedEq,
                     u64::from(u32::MAX),
-                    Some(libc::SIGTERM as u64)
+                    Some(libc::SIGTERM as u64),
                 ),
             ],
         )?;
@@ -173,36 +155,27 @@ pub fn sandbox_epoll_thread(
             Action::Allow,
             Syscall::kill,
             &[
-                Comparator::new(
-                    0,
-                    Cmp::MaskedEq,
-                    u64::from(u32::MAX),
-                    Some(*pid as u64)
-                ),
+                Comparator::new(0, Cmp::MaskedEq, u64::from(u32::MAX), Some(*pid as u64)),
                 Comparator::new(
                     1,
                     Cmp::MaskedEq,
                     u64::from(u32::MAX),
-                    Some(libc::SIGKILL as u64)
+                    Some(libc::SIGKILL as u64),
                 ),
             ],
         )?;
     }
 
-    ctx.allow_syscall(Syscall::clock_nanosleep)?;
-
     // probably stems from rust optimizations
     ctx.set_rule_for_syscall(
         Action::Allow,
         Syscall::madvise,
-        &[
-            Comparator::new(
-                2,
-                Cmp::MaskedEq,
-                u64::from(u32::MAX),
-                Some(libc::MADV_DONTNEED as u64)
-            ),
-        ],
+        &[Comparator::new(
+            2,
+            Cmp::MaskedEq,
+            u64::from(u32::MAX),
+            Some(libc::MADV_DONTNEED as u64),
+        )],
     )?;
 
     crate::landlock(None, None, None, None, None)?;
