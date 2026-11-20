@@ -96,8 +96,9 @@ $ USBSAS_BIN_PATH=/usr/libexec USBSAS_CONFIG=/etc/usbsas/config.toml cargo build
 
 | Feature | Crate | Default | Description |
 |---------|-------|---------|-------------|
-| `authkrb` | `usbsas-net` | yes | Kerberos authentication with remote servers |
-| `native-tls` | `usbsas-net` | no | Use the system TLS library instead of rustls |
+| `authkrb` | `usbsas-net` | no | Kerberos authentication with remote servers |
+| `native-tls` | `usbsas-net` | yes | Use the system TLS library |
+| `rustls` | `usbsas-net` | no | Use rustls instead of the system TLS library (the default `native-tls` feature must be disabled) |
 | `landlock-enforce` | `usbsas-sandbox` | no | Fail if landlock rules can't be enforced by the kernel, instead of a best effort. Recommended for a kiosk station whose kernel is known. |
 | `log-json` | `usbsas-utils` | no | Write logs as JSON objects (one per line), with the session id |
 | `mock` | several | no | Replace real USB devices with files, see [Tests](#tests) |
