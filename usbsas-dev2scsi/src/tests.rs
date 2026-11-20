@@ -43,6 +43,17 @@ impl Img {
         self.put(offset, &val.to_le_bytes())
     }
 
+    /// FAT12/16 boot sector at `offset`. The volume serial is in front of the
+    /// label and isn't valid UTF-8 on purpose.
+    fn fat16(&mut self, offset: usize, label: &[u8; 11]) -> &mut Self {
+        self.put(offset, &[0xEB, 0x3C, 0x90])
+            .put(offset + 0x3, b"MSWIN4.1")
+            .put(offset + 0x26, &[0x29, 0xE1, 0x9C, 0x3F, 0xA2])
+            .put(offset + 0x2B, label)
+            .put(offset + 0x36, b"FAT16   ")
+            .put(offset + 0x1FE, &[0x55, 0xAA])
+    }
+
     /// FAT32 boot sector at `offset`.
     fn fat32(&mut self, offset: usize, label: &[u8; 11]) -> &mut Self {
         self.put(offset, &[0xEB, 0x58, 0x90])
@@ -407,18 +418,27 @@ fn end_request_is_answered() {
 #[test]
 fn mock_in_dev_partitions() {
     let size = 8 * MIB as u64;
-    let parts = list(mock_in_dev()).unwrap();
-    assert_eq!(parts.len(), 3);
-    assert_eq!(parts[0], part(0x7, 2048, size, "Unknown", "NTFS"));
     assert_eq!(
-        (parts[1].ptype, parts[1].start, parts[1].size),
-        (0xb, 18432, size)
+        list(mock_in_dev()).unwrap(),
+        [
+            part(0x7, 2048, size, "Unknown", "NTFS"),
+            // FAT12
+            part(0xb, 18432, size, "TSET", "FAT"),
+            part(0x83, 34816, size, "tset", "Linux/Ext"),
+        ]
     );
-    assert_eq!(parts[1].type_str, "FAT");
-    assert_eq!(parts[2], part(0x83, 34816, size, "tset", "Linux/Ext"));
 }
 
 // File systems on the whole device (no partition table)
+
+#[test]
+fn whole_device_fat16() {
+    let img = Img::new(MIB).fat16(0, b"MY KEY     ").build();
+    assert_eq!(
+        list(&img).unwrap(),
+        [part(0x6, 0, MIB as u64, "MY KEY", "FAT")]
+    );
+}
 
 #[test]
 fn whole_device_fat32() {
@@ -520,6 +540,30 @@ fn label_empty_or_invalid() {
 }
 
 // MBR
+
+#[test]
+fn mbr_partitions() {
+    let mut img = Img::new(8 * MIB);
+    img.mbr(&[
+        (0x0c, 2048, 2048),
+        (0x07, 4096, 2048),
+        (0x83, 6144, 2048),
+        (0x0e, 8192, 2048),
+    ])
+    .fat32(2048 * SECTOR, b"FIRST      ")
+    .ntfs(4096 * SECTOR)
+    .ext(6144 * SECTOR, 0x2C2, b"third")
+    .fat16(8192 * SECTOR, b"FOURTH     ");
+    assert_eq!(
+        list(&img.build()).unwrap(),
+        [
+            part(0x0c, 2048, MIB as u64, "FIRST", "FAT"),
+            part(0x07, 4096, MIB as u64, "Unknown", "NTFS"),
+            part(0x83, 6144, MIB as u64, "third", "Linux/Ext"),
+            part(0x0e, 8192, MIB as u64, "FOURTH", "FAT"),
+        ]
+    );
+}
 
 #[test]
 fn mbr_unknown_types() {

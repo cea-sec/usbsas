@@ -281,7 +281,7 @@ impl DevOpenedState {
             // FAT12 / FAT16
             if let Ok("FAT") = str::from_utf8(data[0x36..0x39].into()) {
                 part.type_str = "FAT".into();
-                if let Ok(name) = str::from_utf8(data[0x26..0x31].into()) {
+                if let Ok(name) = str::from_utf8(data[0x2B..0x36].into()) {
                     part.name_str = name.into();
                 };
                 if part.ptype == 0 {
