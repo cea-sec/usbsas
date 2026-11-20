@@ -11,13 +11,13 @@ use thiserror::Error;
 use usbsas_comm::{ComRpScsi, ProtoRespCommon, ProtoRespScsi};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
-#[cfg(not(feature = "mock"))]
+#[cfg(not(any(test, feature = "mock")))]
 use {
     std::os::unix::io::AsRawFd,
     usbsas_comm::ToFd,
     usbsas_mass_storage::{self, MassStorage},
 };
-#[cfg(feature = "mock")]
+#[cfg(any(test, feature = "mock"))]
 use {
     std::{env, fs::OpenOptions},
     usbsas_mock::mass_storage::MockMassStorage as MassStorage,
@@ -36,7 +36,7 @@ pub enum Error {
     Sandbox(#[from] usbsas_sandbox::Error),
     #[error("partition error: {0}")]
     Partition(String),
-    #[cfg(not(feature = "mock"))]
+    #[cfg(not(any(test, feature = "mock")))]
     #[error("mass storage: {0}")]
     MassStorage(#[from] usbsas_mass_storage::Error),
     #[error("var error: {0}")]
@@ -102,12 +102,12 @@ impl InitState {
 
         // If the process is unlocked with 0-0, usbsas is resetting, go directly to the EndState
         if busnum == 0 && devnum == 0 {
-            #[cfg(not(feature = "mock"))]
+            #[cfg(not(any(test, feature = "mock")))]
             usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), None)?;
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
-        #[cfg(not(feature = "mock"))]
+        #[cfg(not(any(test, feature = "mock")))]
         let (device_file, device_fd) = {
             let device_path = format!("/dev/bus/usb/{busnum:03}/{devnum:03}");
             match std::fs::OpenOptions::new()
@@ -127,7 +127,7 @@ impl InitState {
             }
         };
 
-        #[cfg(feature = "mock")]
+        #[cfg(any(test, feature = "mock"))]
         let device_file = OpenOptions::new()
             .read(true)
             .write(false)
@@ -142,7 +142,7 @@ impl InitState {
             }
         };
 
-        #[cfg(not(feature = "mock"))]
+        #[cfg(not(any(test, feature = "mock")))]
         usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), Some(device_fd))?;
 
         comm.opendevice(proto::scsi::ResponseOpenDevice {
@@ -451,3 +451,6 @@ impl Dev2Scsi {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -36,6 +36,14 @@ without being asked.
 
 seccomp, with access only to the device opened at unlock.
 
+## Tests
+
+`cargo test -p usbsas-dev2scsi`: the unit tests use the `mock` mass storage on
+`mock_in_dev.img` of the integration tests (in
+`usbsas-usbsas/tests/resources`), or on disk images built in memory for the
+layouts it doesn't have (GPT, ISO9660, partition table edge cases, file system
+headers), and drive the process over pipes as scsi2files does.
+
 ## Features
 
 - `mock`: read the file given by `USBSAS_MOCK_IN_DEV` instead of a real device
