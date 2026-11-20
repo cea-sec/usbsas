@@ -36,6 +36,7 @@ use std::{
 };
 use usbsas_comm::ProtoRespCommon;
 use usbsas_proto::common::Status;
+use usbsas_utils::MAX_PROTO_MESS_SIZE;
 
 use thiserror::Error;
 
@@ -162,6 +163,10 @@ pub enum Error {
     State,
     #[error("{0}")]
     Upload(String),
+    #[error("Insecure URL in configuration: '{0}', only https is allowed")]
+    InsecureUrl(String),
+    #[error("HTTP response body larger than {0} bytes")]
+    ResponseTooLarge(u64),
 }
 /// Result type of the network processes.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -169,6 +174,39 @@ pub type Result<T> = std::result::Result<T, Error>;
 // in bytes/s, slowest supported link
 const MIN_THROUGHPUT: u64 = 256 * 1024;
 const BASE_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_REDIRECTS: usize = 3;
+
+/// Check that a configured URL uses https. Plain http is only accepted when
+/// built with the `allow-http` feature.
+pub(crate) fn check_url(url: &str) -> Result<()> {
+    if url::Url::parse(url)?.scheme() == "https" || cfg!(feature = "allow-http") {
+        Ok(())
+    } else {
+        Err(Error::InsecureUrl(url.to_string()))
+    }
+}
+
+/// Maximum size of an HTTP response body read in memory. Below
+/// `MAX_PROTO_MESS_SIZE` to leave room for the protobuf framing when the body
+/// is forwarded to another process (e.g. jsonparser).
+const MAX_RESP_BODY_SIZE: u64 = MAX_PROTO_MESS_SIZE - 1024;
+
+/// Read the body of `resp`, failing if it is larger than `MAX_RESP_BODY_SIZE`
+/// (announced by `Content-Length` or actually read).
+pub(crate) fn read_body_limited(resp: Response) -> Result<Vec<u8>> {
+    if resp
+        .content_length()
+        .is_some_and(|len| len > MAX_RESP_BODY_SIZE)
+    {
+        return Err(Error::ResponseTooLarge(MAX_RESP_BODY_SIZE));
+    }
+    let mut body = Vec::new();
+    resp.take(MAX_RESP_BODY_SIZE + 1).read_to_end(&mut body)?;
+    if body.len() as u64 > MAX_RESP_BODY_SIZE {
+        return Err(Error::ResponseTooLarge(MAX_RESP_BODY_SIZE));
+    }
+    Ok(body)
+}
 
 // Wrapper around reqwest::Client to transparently perform kerberos authentication
 pub(crate) struct HttpClient {
@@ -179,12 +217,20 @@ pub(crate) struct HttpClient {
 }
 
 impl HttpClient {
-    fn new(#[cfg(feature = "authkrb")] krb_service_name: Option<String>) -> Result<Self> {
-        let client = Client::builder()
-            .gzip(true)
+    fn new(
+        gzip: bool,
+        #[cfg(feature = "authkrb")] krb_service_name: Option<String>,
+    ) -> Result<Self> {
+        let builder = Client::builder()
+            .gzip(gzip)
             .connect_timeout(BASE_TIMEOUT)
             .tcp_user_timeout(BASE_TIMEOUT)
-            .build()?;
+            .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS));
+        #[cfg(not(feature = "allow-http"))]
+        let builder = builder
+            .https_only(true)
+            .tls_version_min(reqwest::tls::Version::TLS_1_3);
+        let client = builder.build()?;
         Ok(Self {
             client,
             headers: HeaderMap::new(),
@@ -335,5 +381,74 @@ impl HttpClient {
             .timeout(timeout)
             .body(body)
             .send()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Serve one HTTP response with a body of `size` bytes, chunked (no
+    /// Content-Length) or not.
+    fn serve(size: usize, chunked: bool) -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = stream.read(&mut buf);
+            let body = vec![b'a'; size];
+            if chunked {
+                let _ = stream.write_all(
+                    b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+                );
+                for chunk in body.chunks(1024 * 1024) {
+                    let _ = stream.write_all(format!("{:x}\r\n", chunk.len()).as_bytes());
+                    let _ = stream.write_all(chunk);
+                    let _ = stream.write_all(b"\r\n");
+                }
+                let _ = stream.write_all(b"0\r\n\r\n");
+            } else {
+                let _ = stream.write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {size}\r\nConnection: close\r\n\r\n"
+                    )
+                    .as_bytes(),
+                );
+                let _ = stream.write_all(&body);
+            }
+        });
+        format!("http://{addr}/")
+    }
+
+    #[test]
+    fn body_limit() {
+        let max = MAX_RESP_BODY_SIZE as usize;
+        let get = |url: String| Client::new().get(url).send().unwrap();
+        // Exactly at the limit
+        let body = read_body_limited(get(serve(max, false))).unwrap();
+        assert_eq!(body.len(), max);
+        // Announced too large
+        assert!(matches!(
+            read_body_limited(get(serve(max + 1, false))),
+            Err(Error::ResponseTooLarge(_))
+        ));
+        // Not announced, too large once read
+        assert!(matches!(
+            read_body_limited(get(serve(max + 1, true))),
+            Err(Error::ResponseTooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn url_scheme() {
+        assert!(check_url("https://example.org/api").is_ok());
+        assert!(check_url("not an url").is_err());
+        let http = check_url("http://example.org/api");
+        if cfg!(feature = "allow-http") {
+            assert!(http.is_ok());
+        } else {
+            assert!(matches!(http, Err(Error::InsecureUrl(_))));
+        }
     }
 }

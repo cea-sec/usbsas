@@ -10,7 +10,7 @@
 //! States: `Init` (sandbox, start the udev thread) -> `Running` (`Devices`) ->
 //! `End`.
 
-use log::{debug, error, info, trace};
+use log::{error, info, trace};
 use mio::{Events, Interest, Poll, Token};
 use std::{
     collections::HashMap,

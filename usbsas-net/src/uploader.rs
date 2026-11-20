@@ -52,7 +52,7 @@ impl InitState {
         let mut connect_ports = Vec::new();
         #[cfg(feature = "authkrb")]
         connect_ports.push(crate::KRB_AS_PORT);
-        if let Some(networks) = config.networks {
+        if let Some(networks) = &config.networks {
             for network in networks {
                 connect_ports.push(
                     Url::parse(&network.url)?
@@ -93,6 +93,10 @@ impl InitState {
             }
         }
 
+        for network in config.networks.iter().flatten() {
+            crate::check_url(&network.url)?;
+        }
+
         let file = File::open(self.tarpath)?;
 
         Ok(State::Running(RunningState { file: Some(file) }))
@@ -127,6 +131,7 @@ impl RunningState {
         let network = req.network.ok_or(Error::BadRequest)?;
         let url = format!("{}/{}", network.url.trim_end_matches('/'), req.id);
         let mut http_client = HttpClient::new(
+            false,
             #[cfg(feature = "authkrb")]
             network.krb_service_name,
         )?;

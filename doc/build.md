@@ -96,12 +96,14 @@ $ USBSAS_BIN_PATH=/usr/libexec USBSAS_CONFIG=/etc/usbsas/config.toml cargo build
 
 | Feature | Crate | Default | Description |
 |---------|-------|---------|-------------|
-| `authkrb` | `usbsas-net` | yes | Kerberos authentication with remote servers |
-| `native-tls` | `usbsas-net` | no | Use the system TLS library instead of rustls |
+| `authkrb` | `usbsas-net` | no | Kerberos authentication with remote servers |
+| `native-tls` | `usbsas-net` | yes | Use the system TLS library |
+| `rustls` | `usbsas-net` | no | Use rustls instead of the system TLS library (the default `native-tls` feature must be disabled) |
 | `landlock-enforce` | `usbsas-sandbox` | no | Fail if landlock rules can't be enforced by the kernel, instead of a best effort. Recommended for a kiosk station whose kernel is known. |
 | `log-json` | `usbsas-utils` | no | Write logs as JSON objects (one per line), with the session id |
 | `mock` | several | no | Replace real USB devices with files, see [Tests](#tests) |
 | `integration-tests` | `usbsas-usbsas` | no | Deterministic reports (fixed date and hostname) for the integration tests |
+| `allow-http` | `usbsas-net` | no | Allow plain HTTP and TLS < 1.3 (by default, only HTTPS with TLS >= 1.3 is allowed), for the integration tests |
 
 Features of a dependency crate are enabled with its name, for example:
 
@@ -109,7 +111,7 @@ Features of a dependency crate are enabled with its name, for example:
 $ cargo build --release --all --features usbsas-sandbox/landlock-enforce,usbsas-utils/log-json
 ```
 
-`mock` and `integration-tests` are for tests only and must never be enabled in
+`mock`, `integration-tests` and `allow-http` are for tests only and must never be enabled in
 a production build.
 
 ## <a name="docker">Building with Docker</a>
@@ -226,7 +228,7 @@ with files, and start a local analyzer server, so `clamd` and an up to date
 ClamAV database (`freshclam`) are needed.
 
 ```shell
-$ cargo build --release --all --features mock,integration-tests
+$ cargo build --release --all --features mock,integration-tests,usbsas-net/allow-http
 $ cargo test --release -p usbsas-usbsas --features integration-tests
 ```
 

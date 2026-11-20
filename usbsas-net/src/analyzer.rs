@@ -68,6 +68,7 @@ impl InitState {
             log::warn!("No analyzer conf, parking");
             return Ok(State::WaitEnd(WaitEndState {}));
         };
+        crate::check_url(&conf.url)?;
         let port = Url::parse(&conf.url)?
             .port_or_known_default()
             .ok_or(url::ParseError::InvalidPort)?;
@@ -98,6 +99,7 @@ impl InitState {
             url: conf.url,
             poll_timeout: Duration::from_secs(conf.poll_timeout),
             http_client: HttpClient::new(
+                false,
                 #[cfg(feature = "authkrb")]
                 conf.krb_service_name,
             )?,
@@ -182,11 +184,12 @@ impl RunningState {
         if !resp.status().is_success() {
             return Err(Error::Remote);
         }
+        let response_bytes = crate::read_body_limited(resp)?;
         let response = self
             .json_parser
             .comm
             .parseresp(proto::jsonparser::RequestParseResp {
-                data: resp.bytes()?.into(),
+                data: response_bytes,
             })?
             .resp
             .ok_or(Error::Upload("error uploading bundle for analysis".into()))?;
@@ -206,12 +209,12 @@ impl RunningState {
             if !resp.status().is_success() {
                 return Err(Error::Remote);
             }
-            let response_bytes = resp.bytes()?;
+            let response_bytes = crate::read_body_limited(resp)?;
             let response = self
                 .json_parser
                 .comm
                 .parseresp(proto::jsonparser::RequestParseResp {
-                    data: response_bytes.clone().into(),
+                    data: response_bytes.clone(),
                 })?
                 .resp
                 .ok_or(Error::Upload("error getting analysis result".into()))?;
@@ -222,7 +225,7 @@ impl RunningState {
                         .json_parser
                         .comm
                         .parsereport(proto::jsonparser::RequestParseReport {
-                            data: response_bytes.into(),
+                            data: response_bytes,
                         })?
                         .report
                         .ok_or(Error::Upload("error parsing analysis result".into()))?;
