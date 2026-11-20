@@ -180,11 +180,15 @@ pub(crate) struct HttpClient {
 
 impl HttpClient {
     fn new(#[cfg(feature = "authkrb")] krb_service_name: Option<String>) -> Result<Self> {
-        let client = Client::builder()
+        let builder = Client::builder()
             .gzip(true)
             .connect_timeout(BASE_TIMEOUT)
-            .tcp_user_timeout(BASE_TIMEOUT)
-            .build()?;
+            .tcp_user_timeout(BASE_TIMEOUT);
+        #[cfg(not(feature = "allow-http"))]
+        let builder = builder
+            .https_only(true)
+            .tls_version_min(reqwest::tls::Version::TLS_1_3);
+        let client = builder.build()?;
         Ok(Self {
             client,
             headers: HeaderMap::new(),

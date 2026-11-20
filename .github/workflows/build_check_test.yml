@@ -106,7 +106,7 @@ jobs:
           docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
           --env CARGO_HOME=/SRC/target/.cargo \
           usbsas-builder:debian \
-          cargo build --release --all --features mock,integration-tests
+          cargo build --release --all --features mock,integration-tests,usbsas-net/allow-http
       - name: integration tests
         run: |
           docker run -t -u $(id -u):$(id -g) -v $(pwd)/:/SRC \
