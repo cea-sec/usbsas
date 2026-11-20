@@ -2975,7 +2975,6 @@ dependencies = [
  "portable-atomic",
  "unicode-width",
  "unit-prefix",
- "web-time",
 ]
 
 [[package]]
