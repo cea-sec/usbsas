@@ -398,6 +398,44 @@ fn read_sectors() {
 }
 
 #[test]
+fn read_sectors_out_of_device() {
+    let img = mock_in_dev();
+    let sectors = (img.len() / SECTOR) as u64;
+    let mut dev2scsi = Running::opened(img);
+    assert!(dev2scsi.read(sectors, 1).is_err());
+    assert!(dev2scsi.read(sectors - 1, 2).is_err());
+    assert!(dev2scsi.read(u64::MAX, 2).is_err());
+    assert!(dev2scsi.read(1, u64::MAX).is_err());
+    // the process is still usable
+    assert_eq!(dev2scsi.read(1, 1).unwrap(), img[SECTOR..2 * SECTOR]);
+    dev2scsi.end();
+}
+
+#[test]
+fn read_sectors_larger_than_a_message() {
+    // the response wouldn't be accepted by the parent: refuse it before
+    // reading (and allocating) anything
+    let img = mock_in_dev();
+    let mut dev2scsi = Running::opened(img);
+    let count = usbsas_utils::MAX_PROTO_MESS_SIZE / SECTOR as u64;
+    let err = dev2scsi.read(0, count).unwrap_err();
+    assert!(err.to_string().contains("too many sectors"), "{err}");
+    assert_eq!(dev2scsi.read(1, 1).unwrap(), img[SECTOR..2 * SECTOR]);
+    dev2scsi.end();
+}
+
+#[test]
+fn read_sectors_after_partitions() {
+    let img = mock_in_dev();
+    let mut dev2scsi = Running::opened(img);
+    dev2scsi.partitions().unwrap();
+    assert_eq!(dev2scsi.read(0, 2).unwrap(), img[..2 * SECTOR]);
+    assert!(dev2scsi.read(u64::MAX, 1).is_err());
+    assert_eq!(dev2scsi.read(1, 1).unwrap(), img[SECTOR..2 * SECTOR]);
+    dev2scsi.end();
+}
+
+#[test]
 fn partitions_only_once() {
     let img = mock_in_dev();
     let mut dev2scsi = Running::opened(img);

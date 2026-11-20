@@ -11,6 +11,7 @@ use thiserror::Error;
 use usbsas_comm::{ComRpScsi, ProtoRespCommon, ProtoRespScsi};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
+use usbsas_utils::MAX_PROTO_MESS_SIZE;
 #[cfg(not(any(test, feature = "mock")))]
 use {
     std::os::unix::io::AsRawFd,
@@ -54,6 +55,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 const MAX_LEN_PART_HEADER: u64 = 0x488;
 /// Bytes to read (from offset 0x8000) to detect an ISO9660 image
 const MAX_LEN_ISO_HEADER: u64 = 0x8806;
+/// Max bytes read in one request: the response must fit in a message (with
+/// room for the protobuf framing of the response).
+const MAX_READ_SIZE: u64 = MAX_PROTO_MESS_SIZE - 64;
 
 /// States of the process, see the module documentation.
 enum State {
@@ -87,6 +91,44 @@ struct PartitionsListedState {
 }
 
 struct WaitEndState {}
+
+/// Read `count` sectors at sector `offset`. Reads beyond the end of the device
+/// or whose response wouldn't fit in a message are refused before reading (or
+/// allocating) anything.
+fn read_sectors(ums: &mut MassStorage, offset: u64, count: u64) -> Result<Vec<u8>> {
+    let block_size = u64::from(ums.block_size);
+    if count
+        .checked_mul(block_size)
+        .is_none_or(|len| len > MAX_READ_SIZE)
+    {
+        return Err(Error::Error(format!("read of too many sectors: {count}")));
+    }
+    if offset
+        .checked_add(count)
+        .is_none_or(|end| end > ums.dev_size / block_size)
+    {
+        return Err(Error::Error(format!(
+            "read out of device: {count} sectors at {offset}"
+        )));
+    }
+    Ok(ums.read_sectors(offset, count, block_size as usize)?)
+}
+
+/// Answer a `ReadSectors` request, read errors are sent to the parent.
+fn handle_read_sectors(
+    ums: &mut MassStorage,
+    comm: &mut ComRpScsi,
+    req: proto::scsi::RequestReadSectors,
+) -> Result<()> {
+    match read_sectors(ums, req.offset, req.count) {
+        Ok(data) => comm.readsectors(proto::scsi::ResponseReadSectors { data })?,
+        Err(err) => {
+            error!("{err}");
+            comm.error(err)?;
+        }
+    }
+    Ok(())
+}
 
 impl InitState {
     /// Wait for the bus and device numbers of the device (`0` to exit), open
@@ -166,17 +208,7 @@ impl DevOpenedState {
                     }
                 },
                 Msg::ReadSectors(req) => {
-                    match self.usb_mass_storage.read_sectors(
-                        req.offset,
-                        req.count,
-                        self.usb_mass_storage.block_size as usize,
-                    ) {
-                        Ok(data) => comm.readsectors(proto::scsi::ResponseReadSectors { data })?,
-                        Err(err) => {
-                            error!("{err}");
-                            comm.error(err)?;
-                        }
-                    }
+                    handle_read_sectors(&mut self.usb_mass_storage, comm, req)?
                 }
                 Msg::End(_) => {
                     comm.end()?;
@@ -378,17 +410,7 @@ impl PartitionsListedState {
         loop {
             match comm.recv_req()? {
                 Msg::ReadSectors(req) => {
-                    match self.usb_mass_storage.read_sectors(
-                        req.offset,
-                        req.count,
-                        self.usb_mass_storage.block_size as usize,
-                    ) {
-                        Ok(data) => comm.readsectors(proto::scsi::ResponseReadSectors { data })?,
-                        Err(err) => {
-                            error!("{err}");
-                            comm.error(err)?;
-                        }
-                    }
+                    handle_read_sectors(&mut self.usb_mass_storage, comm, req)?
                 }
                 Msg::End(_) => {
                     comm.end()?;
