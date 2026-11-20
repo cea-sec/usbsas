@@ -169,6 +169,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 // in bytes/s, slowest supported link
 const MIN_THROUGHPUT: u64 = 256 * 1024;
 const BASE_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_REDIRECTS: usize = 3;
 
 // Wrapper around reqwest::Client to transparently perform kerberos authentication
 pub(crate) struct HttpClient {
@@ -183,7 +184,8 @@ impl HttpClient {
         let builder = Client::builder()
             .gzip(true)
             .connect_timeout(BASE_TIMEOUT)
-            .tcp_user_timeout(BASE_TIMEOUT);
+            .tcp_user_timeout(BASE_TIMEOUT)
+            .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS));
         #[cfg(not(feature = "allow-http"))]
         let builder = builder
             .https_only(true)
