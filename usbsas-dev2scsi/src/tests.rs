@@ -584,6 +584,16 @@ fn whole_device_iso9660() {
 }
 
 #[test]
+fn small_iso9660() {
+    // 0x8000 of system area, primary volume descriptor and terminator
+    let img = Img::new(0x9000).iso(0).build();
+    assert_eq!(
+        list(&img).unwrap(),
+        [part(0xFF, 0, 0x9000, "Unknown", "ISO9660")]
+    );
+}
+
+#[test]
 fn iso9660_second_descriptor() {
     // only the descriptor at 0x8800 is valid
     let mut img = Img::new(MIB);

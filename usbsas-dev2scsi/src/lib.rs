@@ -50,11 +50,14 @@ pub enum Error {
 /// Result type of this process.
 pub type Result<T> = std::result::Result<T, Error>;
 
-// Max we need to read for ext4 check (other fs need less) and iso9660
+// Max we need to read for ext4 check (other fs need less)
 /// Bytes to read at the start of a partition to detect its file system
 const MAX_LEN_PART_HEADER: u64 = 0x488;
-/// Bytes to read (from offset 0x8000) to detect an ISO9660 image
-const MAX_LEN_ISO_HEADER: u64 = 0x8806;
+/// Offset of the ISO9660 volume descriptors in a partition
+const ISO_DESCRIPTORS_OFFSET: u64 = 0x8000;
+/// Bytes to read from `ISO_DESCRIPTORS_OFFSET` to detect an ISO9660 image
+/// ('CD001' in the first or second descriptor)
+const LEN_ISO_HEADER: u64 = 0x806;
 /// Max bytes read in one request: the response must fit in a message (with
 /// room for the protobuf framing of the response).
 const MAX_READ_SIZE: u64 = MAX_PROTO_MESS_SIZE - 64;
@@ -280,6 +283,25 @@ impl DevOpenedState {
         }))
     }
 
+    /// Whether the device is an ISO9660 image.
+    fn is_iso9660(&mut self) -> bool {
+        let block_size = u64::from(self.usb_mass_storage.block_size);
+        let count = LEN_ISO_HEADER.div_ceil(block_size);
+        let data = match read_sectors(
+            &mut self.usb_mass_storage,
+            ISO_DESCRIPTORS_OFFSET / block_size,
+            count,
+        ) {
+            Ok(data) => data,
+            Err(err) => {
+                warn!("couldn't read iso9660 header: {err}");
+                return false;
+            }
+        };
+        const ISO_MAGIC: &[u8] = b"CD001";
+        ISO_MAGIC == &data[0x1..0x6] || ISO_MAGIC == &data[0x801..0x806]
+    }
+
     /// List partitions (MBR or GPT) and detect their file system and label. A
     /// device without partition table is a single partition. Returns an error
     /// if no supported file system is found.
@@ -375,25 +397,11 @@ impl DevOpenedState {
         // If we didn't find anything supported, last try with ISO9660 which requires different
         // sectors to read
         if partitions.len() == 1 && partitions[0].ptype == 0 {
-            // Check for 'CD001' at 0x8001 and 0x8801
-            let mut sectors_to_read = MAX_LEN_ISO_HEADER / block_size;
-            if MAX_LEN_ISO_HEADER.rem_euclid(block_size) > 0 {
-                sectors_to_read += 1;
-            }
-            let data = self.usb_mass_storage.read_sectors(
-                0x8000 / block_size,
-                sectors_to_read,
-                block_size as usize,
-            )?;
-            if [0x43, 0x44, 0x30, 0x30, 0x31] == data[0x1..0x6]
-                || [0x43, 0x44, 0x30, 0x30, 0x31] == data[0x801..0x806]
-            {
+            if self.is_iso9660() {
                 partitions[0].type_str = "ISO9660".into();
-                if partitions[0].ptype == 0 {
-                    // use this ptype since there isn't any for iso and we
-                    // should never support this one
-                    partitions[0].ptype = 0xFF;
-                }
+                // use this ptype since there isn't any for iso and we
+                // should never support this one
+                partitions[0].ptype = 0xFF;
             } else {
                 return Err(Error::Partition(
                     "No supported filesystem found".to_string(),
