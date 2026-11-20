@@ -6487,7 +6487,6 @@ name = "usbsas-files2fs"
 version = "0.2.0"
 dependencies = [
  "bitvec",
- "env_logger",
  "fscommon",
  "log",
  "thiserror 2.0.21",
