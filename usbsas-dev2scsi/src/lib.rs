@@ -7,22 +7,22 @@
 use byteorder::{ByteOrder, LittleEndian};
 use log::{debug, error, trace, warn};
 use positioned_io2::ReadAt;
-use std::{convert::TryFrom, io, io::prelude::*, str};
+use std::{convert::TryFrom, io, io::prelude::*, os::unix::io::RawFd, str};
 use thiserror::Error;
 use usbsas_comm::{ComRpScsi, ProtoRespCommon, ProtoRespScsi};
 use usbsas_proto as proto;
 use usbsas_proto::{common::PartitionInfo, scsi::request::Msg};
 use usbsas_utils::MAX_PROTO_MESS_SIZE;
-#[cfg(not(any(test, feature = "mock")))]
-use {
-    std::os::unix::io::AsRawFd,
-    usbsas_comm::ToFd,
-    usbsas_mass_storage::{self, MassStorage},
-};
 #[cfg(any(test, feature = "mock"))]
 use {
     std::{env, fs::OpenOptions},
     usbsas_mock::mass_storage::MockMassStorage as MassStorage,
+};
+#[cfg(not(any(test, feature = "mock")))]
+use {
+    std::{fs::OpenOptions, os::unix::io::AsRawFd},
+    usbsas_comm::ToFd,
+    usbsas_mass_storage::{self, MassStorage},
 };
 
 /// Errors of this process.
@@ -100,6 +100,45 @@ struct PartitionsListedState {
 }
 
 struct WaitEndState {}
+
+/// Apply the seccomp filter: communication with the parent, and libusb on
+/// `device_fd` if a device was opened.
+#[cfg(not(any(test, feature = "mock")))]
+fn sandbox(comm: &ComRpScsi, device_fd: Option<RawFd>) -> Result<()> {
+    Ok(usbsas_sandbox::dev2scsi::seccomp(
+        comm.input_fd(),
+        comm.output_fd(),
+        device_fd,
+    )?)
+}
+
+#[cfg(any(test, feature = "mock"))]
+fn sandbox(_: &ComRpScsi, _: Option<RawFd>) -> Result<()> {
+    Ok(())
+}
+
+/// Open `/dev/bus/usb/BBB/DDD` and initialize the mass storage device. Returns
+/// the device and its file descriptor, to allow it in the sandbox.
+#[cfg(not(any(test, feature = "mock")))]
+fn open_device(busnum: u32, devnum: u32) -> Result<(MassStorage, Option<RawFd>)> {
+    let device_path = format!("/dev/bus/usb/{busnum:03}/{devnum:03}");
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(device_path)?;
+    let fd = file.as_raw_fd();
+    Ok((MassStorage::from_opened_file(file)?, Some(fd)))
+}
+
+/// Open the file given by `USBSAS_MOCK_IN_DEV` as the device.
+#[cfg(any(test, feature = "mock"))]
+fn open_device(_: u32, _: u32) -> Result<(MassStorage, Option<RawFd>)> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(false)
+        .open(env::var("USBSAS_MOCK_IN_DEV")?)?;
+    Ok((MassStorage::from_opened_file(file)?, None))
+}
 
 /// Read `count` sectors at sector `offset`. Reads beyond the end of the device
 /// or whose response wouldn't fit in a message are refused before reading (or
@@ -252,8 +291,11 @@ impl InitState {
     /// Wait for the bus and device numbers of the device (`0` to exit), open
     /// it, sandbox the process and send `ResponseOpenDevice`.
     fn run(self, comm: &mut ComRpScsi) -> Result<State> {
-        let mut buf = vec![0u8; 8];
-        comm.read_exact(&mut buf)?;
+        let mut buf = [0u8; 8];
+        if let Err(err) = comm.read_exact(&mut buf) {
+            sandbox(comm, None)?;
+            return Err(err.into());
+        }
 
         let busnum = LittleEndian::read_u32(&buf[0..4]);
         let devnum = LittleEndian::read_u32(&buf[4..8]);
@@ -262,48 +304,21 @@ impl InitState {
 
         // If the process is unlocked with 0-0, usbsas is resetting, go directly to the EndState
         if busnum == 0 && devnum == 0 {
-            #[cfg(not(any(test, feature = "mock")))]
-            usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), None)?;
+            sandbox(comm, None)?;
             return Ok(State::WaitEnd(WaitEndState {}));
         }
 
-        #[cfg(not(any(test, feature = "mock")))]
-        let (device_file, device_fd) = {
-            let device_path = format!("/dev/bus/usb/{busnum:03}/{devnum:03}");
-            match std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(device_path)
-            {
-                Ok(file) => {
-                    let file_fd = file.as_raw_fd();
-                    (file, file_fd)
-                }
-                Err(err) => {
-                    error!("Error opening device file: {err}");
-                    comm.error(err)?;
-                    return Ok(State::WaitEnd(WaitEndState {}));
-                }
-            }
-        };
-
-        #[cfg(any(test, feature = "mock"))]
-        let device_file = OpenOptions::new()
-            .read(true)
-            .write(false)
-            .open(env::var("USBSAS_MOCK_IN_DEV")?)?;
-
-        let usb_mass_storage = match MassStorage::from_opened_file(device_file) {
-            Ok(ums) => ums,
+        let (usb_mass_storage, device_fd) = match open_device(busnum, devnum) {
+            Ok(dev) => dev,
             Err(err) => {
-                error!("Init mass storage error: {err}, waiting end");
+                error!("Error opening device: {err}, waiting end");
+                sandbox(comm, None)?;
                 comm.error(err)?;
                 return Ok(State::WaitEnd(WaitEndState {}));
             }
         };
 
-        #[cfg(not(any(test, feature = "mock")))]
-        usbsas_sandbox::dev2scsi::seccomp(comm.input_fd(), comm.output_fd(), Some(device_fd))?;
+        sandbox(comm, device_fd)?;
 
         comm.opendevice(proto::scsi::ResponseOpenDevice {
             block_size: u64::from(usb_mass_storage.block_size),
