@@ -193,6 +193,10 @@ fn main() -> Result<()> {
         // Create an epoll(7) thread to terminate the process and its children if the client socket is shutdown
         let pid = std::process::id();
         let _ = std::thread::spawn(move || {
+            if let Err(e) = usbsas_sandbox::usbsas::sandbox_epoll_thread(&[pid], stream.as_raw_fd()).context("seccomp") {
+                warn!("epoll thread sandbox couldn't be enforced: {}", e);
+            }
+
             if let Err(e) = wait_for_socket_shutdown(&stream) {
                 error!("while epolling for client socket shutdown: {}", e);
             }

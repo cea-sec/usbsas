@@ -76,3 +76,138 @@ pub fn sandbox(
 
     Ok(())
 }
+
+/// seccomp: communication with the socket and the epoll fd,
+/// kill on children pids with SIG(TERM|INT)
+pub fn sandbox_epoll_thread(
+    killable_pids: &[u32],
+    socket_fd: RawFd,
+) -> Result<()> {
+    let mut ctx = seccomp::new_context_with_common_rules(vec![], vec![])?;
+
+    // epoll-related syscalls
+    ctx.allow_syscall(Syscall::epoll_create1)?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::epoll_ctl,
+        &[
+            Comparator::new(
+                1,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(libc::EPOLL_CTL_ADD as u64),
+            ),
+            Comparator::new(
+                2,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(socket_fd as u64),
+            )
+        ],
+    )?;
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        #[cfg(not(target_arch = "aarch64"))]
+        Syscall::epoll_wait,
+        #[cfg(target_arch = "aarch64")]
+        Syscall::epoll_pwait,
+        &[
+            Comparator::new(
+                2,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(1),
+            ),
+            Comparator::new(
+                3,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(-1i32 as u64),
+            )
+        ],
+    )?;
+
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::shutdown,
+        &[
+            Comparator::new(
+                0,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(socket_fd as u64),
+            ),
+            Comparator::new(
+                1,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(libc::SHUT_RDWR as u64),
+            )
+        ],
+    )?;
+
+    // it's impractical to allow close on the epoll fd so we allow close on all fds
+    ctx.allow_syscall(Syscall::close)?;
+
+    // allow killable pids to be SIGTERMed or SIGKILLed
+    for pid in killable_pids {
+        ctx.set_rule_for_syscall(
+            Action::Allow,
+            Syscall::kill,
+            &[
+                Comparator::new(
+                    0,
+                    Cmp::MaskedEq,
+                    u64::from(u32::MAX),
+                    Some(*pid as u64)
+                ),
+                Comparator::new(
+                    1,
+                    Cmp::MaskedEq,
+                    u64::from(u32::MAX),
+                    Some(libc::SIGTERM as u64)
+                ),
+            ],
+        )?;
+        ctx.set_rule_for_syscall(
+            Action::Allow,
+            Syscall::kill,
+            &[
+                Comparator::new(
+                    0,
+                    Cmp::MaskedEq,
+                    u64::from(u32::MAX),
+                    Some(*pid as u64)
+                ),
+                Comparator::new(
+                    1,
+                    Cmp::MaskedEq,
+                    u64::from(u32::MAX),
+                    Some(libc::SIGKILL as u64)
+                ),
+            ],
+        )?;
+    }
+
+    ctx.allow_syscall(Syscall::clock_nanosleep)?;
+
+    // probably stems from rust optimizations
+    ctx.set_rule_for_syscall(
+        Action::Allow,
+        Syscall::madvise,
+        &[
+            Comparator::new(
+                2,
+                Cmp::MaskedEq,
+                u64::from(u32::MAX),
+                Some(libc::MADV_DONTNEED as u64)
+            ),
+        ],
+    )?;
+
+    crate::landlock(None, None, None, None, None)?;
+
+    ctx.load()?;
+
+    Ok(())
+}
