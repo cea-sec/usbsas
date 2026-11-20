@@ -407,13 +407,16 @@ impl PartitionsListedState {
 impl WaitEndState {
     fn run(self, comm: &mut ComRpScsi) -> Result<State> {
         trace!("wait end state");
-        match comm.recv_req()? {
-            Msg::End(_) => {
-                comm.end()?;
-            }
-            _ => {
-                error!("unexpected req");
-                comm.error("unexpected request")?;
+        loop {
+            match comm.recv_req()? {
+                Msg::End(_) => {
+                    comm.end()?;
+                    break;
+                }
+                _ => {
+                    error!("unexpected req");
+                    comm.error("unexpected request")?;
+                }
             }
         }
         Ok(State::End)

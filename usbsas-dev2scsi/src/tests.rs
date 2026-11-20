@@ -330,6 +330,17 @@ fn unlock_zero_waits_end() {
 }
 
 #[test]
+fn wait_end_answers_requests_until_end() {
+    let mut dev2scsi = Running::locked();
+    dev2scsi.unlock(0, 0);
+    let err = dev2scsi.read(0, 1).unwrap_err();
+    assert_eq!(err.to_string(), "unexpected request");
+    let err = dev2scsi.partitions().unwrap_err();
+    assert_eq!(err.to_string(), "unexpected request");
+    dev2scsi.end();
+}
+
+#[test]
 fn parent_gone_before_unlock() {
     let dev2scsi = Running::locked();
     // read_exact fails, the error can't be sent either
@@ -412,6 +423,18 @@ fn partitions_error_can_be_retried() {
     // still in the same state
     assert_eq!(dev2scsi.read(0, 1).unwrap(), img[..SECTOR]);
     assert!(dev2scsi.partitions().is_err());
+    dev2scsi.end();
+}
+
+#[test]
+fn malformed_request_then_end() {
+    let img = mock_in_dev();
+    let mut dev2scsi = Running::opened(img);
+    dev2scsi.rq.send(Request { msg: None }).unwrap();
+    assert!(matches!(dev2scsi.recv(), response::Msg::Error(_)));
+    // device closed, waiting for end
+    let err = dev2scsi.read(0, 1).unwrap_err();
+    assert_eq!(err.to_string(), "unexpected request");
     dev2scsi.end();
 }
 
