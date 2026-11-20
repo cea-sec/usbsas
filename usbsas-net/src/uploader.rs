@@ -131,6 +131,7 @@ impl RunningState {
         let network = req.network.ok_or(Error::BadRequest)?;
         let url = format!("{}/{}", network.url.trim_end_matches('/'), req.id);
         let mut http_client = HttpClient::new(
+            false,
             #[cfg(feature = "authkrb")]
             network.krb_service_name,
         )?;

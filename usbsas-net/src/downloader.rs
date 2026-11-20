@@ -83,6 +83,7 @@ impl InitState {
             file,
             url: net_conf.url,
             http_client: HttpClient::new(
+                true,
                 #[cfg(feature = "authkrb")]
                 net_conf.krb_service_name,
             )?,

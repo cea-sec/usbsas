@@ -192,9 +192,12 @@ pub(crate) struct HttpClient {
 }
 
 impl HttpClient {
-    fn new(#[cfg(feature = "authkrb")] krb_service_name: Option<String>) -> Result<Self> {
+    fn new(
+        gzip: bool,
+        #[cfg(feature = "authkrb")] krb_service_name: Option<String>,
+    ) -> Result<Self> {
         let builder = Client::builder()
-            .gzip(true)
+            .gzip(gzip)
             .connect_timeout(BASE_TIMEOUT)
             .tcp_user_timeout(BASE_TIMEOUT)
             .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS));
