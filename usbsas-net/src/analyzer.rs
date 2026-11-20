@@ -184,11 +184,12 @@ impl RunningState {
         if !resp.status().is_success() {
             return Err(Error::Remote);
         }
+        let response_bytes = crate::read_body_limited(resp)?;
         let response = self
             .json_parser
             .comm
             .parseresp(proto::jsonparser::RequestParseResp {
-                data: resp.bytes()?.into(),
+                data: response_bytes,
             })?
             .resp
             .ok_or(Error::Upload("error uploading bundle for analysis".into()))?;
@@ -208,12 +209,12 @@ impl RunningState {
             if !resp.status().is_success() {
                 return Err(Error::Remote);
             }
-            let response_bytes = resp.bytes()?;
+            let response_bytes = crate::read_body_limited(resp)?;
             let response = self
                 .json_parser
                 .comm
                 .parseresp(proto::jsonparser::RequestParseResp {
-                    data: response_bytes.clone().into(),
+                    data: response_bytes.clone(),
                 })?
                 .resp
                 .ok_or(Error::Upload("error getting analysis result".into()))?;
@@ -224,7 +225,7 @@ impl RunningState {
                         .json_parser
                         .comm
                         .parsereport(proto::jsonparser::RequestParseReport {
-                            data: response_bytes.into(),
+                            data: response_bytes,
                         })?
                         .report
                         .ok_or(Error::Upload("error parsing analysis result".into()))?;
