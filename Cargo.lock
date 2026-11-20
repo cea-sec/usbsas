@@ -6436,7 +6436,6 @@ name = "usbsas-cmdexec"
 version = "0.1.4"
 dependencies = [
  "byteorder",
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
