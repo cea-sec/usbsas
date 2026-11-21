@@ -33,6 +33,9 @@ mod comm_async;
 #[cfg(feature = "async")]
 pub use comm_async::*;
 
+#[cfg(test)]
+mod tests;
+
 /// Build a value from an environment variable.
 pub trait FromEnv: Sized {
     type Err;

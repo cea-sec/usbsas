@@ -149,3 +149,178 @@ protorequest_async!(
     UserId,
     Wipe
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_lite::future::block_on;
+    use prost::Message;
+    use usbsas_proto::{
+        common::{ResponseEnd, ResponseError, ResponseStatus, Status},
+        usbsas::{
+            Request, RequestEnd, RequestReadDir, RequestUserId, Response, ResponseUserId, request,
+            response,
+        },
+    };
+
+    type MemCommAsync<'a> = ComRqAsyncUsbsas<&'a [u8], Vec<u8>>;
+
+    fn frames(msgs: impl IntoIterator<Item = Response>) -> Vec<u8> {
+        let mut buf = Vec::new();
+        for msg in msgs {
+            buf.extend_from_slice(&(msg.encoded_len() as u64).to_le_bytes());
+            msg.encode(&mut buf).unwrap();
+        }
+        buf
+    }
+
+    fn resp(msg: response::Msg) -> Response {
+        Response { msg: Some(msg) }
+    }
+
+    fn sent_requests(mut buf: &[u8]) -> Vec<Request> {
+        let mut reqs = Vec::new();
+        while !buf.is_empty() {
+            let len = u64::from_le_bytes(buf[..8].try_into().unwrap()) as usize;
+            reqs.push(Request::decode(&buf[8..8 + len]).unwrap());
+            buf = &buf[8 + len..];
+        }
+        reqs
+    }
+
+    #[test]
+    fn same_wire_format_as_comm() {
+        let msg = RequestReadDir {
+            path: "/some/path".into(),
+        };
+        let mut comm: CommAsync<(), &[u8], Vec<u8>> = CommAsync::new(&[], Vec::new());
+        block_on(comm.send(msg.clone())).unwrap();
+        let (_, out) = comm.into_inner();
+        let mut expected = (msg.encoded_len() as u64).to_le_bytes().to_vec();
+        expected.extend(msg.encode_to_vec());
+        assert_eq!(out, expected);
+
+        let mut comm: CommAsync<(), &[u8], Vec<u8>> = CommAsync::new(&out, Vec::new());
+        assert_eq!(block_on(comm.recv::<RequestReadDir>()).unwrap(), msg);
+        let err = block_on(comm.recv::<RequestReadDir>()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn recv_rejects_oversized_message() {
+        let input = (MAX_PROTO_MESS_SIZE + 1).to_le_bytes();
+        let mut comm: CommAsync<(), &[u8], Vec<u8>> = CommAsync::new(&input, Vec::new());
+        let err = block_on(comm.recv::<Request>()).unwrap_err();
+        assert_eq!(err.to_string(), "Message size exceeded");
+    }
+
+    #[test]
+    fn recv_truncated_and_invalid() {
+        let input = [1, 0, 0];
+        let mut comm: CommAsync<(), &[u8], Vec<u8>> = CommAsync::new(&input, Vec::new());
+        let err = block_on(comm.recv::<Request>()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+
+        let input = [3, 0, 0, 0, 0, 0, 0, 0, 0x0a, 0x0a, 0x00];
+        let mut comm: CommAsync<(), &[u8], Vec<u8>> = CommAsync::new(&input, Vec::new());
+        let err = block_on(comm.recv::<RequestReadDir>()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn request_responses() {
+        let input = frames([
+            resp(response::Msg::UserId(ResponseUserId {
+                userid: "alice".into(),
+            })),
+            resp(response::Msg::Error(ResponseError {
+                err: "no such dir".into(),
+            })),
+            resp(response::Msg::UserId(ResponseUserId::default())),
+            Response { msg: None },
+        ]);
+        let mut comm: MemCommAsync = CommAsync::new(&input, Vec::new());
+        block_on(async {
+            assert_eq!(comm.userid(RequestUserId {}).await.unwrap().userid, "alice");
+            let err = comm
+                .readdir(RequestReadDir { path: "/x".into() })
+                .await
+                .unwrap_err();
+            assert_eq!(err.to_string(), "no such dir");
+            let err = comm.readdir(RequestReadDir::default()).await.unwrap_err();
+            assert_eq!(err.to_string(), "Unexpected response");
+            let err = comm.userid(RequestUserId {}).await.unwrap_err();
+            assert_eq!(err.to_string(), "Unexpected response");
+        });
+        let (_, out) = comm.into_inner();
+        assert_eq!(
+            sent_requests(&out),
+            [
+                Request {
+                    msg: Some(request::Msg::UserId(RequestUserId {}))
+                },
+                Request {
+                    msg: Some(request::Msg::ReadDir(RequestReadDir { path: "/x".into() }))
+                },
+                Request {
+                    msg: Some(request::Msg::ReadDir(RequestReadDir::default()))
+                },
+                Request {
+                    msg: Some(request::Msg::UserId(RequestUserId {}))
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn recv_status() {
+        let status = ResponseStatus {
+            current: 5,
+            total: 10,
+            done: false,
+            status: Status::UploadAv.into(),
+        };
+        let input = frames([
+            resp(response::Msg::Status(status)),
+            resp(response::Msg::Error(ResponseError {
+                err: "upload failed".into(),
+            })),
+            resp(response::Msg::End(ResponseEnd {})),
+        ]);
+        let mut comm: MemCommAsync = CommAsync::new(&input, Vec::new());
+        block_on(async {
+            assert_eq!(comm.recv_status().await.unwrap(), status);
+            assert_eq!(
+                comm.recv_status().await.unwrap_err().to_string(),
+                "upload failed"
+            );
+            assert_eq!(
+                comm.recv_status().await.unwrap_err().to_string(),
+                "Unexpected response"
+            );
+        });
+        assert!(comm.output().is_empty());
+    }
+
+    #[test]
+    fn end() {
+        let input = frames([
+            resp(response::Msg::End(ResponseEnd {})),
+            resp(response::Msg::Error(ResponseError { err: "busy".into() })),
+        ]);
+        let mut comm: MemCommAsync = CommAsync::new(&input, Vec::new());
+        block_on(async {
+            comm.end().await.unwrap();
+            assert_eq!(comm.end().await.unwrap_err().to_string(), "busy");
+        });
+        assert_eq!(
+            sent_requests(comm.output()),
+            vec![
+                Request {
+                    msg: Some(request::Msg::End(RequestEnd {}))
+                };
+                2
+            ]
+        );
+    }
+}
