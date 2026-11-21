@@ -167,6 +167,10 @@ pub enum Error {
     InsecureUrl(String),
     #[error("HTTP response body larger than {0} bytes")]
     ResponseTooLarge(u64),
+    #[error("Downloaded {received} bytes, expected {expected}")]
+    DownloadSize { received: u64, expected: u64 },
+    #[error("Unsupported Content-Encoding: '{0}'")]
+    ContentEncoding(String),
 }
 /// Result type of the network processes.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -175,6 +179,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 const MIN_THROUGHPUT: u64 = 256 * 1024;
 const BASE_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_REDIRECTS: usize = 3;
+
+/// Total timeout of a request sending or receiving `size` bytes, estimated
+/// for the slowest supported link.
+fn transfer_timeout(size: u64) -> Duration {
+    BASE_TIMEOUT + Duration::from_secs(size / MIN_THROUGHPUT)
+}
 
 /// Check that a configured URL uses https. Plain http is only accepted when
 /// built with the `allow-http` feature.
@@ -217,12 +227,8 @@ pub(crate) struct HttpClient {
 }
 
 impl HttpClient {
-    fn new(
-        gzip: bool,
-        #[cfg(feature = "authkrb")] krb_service_name: Option<String>,
-    ) -> Result<Self> {
+    fn new(#[cfg(feature = "authkrb")] krb_service_name: Option<String>) -> Result<Self> {
         let builder = Client::builder()
-            .gzip(gzip)
             .connect_timeout(BASE_TIMEOUT)
             .tcp_user_timeout(BASE_TIMEOUT)
             .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS));
@@ -240,9 +246,15 @@ impl HttpClient {
     }
 
     /// Authenticate with Kerberos (SPNEGO, mutual authentication) and send
-    /// the request again with the `Authorization` header.
+    /// the request again with the `Authorization` header. `timeout` is the
+    /// total timeout of each request, including reading the response body.
     #[cfg(feature = "authkrb")]
-    fn req_with_krb_auth(&mut self, method: reqwest::Method, url: &str) -> Result<Response> {
+    fn req_with_krb_auth(
+        &mut self,
+        method: reqwest::Method,
+        url: &str,
+        timeout: Duration,
+    ) -> Result<Response> {
         let mut resp_ret: Option<Response> = None;
         if let Some(krb_service_name) = &self.krb_service_name {
             let desired_mechs = {
@@ -288,6 +300,7 @@ impl HttpClient {
                             .client
                             .request(method.clone(), url)
                             .headers(self.headers.clone())
+                            .timeout(timeout)
                             .send()?;
                         if !resp.status().is_success() {
                             return Err(Error::Nego);
@@ -316,19 +329,49 @@ impl HttpClient {
 
     /// GET request, authenticating if the server answers 401.
     fn get(&mut self, url: &str) -> Result<Response> {
+        self.get_with_timeout(url, BASE_TIMEOUT)
+    }
+
+    /// GET request of a (potentially large) body of `size` bytes, gzip
+    /// encoding accepted. The timeout depends on `size`, see
+    /// `transfer_timeout()`. Decompressing and checking the size of the
+    /// body is up to the caller.
+    fn get_large(&mut self, url: &str, size: u64) -> Result<Response> {
+        self.headers.insert(
+            reqwest::header::ACCEPT_ENCODING,
+            HeaderValue::from_static("gzip"),
+        );
+        let resp = self.get_with_timeout(url, transfer_timeout(size));
+        self.headers.remove(reqwest::header::ACCEPT_ENCODING);
+        resp
+    }
+
+    /// GET request with a total timeout (including reading the response
+    /// body), authenticating if the server answers 401.
+    fn get_with_timeout(&mut self, url: &str, timeout: Duration) -> Result<Response> {
         self.headers
             .insert(reqwest::header::REFERER, HeaderValue::from_str(url)?);
 
         #[cfg(not(feature = "authkrb"))]
         {
-            Ok(self.client.get(url).headers(self.headers.clone()).send()?)
+            Ok(self
+                .client
+                .get(url)
+                .headers(self.headers.clone())
+                .timeout(timeout)
+                .send()?)
         }
 
         #[cfg(feature = "authkrb")]
         {
-            let mut resp = self.client.get(url).headers(self.headers.clone()).send()?;
+            let mut resp = self
+                .client
+                .get(url)
+                .headers(self.headers.clone())
+                .timeout(timeout)
+                .send()?;
             if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
-                resp = self.req_with_krb_auth(Method::GET, url)?;
+                resp = self.req_with_krb_auth(Method::GET, url, timeout)?;
             }
             Ok(resp)
         }
@@ -348,7 +391,7 @@ impl HttpClient {
         {
             let mut resp = self.client.head(url).headers(self.headers.clone()).send()?;
             if resp.status() == StatusCode::UNAUTHORIZED && self.krb_service_name.is_some() {
-                resp = self.req_with_krb_auth(Method::HEAD, url)?;
+                resp = self.req_with_krb_auth(Method::HEAD, url, BASE_TIMEOUT)?;
             }
             Ok(resp)
         }
@@ -368,17 +411,15 @@ impl HttpClient {
                 .headers(self.headers.clone())
                 .send()?;
             if resp.status() == StatusCode::UNAUTHORIZED {
-                self.req_with_krb_auth(Method::OPTIONS, url)?;
+                self.req_with_krb_auth(Method::OPTIONS, url, BASE_TIMEOUT)?;
             }
         }
 
-        // Estimate timeout value based on size and eventual slow link
-        let timeout = BASE_TIMEOUT + Duration::from_secs(size / MIN_THROUGHPUT);
         Ok(self
             .client
             .post(url)
             .headers(self.headers.clone())
-            .timeout(timeout)
+            .timeout(transfer_timeout(size))
             .body(body)
             .send()?)
     }

@@ -666,7 +666,7 @@ impl RunState for DownloadSrcState {
         if self
             .config
             .available_space
-            .is_some_and(|size| archive_size > size)
+            .is_some_and(|size| 2 * archive_size > size)
         {
             bail!(
                 "Files to download ({archive_size}B) would be larger than available local space, aborting transfer"

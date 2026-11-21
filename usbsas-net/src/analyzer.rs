@@ -99,7 +99,6 @@ impl InitState {
             url: conf.url,
             poll_timeout: Duration::from_secs(conf.poll_timeout),
             http_client: HttpClient::new(
-                false,
                 #[cfg(feature = "authkrb")]
                 conf.krb_service_name,
             )?,

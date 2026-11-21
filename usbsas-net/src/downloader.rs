@@ -6,9 +6,13 @@
 
 use crate::FileWriterProgress;
 use crate::{Error, HttpClient, Result};
+use flate2::read::MultiGzDecoder;
 use log::{error, trace};
-use reqwest::Url;
-use std::fs::{File, OpenOptions};
+use reqwest::{Url, header::CONTENT_ENCODING};
+use std::{
+    fs::{File, OpenOptions},
+    io::{self, Read},
+};
 use usbsas_comm::{ComRpDownloader, ProtoRespCommon, ProtoRespDownloader};
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_proto as proto;
@@ -83,7 +87,6 @@ impl InitState {
             file,
             url: net_conf.url,
             http_client: HttpClient::new(
-                true,
                 #[cfg(feature = "authkrb")]
                 net_conf.krb_service_name,
             )?,
@@ -161,13 +164,51 @@ impl RunningState {
         comm.download(proto::downloader::ResponseDownload {})?;
         let comm_progress =
             ComRpDownloader::new(comm.input().try_clone()?, comm.output().try_clone()?);
-        let mut resp = self.http_client.get(&self.url)?;
+        // The archive may be gzipped, `filesize` is its uncompressed size
+        let max_wire_size = max_gzip_size(filesize);
+        let resp = self.http_client.get_large(&self.url, max_wire_size)?;
         if !resp.status().is_success() {
             return Err(Error::Error(format!(
                 "Unknown status code {:?}",
                 resp.status()
             )));
         }
+
+        let gzip = match resp
+            .headers()
+            .get(CONTENT_ENCODING)
+            .map(|enc| enc.to_str().map(str::trim))
+            .transpose()?
+        {
+            None => false,
+            Some(enc) if enc.eq_ignore_ascii_case("identity") => false,
+            Some(enc) if enc.eq_ignore_ascii_case("gzip") || enc.eq_ignore_ascii_case("x-gzip") => {
+                true
+            }
+            Some(enc) => return Err(Error::ContentEncoding(enc.to_string())),
+        };
+
+        // Stop the transfer as soon as more than expected is received, on the
+        // wire and after decompression.
+        let body: Box<dyn Read> = if gzip {
+            if let Some(len) = resp.content_length()
+                && len > max_wire_size
+            {
+                return Err(Error::ResponseTooLarge(max_wire_size));
+            }
+            Box::new(MultiGzDecoder::new(LimitedReader::new(resp, max_wire_size)))
+        } else {
+            if let Some(len) = resp.content_length()
+                && len != filesize
+            {
+                return Err(Error::DownloadSize {
+                    received: len,
+                    expected: filesize,
+                });
+            }
+            Box::new(resp)
+        };
+        let mut body = LimitedReader::new(body, filesize);
 
         let mut filewriterprogress = FileWriterProgress {
             comm: comm_progress,
@@ -177,9 +218,56 @@ impl RunningState {
             status: Status::DlSrc,
         };
 
-        resp.copy_to(&mut filewriterprogress)?;
+        let received = io::copy(&mut body, &mut filewriterprogress)?;
+        if received != filesize {
+            return Err(Error::DownloadSize {
+                received,
+                expected: filesize,
+            });
+        }
         comm.done(Status::DlSrc)?;
         Ok(())
+    }
+}
+
+/// Maximum size of a gzip stream decompressing to `size` bytes. Worst case
+/// for incompressible data is about 5 bytes per 64 KiB (stored blocks), plus
+/// headers and trailers of each gzip member, this leaves a large margin.
+fn max_gzip_size(size: u64) -> u64 {
+    size.saturating_add(size / 1024).saturating_add(64 * 1024)
+}
+
+/// Reader failing as soon as more than `limit` bytes are read.
+struct LimitedReader<R> {
+    inner: R,
+    limit: u64,
+    read: u64,
+}
+
+impl<R: Read> LimitedReader<R> {
+    fn new(inner: R, limit: u64) -> Self {
+        Self {
+            inner,
+            limit,
+            read: 0,
+        }
+    }
+}
+
+impl<R: Read> Read for LimitedReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        // Never read more than one byte past the limit
+        let max = usize::try_from(self.limit - self.read + 1).unwrap_or(usize::MAX);
+        let len = buf.len().min(max);
+        let size_read = self.inner.read(&mut buf[..len])?;
+        self.read += size_read as u64;
+        if self.read > self.limit {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("received more than {} bytes", self.limit),
+            ));
+        }
+        Ok(size_read)
     }
 }
 
@@ -238,5 +326,74 @@ impl Downloader {
             };
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flate2::{Compression, write::GzEncoder};
+    use std::io::Write;
+
+    fn read_all<R: Read>(mut reader: R) -> io::Result<Vec<u8>> {
+        let mut out = Vec::new();
+        reader.read_to_end(&mut out)?;
+        Ok(out)
+    }
+
+    #[test]
+    fn limited_reader() {
+        let data = vec![1u8; 1000];
+        assert_eq!(
+            read_all(LimitedReader::new(&data[..], 1000)).unwrap().len(),
+            1000
+        );
+        assert_eq!(
+            read_all(LimitedReader::new(&data[..], 999))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidData
+        );
+        assert_eq!(
+            read_all(LimitedReader::new(&data[..0], 0)).unwrap().len(),
+            0
+        );
+    }
+
+    #[test]
+    fn gzip_size_bound() {
+        // Incompressible data, in several gzip members
+        let mut state = 0x1234_5678_u32;
+        let data: Vec<u8> = (0..4 * 1024 * 1024)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                state as u8
+            })
+            .collect();
+        let mut gz = Vec::new();
+        for chunk in data.chunks(1024 * 1024) {
+            let mut enc = GzEncoder::new(Vec::new(), Compression::best());
+            enc.write_all(chunk).unwrap();
+            gz.extend(enc.finish().unwrap());
+        }
+        let max = max_gzip_size(data.len() as u64);
+        assert!(gz.len() as u64 > data.len() as u64);
+        assert!(gz.len() as u64 <= max);
+        let out = read_all(LimitedReader::new(
+            MultiGzDecoder::new(LimitedReader::new(&gz[..], max)),
+            data.len() as u64,
+        ))
+        .unwrap();
+        assert_eq!(out, data);
+        // Decompresses to more than expected
+        assert!(
+            read_all(LimitedReader::new(
+                MultiGzDecoder::new(&gz[..]),
+                data.len() as u64 - 1
+            ))
+            .is_err()
+        );
     }
 }
