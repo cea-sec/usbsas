@@ -16,14 +16,15 @@
 //! has a generation number, responses tagged with an older generation (sent
 //! before a reset) are dropped.
 
-use iced::{Task, time::Instant};
-use smol::{Async, lock::Mutex};
+use iced::{Task, futures::FutureExt as _, time::Instant};
+use smol::{Async, Timer, future::FutureExt, lock::Mutex};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     os::unix::net::UnixStream,
     path::Path,
     sync::Arc,
+    time::Duration,
 };
 use usbsas_comm::{ComRqAsyncUsbsas, CommAsync};
 use usbsas_config::{conf_parse, conf_read};
@@ -317,6 +318,10 @@ pub struct GUI {
     /// Connection to usbsas, `None` until connected and during resets. Shared
     /// with the tasks sending requests.
     comm: Option<Arc<Mutex<ComRqUsbsas>>>,
+    /// Owned socket, `None` when `comm` is `None`. Allows for a shutdown of the socket after the
+    /// timeout for a potentially blocked `comm` has expired, thus signaling the server that a reset
+    /// is going on.
+    shutdown_handle: Option<UnixStream>,
     /// Incremented on each reset to discard messages of previous sessions
     generation: u64,
     /// A user-triggered request is in flight
@@ -410,6 +415,7 @@ impl GUI {
         (
             Self {
                 comm: None,
+                shutdown_handle: None,
                 generation: 0,
                 busy: false,
                 polling: false,
@@ -485,16 +491,20 @@ impl GUI {
     fn try_connect(&mut self) {
         if self.comm.is_none() {
             // connect() on a unix socket doesn't block, no need to make it async
-            let connect = || -> std::io::Result<ComRqUsbsas> {
+            let connect = || -> std::io::Result<(ComRqUsbsas, UnixStream)> {
                 let stream = UnixStream::connect(&self.socket_path)?;
-                Ok(CommAsync::new(
-                    Async::new(stream.try_clone()?)?,
-                    Async::new(stream)?,
+                Ok((
+                    CommAsync::new(
+                        Async::new(stream.try_clone()?)?,
+                        Async::new(stream.try_clone()?)?,
+                    ),
+                    stream,
                 ))
             };
             match connect() {
-                Ok(comm) => {
+                Ok((comm, stream)) => {
                     self.comm = Some(Arc::new(Mutex::new(comm)));
+                    self.shutdown_handle = Some(stream);
                     self.state = State::Init;
                 }
                 Err(err) => {
@@ -520,21 +530,53 @@ impl GUI {
         self.polling = false;
         let generation = self.generation;
 
-        match self.comm.take() {
-            Some(comm) => Task::perform(
+        match (self.comm.take(), self.shutdown_handle.take()) {
+            (Some(comm), Some(shutdown_handle)) => Task::perform(
                 async move {
-                    // Waits for a request still in flight before sending End
-                    let mut guard = comm.lock().await;
-                    if let Err(err) = guard.end().await {
+                    // Waits for a request still in flight before sending End, shutting socket down
+                    // on timeout
+                    let comm_or_shutdown = comm
+                        .lock()
+                        .map(|inner| Ok(inner))
+                        .or(async {
+                            Timer::after(Duration::from_secs(5)).await;
+                            shutdown_handle.shutdown(std::net::Shutdown::Both)?;
+                            Err::<_, std::io::Error>(std::io::ErrorKind::TimedOut.into())
+                        })
+                        .await;
+
+                    let mut guard = match comm_or_shutdown {
+                        Ok(comm) => comm,
+                        Err(err) => {
+                            if let std::io::ErrorKind::TimedOut = err.kind() {
+                                log::warn!(
+                                    "shut the socket down after waiting for in flight request timed out"
+                                );
+                            } else {
+                                log::error!("{}", err);
+                            }
+                            return;
+                        }
+                    };
+
+                    if let Err(err) = guard
+                        .end()
+                        .or(async {
+                            Timer::after(Duration::from_secs(5)).await;
+                            Err(std::io::ErrorKind::TimedOut.into())
+                        })
+                        .await
+                    {
                         log::error!("couldn't end usbsas properly: {}", err);
                     }
+
                     if let Err(err) = guard.input().get_ref().shutdown(std::net::Shutdown::Both) {
                         log::error!("couldn't shutdown socket: {}", err);
                     };
                 },
                 move |_| Message::ResetDone(generation),
             ),
-            None => Task::done(Message::ResetDone(generation)),
+            _ => Task::done(Message::ResetDone(generation)),
         }
     }
 

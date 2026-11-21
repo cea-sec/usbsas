@@ -3,7 +3,14 @@
 //! socket (`-s`) or via pipes inherited from its parent.
 
 use anyhow::{Context, Result, bail};
-use log::{error, info};
+use log::{error, info, warn};
+use nix::{
+    sys::signal::{
+        self,
+        Signal::{SIGKILL, SIGTERM},
+    },
+    unistd::Pid,
+};
 use std::{
     env,
     fs::{self, File, Permissions},
@@ -11,12 +18,14 @@ use std::{
         fd::AsRawFd,
         unix::{fs::PermissionsExt, net::UnixListener},
     },
+    process::exit,
 };
 use usbsas_comm::{ComRpUsbsas, Comm, ProtoRespUsbsas, ToFd};
 use usbsas_config::{Config, conf_parse, conf_read};
 use usbsas_usbsas::{
     TmpFiles,
     children::Children,
+    socket::wait_for_socket_shutdown,
     states::{EndState, InitState, State},
 };
 use usbsas_utils::clap::UsbsasClap;
@@ -162,7 +171,7 @@ fn main() -> Result<()> {
         }
         let socket_path = format!("{}/usbsas.sock", dir.trim_end_matches('/'));
         if let Ok(true) = std::path::Path::new(&socket_path).try_exists() {
-            log::warn!("socket already exists, probably residual, removing it");
+            warn!("socket already exists, probably residual, removing it");
             fs::remove_file(&socket_path).expect("remove socket");
         };
         let listener = UnixListener::bind(&socket_path).context("bind")?;
@@ -175,7 +184,69 @@ fn main() -> Result<()> {
             None => panic!("shouldn't happen"),
         };
         info!("client connected");
-        let comm = Comm::new(stream.try_clone().context("clone stream")?, stream);
+        let comm = Comm::new(
+            stream.try_clone().context("clone stream")?,
+            stream.try_clone().context("clone stream")?,
+        );
+
+        // Create an epoll(7) thread to terminate the process' children (thus the main thread) if
+        // the client shuts down its socket
+        let children_pids = [
+            ("analyzer", children.analyzer.child.id()),
+            ("identifier", children.identifier.child.id()),
+            ("cmdexec", children.cmdexec.child.id()),
+            ("downloader", children.downloader.child.id()),
+            ("files2fs", children.files2fs.child.id()),
+            ("files2tar", children.files2tar.child.id()),
+            ("files2cleantar", children.files2cleantar.child.id()),
+            ("local2files", children.local2files.child.id()),
+            ("fs2dev", children.fs2dev.child.id()),
+            ("scsi2files", children.scsi2files.child.id()),
+            ("tar2files", children.tar2files.child.id()),
+            ("uploader", children.uploader.child.id()),
+            ("usbdev", children.usbdev.child.id()),
+        ];
+        let _ = std::thread::spawn(move || {
+            let sandbox_res = usbsas_sandbox::usbsas::sandbox_epoll_thread(
+                &children_pids.map(|(_name, pid)| pid),
+                stream.as_raw_fd(),
+            )
+            .context("seccomp");
+            if let Err(err) = sandbox_res {
+                error!("epoll thread sandbox couldn't be enforced: {err}");
+                exit(1);
+            }
+
+            if let Err(err) = wait_for_socket_shutdown(&stream) {
+                error!("while epolling for client socket shutdown: {err}");
+            }
+            warn!("client socket was shutdown, ending registered children...");
+
+            for (name, pid) in children_pids {
+                info!("sending SIGTERM to {}", name);
+                if let Err(err) = signal::kill(Pid::from_raw(pid as i32), SIGTERM) {
+                    warn!("epoll thread's SIGTERM didn't reach {name}: {err}.");
+                }
+                match std::fs::exists(format!("/proc/{}", pid)) {
+                    Ok(false) => return,
+                    Ok(true) => warn!(
+                        "epoll thread's SIGTERM didn't end {name} succesfully. Retrying with SIGKILL..."
+                    ),
+                    Err(err) => error!("couldn't check if {name} still existed: {err}"),
+                }
+                if let Err(err) = signal::kill(Pid::from_raw(pid as i32), SIGKILL) {
+                    warn!("epoll thread's SIGKILL didn't reach {name}: {err}.");
+                }
+                match std::fs::exists(format!("/proc/{}", pid)) {
+                    Ok(false) => (),
+                    Ok(true) => warn!(
+                        "epoll thread's SIGKILL didn't end {name} succesfully. Giving up on them."
+                    ),
+                    Err(err) => error!("couldn't check if {name} still existed: {err}"),
+                }
+            }
+        });
+
         let socket = usbsas_sandbox::usbsas::UsbsasSocket {
             listen: listener.as_raw_fd(),
             read: comm.input_fd(),
