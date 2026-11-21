@@ -490,9 +490,9 @@ fn csw_timeouts_are_retried() {
     let mut scsi = scsi(vec![Lun::disk(8)]);
     scsi.init_mass_storage().unwrap();
     let mut buf = vec![0; BLOCK];
-    state(&scsi).csw_timeouts = 2;
+    state(&scsi).csw_timeouts = 1;
     scsi.scsi_read_10(&mut buf, 0, 1).unwrap();
-    state(&scsi).csw_timeouts = 3;
+    state(&scsi).csw_timeouts = 2;
     assert!(matches!(
         scsi.scsi_read_10(&mut buf, 0, 1),
         Err(Error::Usb {

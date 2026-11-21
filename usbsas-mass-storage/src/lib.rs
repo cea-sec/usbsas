@@ -125,7 +125,7 @@ impl MassStorage {
                             desc.setting_number(),
                             ep0,
                             ep1,
-                            Duration::from_secs(5),
+                            Duration::from_secs(30),
                         );
                         return MassStorage::new(scsiusb, Some(file));
                     }

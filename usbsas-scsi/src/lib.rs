@@ -34,8 +34,9 @@ pub use transport::UsbTransport;
 /// Maximum number of blocks requested by a single command in [`ScsiUsb::read_sectors`].
 pub const MAX_SECTORS_PER_TRANSFER: u16 = 0x800;
 
-/// Attempts at reading a CSW when the device times out.
-const CSW_READ_ATTEMPTS: u32 = 3;
+/// Attempts at reading a CSW when the device times out (2 × 30 s, see the
+/// transfer timeout in usbsas-mass-storage).
+const CSW_READ_ATTEMPTS: u32 = 2;
 /// TEST UNIT READY polls per logical unit before giving up on it.
 const TEST_UNIT_READY_ATTEMPTS: u32 = 100;
 /// Delay between polls while a unit is becoming ready.
