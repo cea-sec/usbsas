@@ -9,6 +9,7 @@ license = "GPL-3.0"
 bootsector = "0.2"
 byteorder = "1.5"
 log = "0.4"
+positioned-io2 = "0.3"
 thiserror = "2.0"
 usbsas-comm = { path = "../usbsas-comm" }
 usbsas-mass-storage = { path = "../usbsas-mass-storage" }
@@ -19,3 +20,7 @@ usbsas-utils = { path = "../usbsas-utils" }
 
 [features]
 mock = ["usbsas-mock"]
+
+[dev-dependencies]
+flate2 = { version = "1.1", features = ["zlib-rs"], default-features = false }
+usbsas-mock = { path = "../usbsas-mock" }

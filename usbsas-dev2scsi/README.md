@@ -32,9 +32,24 @@ without being asked.
 | `ReadSectors` | raw sectors (`offset` and `count` in sectors)  |
 | `End`         | exit                                           |
 
+Every request gets a response, an error if it is unexpected (e.g. a second
+`Partitions` once they are listed). Reads beyond the end of the device, or
+larger than a message (`MAX_PROTO_MESS_SIZE`), are refused.
+
+If the device can't be opened, or after an error, the process only waits for
+`End`.
+
 ## Sandbox
 
 seccomp, with access only to the device opened at unlock.
+
+## Tests
+
+`cargo test -p usbsas-dev2scsi`: the unit tests use the `mock` mass storage on
+`mock_in_dev.img` of the integration tests (in
+`usbsas-usbsas/tests/resources`), or on disk images built in memory for the
+layouts it doesn't have (GPT, ISO9660, partition table edge cases, file system
+headers), and drive the process over pipes as scsi2files does.
 
 ## Features
 
