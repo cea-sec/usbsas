@@ -6,9 +6,8 @@ edition = "2024"
 license = "GPL-3.0"
 
 [dependencies]
-env_logger = "0.11"
 log = "0.4"
-mio = { version = "1.2", features = ["os-ext"] }
+mio = { version = "1.2", default-features = false, features = ["os-ext"] }
 thiserror = "2.0"
 udev = { version = "0.9", features = ["mio"] }
 usbsas-comm = { path = "../usbsas-comm" }

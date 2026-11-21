@@ -657,7 +657,7 @@ dependencies = [
  "clang-sys",
  "itertools 0.13.0",
  "log",
- "prettyplease 0.2.37",
+ "prettyplease",
  "proc-macro2",
  "quote",
  "regex",
@@ -675,8 +675,6 @@ dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "log",
- "prettyplease 0.3.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -1161,12 +1159,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "const-oid"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be95d4a884358a21a199689323c29e9256b4a1b315e22f183d155422041d3a9a"
-
-[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1449,7 +1441,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
  "block-buffer",
- "const-oid",
  "crypto-common",
 ]
 
@@ -2386,9 +2377,6 @@ name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
-dependencies = [
- "foldhash 0.2.0",
-]
 
 [[package]]
 name = "heapless"
@@ -2980,7 +2968,6 @@ dependencies = [
  "portable-atomic",
  "unicode-width",
  "unit-prefix",
- "web-time",
 ]
 
 [[package]]
@@ -3401,9 +3388,6 @@ name = "lru"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a9f71e3591c7ec44d3e563e87bf14ddc2bada8519dca046e5b0e560cd004e2d"
-dependencies = [
- "hashbrown 0.17.1",
-]
 
 [[package]]
 name = "lru-slab"
@@ -4117,17 +4101,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "objc2-open-directory"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb82bed227edf5201dfedf072bba4015a33d3d4a98519837295a90f0a23f676d"
-dependencies = [
- "objc2 0.6.5",
- "objc2-core-foundation",
- "objc2-foundation 0.3.2",
-]
-
-[[package]]
 name = "objc2-quartz-core"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4553,16 +4526,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prettyplease"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bfe0f4c752e450fc2faf62654f1c134747922825d5b04ca717b8874f41a40c0"
-dependencies = [
- "proc-macro2",
- "syn 3.0.10",
-]
-
-[[package]]
 name = "proc-macro-crate"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4641,11 +4604,9 @@ dependencies = [
  "log",
  "multimap",
  "petgraph",
- "prettyplease 0.3.0",
  "prost",
  "prost-types",
  "regex",
- "syn 3.0.10",
  "tempfile",
 ]
 
@@ -5026,7 +4987,6 @@ checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
 dependencies = [
  "base64 0.23.1",
  "bytes",
- "encoding_rs",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -5039,7 +4999,6 @@ dependencies = [
  "hyper-util",
  "js-sys",
  "log",
- "mime",
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
@@ -5047,8 +5006,6 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
- "serde",
- "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
@@ -5864,7 +5821,6 @@ dependencies = [
  "ntapi",
  "objc2-core-foundation",
  "objc2-io-kit",
- "objc2-open-directory",
  "windows 0.62.2",
 ]
 
@@ -5903,7 +5859,6 @@ checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
 dependencies = [
  "filetime",
  "libc",
- "xattr",
 ]
 
 [[package]]
@@ -6448,7 +6403,6 @@ name = "usbsas-cmdexec"
 version = "0.1.4"
 dependencies = [
  "byteorder",
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
@@ -6485,7 +6439,6 @@ version = "0.1.4"
 dependencies = [
  "bootsector",
  "byteorder",
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
@@ -6501,7 +6454,6 @@ name = "usbsas-files2fs"
 version = "0.2.0"
 dependencies = [
  "bitvec",
- "env_logger",
  "fscommon",
  "log",
  "thiserror 2.0.21",
@@ -6517,7 +6469,6 @@ dependencies = [
 name = "usbsas-files2tar"
 version = "0.1.7"
 dependencies = [
- "env_logger",
  "log",
  "tar",
  "thiserror 2.0.21",
@@ -6533,7 +6484,6 @@ version = "0.1.5"
 dependencies = [
  "bitvec",
  "byteorder",
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
@@ -6585,7 +6535,6 @@ dependencies = [
 name = "usbsas-identifier"
 version = "0.2.0"
 dependencies = [
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
@@ -6598,7 +6547,6 @@ dependencies = [
 name = "usbsas-local2files"
 version = "0.1.0"
 dependencies = [
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
@@ -6646,7 +6594,6 @@ version = "0.3.2"
 dependencies = [
  "base64 0.23.1",
  "byteorder",
- "env_logger",
  "libgssapi",
  "log",
  "reqwest",
@@ -6711,7 +6658,6 @@ name = "usbsas-scsi2files"
 version = "0.1.5"
 dependencies = [
  "byteorder",
- "env_logger",
  "log",
  "thiserror 2.0.21",
  "usbsas-comm",
@@ -6728,7 +6674,6 @@ name = "usbsas-tar2files"
 version = "0.1.7"
 dependencies = [
  "byteorder",
- "env_logger",
  "log",
  "tar",
  "thiserror 2.0.21",
@@ -6768,7 +6713,6 @@ dependencies = [
 name = "usbsas-usbdev"
 version = "0.1.5"
 dependencies = [
- "env_logger",
  "log",
  "mio",
  "thiserror 2.0.21",
@@ -7821,16 +7765,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
 dependencies = [
  "tap",
-]
-
-[[package]]
-name = "xattr"
-version = "1.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "963d6fab92d5504b971dc8bd90ca743c2575e590bc8071ea5bc571598667ae08"
-dependencies = [
- "libc",
- "rustix 1.1.6",
 ]
 
 [[package]]

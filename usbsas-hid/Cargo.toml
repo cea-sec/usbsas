@@ -7,10 +7,10 @@ description = "usbsas userland HID"
 
 [dependencies]
 bitfield = "0.20"
-env_logger = "0.11"
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 libc = "0.2"
 log = "0.4"
-mio = { version = "1.2", features = ["os-ext"] }
+mio = { version = "1.2", default-features = false, features = ["os-ext"] }
 rusb = { version = "0.9", features = ["vendored"] }
 udev = { version = "0.9", features = ["mio"] }
 usbsas-config = { path = "../usbsas-config" }

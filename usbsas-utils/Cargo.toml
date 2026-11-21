@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 clap = "4.6"
-env_logger = "0.11"
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 log = "0.4"
 serde_json = { version = "1.0", optional = true }
 thiserror = { version = "2.0", optional = true }

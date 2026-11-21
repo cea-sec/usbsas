@@ -6,7 +6,7 @@ edition = "2024"
 license = "GPL-3.0"
 
 [build-dependencies]
-prost-build = "0.14"
+prost-build = { version = "0.14", default-features = false }
 
 [dependencies]
 prost = "0.14"
