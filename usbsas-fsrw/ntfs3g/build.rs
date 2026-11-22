@@ -62,6 +62,7 @@ fn main() {
         .derive_copy(false)
         .derive_debug(false)
         .generate_comments(false)
+        .wrap_unsafe_ops(true)
         .generate()
         .expect("Unable to generate bindings");
 

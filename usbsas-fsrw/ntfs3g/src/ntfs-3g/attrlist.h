@@ -26,6 +26,9 @@
 
 #include "attrib.h"
 
+extern int ntfs_attrlist_entry_inconsistent(const ntfs_inode *ni,
+				const ATTR_LIST_ENTRY *ale);
+
 extern int ntfs_attrlist_need(ntfs_inode *ni);
 
 extern int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr);

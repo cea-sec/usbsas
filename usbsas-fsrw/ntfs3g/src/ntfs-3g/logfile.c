@@ -177,14 +177,16 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 	ra_ofs = le16_to_cpu(rp->restart_area_offset);
 	ra = (RESTART_AREA*)((u8*)rp + ra_ofs);
 	/*
-	 * Everything before ra->file_size must be before the first word
-	 * protected by an update sequence number.  This ensures that it is
-	 * safe to access ra->client_array_offset.
+	 * The fixed RESTART_AREA prefix must be entirely before the first
+	 * MST-protected sector word.  Fixups have not been applied yet, so this
+	 * makes every fixed field accessed below safe to read.
+	 *
+	 * The subsequent client_array_offset check bounds any format-specific
+	 * extension before the client array.
 	 */
-	if (ra_ofs + offsetof(RESTART_AREA, file_size) >
-			NTFS_BLOCK_SIZE - sizeof(u16)) {
-		ntfs_log_error("$LogFile restart area specifies "
-				"inconsistent file offset.\n");
+	if (ra_ofs + sizeof(RESTART_AREA) > NTFS_BLOCK_SIZE - sizeof(u16)) {
+		ntfs_log_error("$LogFile restart area extends into the first "
+				"MST-protected sector word.\n");
 		return FALSE;
 	}
 	/*
