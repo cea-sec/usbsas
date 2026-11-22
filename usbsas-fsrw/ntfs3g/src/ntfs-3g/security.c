@@ -3938,6 +3938,9 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		 * except for differences in SIDs which appear in
 		 * owner, group and possible grants and denials in
 		 * generic creator-owner and creator-group ACEs.
+		 * Each of these ACEs can occur at most once in
+		 * the DACL and in the SACL, so for a file there
+		 * may be at most 3 usid and 3 gsid replacements.
 		 * For directories, an ACE may be duplicated for
 		 * access and inheritance, so we double the count.
 		 */

@@ -4,22 +4,26 @@ Applied on top of usbsas.patch. mkntfs() is used as a library function and
 may be called several times in the same process: mkntfs_cleanup() freed the
 g_allocation list without resetting it (use after free / double free on the
 next call), leaked g_upcaseinfo and kept stale sizes and counters.
-
 ---
+ mkntfs.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/mkntfs.c b/mkntfs.c
+index ca79971..87350f4 100644
 --- a/mkntfs.c
 +++ b/mkntfs.c
-@@ -3164,6 +3164,7 @@
-	free(g_rl_mft);		g_rl_mft	= NULL;
-	free(g_rl_mft_bmp);	g_rl_mft_bmp	= NULL;
-	free(g_rl_mftmirr);	g_rl_mftmirr	= NULL;
+@@ -3164,6 +3164,7 @@ static void mkntfs_cleanup(void)
+ 	free(g_rl_mft);		g_rl_mft	= NULL;
+ 	free(g_rl_mft_bmp);	g_rl_mft_bmp	= NULL;
+ 	free(g_rl_mftmirr);	g_rl_mftmirr	= NULL;
 +	free(g_upcaseinfo);	g_upcaseinfo	= NULL;
-
-	p = g_allocation;
-	while (p) {
-@@ -3171,6 +3172,22 @@
-		free(p);
-		p = q;
-	}
+ 
+ 	p = g_allocation;
+ 	while (p) {
+@@ -3171,6 +3172,22 @@ static void mkntfs_cleanup(void)
+ 		free(p);
+ 		p = q;
+ 	}
 +	g_allocation = NULL;
 +
 +	/*
@@ -37,3 +41,8 @@ next call), leaked g_upcaseinfo and kept stale sizes and counters.
 +	g_mft_zone_end = 0;
 +	g_num_bad_blocks = 0;
  }
+ 
+ 
+-- 
+2.56.1
+

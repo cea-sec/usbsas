@@ -3340,6 +3340,20 @@ do_next_attr_loop:
 		 */
 		if (al_entry->type != a->type)
 			break;
+		/*
+		 * The same check is made in ntfs_attr_inconsistent() when the
+		 * mft record is read, but that validation is skipped for the
+		 * tools which set NVolNoFixupWarn(), so the name has to be
+		 * checked here as well.
+		 */
+		if (a->name_length && ((le16_to_cpu(a->name_offset)
+				+ a->name_length * sizeof(ntfschar))
+				> le32_to_cpu(a->length))) {
+			ntfs_log_error("Corrupt attribute name"
+				" in MFT record %lld\n",
+				(long long)ctx->ntfs_ino->mft_no);
+			break;
+		}
 		if (!ntfs_names_are_equal((ntfschar*)((char*)a +
 				le16_to_cpu(a->name_offset)),
 				a->name_length, al_name,

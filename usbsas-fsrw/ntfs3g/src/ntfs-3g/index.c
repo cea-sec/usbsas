@@ -1448,12 +1448,19 @@ static int ntfs_ir_make_space(ntfs_index_context *icx, int data_size)
 static int ntfs_ie_add_vcn(INDEX_ENTRY **ie)
 {
 	INDEX_ENTRY *p, *old = *ie;
-	 
-	old->length = cpu_to_le16(le16_to_cpu(old->length) + sizeof(VCN));
-	p = realloc(old, le16_to_cpu(old->length));
+	u32 new_length = le16_to_cpu(old->length) + (u32)sizeof(VCN);
+
+	if (new_length > 0xffff) {
+		ntfs_log_error("Index entry of length %u cannot hold a VCN\n",
+				(unsigned)le16_to_cpu(old->length));
+		errno = EIO;
+		return STATUS_ERROR;
+	}
+	p = realloc(old, new_length);
 	if (!p)
 		return STATUS_ERROR;
 	
+	p->length = cpu_to_le16(new_length);
 	p->ie_flags |= INDEX_ENTRY_NODE;
 	*ie = p;
 

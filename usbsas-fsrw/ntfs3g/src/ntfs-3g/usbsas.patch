@@ -3,7 +3,7 @@ Subject: [PATCH] usbsas
 ---
  ea.c        |   2 +-
  mft.c       |   6 +-
- mkntfs.c    | 478 +++++++---------------------------------------------
+ mkntfs.c    | 476 +++++++---------------------------------------------
  mkntfs.h    |  30 ++++
  object_id.c |   2 +-
  reparse.c   |   2 +-
@@ -12,12 +12,12 @@ Subject: [PATCH] usbsas
  unix_io.h   |   8 +
  volume.c    |   4 +-
  volume.h    |   9 +-
- 11 files changed, 124 insertions(+), 582 deletions(-)
+ 11 files changed, 123 insertions(+), 581 deletions(-)
  create mode 100644 mkntfs.h
  create mode 100644 unix_io.h
 
 diff --git a/ea.c b/ea.c
-index b86930a..d29d521 100644
+index 05daa53..53721f6 100644
 --- a/ea.c
 +++ b/ea.c
 @@ -74,7 +74,7 @@ static const char lxmod[] = "$LXMOD";
@@ -75,7 +75,7 @@ index eb4363c..ca79971 100644
  struct BITMAP_ALLOCATION {
  	struct BITMAP_ALLOCATION *next;
  	LCN	lcn;		/* first allocated cluster */
-@@ -206,91 +204,57 @@ static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
+@@ -206,92 +204,58 @@ static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
  
  static struct BITMAP_ALLOCATION *g_allocation	  = NULL;	/* Head of cluster allocations */
  
@@ -114,6 +114,7 @@ index eb4363c..ca79971 100644
 +		ntfschar **outs, int outs_len)
  {
 -	ntfs_log_info("%s", ntfs_gpl);
+-}
 +	if(!outs) {
 +		errno = EINVAL;
 +		return -1;
@@ -139,21 +140,6 @@ index eb4363c..ca79971 100644
 +				else
 +					*outs = re_outs;
 +			}
-+
-+			if(tmpstr_len >= 0) {
-+				/* The extra character is the \0 terminator. */
-+				memcpy(*outs, tmpstr,
-+					sizeof(ntfschar)*(tmpstr_len + 1));
-+			}
-+
-+			free(tmpstr);
-+		}
-+
-+		return tmpstr_len;
-+	}
-+	else
-+		return ntfs_mbstoucs(ins, outs);
- }
  
 -/**
 - * mkntfs_usage
@@ -192,7 +178,12 @@ index eb4363c..ca79971 100644
 -"\n", basename(EXEC_NAME));
 -	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 -}
--
++			if(tmpstr_len >= 0) {
++				/* The extra character is the \0 terminator. */
++				memcpy(*outs, tmpstr,
++					sizeof(ntfschar)*(tmpstr_len + 1));
++			}
+
 -/**
 - * mkntfs_version
 - */
@@ -208,10 +199,19 @@ index eb4363c..ca79971 100644
 -	ntfs_log_info("Copyright (c) 2007      Yura Pakhuchiy\n");
 -	ntfs_log_info("Copyright (c) 2010-2018 Jean-Pierre Andre\n");
 -	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
--}
++			free(tmpstr);
++		}
++
++		return tmpstr_len;
++	}
++	else
++		return ntfs_mbstoucs(ins, outs);
+ }
  
++
  /*
   *  crc64, adapted from http://rpm5.org/docs/api/digest_8c-source.html
+  * ECMA-182 polynomial, see
 @@ -514,258 +478,6 @@ static void bitmap_build(u8 *buf, LCN lcn, s64 length)
  	}
  }
@@ -680,10 +680,10 @@ index 54858ca..ff05413 100644
  	ntfs_index_context *xr;
  
 diff --git a/security.c b/security.c
-index d0e030e..13fd9b6 100644
+index 67d3d53..1049d65 100644
 --- a/security.c
 +++ b/security.c
-@@ -5366,7 +5366,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
+@@ -5369,7 +5369,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
  	scapi = (struct SECURITY_API*)NULL;
  	mnt = ntfs_check_if_mounted(device, &mntflag);
  	if (!mnt && !(mntflag & NTFS_MF_MOUNTED) && !getuid()) {
@@ -1011,5 +1011,5 @@ index 42800a2..600d648 100644
  
  extern int ntfs_version_is_supported(ntfs_volume *vol);
 -- 
-2.55.0
+2.56.1
 

@@ -183,6 +183,60 @@ static int ntfs_update_ea(ntfs_inode *ni, const char *value, size_t size,
 	return (res);
 }
 
+/**
+ * ntfs_ea_inconsistent - check that one EA record is sane
+ * @p_ea:	the EA record to check
+ * @offs:	where the record starts in the EA buffer
+ * @size:	size of the EA buffer
+ *
+ * Every EA record says where the next one starts. Check that the record fits
+ * in the buffer and that its name and value fit in the record :
+ *
+ *      offs                                                  nextoffs
+ *       |                                                        |
+ *       | header |      name      | NUL |     value      |  pad  |
+ *       |========|================|=====|================|=======|
+ *       |        |                |     |                |       |
+ *       |<- 8 -->|<- name_length->|<-1->|<-value_length->|<-0..3>|
+ *       |<---------------- next_entry_offset ------------------->|
+ *
+ * nextoffs is @offs + next_entry_offset. It has to move forward & be a
+ * multiple of 4 and stay inside the buffer. The name must not be empty and
+ * must be null terminated. Also the name and value must end at nextoffs or
+ * at most 3 bytes before it. The rest of it being padding.
+ *
+ * These are the checks which used to be inlined in ntfs_set_ntfs_ea(). The
+ * caller must have checked that @offs is inside the buffer and that the 8
+ * byte header fits.
+ *
+ * Return 0 if the record is sane and -1 if it is not.
+ */
+
+static int ntfs_ea_inconsistent(const EA_ATTR *p_ea, size_t offs, size_t size)
+{
+	size_t nextoffs;
+	BOOL ok;
+
+	nextoffs = offs + le32_to_cpu(p_ea->next_entry_offset);
+		/* null offset to next not allowed */
+	ok = (nextoffs > offs)
+			&& (nextoffs <= size)
+			&& !(nextoffs & 3)
+			&& p_ea->name_length
+				/* zero sized value are allowed */
+			&& ((offs + offsetof(EA_ATTR,name)
+				+ p_ea->name_length + 1
+				+ le16_to_cpu(p_ea->value_length))
+					<= nextoffs)
+			&& ((offs + offsetof(EA_ATTR,name)
+				+ p_ea->name_length + 1
+				+ le16_to_cpu(p_ea->value_length))
+					>= (nextoffs - 3))
+			&& !p_ea->name[p_ea->name_length];
+	/* name not checked, as chkdsk accepts any chars */
+	return ok ? 0 : -1;
+}
+
 /*
  *		Return the existing EA
  *
@@ -263,22 +317,7 @@ int ntfs_set_ntfs_ea(ntfs_inode *ni, const char *value, size_t size, int flags)
 		while (ok && (offs < size)) {
 			p_ea = (const EA_ATTR*)&value[offs];
 			nextoffs = offs + le32_to_cpu(p_ea->next_entry_offset);
-				/* null offset to next not allowed */
-			ok = (nextoffs > offs)
-			    && (nextoffs <= size)
-			    && !(nextoffs & 3)
-			    && p_ea->name_length
-				/* zero sized value are allowed */
-			    && ((offs + offsetof(EA_ATTR,name)
-				+ p_ea->name_length + 1
-				+ le16_to_cpu(p_ea->value_length))
-				    <= nextoffs)
-			    && ((offs + offsetof(EA_ATTR,name)
-				+ p_ea->name_length + 1
-				+ le16_to_cpu(p_ea->value_length))
-				    >= (nextoffs - 3))
-			    && !p_ea->name[p_ea->name_length];
-			/* name not checked, as chkdsk accepts any chars */
+			ok = !ntfs_ea_inconsistent(p_ea, offs, size);
 			if (ok) {
 				if (p_ea->flags & NEED_EA)
 					ea_count++;
@@ -444,16 +483,20 @@ int ntfs_ea_check_wsldev(ntfs_inode *ni, dev_t *rdevp)
 		offset = 0;
 		found = FALSE;
 		do {
+			/* The fixed header must fit in the remaining buffer. */
+			if ((lth - offset) < (int)offsetof(EA_ATTR, name))
+				break;
 			p_ea = (const EA_ATTR*)&buf[offset];
+			if (ntfs_ea_inconsistent(p_ea, offset, lth))
+				break;
 			next = le32_to_cpu(p_ea->next_entry_offset);
-			found = ((next > (int)(sizeof(lxdev) + sizeof(device)))
-				&& (p_ea->name_length == (sizeof(lxdev) - 1))
+			found = ((p_ea->name_length == (sizeof(lxdev) - 1))
 				&& (p_ea->value_length
 					== const_cpu_to_le16(sizeof(device)))
 				&& !memcmp(p_ea->name, lxdev, sizeof(lxdev)));
 			if (!found)
 				offset += next;
-		} while (!found && (next > 0) && (offset < lth));
+		} while (!found && (offset < lth));
 		if (found) {
 				/* beware of alignment */
 			memcpy(&device, &p_ea->name[p_ea->name_length + 1],

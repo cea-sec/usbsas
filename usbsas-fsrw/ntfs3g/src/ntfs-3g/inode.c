@@ -716,6 +716,8 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	errno = 0;
 	ale = (ATTR_LIST_ENTRY *)ni->attr_list;
 	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
+		if (ntfs_attrlist_entry_inconsistent(ni, ale))
+			return -1;
 		if (ni->mft_no != MREF_LE(ale->mft_reference) &&
 				prev_attached != MREF_LE(ale->mft_reference)) {
 			if (!ntfs_extent_inode_open(ni, ale->mft_reference)) {

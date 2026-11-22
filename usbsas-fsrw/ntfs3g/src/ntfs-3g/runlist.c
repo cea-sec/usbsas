@@ -790,7 +790,7 @@ static runlist_element *ntfs_mapping_pairs_decompress_i(const ntfs_volume *vol,
 	const u8 *buf;		/* Current position in mapping pairs array. */
 	const u8 *attr_end;	/* End of attribute. */
 	int err, rlsize;	/* Size of runlist buffer. */
-	u16 rlpos;		/* Current runlist position in units of
+	int rlpos;		/* Current runlist position in units of
 				   runlist_elements. */
 	u8 b;			/* Current byte offset in buf. */
 
@@ -832,7 +832,7 @@ static runlist_element *ntfs_mapping_pairs_decompress_i(const ntfs_volume *vol,
 		 * Allocate more memory if needed, including space for the
 		 * not-mapped and terminator elements.
 		 */
-		if ((int)((rlpos + 3) * sizeof(*old_rl)) > rlsize) {
+		if ((rlpos + 3) > (rlsize / (int)sizeof(*old_rl))) {
 			runlist_element *rl2;
 
 			rlsize += 0x1000;

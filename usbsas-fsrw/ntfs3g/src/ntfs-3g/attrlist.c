@@ -46,6 +46,32 @@
 #include "misc.h"
 
 /**
+ * ntfs_attrlist_entry_inconsistent - check an attribute list entry
+ * @ni:		inode whose attribute list is being walked
+ * @ale:	entry to check
+ *
+ * The entry has to lie fully within the attribute list so that its fields can
+ * be read, and it has to be long enough for a walk to make progress.
+ *
+ * Return 0 if the entry may be used and -1 if it may not, with errno set to
+ * EIO.
+ */
+int ntfs_attrlist_entry_inconsistent(const ntfs_inode *ni,
+				const ATTR_LIST_ENTRY *ale)
+{
+	u32 length = le16_to_cpu(ale->length);
+
+	if ((length < sizeof(ATTR_LIST_ENTRY)) || (((const u8*)ale + length)
+			> (ni->attr_list + ni->attr_list_size))) {
+		ntfs_log_error("Corrupt attribute list entry in inode %lld\n",
+				(long long)ni->mft_no);
+		errno = EIO;
+		return -1;
+	}
+	return 0;
+}
+
+/**
  * ntfs_attrlist_need - check whether inode need attribute list
  * @ni:		opened ntfs inode for which perform check
  *
@@ -85,6 +111,8 @@ int ntfs_attrlist_need(ntfs_inode *ni)
 	errno = 0;
 	ale = (ATTR_LIST_ENTRY *)ni->attr_list;
 	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
+		if (ntfs_attrlist_entry_inconsistent(ni, ale))
+			return -1;
 		if (MREF_LE(ale->mft_reference) != ni->mft_no)
 			return 1;
 		ale = (ATTR_LIST_ENTRY *)((u8*)ale + le16_to_cpu(ale->length));
