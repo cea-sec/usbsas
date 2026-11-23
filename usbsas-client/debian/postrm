@@ -8,7 +8,13 @@ if [ "remove" = "$1" ]; then
     set +e
     if id usbsas-client >/dev/null 2>&1; then
         set -e
+        client_slice_dir="/etc/systemd/system/user-$(id -u usbsas-client).slice.d"
+        rm -f "$client_slice_dir/50-usbsas-client.conf"
+        rmdir --ignore-fail-on-non-empty "$client_slice_dir" 2>/dev/null || true
         userdel -r -f usbsas-client
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload
+        fi
     fi
 fi
 
