@@ -59,6 +59,7 @@ jobs:
           echo "U_PKG_SRV=$(ls usbsas-server*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_PKG_KIOSK=$(ls usbsas-kiosk*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_PKG_HID=$(ls usbsas-hid*.deb)" >> "$GITHUB_OUTPUT" && \
+          echo "U_PKG_TOOLS=$(ls usbsas-tools*.deb)" >> "$GITHUB_OUTPUT" && \
           echo "U_ISO=$(ls usbsas-*.hybrid.iso)" >> "$GITHUB_OUTPUT"
       - name: Create draft release
         uses: softprops/action-gh-release@v2
@@ -69,4 +70,5 @@ jobs:
             ${{ steps.artifacts_names.outputs.U_PKG_SRV }}
             ${{ steps.artifacts_names.outputs.U_PKG_KIOSK }}
             ${{ steps.artifacts_names.outputs.U_PKG_HID }}
+            ${{ steps.artifacts_names.outputs.U_PKG_TOOLS }}
             ${{ steps.artifacts_names.outputs.U_ISO }}

@@ -1,4 +1,4 @@
-ISO_VER=$(shell grep '^ISO_VER' live-iso/Makefile| head -1 | cut -d'"' -f2)
+ISO_VER=$(shell grep '^ISO_VER=' live-iso/Makefile | head -1 | cut -d= -f2)
 
 PKG_DIR=../target/debian
 
@@ -10,6 +10,8 @@ ASRV_VER := $(shell grep '^version = ' ../usbsas-analyzer-server/Cargo.toml | cu
 HID_VER := $(shell grep '^version = ' ../usbsas-hid/Cargo.toml | cut -d'"' -f2)-1
 KIOSK_VER := $(shell grep '^version = ' ../usbsas-client/Cargo.toml | cut -d'"' -f2)-1
 TOOLS_VER := $(shell grep '^version = ' ../usbsas-tools/Cargo.toml | cut -d'"' -f2)-1
+
+.PHONY: all pkgs clean distclean
 
 all: live-iso/usbsas-$(ISO_VER)-amd64.hybrid.iso
 
