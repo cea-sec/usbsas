@@ -3,7 +3,6 @@
 rm -f /usbsas*.deb
 
 for pkg in \
-	apt-transport-https \
 	apt-utils \
 	info \
 	man-db \
