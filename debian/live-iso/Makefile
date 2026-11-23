@@ -12,6 +12,8 @@ KIOSK_VER := $(shell grep '^version = ' ../../usbsas-client/Cargo.toml | cut -d'
 
 SU=sudo
 
+.PHONY: all pkgs clean distclean
+
 all: usbsas-$(ISO_VER)-amd64.hybrid.iso
 
 PKGS = $(DST_PKG_DIR)/usbsas-kiosk_$(KIOSK_VER)_amd64.deb \

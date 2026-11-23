@@ -11,6 +11,8 @@ HID_VER := $(shell grep '^version = ' ../usbsas-hid/Cargo.toml | cut -d'"' -f2)-
 KIOSK_VER := $(shell grep '^version = ' ../usbsas-client/Cargo.toml | cut -d'"' -f2)-1
 TOOLS_VER := $(shell grep '^version = ' ../usbsas-tools/Cargo.toml | cut -d'"' -f2)-1
 
+.PHONY: all pkgs clean distclean
+
 all: live-iso/usbsas-$(ISO_VER)-amd64.hybrid.iso
 
 pkgs: $(PKG_DIR)/usbsas-kiosk_$(KIOSK_VER)_amd64.deb \
