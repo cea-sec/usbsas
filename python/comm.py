@@ -30,10 +30,14 @@ class Comm():
         data_size = struct.unpack("<Q", self.read_exact(8))[0]
         return self.read_exact(data_size)
 
+    def write_all(self, buf):
+        view = memoryview(buf)
+        while view:
+            written = os.write(self.pipe_send, view)
+            view = view[written:]
+
     def send(self, buf):
-        data_size_b = struct.pack("<Q", len(buf))
-        os.write(self.pipe_send, data_size_b)
-        os.write(self.pipe_send, buf)
+        self.write_all(struct.pack("<Q", len(buf)) + buf)
 
     def send_msg(self, msg):
         buf = msg.SerializeToString()
