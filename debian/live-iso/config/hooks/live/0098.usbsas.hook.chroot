@@ -2,7 +2,7 @@
 
 set -e
 
-apt install -y --no-install-recommends -o Dpkg::Options::="--force-confold" \
+apt-get install -y --no-install-recommends -o Dpkg::Options::="--force-confold" \
     /usbsas-server_*_amd64.deb \
     /usbsas-analyzer-server_*_amd64.deb \
     /usbsas-kiosk_*_amd64.deb \
