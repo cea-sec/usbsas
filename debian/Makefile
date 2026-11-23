@@ -1,4 +1,4 @@
-ISO_VER=$(shell grep '^ISO_VER' live-iso/Makefile| head -1 | cut -d'"' -f2)
+ISO_VER=$(shell grep '^ISO_VER=' live-iso/Makefile | head -1 | cut -d= -f2)
 
 PKG_DIR=../target/debian
 
