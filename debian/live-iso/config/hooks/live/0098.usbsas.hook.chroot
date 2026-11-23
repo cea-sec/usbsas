@@ -25,6 +25,5 @@ systemctl disable networking
 
 # ISO won't boot without usb modules, remove them once booted
 rm /etc/modprobe.d/usbsas.conf
-sed -i '/^\[Unit\]$/a Requires=usbsas-rmmod.service' /usr/lib/systemd/system/usbsas-server.service
 
 rm /usbsas-*.deb
