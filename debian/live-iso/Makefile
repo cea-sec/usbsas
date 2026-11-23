@@ -9,7 +9,6 @@ SRV_VER := $(shell grep '^version = ' ../../usbsas-usbsas/Cargo.toml | cut -d'"'
 ASRV_VER := $(shell grep '^version = ' ../../usbsas-analyzer-server/Cargo.toml | cut -d'"' -f2)-1
 HID_VER := $(shell grep '^version = ' ../../usbsas-hid/Cargo.toml | cut -d'"' -f2)-1
 KIOSK_VER := $(shell grep '^version = ' ../../usbsas-client/Cargo.toml | cut -d'"' -f2)-1
-TOOLS_VER := $(shell grep '^version = ' ../../usbsas-tools/Cargo.toml | cut -d'"' -f2)-1
 
 SU=sudo
 
@@ -18,7 +17,6 @@ all: usbsas-$(ISO_VER)-amd64.hybrid.iso
 PKGS = $(DST_PKG_DIR)/usbsas-kiosk_$(KIOSK_VER)_amd64.deb \
 	$(DST_PKG_DIR)/usbsas-server_$(SRV_VER)_amd64.deb \
 	$(DST_PKG_DIR)/usbsas-analyzer-server_$(ASRV_VER)_amd64.deb \
-	$(DST_PKG_DIR)/usbsas-tools_$(TOOLS_VER)_amd64.deb \
 	$(DST_PKG_DIR)/usbsas-hid_$(HID_VER)_amd64.deb
 
 # Remove packages of previous versions, the chroot hook expects only one
