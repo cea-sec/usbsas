@@ -17,13 +17,18 @@ class Comm():
         self.pipe_send = pipe_send
         self.pipe_recv = pipe_recv
 
+    def read_exact(self, size):
+        data = bytearray()
+        while len(data) < size:
+            chunk = os.read(self.pipe_recv, size - len(data))
+            if not chunk:
+                raise ConnectionError("connection closed by peer")
+            data += chunk
+        return bytes(data)
+
     def recv(self):
-        data_size_b = os.read(self.pipe_recv, 8)
-        data_size = struct.unpack("<Q", data_size_b)[0]
-        data = b""
-        while len(data) != data_size:
-            data += os.read(self.pipe_recv, data_size)
-        return data
+        data_size = struct.unpack("<Q", self.read_exact(8))[0]
+        return self.read_exact(data_size)
 
     def send(self, buf):
         data_size_b = struct.pack("<Q", len(buf))
