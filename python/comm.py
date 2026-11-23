@@ -113,7 +113,7 @@ class CommUsbsas(Comm):
         while True:
             resp = self.recv_resp()
             if self.is_error(resp):
-                print(f"error: {resp.error}")
+                print(f"error: {resp.err}")
                 raise Exception("run error")
             if not isinstance(resp, proto_usbsas.ResponseStatus):
                 raise Exception("run error")
@@ -181,8 +181,10 @@ class CommUsbsas(Comm):
             )
         )
         resp = self.recv_resp()
+        if self.is_error(resp):
+            raise Exception(f"ImgDisk error: {resp.err}")
         if not isinstance(resp, proto_usbsas.ResponseImgDisk):
-            raise Exception(f"ImgDisk error: {resp.error}")
+            raise Exception(f"ImgDisk: unexpected response {resp!r}")
 
 
 def start_usbsas():
