@@ -15,22 +15,31 @@ SU=sudo
 
 all: usbsas-$(ISO_VER)-amd64.hybrid.iso
 
-pkgs: $(DST_PKG_DIR)/usbsas-kiosk_$(KIOSK_VER)_amd64.deb \
+PKGS = $(DST_PKG_DIR)/usbsas-kiosk_$(KIOSK_VER)_amd64.deb \
 	$(DST_PKG_DIR)/usbsas-server_$(SRV_VER)_amd64.deb \
 	$(DST_PKG_DIR)/usbsas-analyzer-server_$(ASRV_VER)_amd64.deb \
 	$(DST_PKG_DIR)/usbsas-tools_$(TOOLS_VER)_amd64.deb \
 	$(DST_PKG_DIR)/usbsas-hid_$(HID_VER)_amd64.deb
 
+# Remove packages of previous versions, the chroot hook expects only one
+pkgs: $(PKGS)
+	@for f in $(DST_PKG_DIR)/*.deb; do \
+		case " $(PKGS) " in *" $$f "*) ;; *) rm -fv "$$f" ;; esac; \
+	done
+
 $(DST_PKG_DIR)/%.deb: $(SRC_PKG_DIR)/%.deb
 	cp $< $@
 
+# Start from a clean tree (the package cache is kept), otherwise stage files
+# of a previous build could make lb skip the chroot stages
 usbsas-$(ISO_VER)-amd64.hybrid.iso: pkgs
+	$(SU) lb clean
 	lb config
 	$(SU) lb build
 
 clean:
 	$(SU) lb clean
+	rm -f $(DST_PKG_DIR)/*.deb
 
 distclean: clean
 	$(SU) rm -rf cache
-	rm $(DST_PKG_DIR)/*.deb
