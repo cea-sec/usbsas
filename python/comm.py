@@ -1,5 +1,5 @@
 import os
-import sys
+import socket
 import struct
 
 from proto.usbsas import proto3_pb2 as proto_usbsas
@@ -13,9 +13,27 @@ class Comm():
     response_cls = None
     request_cls = None
 
-    def __init__(self, pipe_recv, pipe_send):
+    def __init__(self, pipe_recv, pipe_send, sock=None):
         self.pipe_send = pipe_send
         self.pipe_recv = pipe_recv
+        # Keep a reference, the socket would be closed when garbage collected
+        self.sock = sock
+
+    @classmethod
+    def connect(cls, socket_path):
+        """Connect to the Unix socket of a usbsas server (`usbsas-usbsas -s`)."""
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.connect(socket_path)
+        except OSError:
+            sock.close()
+            raise
+        return cls(sock.fileno(), sock.fileno(), sock)
+
+    def close(self):
+        if self.sock is not None:
+            self.sock.close()
+            self.sock = None
 
     def read_exact(self, size):
         data = bytearray()
@@ -190,37 +208,3 @@ class CommUsbsas(Comm):
         if not isinstance(resp, proto_usbsas.ResponseImgDisk):
             raise Exception(f"ImgDisk: unexpected response {resp!r}")
 
-
-def start_usbsas():
-    usbsas_bin = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "../target/debug/usbsas-usbsas"
-    )
-    config_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "../config.example.toml"
-    )
-    if not os.path.exists(usbsas_bin):
-        print("usbsas-usbsas binary not found")
-        sys.exit(1)
-    (child_to_parent_r, child_to_parent_w) = os.pipe()
-    (parent_to_child_r, parent_to_child_w) = os.pipe()
-    os.set_inheritable(child_to_parent_w, True)
-    os.set_inheritable(parent_to_child_r, True)
-    pid_usbsas = os.fork()
-    if pid_usbsas < 0:
-        print("fork error")
-        sys.exit(1)
-    if pid_usbsas == 0:
-        # Should be closed already (non-inheritable)
-        os.close(child_to_parent_r)
-        os.close(parent_to_child_w)
-        os.environ["INPUT_PIPE_FD"] = str(parent_to_child_r)
-        os.environ["OUTPUT_PIPE_FD"] = str(child_to_parent_w)
-        os.environ["RUST_LOG"] = "error"
-        os.environ["USBSAS_MOCK_OUT_DEV"] = "/tmp/mock_out_dev.img"
-        os.environ["USBSAS_MOCK_IN_DEV"] = "/tmp/mock_in_dev.img"
-        os.execv(usbsas_bin, [usbsas_bin, "-c", config_path])
-        sys.exit(0)
-    os.close(parent_to_child_r)
-    os.close(child_to_parent_w)
-    comm = CommUsbsas(child_to_parent_r, parent_to_child_w)
-    return comm
