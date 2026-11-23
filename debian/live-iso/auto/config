@@ -6,6 +6,7 @@ MIRROR="https://deb.debian.org"
 
 lb config noauto \
 	--distribution trixie \
+	--archive-areas "main non-free-firmware" \
 	--architecture amd64 \
 	--image-name "usbsas-${USBSAS_ISO_VER}" \
 	--apt-recommends false \
@@ -27,7 +28,7 @@ lb config noauto \
 	--linux-packages "linux-image linux-headers" \
 	--bootappend-live "boot=live silent toram splash nopersistence components noautologin hostname=live-usbsas" \
 	--bootappend-live-failsafe "none" \
-	--firmware-binary true \
+	--firmware-binary false \
 	--firmware-chroot true \
 	--uefi-secure-boot enable \
 	"${@}"
