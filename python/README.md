@@ -24,13 +24,9 @@ $ usbsas-usbsas -s /tmp
 ```
 
 ```python
->>> import socket
 >>> from comm import CommUsbsas
->>> socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
->>> socket.connect('/tmp/usbsas.sock')
->>> # CommUsbsas expects one file descriptor for reading and one for writing (it was initially written for pipes) but since a socket is bidirectional you can use same fd for both
->>> comm = CommUsbsas(socket.fileno(), socket.fileno())
->>> comm.devices()
+>>> comm = CommUsbsas.connect('/tmp/usbsas.sock')
+>>> comm.devices(include_alt=True)
 devices {
   network {
     url: "http://127.0.0.1:8042/api/downloadbundle"
@@ -326,5 +322,5 @@ analyzereport {
 }
 
 >>> comm.end()
->>> socket.close()
+>>> comm.close()
 ```
