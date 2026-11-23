@@ -1,17 +1,9 @@
 #! /usr/bin/env sh
 
-mkdir -p /etc/modprobe.d
-cat <<EOF > /etc/modprobe.d/usbsas.conf
-blacklist uas
-blacklist usb_storage
-blacklist usbnet
-install usb_storage /bin/true
-install uas /bin/true
-install usbnet /bin/true
-EOF
+# The modprobe configuration of usbsas-server is moved away at build time so
+# that the live system can boot from a USB drive, restore it and unload the
+# USB storage modules.
+install -m 644 /usr/share/usbsas/modprobe-usbsas.conf /etc/modprobe.d/usbsas.conf
 
 rmmod uas
 rmmod usb_storage
-
-systemctl restart systemd-modules-load
-depmod $(uname -r)

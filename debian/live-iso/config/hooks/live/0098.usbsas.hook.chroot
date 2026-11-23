@@ -23,7 +23,9 @@ systemctl disable getty@tty1.service
 systemctl disable systemd-networkd
 systemctl disable networking
 
-# ISO won't boot without usb modules, remove them once booted
-rm /etc/modprobe.d/usbsas.conf
+# ISO won't boot without usb modules: keep usbsas' modprobe configuration
+# out of the initramfs, usbsas-rmmod.service puts it back once booted
+mkdir -p /usr/share/usbsas
+mv /etc/modprobe.d/usbsas.conf /usr/share/usbsas/modprobe-usbsas.conf
 
 rm /usbsas-*.deb
