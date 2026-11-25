@@ -171,7 +171,8 @@ fn load_metadata(tar: File) -> Result<(HashMap<String, Attrs>, File)> {
             Attrs {
                 ftype,
                 size: header.size()?,
-                timestamp: i64::try_from(header.mtime()?)?,
+                // Above i64::MAX (binary encoding): clamped
+                timestamp: i64::try_from(header.mtime()?).unwrap_or(i64::MAX),
                 offset: entry.raw_file_position(),
             },
         );
