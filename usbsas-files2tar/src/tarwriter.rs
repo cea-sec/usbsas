@@ -94,3 +94,144 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+
+    /// Entry read back: path, type, size, mtime and content.
+    type Entry = (String, tar::EntryType, u64, u64, Vec<u8>);
+
+    fn read_back(tar: &[u8]) -> Vec<Entry> {
+        tar::Archive::new(tar)
+            .entries()
+            .unwrap()
+            .map(|e| {
+                let mut e = e.unwrap();
+                let mut data = Vec::new();
+                e.read_to_end(&mut data).unwrap();
+                let h = e.header();
+                (
+                    e.path().unwrap().to_string_lossy().into_owned(),
+                    h.entry_type(),
+                    h.size().unwrap(),
+                    h.mtime().unwrap(),
+                    data,
+                )
+            })
+            .collect()
+    }
+
+    fn writer() -> TarWriter<Vec<u8>> {
+        let mut w = TarWriter::new(Vec::new());
+        w.init().unwrap();
+        w
+    }
+
+    fn file(w: &mut TarWriter<Vec<u8>>, path: &str, ftype: FileType, data: &[u8]) {
+        w.newfile(path, ftype, data.len() as u64, 1_600_000_000)
+            .unwrap();
+        for chunk in data.chunks(100) {
+            w.writefile(chunk).unwrap();
+        }
+        w.endfile(data.len()).unwrap();
+    }
+
+    fn finish(w: TarWriter<Vec<u8>>) -> Vec<u8> {
+        w.builder.into_inner().unwrap()
+    }
+
+    #[test]
+    fn layout() {
+        let mut w = writer();
+        w.newfile("/dir", FileType::Directory, 0, 1_500_000_000)
+            .unwrap();
+        w.endfile(0).unwrap();
+        file(&mut w, "/dir/a.txt", FileType::Regular, b"hello");
+        file(&mut w, "/empty", FileType::Regular, b"");
+        // Exactly one block: no padding
+        file(&mut w, "/block", FileType::Regular, &[7; TAR_BLOCK_SIZE]);
+        file(&mut w, "config.json", FileType::Metadata, b"{}");
+        let tar = finish(w);
+        assert_eq!(tar.len() % TAR_BLOCK_SIZE, 0);
+
+        let entries = read_back(&tar);
+        let summary: Vec<_> = entries
+            .iter()
+            .map(|(p, t, s, _, d)| (p.as_str(), *t, *s, d.as_slice()))
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                ("data/", tar::EntryType::Directory, 0, &b""[..]),
+                ("data/dir", tar::EntryType::Directory, 0, b""),
+                ("data/dir/a.txt", tar::EntryType::Regular, 5, b"hello"),
+                ("data/empty", tar::EntryType::Regular, 0, b""),
+                ("data/block", tar::EntryType::Regular, 512, &[7; 512]),
+                // Metadata files are at the root of the archive
+                ("config.json", tar::EntryType::Regular, 2, b"{}"),
+            ]
+        );
+        assert_eq!(entries[1].3, 1_500_000_000);
+        assert_eq!(entries[2].3, 1_600_000_000);
+    }
+
+    #[test]
+    fn long_path() {
+        let path = format!("/{}/{}.txt", "d".repeat(150), "f".repeat(150));
+        let mut w = writer();
+        file(&mut w, &path, FileType::Regular, b"long");
+        let entries = read_back(&finish(w));
+        assert_eq!(entries[1].0, format!("data{path}"));
+        assert_eq!(entries[1].4, b"long");
+    }
+
+    #[test]
+    fn bad_names() {
+        for path in ["..", "/..", "../a", "/a/../../b", "a/..", "a/../b"] {
+            for ftype in [FileType::Regular, FileType::Directory, FileType::Metadata] {
+                let mut w = writer();
+                assert!(w.newfile(path, ftype, 0, 0).is_err(), "{path:?} accepted");
+                // Nothing written after the data directory
+                assert_eq!(read_back(&finish(w)).len(), 1);
+            }
+        }
+    }
+
+    #[test]
+    fn root() {
+        for path in ["", "/", "//", ".", "/./"] {
+            // The root directory is the data directory
+            let mut w = writer();
+            w.newfile(path, FileType::Directory, 0, 0).unwrap();
+            w.endfile(0).unwrap();
+            let entries = read_back(&finish(w));
+            assert_eq!(entries.len(), 2);
+            assert!(
+                entries[1].0 == "data/" || entries[1].0 == "data",
+                "{path:?}"
+            );
+            assert_eq!(entries[1].1, tar::EntryType::Directory);
+            // A file needs a name
+            for ftype in [FileType::Regular, FileType::Metadata] {
+                let mut w = writer();
+                assert!(w.newfile(path, ftype, 0, 0).is_err(), "{path:?} accepted");
+                assert_eq!(read_back(&finish(w)).len(), 1);
+            }
+        }
+    }
+
+    #[test]
+    fn current_dir_components_ignored() {
+        let mut w = writer();
+        file(&mut w, "/./a/./b", FileType::Regular, b"x");
+        assert_eq!(read_back(&finish(w))[1].0, "data/a/b");
+    }
+
+    #[test]
+    fn bad_type() {
+        let mut w = writer();
+        assert!(w.newfile("/a", FileType::Other, 0, 0).is_err());
+    }
+}
