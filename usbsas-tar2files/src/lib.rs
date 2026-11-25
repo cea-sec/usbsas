@@ -252,9 +252,21 @@ impl MainLoopState {
             return Err(Error::Error("max read size exceeded".to_string()));
         }
 
+        let entry = self.get_entry(path)?;
+        if entry.ftype != FileType::Regular {
+            return Err(Error::Error(format!("{path} isn't a regular file")));
+        }
+        if file_offset
+            .checked_add(size as u64)
+            .is_none_or(|end| end > entry.size)
+        {
+            return Err(Error::Error(format!(
+                "read of {path} out of the file ({size}B at {file_offset}, size {}B)",
+                entry.size
+            )));
+        }
+        let entry_offset = entry.offset;
         let mut data = vec![0u8; size];
-
-        let entry_offset = self.get_entry(path)?.offset;
 
         self.archive
             .seek(SeekFrom::Start(entry_offset + file_offset))?;
