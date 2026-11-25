@@ -139,11 +139,7 @@ impl WaitFsInfosState {
                 comm.end()?;
                 State::End
             }
-            _ => {
-                error!("bad request");
-                comm.error("bad request")?;
-                return Err(Error::State);
-            }
+            _ => return Err(Error::BadRequest),
         };
         Ok(newstate)
     }
@@ -161,7 +157,9 @@ impl WaitFsInfosState {
 
         log::debug!("mkfs dev_size: {dev_size}");
 
-        let fs_size = dev_size - (SECTOR_START * SECTOR_SIZE);
+        let fs_size = dev_size
+            .checked_sub(SECTOR_START * SECTOR_SIZE)
+            .ok_or_else(|| Error::FSError(format!("dev size too small ({dev_size}B)")))?;
         if !fs_size.is_multiple_of(SECTOR_SIZE) {
             return Err(Error::FSError("fs size not multiple of sector size".into()));
         }
@@ -254,11 +252,7 @@ impl WaitNewFileState {
                 comm.end()?;
                 State::End
             }
-            _ => {
-                error!("bad request");
-                comm.error("bad request")?;
-                return Err(Error::State);
-            }
+            _ => return Err(Error::BadRequest),
         };
         Ok(newstate)
     }
@@ -287,10 +281,7 @@ impl WaitNewFileState {
                 }
                 State::WaitNewFile(self)
             }
-            _ => {
-                comm.error("bad file type")?;
-                return Err(Error::FSError("bad file type".into()));
-            }
+            _ => return Err(Error::FSError("bad file type".into())),
         };
         Ok(newstate)
     }
@@ -361,11 +352,7 @@ impl WriteRawState {
                     comm.end()?;
                     break;
                 }
-                _ => {
-                    error!("bad request");
-                    comm.error("bad request")?;
-                    return Err(Error::State);
-                }
+                _ => return Err(Error::BadRequest),
             }
         }
         Ok(State::End)
@@ -399,11 +386,7 @@ impl ForwardBitVecState {
                     comm.end()?;
                     break State::End;
                 }
-                _ => {
-                    error!("bad request");
-                    comm.error("bad request")?;
-                    return Err(Error::State);
-                }
+                _ => return Err(Error::BadRequest),
             }
         };
         Ok(newstate)
@@ -457,3 +440,6 @@ impl Files2Fs {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;
