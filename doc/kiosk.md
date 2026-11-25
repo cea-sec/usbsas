@@ -111,7 +111,8 @@ ignored**. Left click is all the interface needs. It depends on
 When installed, it creates the `usbsas-hid` user and installs:
 
 - the `hid-dealer` systemd service, which starts a driver process for each HID
-  device plugged (on an allowed port, if `ports_hid` is configured),
+  device plugged (on an allowed port, if `ports_hid` is configured), with at
+  most 3 devices handled at a time,
 - a udev rule giving the `usbsas-hid` user the ownership of HID devices and of
   `/dev/uinput`, and a `modules-load.d` file loading the `uinput` module,
 - a modprobe configuration preventing the kernel HID, mouse and keyboard

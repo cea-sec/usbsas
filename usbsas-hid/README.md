@@ -6,7 +6,9 @@ The kernel HID drivers are disabled (`assets/hid.conf`). Instead:
 
 - `hid-dealer` monitors udev and starts a `hid-user` process for each HID
   device plugged, on an allowed port if `ports_hid` is set in
-  `[usb_port_accesses]`. It stops it when the device is unplugged.
+  `[usb_port_accesses]`. It stops it when the device is unplugged. At most 3
+  `hid-user` run at a time: further HID devices are ignored (and logged) until
+  one is unplugged.
 - `hid-user` opens the device with libusb, parses its HID report descriptor and
   replays the reports of mice and touch screens on a virtual `uinput` device.
   Only pointer motion and left click are forwarded: **keystrokes are never
