@@ -14,6 +14,11 @@ use std::{
 use usbsas_config::{conf_parse, conf_read};
 use usbsas_utils::{USBSAS_BIN_PATH, clap::UsbsasClap};
 
+/// Maximum number of hid-user processes running at the same time: a device
+/// declaring itself as many HID devices can't start an unbounded number of
+/// drivers.
+const MAX_HID_USERS: usize = 3;
+
 /// Running hid-user processes, by (bus, device) numbers.
 static HM_SONS: LazyLock<Mutex<HashMap<(u8, u8), Child>>> = LazyLock::new(|| {
     let hm = HashMap::new();
@@ -59,6 +64,15 @@ fn update_entry(busnum: u8, devnum: u8) {
         log::debug!("wait: {result:?}");
     }
 
+    // Don't count processes that exited but weren't reaped yet
+    reap_sons(&mut sons);
+    if sons.len() >= MAX_HID_USERS {
+        log::error!(
+            "Not running hid-user for {busnum} {devnum}: already {MAX_HID_USERS} HID devices in use"
+        );
+        return;
+    }
+
     log::debug!("Run hid-user with {busnum} {devnum}");
     match run_son(busnum, devnum) {
         Ok(child) => {
@@ -86,23 +100,25 @@ fn remove_entry(busnum: u8, devnum: u8) {
     }
 }
 
+/// Remove the hid-user processes that exited from `sons`.
+fn reap_sons(sons: &mut HashMap<(u8, u8), Child>) {
+    sons.retain(|&_, child| match child.try_wait() {
+        Ok(Some(status)) => {
+            log::debug!("Son {:?} ended with status {status}", child.id());
+            false
+        }
+        Ok(None) => true,
+        Err(err) => {
+            log::error!("Wait son {:?} error {err:?}", child.id());
+            false
+        }
+    })
+}
+
 /// Reap hid-user processes that exited, every second.
 fn wait_sons() -> ! {
     loop {
-        {
-            let mut sons = HM_SONS.lock().unwrap();
-            sons.retain(|&_, child| match child.try_wait() {
-                Ok(Some(status)) => {
-                    log::debug!("Son {:?} ended with status {status}", child.id());
-                    false
-                }
-                Ok(None) => true,
-                Err(err) => {
-                    log::error!("Wait son {:?} error {err:?}", child.id());
-                    false
-                }
-            })
-        }
+        reap_sons(&mut HM_SONS.lock().unwrap());
         let wait_time = time::Duration::from_millis(1000);
         thread::sleep(wait_time);
     }
