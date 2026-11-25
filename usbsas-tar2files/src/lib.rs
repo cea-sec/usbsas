@@ -349,7 +349,7 @@ impl Tar2Files {
 
 #[cfg(test)]
 mod tests {
-    use super::parent_dir;
+    use super::{is_valid_path, parent_dir};
 
     #[test]
     fn test_parent_dir() {
@@ -358,4 +358,19 @@ mod tests {
         assert_eq!(parent_dir("ab"), "");
         assert_eq!(parent_dir("a/b/c"), "a/b");
     }
+
+    #[test]
+    fn valid_paths() {
+        for path in ["a", "a/b", "a.txt", "..a", "a..", "...", ".a/b."] {
+            assert!(is_valid_path(path), "{path}");
+        }
+        for path in [
+            "", "/", "/a", "a/", "a//b", ".", "..", "./a", "a/.", "a/./b", "../a", "a/..", "a/../b",
+        ] {
+            assert!(!is_valid_path(path), "{path}");
+        }
+    }
 }
+
+#[cfg(test)]
+mod tests_process;
