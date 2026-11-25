@@ -90,7 +90,11 @@ struct MainLoopState {
     archive: File,
 }
 
-struct WaitEndState;
+/// Waits for `End`.
+/// Optional error if reading header failed.
+struct WaitEndState {
+    err: Option<String>,
+}
 
 impl InitState {
     fn run(self, comm: &mut ComRpFiles) -> Result<State> {
@@ -107,61 +111,69 @@ impl InitState {
             }
             _ => {
                 usbsas_sandbox::tar2files::seccomp(comm.input_fd(), comm.output_fd(), None)?;
-                State::WaitEnd(WaitEndState {})
+                State::WaitEnd(WaitEndState { err: None })
             }
         })
     }
 }
 
 impl LoadMetadataState {
+    /// Load the headers. On error, goto WaitEnd state.
     fn run(self, _comm: &mut ComRpFiles) -> Result<State> {
-        let mut metadata = HashMap::new();
-        let mut archive = Archive::new(self.tar);
-        let data_dir = TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/";
+        Ok(match load_metadata(self.tar) {
+            Ok((metadata, archive)) => State::MainLoop(MainLoopState { metadata, archive }),
+            Err(err) => {
+                error!("couldn't read archive: {err}");
+                State::WaitEnd(WaitEndState {
+                    err: Some(format!("couldn't read archive: {err}")),
+                })
+            }
+        })
+    }
+}
 
-        // Read tar headers once
-        for entry in archive.entries()? {
-            let entry = entry?;
-            let path_name = entry.path()?.to_path_buf().to_string_lossy().to_string();
-            if path_name.starts_with("../") || path_name.contains("/../") || path_name == ".." {
-                log::debug!("ignoring file '{path_name}'");
+/// Read the tar headers once: files under `data/` (by their path in it) and the
+/// `config.json` report.
+fn load_metadata(tar: File) -> Result<(HashMap<String, Attrs>, File)> {
+    let mut metadata = HashMap::new();
+    let mut archive = Archive::new(tar);
+    let data_dir = TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/";
+
+    for entry in archive.entries()? {
+        let entry = entry?;
+        let path_name = entry.path()?.to_string_lossy().to_string();
+        if path_name.starts_with("../") || path_name.contains("/../") || path_name == ".." {
+            debug!("ignoring '{path_name}': bad path");
+            continue;
+        }
+        let ftype = match entry.header().entry_type() {
+            tar::EntryType::Directory => FileType::Directory,
+            tar::EntryType::Regular => FileType::Regular,
+            _ => {
+                debug!("ignoring '{path_name}': not a file nor a directory");
                 continue;
             }
-            let ftype = match entry.header().entry_type() {
-                tar::EntryType::Directory => FileType::Directory,
-                tar::EntryType::Regular => FileType::Regular,
-                _ => continue,
-            };
-            if let Some(name) = path_name.strip_prefix(&data_dir) {
-                metadata.insert(
-                    name.trim_end_matches('/').to_owned(),
-                    Attrs {
-                        ftype,
-                        size: entry.header().size()?,
-                        timestamp: i64::try_from(entry.header().mtime()?)?,
-                        offset: entry.raw_file_position(),
-                    },
-                );
-            } else if path_name == "config.json" {
-                metadata.insert(
-                    path_name,
-                    Attrs {
-                        ftype,
-                        size: entry.header().size()?,
-                        timestamp: i64::try_from(entry.header().mtime()?)?,
-                        offset: entry.raw_file_position(),
-                    },
-                );
-            } else {
-                log::debug!("file '{path_name}' not in '{data_dir}' dir, ignoring");
-            }
-        }
-
-        Ok(State::MainLoop(MainLoopState {
-            metadata,
-            archive: archive.into_inner(),
-        }))
+        };
+        let name = if let Some(name) = path_name.strip_prefix(&data_dir) {
+            name.trim_end_matches('/')
+        } else if path_name == "config.json" {
+            &path_name
+        } else {
+            debug!("ignoring '{path_name}': not in '{data_dir}'");
+            continue;
+        };
+        let header = entry.header();
+        metadata.insert(
+            name.to_owned(),
+            Attrs {
+                ftype,
+                size: header.size()?,
+                timestamp: i64::try_from(header.mtime()?)?,
+                offset: entry.raw_file_position(),
+            },
+        );
     }
+    Ok((metadata, archive.into_inner()))
 }
 
 impl MainLoopState {
@@ -265,7 +277,7 @@ impl WaitEndState {
             }
             _ => {
                 error!("unexpected req");
-                comm.error("bad request")?;
+                comm.error(self.err.as_deref().unwrap_or("bad request"))?;
             }
         }
         Ok(State::End)
@@ -296,7 +308,7 @@ impl Tar2Files {
                 Err(err) => {
                     error!("state run error: {err}");
                     comm.error(err)?;
-                    State::WaitEnd(WaitEndState {})
+                    State::WaitEnd(WaitEndState { err: None })
                 }
             }
         }
