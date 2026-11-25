@@ -7,6 +7,9 @@ use std::{
 use usbsas_proto::common::FileType;
 use usbsas_utils::{TAR_BLOCK_SIZE, TAR_DATA_DIR};
 
+/// Largest modification time of a ustar header (11 octal digits).
+const MAX_MTIME: i64 = 0o777_7777_7777;
+
 /// Tar (ustar) [`ArchiveWriter`].
 pub(crate) struct TarWriter<W: Write> {
     builder: tar::Builder<W>,
@@ -61,7 +64,8 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
             }
             _ => return Err(Error::Error("Bad file type".to_string())),
         }
-        header.set_mtime(timestamp as u64);
+        // Times before 1970 (or after 2242) are clamped
+        header.set_mtime(timestamp.clamp(0, MAX_MTIME) as u64);
         if !matches!(ftype, FileType::Metadata) {
             path_string.insert_str(0, &self.data_dir);
         }
@@ -227,6 +231,27 @@ mod tests {
         let mut w = writer();
         file(&mut w, "/./a/./b", FileType::Regular, b"x");
         assert_eq!(read_back(&finish(w))[1].0, "data/a/b");
+    }
+
+    #[test]
+    fn timestamps_clamped() {
+        for (ts, expected) in [
+            (-1, 0),
+            (i64::MIN, 0),
+            (0, 0),
+            (MAX_MTIME, MAX_MTIME as u64),
+            (MAX_MTIME + 1, MAX_MTIME as u64),
+            (i64::MAX, MAX_MTIME as u64),
+        ] {
+            let mut w = writer();
+            w.newfile("/a", FileType::Regular, 0, ts).unwrap();
+            w.endfile(0).unwrap();
+            let tar = finish(w);
+            assert_eq!(read_back(&tar)[1].3, expected, "{ts}");
+            // Standard octal field, readable by any ustar reader
+            let mtime_field = &tar[TAR_BLOCK_SIZE + 136..TAR_BLOCK_SIZE + 148];
+            assert!(mtime_field[0] & 0x80 == 0, "{ts}: binary encoding");
+        }
     }
 
     #[test]
