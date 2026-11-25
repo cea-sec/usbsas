@@ -64,9 +64,16 @@ impl WaitNewFileState {
                 {
                     Ok(_) => {
                         comm.newfile(proto::writedst::ResponseNewFile {})?;
+                        // The header of a directory has a size of 0
+                        let total_size = if fstype == FileType::Directory {
+                            0
+                        } else {
+                            usize::try_from(req.size)
+                                .map_err(|err| Error::Error(format!("{err}")))?
+                        };
                         Ok(State::WritingFile(WritingFileState {
                             archive: self.archive,
-                            total_size: req.size as usize,
+                            total_size,
                             len_written: 0,
                         }))
                     }
@@ -119,6 +126,14 @@ impl WritingFileState {
                     }
                 }
                 Msg::EndFile(_) => {
+                    // Check the whole file was written, otherwise the next file
+                    // could sneak files into the archive
+                    if self.len_written != self.total_size {
+                        return Err(Error::Error(format!(
+                            "Data undersize while writing file in archive ({}B of {}B)",
+                            self.len_written, self.total_size
+                        )));
+                    }
                     if let Err(err) = self.archive.endfile(self.len_written) {
                         return Err(Error::Error(format!("{err}")));
                     };
@@ -190,3 +205,7 @@ impl Files2Tar {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tests.rs"]
+mod tests;
