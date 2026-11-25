@@ -75,7 +75,12 @@ mod tests {
     const SECTOR_SIZE: u64 = 512;
 
     fn sparse(sectors: usize) -> SparseFile<Cursor<Vec<u8>>> {
-        SparseFile::new(Cursor::new(vec![0; sectors * SECTOR_SIZE as usize]), SECTOR_SIZE, sectors).unwrap()
+        SparseFile::new(
+            Cursor::new(vec![0; sectors * SECTOR_SIZE as usize]),
+            SECTOR_SIZE,
+            sectors,
+        )
+        .unwrap()
     }
 
     fn written(bitvec: &FileBitVec) -> Vec<usize> {
