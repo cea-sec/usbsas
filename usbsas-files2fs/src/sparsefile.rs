@@ -66,3 +66,76 @@ impl<T: Read + Write + Seek> Seek for SparseFile<T> {
         self.file.seek(pos)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Cursor, SeekFrom};
+
+    const SECTOR_SIZE: u64 = 512;
+
+    fn sparse(sectors: usize) -> SparseFile<Cursor<Vec<u8>>> {
+        SparseFile::new(Cursor::new(vec![0; sectors * SECTOR_SIZE as usize]), SECTOR_SIZE, sectors).unwrap()
+    }
+
+    fn written(bitvec: &FileBitVec) -> Vec<usize> {
+        bitvec.iter_ones().collect()
+    }
+
+    #[test]
+    fn nothing_written() {
+        let bitvec = sparse(8).get_bitvec().unwrap();
+        assert_eq!(bitvec.len(), 8);
+        assert!(bitvec.not_any());
+    }
+
+    #[test]
+    fn marks_touched_sectors() {
+        let mut f = sparse(8);
+        // Inside sector 1
+        f.seek(SeekFrom::Start(SECTOR_SIZE + 10)).unwrap();
+        f.write_all(b"a").unwrap();
+        // Across sectors 3 and 4
+        f.seek(SeekFrom::Start(4 * SECTOR_SIZE - 1)).unwrap();
+        f.write_all(b"bc").unwrap();
+        // Exactly sector 6
+        f.seek(SeekFrom::Start(6 * SECTOR_SIZE)).unwrap();
+        f.write_all(&[1; SECTOR_SIZE as usize]).unwrap();
+        assert_eq!(written(&f.get_bitvec().unwrap()), [1, 3, 4, 6]);
+    }
+
+    #[test]
+    fn writes_go_to_the_file() {
+        let mut f = sparse(2);
+        f.seek(SeekFrom::Start(SECTOR_SIZE)).unwrap();
+        f.write_all(b"usbsas").unwrap();
+        f.seek(SeekFrom::Start(SECTOR_SIZE)).unwrap();
+        let mut buf = [0; 6];
+        f.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf, b"usbsas");
+    }
+
+    #[test]
+    fn last_sector() {
+        let mut f = sparse(4);
+        f.seek(SeekFrom::Start(4 * SECTOR_SIZE - 2)).unwrap();
+        f.write_all(b"ok").unwrap();
+        assert_eq!(written(&f.get_bitvec().unwrap()), [3]);
+    }
+
+    #[test]
+    fn write_past_last_sector() {
+        let mut f = sparse(4);
+        f.seek(SeekFrom::Start(4 * SECTOR_SIZE - 1)).unwrap();
+        let err = f.write_all(b"no").unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::StorageFull);
+    }
+
+    #[test]
+    fn empty_write() {
+        let mut f = sparse(4);
+        f.seek(SeekFrom::Start(SECTOR_SIZE)).unwrap();
+        assert_eq!(f.write(b"").unwrap(), 0);
+        assert!(f.get_bitvec().unwrap().not_any());
+    }
+}
