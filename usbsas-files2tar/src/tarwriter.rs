@@ -1,6 +1,9 @@
 use crate::ArchiveWriter;
 use crate::{Error, Result};
-use std::{io::Write, path::Path};
+use std::{
+    io::Write,
+    path::{Component, Path},
+};
 use usbsas_proto::common::FileType;
 use usbsas_utils::{TAR_BLOCK_SIZE, TAR_DATA_DIR};
 
@@ -8,7 +11,6 @@ use usbsas_utils::{TAR_BLOCK_SIZE, TAR_DATA_DIR};
 pub(crate) struct TarWriter<W: Write> {
     builder: tar::Builder<W>,
     data_dir: String,
-    files: Vec<String>,
 }
 
 impl<W: Write> TarWriter<W> {
@@ -16,7 +18,6 @@ impl<W: Write> TarWriter<W> {
         TarWriter {
             builder: tar::Builder::new(writer),
             data_dir: TAR_DATA_DIR.trim_end_matches('/').to_owned() + "/",
-            files: Vec::new(),
         }
     }
 }
@@ -35,10 +36,15 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
     }
 
     /// Files are stored under the data directory, except metadata files.
-    /// Paths containing `..` are refused.
+    /// Paths containing `..` are refused, and files need a name (but the root
+    /// directory `/` is accepted, written as the data directory).
     fn newfile(&mut self, path: &str, ftype: FileType, size: u64, timestamp: i64) -> Result<()> {
         let mut path_string: String = path.trim_start_matches('/').into();
-        if path_string.starts_with("../") || path_string.contains("/../") || path_string == ".." {
+        let mut components = Path::new(&path_string).components();
+        if components.clone().any(|c| c == Component::ParentDir) {
+            return Err(Error::Error("Bad file name".to_string()));
+        }
+        if ftype != FileType::Directory && !components.any(|c| matches!(c, Component::Normal(_))) {
             return Err(Error::Error("Bad file name".to_string()));
         }
         let mut header = tar::Header::new_ustar();
@@ -56,7 +62,6 @@ impl<W: Write> ArchiveWriter for TarWriter<W> {
             _ => return Err(Error::Error("Bad file type".to_string())),
         }
         header.set_mtime(timestamp as u64);
-        self.files.push(path_string.clone());
         if !matches!(ftype, FileType::Metadata) {
             path_string.insert_str(0, &self.data_dir);
         }
