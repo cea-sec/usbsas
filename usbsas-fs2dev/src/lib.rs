@@ -339,11 +339,7 @@ impl DevOpenedState {
                 comm.end()?;
                 State::End
             }
-            _ => {
-                error!("bad request");
-                comm.error("bad request")?;
-                return Err(Error::State);
-            }
+            _ => return Err(Error::BadRequest),
         })
     }
 
@@ -361,11 +357,7 @@ impl DevOpenedState {
                             break;
                         }
                     }
-                    _ => {
-                        error!("bad request");
-                        comm.error("bad request")?;
-                        return Err(Error::State);
-                    }
+                    _ => return Err(Error::BadRequest),
                 }
             }
         }
@@ -391,11 +383,7 @@ impl BitVecLoadedState {
                 comm.end()?;
                 State::End
             }
-            _ => {
-                error!("bad request");
-                comm.error("bad request")?;
-                return Err(Error::State);
-            }
+            _ => return Err(Error::BadRequest),
         })
     }
 }
@@ -438,7 +426,7 @@ impl Fs2Dev {
                 Ok(state) => state,
                 Err(err) => {
                     error!("state run error: {err}, waiting end");
-                    comm.error("bad request")?;
+                    comm.error(err)?;
                     State::WaitEnd(WaitEndState {})
                 }
             };
