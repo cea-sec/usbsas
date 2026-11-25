@@ -491,7 +491,8 @@ $ usbsas-fuse-mount -n 1 1 12 /mnt
 ```
 
 Disk images made from the interface (Tools menu) are saved in `out_directory`
-as `usbsas_imgdisk_<session id>.img`.
+as `usbsas_imgdisk_<session id>.img`. The image is as large as the whole
+device: it's refused if `out_directory` doesn't have enough free space.
 
 ## <a name="devrun">Running from the build directory</a>
 

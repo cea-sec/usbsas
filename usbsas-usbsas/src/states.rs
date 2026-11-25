@@ -1442,6 +1442,13 @@ impl RunState for ImgDiskState {
         let (block_size, dev_size) = (rep.block_size, rep.dev_size);
         self.device.block_size = Some(block_size);
         self.device.dev_size = Some(dev_size);
+
+        if let Some(space) = self.config.available_space
+            && dev_size > space
+        {
+            bail!("Not enough space ({space}B available for a {dev_size}B disk image)");
+        }
+
         children
             .files2fs
             .comm

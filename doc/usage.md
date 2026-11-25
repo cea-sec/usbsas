@@ -145,7 +145,8 @@ Select the device to wipe and click **Continue**.
 
 Save a complete copy of a device on the station, for your administrators to
 analyze it (for instance if you think the device is infected). Nothing is
-written to the device.
+written to the device. The image is refused if the station doesn't have enough
+free space for the whole device.
 
 ### System information
 
