@@ -142,10 +142,6 @@ fn load_metadata(tar: File) -> Result<(HashMap<String, Attrs>, File)> {
     for entry in archive.entries()? {
         let entry = entry?;
         let path_name = entry.path()?.to_string_lossy().to_string();
-        if path_name.starts_with("../") || path_name.contains("/../") || path_name == ".." {
-            debug!("ignoring '{path_name}': bad path");
-            continue;
-        }
         let ftype = match entry.header().entry_type() {
             tar::EntryType::Directory => FileType::Directory,
             tar::EntryType::Regular => FileType::Regular,
@@ -162,6 +158,13 @@ fn load_metadata(tar: File) -> Result<(HashMap<String, Attrs>, File)> {
             debug!("ignoring '{path_name}': not in '{data_dir}'");
             continue;
         };
+        if name.is_empty() {
+            continue;
+        }
+        if !is_valid_path(name) {
+            debug!("ignoring '{path_name}': bad path");
+            continue;
+        }
         let header = entry.header();
         metadata.insert(
             name.to_owned(),
@@ -174,6 +177,13 @@ fn load_metadata(tar: File) -> Result<(HashMap<String, Attrs>, File)> {
         );
     }
     Ok((metadata, archive.into_inner()))
+}
+
+/// Path of an entry (relative to TAR_DATA_DIR, without trailing '/'): only
+/// names, no empty, `.` or `..` component.
+fn is_valid_path(path: &str) -> bool {
+    path.split('/')
+        .all(|name| !name.is_empty() && name != "." && name != "..")
 }
 
 impl MainLoopState {
@@ -212,6 +222,14 @@ impl MainLoopState {
 
     fn getattr(&mut self, comm: &mut ComRpFiles, path: &str) -> Result<()> {
         trace!("req_getattr: {path}");
+        // root dir
+        if path.trim_matches('/').is_empty() {
+            return Ok(comm.getattr(proto::files::ResponseGetAttr {
+                ftype: FileType::Directory.into(),
+                size: 0,
+                timestamp: 0,
+            })?);
+        }
         let entry = self.get_entry(path)?;
         Ok(comm.getattr(proto::files::ResponseGetAttr {
             ftype: entry.ftype.into(),
