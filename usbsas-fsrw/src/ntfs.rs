@@ -312,6 +312,18 @@ mod tests {
         writer.newfile("/new", i64::MAX).unwrap();
         writer.newfile("/rm", 0).unwrap();
         writer.removefile("/rm").unwrap();
+        // Removed in a sub directory, then created again (path cache)
+        {
+            let mut file = writer.newfile("/dir/again.txt", 0).unwrap();
+            file.write_all(b"first").unwrap();
+        }
+        writer.removefile("/dir/again.txt").unwrap();
+        {
+            let mut file = writer.newfile("/dir/again.txt", 0).unwrap();
+            file.write_all(b"second").unwrap();
+        }
+        writer.newfile("/dir/gone", 0).unwrap();
+        writer.removefile("/dir/gone").unwrap();
         let mut disk = writer.unmount_fs().unwrap();
         disk.set_position(0);
 
@@ -341,5 +353,16 @@ mod tests {
             10
         );
         assert_eq!(&buf, b"hello ntfs");
+        let mut dir: Vec<_> = reader
+            .read_dir("/dir")
+            .unwrap()
+            .into_iter()
+            .map(|f| f.path)
+            .collect();
+        dir.sort();
+        assert_eq!(dir, ["/dir/again.txt", "/dir/file.txt"]);
+        let mut buf = vec![0; 6];
+        reader.read_file("/dir/again.txt", &mut buf, 0, 6).unwrap();
+        assert_eq!(&buf, b"second");
     }
 }
