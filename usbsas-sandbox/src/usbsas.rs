@@ -4,14 +4,10 @@ use syscallz::{Action, Cmp, Comparator, Syscall};
 
 /// Unix socket of the server, when used.
 pub struct UsbsasSocket {
-    /// Listening socket
-    pub listen: RawFd,
     /// Connected socket, read side
     pub read: RawFd,
     /// Connected socket, write side
     pub write: RawFd,
-    /// Path of the socket
-    pub path: String,
 }
 
 /// seccomp: communication with the children (`fds_read` / `fds_write`) and the
@@ -31,16 +27,6 @@ pub fn sandbox(
 
     // Allow recvfrom and close and unlink on listen fd socket
     if let Some(sock) = socket {
-        ctx.set_rule_for_syscall(
-            Action::Allow,
-            Syscall::close,
-            &[Comparator::new(
-                0,
-                Cmp::MaskedEq,
-                u64::from(u32::MAX),
-                Some(sock.listen as u64),
-            )],
-        )?;
         ctx.set_rule_for_syscall(
             Action::Allow,
             Syscall::recvfrom,

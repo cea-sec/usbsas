@@ -114,11 +114,10 @@ fn main() -> Result<()> {
     // Spawn children
     let children = Children::spawn(config_path, &tar_path, &fs_path).context("spawn children")?;
 
-    let mut tmpfiles = TmpFiles {
+    let tmpfiles = TmpFiles {
         tar_path,
         clean_tar_path,
         fs_path,
-        socket_path: None,
         keep: config.keep_tmp_files.unwrap_or(false),
     };
 
@@ -179,12 +178,15 @@ fn main() -> Result<()> {
             Some(Err(err)) => panic!("error listen incoming {err}"),
             None => panic!("shouldn't happen"),
         };
+        // Client is connected, we don't need the listener nor the file anymore
+        drop(listener);
+        std::fs::remove_file(socket_path)?;
+
         info!("client connected");
         let comm = Comm::new(
             stream.try_clone().context("clone stream")?,
             stream.try_clone().context("clone stream")?,
         );
-        tmpfiles.socket_path = Some(socket_path.clone());
 
         // Create an epoll(7) thread to terminate the process and its children (thanks to
         // `prctl(PR_SET_PDEATHSIG)`), should the client shut down or close its comm and
@@ -234,10 +236,8 @@ fn main() -> Result<()> {
         });
 
         let socket = usbsas_sandbox::usbsas::UsbsasSocket {
-            listen: listener.as_raw_fd(),
             read: comm.input_fd(),
             write: comm.output_fd(),
-            path: socket_path,
         };
         pipes_read.push(socket.read);
         pipes_write.push(socket.write);
