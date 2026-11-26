@@ -12,7 +12,10 @@ use nix::{
 };
 use std::{
     io,
-    os::unix::io::{AsFd, AsRawFd},
+    os::unix::{
+        io::{AsFd, AsRawFd},
+        process::CommandExt,
+    },
     path, process,
 };
 use thiserror::Error;
@@ -133,6 +136,24 @@ impl<'a> UsbsasChildSpawner<'a> {
             .for_each(|(k, v)| {
                 command.env(k, v);
             });
+
+        let parent_pid = std::process::id();
+        //  SAFETY: getppid, raise are explicitely async-signal-safe.
+        //          prctl is a mere syscall wrapper and as such async-signal-safe.
+        //          last_os_error doesn't allocate.
+        unsafe {
+            command.pre_exec(move || {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                // The parent may have died between fork and prctl, in which case
+                // the signal above would never be delivered.
+                if libc::getppid() != parent_pid as libc::pid_t {
+                    libc::raise(libc::SIGKILL);
+                }
+                Ok(())
+            })
+        };
 
         let child = command.spawn()?;
 

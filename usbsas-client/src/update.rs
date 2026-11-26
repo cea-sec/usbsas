@@ -92,7 +92,7 @@ impl GUI {
     where
         F: Future<Output = Response> + Send + 'static,
     {
-        let Some(comm) = self.comm.clone() else {
+        let Some((ref comm, _)) = self.comm else {
             log::error!("not connected");
             self.state = State::Error("not connected".into());
             return Task::none();
@@ -103,14 +103,16 @@ impl GUI {
             self.busy = true;
         }
         let generation = self.generation;
-        Task::perform(req(comm), move |resp| Message::Response(generation, resp))
+        Task::perform(req(comm.clone()), move |resp| {
+            Message::Response(generation, resp)
+        })
     }
 
     /// Forward status updates of the current operation as `Message::Status`.
     fn status_stream(&self) -> Task<Message> {
         let generation = self.generation;
         match &self.comm {
-            Some(comm) => Task::stream(recv_status(comm.clone()))
+            Some((comm, _)) => Task::stream(recv_status(comm.clone()))
                 .map(move |status| Message::Status(generation, status)),
             None => Task::none(),
         }

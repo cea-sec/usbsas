@@ -26,6 +26,13 @@ It can be reached in two ways:
   $ ./target/release/usbsas-usbsas -s
   ```
 
+> [NOTE]
+> If the client ever shuts down or closes the socket (e.g. because an `End`
+> request wasn't answered in a timely manner (by default 5s) by the server), a
+> dedicated "epoll" thread will handle the end sequence in place of the main
+> one, unless it already managed to successfully answer an `End` request from
+> the client, in which case the "epoll" thread aborts.
+
 - **Pipes** (no `-s`): the server is spawned by its client (with
   `usbsas-process`) and communicates through the pipe file descriptors given in
   its environment.

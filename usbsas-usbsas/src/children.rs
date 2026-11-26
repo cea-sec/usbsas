@@ -1,11 +1,15 @@
 //! Child processes of usbsas.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use anyhow::Result;
 use usbsas_comm::{
     ComRqAnalyzer, ComRqCmdExec, ComRqDownloader, ComRqFiles, ComRqFs2Dev, ComRqIdentifier,
     ComRqUploader, ComRqUsbDev, ComRqWriteDst, ProtoRespUsbsas,
 };
 use usbsas_process::{ChildMngt, UsbsasChild, UsbsasChildSpawner};
+
+pub static END_SUCCESS: AtomicBool = AtomicBool::new(false);
 
 /// Every child process of a session, with the communication channel used to
 /// send them requests.
@@ -128,6 +132,7 @@ impl Children {
         for child in self.as_array_mut().iter_mut() {
             child.wait().ok();
         }
+        END_SUCCESS.store(true, Ordering::Relaxed);
         comm.end()?;
         Ok(())
     }
