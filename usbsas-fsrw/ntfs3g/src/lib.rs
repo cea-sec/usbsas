@@ -324,14 +324,19 @@ impl<T: Read + Write + Seek> Ntfs3g<T> {
     pub fn remove_file(&mut self, path: &str) -> Result<()> {
         let (parent_dir, filename) = split_path_parent(path);
         let name = str2ntfsunicode(filename)?;
-        let name_c = to_cstring(filename)?;
+        let path_c = to_cstring(path)?;
         let p_ni = self.inode_from_path(parent_dir)?;
-        let ni = self.inode_from_path(path)?;
+        let ni = Inode::from_raw(
+            unsafe {
+                n3g_c::ntfs_pathname_to_inode(self.vol, p_ni.0, to_cstring(filename)?.as_ptr())
+            },
+            "ntfs_pathname_to_inode",
+        )?;
 
         if unsafe {
             n3g_c::ntfs_delete(
                 self.vol,
-                name_c.as_ptr(),
+                path_c.as_ptr(),
                 ni.into_raw(),
                 p_ni.into_raw(),
                 name.as_ptr(),
