@@ -14,6 +14,11 @@ fn main() -> iced::Result {
         matches.get_one::<u32>("height").unwrap().to_owned(),
     );
 
+    // disable mesa cache to avoid getting killed by seccomp for accessing $HOME/.cache
+    unsafe {
+        std::env::set_var("MESA_SHADER_CACHE_DISABLE", "true");
+    }
+
     iced::application(GUI::new, GUI::update, GUI::view)
         .window_size((width as f32, height as f32))
         .subscription(GUI::subscription)
