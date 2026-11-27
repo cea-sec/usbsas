@@ -12,9 +12,14 @@ message RequestDownload {
 };
 
 // Get information about the archive to download.
+// The archive is at `<url>/<user id>/<pin>`.
 message RequestArchiveInfos {
-  // Path of the archive on the server (`<user id>/<pin>`)
-  string path = 1;
+  // URL of the source network
+  string url = 1;
+  // User id
+  string id = 2;
+  // PIN given by the user, identifying the archive
+  string pin = 3;
 };
 
 message RequestEnd {

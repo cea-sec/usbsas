@@ -647,11 +647,17 @@ pub struct DownloadSrcState {
 
 impl RunState for DownloadSrcState {
     fn run(self, comm: &mut impl ProtoRespUsbsas, children: &mut Children) -> Result<State> {
-        let remote_path = format!("{}/{}", self.transfer.userid, self.pin);
+        let Device::Network(network) = &self.transfer.src else {
+            bail!("Source isn't a network");
+        };
         let archive_size = children
             .downloader
             .comm
-            .archiveinfos(proto::downloader::RequestArchiveInfos { path: remote_path })?
+            .archiveinfos(proto::downloader::RequestArchiveInfos {
+                url: network.url.clone(),
+                id: self.transfer.userid.clone(),
+                pin: self.pin.clone(),
+            })?
             .size;
 
         if self

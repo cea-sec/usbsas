@@ -44,6 +44,7 @@ struct InitState {
 
 struct RunningState {
     file: File,
+    /// URL of the archive, set by `archive_infos()`
     url: String,
     http_client: HttpClient,
 }
@@ -85,7 +86,7 @@ impl InitState {
 
         Ok(State::Running(RunningState {
             file,
-            url: net_conf.url,
+            url: String::new(),
             http_client: HttpClient::new(
                 #[cfg(feature = "authkrb")]
                 net_conf.krb_service_name,
@@ -100,7 +101,7 @@ impl RunningState {
         loop {
             match comm.recv_req()? {
                 Msg::ArchiveInfos(req) => {
-                    match self.archive_infos(comm, &req.path) {
+                    match self.archive_infos(comm, req) {
                         Ok(size) => filesize = Some(size),
                         Err(err) => {
                             error!("download error: {err}");
@@ -127,11 +128,18 @@ impl RunningState {
         }
     }
 
-    /// HEAD `<url>/<path>`, the uncompressed size of the archive is in the
-    /// `X-Uncompressed-Content-Length` header.
-    fn archive_infos(&mut self, comm: &mut ComRpDownloader, path: &str) -> Result<u64> {
+    /// HEAD `<url>/<user id>/<pin>`, the uncompressed size of the archive is
+    /// in the `X-Uncompressed-Content-Length` header.
+    fn archive_infos(
+        &mut self,
+        comm: &mut ComRpDownloader,
+        req: proto::downloader::RequestArchiveInfos,
+    ) -> Result<u64> {
         trace!("req size");
-        self.url = format!("{}/{}", self.url.trim_end_matches('/'), path);
+        crate::check_url(&req.url)?;
+        crate::check_url_segment(&req.id)?;
+        crate::check_url_segment(&req.pin)?;
+        self.url = format!("{}/{}/{}", req.url.trim_end_matches('/'), req.id, req.pin);
 
         let resp = self.http_client.head(&self.url)?;
         if !resp.status().is_success() {

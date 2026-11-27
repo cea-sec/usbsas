@@ -126,8 +126,13 @@ fn analyze(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Download `<id>/<bundle_path>` from the source network into `bundle_path`.
-fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
+/// Download `<id>/<pin>` from the source network into `bundle_path`.
+fn download(config_path: &str, bundle_path: &str, id: &str, pin: &str) -> Result<()> {
+    let config = conf_parse(&conf_read(config_path)?)?;
+    let network = config
+        .source_network
+        .ok_or_else(|| Error::ArgConf("No source network".into()))?;
+
     let mut downloader = UsbsasChildSpawner::new("usbsas-downloader")
         .arg(bundle_path)
         .args(&["-c", config_path])
@@ -136,7 +141,9 @@ fn download(config_path: &str, bundle_path: &str, id: &str) -> Result<()> {
     let _ = downloader
         .comm
         .archiveinfos(proto::downloader::RequestArchiveInfos {
-            path: format!("{id}/{bundle_path}"),
+            url: network.url,
+            id: id.to_string(),
+            pin: pin.to_string(),
         })?
         .size;
 
@@ -198,6 +205,13 @@ fn main() -> Result<()> {
                 .help("ID of the user")
                 .num_args(1)
                 .required(true),
+        )
+        .arg(
+            Arg::new("PIN")
+                .index(4)
+                .help("PIN of the archive to download (download only)")
+                .num_args(1)
+                .required_if_eq("action", "download"),
         );
 
     let matches = command.get_matches();
@@ -211,7 +225,14 @@ fn main() -> Result<()> {
         (Some(action), Some(path), Some(id)) => match action.as_str() {
             "upload" => upload(config_path, path, id)?,
             "analyze" => analyze(config_path, path, id)?,
-            "download" => download(config_path, path, id)?,
+            "download" => download(
+                config_path,
+                path,
+                id,
+                matches
+                    .get_one::<String>("PIN")
+                    .ok_or_else(|| Error::ArgConf("PIN required to download".into()))?,
+            )?,
             _ => {
                 return Err(Error::ArgConf(
                     "Bad action specified, either: upload, analyze or download".to_owned(),

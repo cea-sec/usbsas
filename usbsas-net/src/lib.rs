@@ -171,6 +171,8 @@ pub enum Error {
     DownloadSize { received: u64, expected: u64 },
     #[error("Unsupported Content-Encoding: '{0}'")]
     ContentEncoding(String),
+    #[error("Invalid URL path segment: '{0}'")]
+    InvalidPathSegment(String),
 }
 /// Result type of the network processes.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -193,6 +195,23 @@ pub(crate) fn check_url(url: &str) -> Result<()> {
         Ok(())
     } else {
         Err(Error::InsecureUrl(url.to_string()))
+    }
+}
+
+/// Check URL segment` (user id)
+pub(crate) fn check_url_segment(segment: &str) -> Result<()> {
+    if !segment.is_empty()
+        && segment != "."
+        && segment != ".."
+        && segment.bytes().all(|b| {
+            b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'@' | b'+')
+        })
+    {
+        Ok(())
+    } else {
+        Err(Error::InvalidPathSegment(
+            segment.escape_default().to_string(),
+        ))
     }
 }
 
@@ -490,6 +509,22 @@ mod tests {
             assert!(http.is_ok());
         } else {
             assert!(matches!(http, Err(Error::InsecureUrl(_))));
+        }
+    }
+
+    #[test]
+    fn url_segment() {
+        for ok in ["user", "User-01", "a.b_c~d", "...", "user@REALM", "a+b"] {
+            assert!(check_url_segment(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "", ".", "..", "a/b", "../admin", "a?b=c", "a#b", "a%2fb", "a b", "a\\b", "a\nb",
+            "a\0", "é", "a;b", "http://x",
+        ] {
+            assert!(
+                matches!(check_url_segment(bad), Err(Error::InvalidPathSegment(_))),
+                "{bad:?}"
+            );
         }
     }
 }

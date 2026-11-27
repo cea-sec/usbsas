@@ -129,6 +129,7 @@ impl RunningState {
         trace!("upload");
         comm.upload(proto::uploader::ResponseUpload {})?;
         let network = req.network.ok_or(Error::BadRequest)?;
+        crate::check_url_segment(&req.id)?;
         let url = format!("{}/{}", network.url.trim_end_matches('/'), req.id);
         let mut http_client = HttpClient::new(
             #[cfg(feature = "authkrb")]
