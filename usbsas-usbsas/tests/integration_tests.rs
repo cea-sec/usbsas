@@ -335,6 +335,89 @@ impl IntegrationTester {
         Ok(())
     }
 
+    // USB to USB transfer with max_entries = 5: the root directory of the FAT
+    // partition alone has 7 entries, so the expansion of the selection reaches
+    // the limit and the transfer is aborted before anything is written
+    fn usb_to_usb_max_entries(&mut self) -> Result<(), Box<dyn Error>> {
+        let devices = self
+            .comm()
+            .devices(proto::usbsas::RequestDevices { include_alt: false })?
+            .devices;
+        let find_dev = |src: bool| {
+            devices
+                .iter()
+                .find(|dev| match &dev.device {
+                    Some(device) => {
+                        matches!(device, Device::Usb(_))
+                            && if src {
+                                device.is_src()
+                            } else {
+                                device.is_dst()
+                            }
+                    }
+                    None => false,
+                })
+                .expect("couldn't find device")
+                .id
+        };
+        let (in_id, out_id) = (find_dev(true), find_dev(false));
+
+        let _ = self.comm().userid(proto::usbsas::RequestUserId {})?;
+        self.comm()
+            .inittransfer(proto::usbsas::RequestInitTransfer {
+                source: in_id,
+                destination: out_id,
+                fstype: Some(FsType::Ntfs.into()),
+                pin: None,
+            })?;
+        let _ = self
+            .comm()
+            .partitions(proto::usbsas::RequestPartitions {})?;
+        let _ = self
+            .comm()
+            .openpartition(proto::usbsas::RequestOpenPartition { index: 1 })?;
+
+        // Browsing isn't limited
+        let files = self
+            .comm()
+            .readdir(proto::usbsas::RequestReadDir { path: "/".into() })?
+            .filesinfo;
+        assert_eq!(files.len(), 7);
+
+        let err = self
+            .comm()
+            .selectfiles(proto::usbsas::RequestSelectFiles {
+                selected: vec!["/".into()],
+            })
+            .expect_err("selection should exceed max_entries");
+        assert!(
+            err.to_string()
+                .contains("Too many files selected (more than 5)"),
+            "unexpected error: {err}"
+        );
+
+        let report = self
+            .comm()
+            .report(proto::usbsas::RequestReport {})?
+            .report
+            .unwrap();
+        assert!(
+            report
+                .status
+                .contains("Too many files selected (more than 5)")
+        );
+        assert!(report.file_names.is_empty());
+        assert!(report.files_info.is_empty());
+
+        // Nothing was written on the destination
+        assert!(
+            fs::read(env::var("USBSAS_MOCK_OUT_DEV")?)?
+                .iter()
+                .all(|b| *b == 0)
+        );
+        Ok(())
+    }
+
     // USB to network transfer
     // read NTFS partition
     fn usb_to_net(&mut self) -> Result<(), Box<dyn Error>> {
@@ -610,4 +693,11 @@ fn integration_tests() {
     tester
         .usb_to_usb_max_depth()
         .expect("usb_to_usb_max_depth test");
+
+    let max_entries_conf = env::var("CARGO_MANIFEST_DIR").expect("missing env var")
+        + "/tests/resources/config_test_max_entries.toml";
+    tester.reset_with_conf(&max_entries_conf);
+    tester
+        .usb_to_usb_max_entries()
+        .expect("usb_to_usb_max_entries test");
 }
