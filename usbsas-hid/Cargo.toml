@@ -6,7 +6,7 @@ license = "GPL-3.0"
 description = "usbsas userland HID"
 
 [dependencies]
-bitfield = "0.20"
+bitfield = "0.21"
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 libc = "0.2"
 log = "0.4"
