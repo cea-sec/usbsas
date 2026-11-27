@@ -79,6 +79,20 @@ unsafe extern "C" {
     pub fn usbdevfs_reset() -> u64;
 }
 
+/// Multi-threaded processes need it once sandboxed: with per-thread arenas,
+/// freeing memory may shrink a thread's arena, and the first time glibc does
+/// it, it opens `/proc/sys/vm/overcommit_memory`, which seccomp filters don't
+/// allow (the process is killed). It happens whatever thread frees, e.g. a
+/// thread freeing data received from a thread that has exited.
+/// (only used bu usbdev)
+pub fn single_malloc_arena() -> Result<()> {
+    #[cfg(target_env = "gnu")]
+    if unsafe { libc::mallopt(libc::M_ARENA_MAX, 1) } != 1 {
+        return Err(Error::Error("mallopt(M_ARENA_MAX) failed".into()));
+    }
+    Ok(())
+}
+
 /// Restrict file system and network access of the process with landlock.
 ///
 /// - `paths_ro`: read only access,
