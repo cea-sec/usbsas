@@ -17,5 +17,12 @@ usbsas-proto = { path = "../usbsas-proto" }
 usbsas-sandbox = { path = "../usbsas-sandbox" }
 usbsas-utils = { path = "../usbsas-utils" }
 
+[dev-dependencies]
+libc = "0.2"
+
+[[test]]
+name = "udev_events"
+harness = false
+
 [features]
 mock = ["usbsas-mock"]
