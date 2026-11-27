@@ -130,6 +130,10 @@ pub struct Config {
     /// Maximum depth of the files of a transfer source
     #[serde(default = "default_max_depth")]
     pub max_depth: usize,
+    /// Maximum number of entries (files and directories) of a selection once
+    /// expanded
+    #[serde(default = "default_max_entries")]
+    pub max_entries: usize,
     pub post_copy: Option<PostCopy>,
     pub analyzer: Option<Analyzer>,
     pub usb_port_accesses: Option<UsbPortAccesses>,
@@ -152,6 +156,10 @@ fn default_out_dir() -> String {
 
 fn default_max_depth() -> usize {
     20
+}
+
+fn default_max_entries() -> usize {
+    100_000
 }
 
 fn default_analyzer_poll_timeout() -> u64 {

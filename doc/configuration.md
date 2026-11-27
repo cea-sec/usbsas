@@ -12,6 +12,7 @@ for a complete deployment.
     * [Reports](#reports)
     * [Filters](#filters)
     * [Maximum depth](#maxdepth)
+    * [Maximum number of entries](#maxentries)
     * [USB port assignment](#usbport)
     * [Graphical interface](#graphicalinterface)
     * [Post copy command](#postcopy)
@@ -260,6 +261,19 @@ max_depth = 20
 ```
 
 The default is 20.
+
+### <a name="maxentries">Maximum number of entries</a>
+
+Maximum number of files and directories of a transfer, once the selected
+directories are expanded. When it's reached, the expansion stops, the transfer
+is aborted and the user gets an error. This protects against sources with very
+large or looping directory trees, which could otherwise fill memory.
+
+```toml
+max_entries = 100000
+```
+
+The default is 100000.
 
 ### <a name="usbport">USB port assignment</a>
 
