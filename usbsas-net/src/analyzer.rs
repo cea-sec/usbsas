@@ -141,6 +141,7 @@ impl RunningState {
         trace!("req analyze");
         comm.analyze(proto::analyzer::ResponseAnalyze {})?;
 
+        crate::check_url_segment(uid)?;
         self.url = format!("{}/{}", self.url.trim_end_matches('/'), uid);
 
         match self.upload(comm) {
@@ -150,6 +151,7 @@ impl RunningState {
                     let id = res.id.ok_or(Error::Upload(
                         "data uploaded but no analysis ID returned".to_string(),
                     ))?;
+                    crate::check_url_segment(&id)?;
                     self.url = format!("{}/{}", self.url.trim_end_matches('/'), id);
                 }
             }
