@@ -10,6 +10,11 @@ keep_tmp_files = false
 # browsed nor transferred. (Optional, default: 20)
 max_depth = 20
 
+# Maximum number of files and directories of a transfer once the selected
+# directories are expanded. Beyond it, the transfer is aborted.
+# (Optional, default: 100000)
+max_entries = 100000
+
 # GUI window title (Optional)
 window_title = "USBSAS"
 

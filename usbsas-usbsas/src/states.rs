@@ -709,7 +709,19 @@ impl RunState for FileSelectionState {
         } else {
             None
         };
-        let selected_size = self.selected_to_filtered_files(children, max_file_size)?;
+        let Some(selected_size) = self.selected_to_filtered_files(children, max_file_size)? else {
+            let msg = format!(
+                "Too many files selected (more than {}), aborting transfer",
+                self.config.max_entries
+            );
+            error!("transfer aborted: {msg}");
+            comm.error(&msg)?;
+            self.transfer.files = TransferFiles::new();
+            let report = self.transfer.to_report(&msg);
+            return Ok(State::End(EndState {
+                report: Some(report),
+            }));
+        };
         let (files_count, dirs_count) =
             self.transfer
                 .files
@@ -788,11 +800,14 @@ impl FileSelectionState {
     ///
     /// Files larger than `max_file_size` (FAT destination) are set in error.
     /// Parent directories of selected files are added if missing.
+    ///
+    /// Returns the total size of the selected files, or `None` if the
+    /// selection has more than `max_entries` entries.
     fn selected_to_filtered_files(
         &mut self,
         children: &mut Children,
         max_file_size: Option<u64>,
-    ) -> Result<u64> {
+    ) -> Result<Option<u64>> {
         let src_reader = match self.transfer.src {
             Device::Usb(_) => &mut children.scsi2files,
             Device::Network(_) => {
@@ -804,6 +819,9 @@ impl FileSelectionState {
         };
         let mut files_size = 0;
         let rules = Rules::from(self.config.filters.take().unwrap_or_default()).into_lowercase();
+        // Processed and queued entries are kept under `max_entries`, so a
+        // source with a huge (or looping) tree can't fill memory.
+        let mut processed = 0;
 
         while let Some(entry) = self.selected.pop_front() {
             if (matches!(self.transfer.src, Device::Network(_)) && entry == "/config.json")
@@ -811,6 +829,7 @@ impl FileSelectionState {
             {
                 continue;
             }
+            processed += 1;
 
             let depth = path_depth(&entry);
             if depth > self.config.max_depth {
@@ -864,10 +883,18 @@ impl FileSelectionState {
                             }
                         }
                         Ok(rep) => {
-                            rep.filesinfo.iter().for_each(|file| {
+                            for file in &rep.filesinfo {
+                                if processed + self.selected.len() >= self.config.max_entries {
+                                    warn!(
+                                        "maximum number of entries ({}) reached while expanding '{entry}'",
+                                        self.config.max_entries
+                                    );
+                                    self.selected.clear();
+                                    return Ok(None);
+                                }
                                 self.selected
                                     .push_back(format!("/{}", file.path.trim_start_matches('/')));
-                            });
+                            }
                         }
                         Err(err) => {
                             error!("get attr '{}' err '{}'", entry, err);
@@ -907,7 +934,7 @@ impl FileSelectionState {
                 }
             }
         });
-        Ok(files_size)
+        Ok(Some(files_size))
     }
 
     /// Copy directories then files from the source to the session tar, along
