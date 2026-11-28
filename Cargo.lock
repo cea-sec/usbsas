@@ -717,18 +717,18 @@ checksum = "cb2907cc03d08cdb1c6724ad0670ce67c4a71e1c45a6d7635224011714cfc4b1"
 
 [[package]]
 name = "bitfield"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b56e92e42c7e82416925c583156d76ae1d3d83fa5133c379173319dbe1ad51e"
+checksum = "c5595862ba351abb946386ea2dd4ab4d1787f0b8fc4f5a9a9be3ce016d486841"
 dependencies = [
  "bitfield-macros",
 ]
 
 [[package]]
 name = "bitfield-macros"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11499bf38d9079be6f0f993f9d033ab3cc4dbd66bd5a51a63b6310ea689f534b"
+checksum = "5ae4c881f64d1eaa303ef9d7ff1985eca1e03e6ff8d15c3ab949744cc4ad7e38"
 dependencies = [
  "proc-macro2",
  "quote",
